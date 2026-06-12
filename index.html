@@ -1,0 +1,2543 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Leistungsfeststellung – Berlin Upbeat</title>
+<style>
+:root {
+  --bg:#f5f3f0; --bg2:#eeecea; --anthrazit:#2d2926; --braun:#6b5040;
+  --accent:#c8a882; --accent2:#9a9a9a; --white:#fff;
+  --green:#3a7a3a; --gl:#e8f4e8; --yl:#fef9e7; --border:#d4cdc6;
+  --r:6px;
+  --font:'Roboto Condensed',Arial Narrow,sans-serif;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Arial Narrow,Arial,sans-serif;background:var(--bg);color:var(--anthrazit);font-size:14px;}
+
+/* HEADER */
+header{background:var(--anthrazit);position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.3);}
+.h-top{display:flex;align-items:center;justify-content:space-between;padding:9px 14px 7px;border-bottom:2px solid var(--braun);}
+.logo{font-weight:700;font-size:17px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;}
+.logo small{display:block;color:var(--accent2);font-weight:400;font-size:10px;letter-spacing:2px;}
+.proj{font-size:12px;color:var(--accent2);text-align:right;line-height:1.4;}
+.proj strong{display:block;color:#fff;font-size:13px;font-weight:700;}
+
+/* TABS */
+.tabs{display:flex;overflow-x:auto;background:#1e1b18;scrollbar-width:none;-webkit-overflow-scrolling:touch;}
+.tabs::-webkit-scrollbar{display:none;}
+.tab{flex-shrink:0;padding:11px 15px;background:none;border:none;border-bottom:3px solid transparent;
+  color:var(--accent2);font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;
+  font-family:Arial Narrow,Arial,sans-serif;-webkit-tap-highlight-color:transparent;}
+.tab.on{color:var(--accent);border-bottom-color:var(--accent);background:rgba(255,255,255,.04);}
+.tab .n{font-size:10px;font-weight:400;margin-left:3px;}
+
+/* FILTERBAR */
+.fbar{background:var(--anthrazit);padding:7px 14px 8px;display:flex;gap:7px;align-items:center;border-top:1px solid rgba(255,255,255,.06);}
+.sw{position:relative;flex:1;}
+.sw input{width:100%;padding:7px 10px 7px 28px;border-radius:var(--r);border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.07);color:#fff;font-size:13px;font-family:Arial Narrow,Arial,sans-serif;}
+.sw input::placeholder{color:var(--accent2);}
+.sw .si{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--accent2);font-size:12px;}
+select.fs{padding:7px 9px;border-radius:var(--r);border:1px solid rgba(255,255,255,.12);
+  background:rgba(255,255,255,.07);color:#fff;font-size:12px;font-family:Arial Narrow,Arial,sans-serif;}
+select.fs option{background:var(--anthrazit);}
+
+/* STATS */
+.sbar{background:var(--braun);padding:5px 14px;display:flex;flex-wrap:wrap;gap:6px 12px;font-size:11px;color:rgba(255,255,255,.85);}
+.sp{display:flex;align-items:center;gap:5px;}
+.sf{cursor:pointer;padding:2px 7px;border-radius:10px;-webkit-tap-highlight-color:transparent;user-select:none;}
+.sf:hover{background:rgba(255,255,255,.1);}
+.sf.on{background:rgba(255,255,255,.22);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);}
+.sd{width:8px;height:8px;border-radius:50%;}
+.dok{background:#5cb85c;} .dop{background:#e8aa40;}
+.sp strong{color:#fff;}
+
+/* PANELS */
+.panel{display:none;padding-bottom:80px;}
+.panel.on{display:block;}
+
+/* BEREICH */
+.bblock{background:#fff;margin:10px 0 0;}
+.bhdr{background:var(--anthrazit);padding:10px 14px;display:flex;align-items:center;
+  border-left:4px solid var(--accent);cursor:pointer;user-select:none;gap:6px;}
+.bhdr h3{font-size:13px;font-weight:700;color:var(--accent);flex:1;}
+.bhdr .bpos{color:rgba(200,168,130,0.6);}
+.bhdr .bcnt{color:rgba(200,168,130,0.6);}
+.bhdr .btog{color:var(--accent);}
+.bpos{font-size:10px;color:var(--accent2);flex-shrink:0;}
+.bcnt{font-size:10px;color:var(--accent2);flex-shrink:0;}
+.bprog{font-size:10px;font-weight:700;color:var(--green);flex-shrink:0;min-width:40px;text-align:right;}
+.btog{font-size:11px;opacity:.4;transition:transform .18s;flex-shrink:0;}
+.btog.cl{transform:rotate(-90deg);}
+.ilist{display:block;}
+.ilist.hid{display:none;}
+
+
+/* FORTSCHRITTSBALKEN */
+.bprog-bar{height:4px;background:#e0ddd9;margin:0 14px 4px;overflow:hidden;display:none;border-radius:2px;}
+.bprog-bar.vis{display:block;}
+.bprog-fill{height:100%;background:var(--green);border-radius:2px;transition:width .3s;}
+
+/* PROTOKOLL */
+.ptype-menu{display:none;position:absolute;background:var(--anthrazit);border:1px solid var(--braun);
+  border-radius:6px;z-index:200;min-width:220px;box-shadow:0 4px 16px rgba(0,0,0,.4);overflow:hidden;}
+.ptype-menu.open{display:block;}
+.ptype-item{padding:11px 14px;color:#fff;font-size:12px;cursor:pointer;
+  font-family:Arial Narrow,Arial,sans-serif;font-weight:700;letter-spacing:0.3px;
+  border-bottom:1px solid rgba(255,255,255,0.08);}
+.ptype-item:last-child{border-bottom:none;}
+.ptype-item:hover,.ptype-item:active{background:var(--braun);color:var(--accent);}
+.pgrid{margin-top:6px;}
+.pdoc{display:flex;align-items:center;gap:6px;padding:4px 8px;font-size:11px;color:var(--braun);
+  background:var(--bg2);border-radius:4px;margin-top:4px;}
+.pdoc a{color:var(--braun);text-decoration:none;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;}
+.pdoc a:hover{text-decoration:underline;}
+.pdoc-del{background:transparent;border:none;color:#8b2222;cursor:pointer;font-size:13px;padding:0 4px;}
+
+
+/* PDF EDITOR */
+.pdfed{display:none;position:fixed;inset:0;background:#3a3530;z-index:1000;flex-direction:column;}
+.pdfed.on{display:flex;}
+.pdfed-bar{background:var(--anthrazit);padding:10px 12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;flex-shrink:0;box-shadow:0 2px 8px rgba(0,0,0,.4);position:sticky;top:0;z-index:10;}
+.pdfed-bar .ti{color:var(--accent);font-size:12px;font-weight:700;flex:1 1 100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;order:-1;}
+.pdfed-tool{background:rgba(255,255,255,.1);border:1.5px solid transparent;color:#fff;
+  border-radius:var(--r);padding:9px 13px;font-size:13px;font-weight:700;cursor:pointer;
+  font-family:Arial Narrow,Arial,sans-serif;-webkit-tap-highlight-color:transparent;white-space:nowrap;
+  min-height:38px;}
+.pdfed-tool.on{border-color:var(--accent);background:var(--braun);color:var(--accent);}
+.pdfed-tool.save{background:var(--green);color:#fff;}
+.pdfed-tool.close{background:#8b2222;color:#fff;margin-left:auto;font-size:14px;}
+.pdfed-tool.close:active{background:#6b1818;}
+@media (max-width:600px){
+  .pdfed-bar{padding:8px 10px;gap:6px;}
+  .pdfed-tool{padding:8px 11px;font-size:12px;}
+}
+.pdfed-pages{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px;display:flex;flex-direction:column;align-items:center;gap:14px;}
+.pdfed-pg{position:relative;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.3);line-height:0;}
+.pdfed-textinput{position:absolute;z-index:100;background:rgba(255,250,200,0.97);
+  border:2px solid #c8a882;color:#000;font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;
+  font-size:16px;padding:5px 8px;border-radius:6px;outline:none;
+  min-width:200px;min-height:30px;resize:none;line-height:1.3;
+  box-shadow:0 4px 16px rgba(0,0,0,0.35);overflow:hidden;
+  -webkit-user-select:text;user-select:text;}
+.pdfed-textinput::placeholder{color:#8a8580;font-style:italic;}
+.pdfed-pg canvas{display:block;touch-action:none;}
+.pdfed-pg .ink{position:absolute;top:0;left:0;touch-action:none;}
+.pen-pick{display:flex;gap:6px;align-items:center;}
+.pen-c{width:24px;height:24px;border-radius:50%;border:2px solid rgba(255,255,255,.4);cursor:pointer;}
+.pen-c.on{border-color:#fff;transform:scale(1.15);}
+
+/* PROTOKOLL EDIT/DEL BUTTONS */
+.pdoc .pdoc-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;cursor:pointer;}
+.pdoc .pdoc-name:hover{text-decoration:underline;}
+.pdoc-btn{background:transparent;border:none;cursor:pointer;font-size:13px;padding:2px 5px;border-radius:3px;}
+.pdoc-edit{color:var(--braun);}
+.pdoc-del{color:#8b2222;}
+
+/* ITEM CARD */
+.card{border-bottom:1px solid var(--border);padding:10px 14px;}
+.card:last-child{border-bottom:none;}
+.card.done{background:var(--gl);}
+.card.part{background:var(--yl);}
+.ih{display:flex;align-items:flex-start;gap:9px;margin-bottom:8px;}
+.pb{background:var(--anthrazit);color:var(--accent);font-size:9px;font-weight:700;
+  padding:2px 6px;border-radius:3px;white-space:nowrap;flex-shrink:0;margin-top:2px;}
+.ii{flex:1;}
+.ibez{font-size:14px;font-weight:700;color:var(--anthrazit);line-height:1.3;}
+.imet{font-size:11px;color:var(--accent2);margin-top:2px;display:flex;gap:10px;flex-wrap:wrap;}
+.img{font-size:12px;font-weight:700;color:var(--braun);white-space:nowrap;margin-top:2px;flex-shrink:0;}
+
+/* CHECKS */
+.crow{display:flex;gap:6px;flex-wrap:wrap;}
+.ck{display:inline-flex;flex-direction:column;align-items:flex-start;gap:1px;padding:5px 11px;border-radius:14px;
+  border:1.5px solid var(--border);cursor:pointer;font-size:12px;font-weight:700;
+  background:var(--bg);color:var(--anthrazit);-webkit-tap-highlight-color:transparent;
+  touch-action:manipulation;transition:all .12s;user-select:none;line-height:1.15;}
+.ck:active{transform:scale(.95);}
+.ck-lbl{display:flex;align-items:center;gap:5px;}
+.ck.on{border-color:var(--green);background:var(--green);color:#fff;}
+.ck-ib.on{border-color:#5b4c8a;background:#5b4c8a;}
+.ck-sa.on{border-color:#1a5f7a;background:#1a5f7a;}
+.ck-ea.on{border-color:#b8860b;background:#b8860b;}
+.ck-ew.on{border-color:#1a6b6b;background:#1a6b6b;}
+.cki{font-size:13px;}
+.ck-ts{font-size:8.5px;font-weight:400;opacity:.8;letter-spacing:0.2px;white-space:nowrap;display:none;padding-left:18px;}
+.ck.on .ck-ts{display:block;}
+
+/* FOTO */
+.fsec{margin-top:8px;}
+.fbtn{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;
+  background:var(--anthrazit);color:#fff;border-radius:20px;font-size:12px;font-weight:700;
+  cursor:pointer;border:none;font-family:Arial Narrow,Arial,sans-serif;
+  -webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+.fbtn:active{background:var(--braun);}
+.fcnt{background:var(--accent);color:var(--anthrazit);font-size:10px;padding:0 5px;border-radius:10px;font-weight:700;}
+.fgrid{display:flex;gap:9px;flex-wrap:wrap;margin-top:7px;}
+.fth-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;}
+.fth{position:relative;width:72px;height:72px;border-radius:8px;overflow:hidden;
+  border:2px solid var(--border);cursor:pointer;flex-shrink:0;background:var(--bg2);}
+.fth img{width:100%;height:100%;object-fit:cover;}
+.fth-date{font-size:9.5px;color:var(--accent2);font-family:Arial Narrow,Arial,sans-serif;
+  font-weight:600;letter-spacing:-0.005em;text-align:center;white-space:nowrap;
+  font-variant-numeric:tabular-nums;}
+.fdel{position:absolute;top:2px;right:2px;background:rgba(139,34,34,.85);color:#fff;
+  border:none;border-radius:50%;width:20px;height:20px;font-size:11px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;}
+
+/* ANMERKUNG */
+.anm{width:100%;margin-top:8px;padding:6px 10px;border:1px solid var(--border);
+  border-radius:var(--r);font-size:12px;color:var(--anthrazit);background:var(--bg);
+  resize:none;min-height:32px;font-family:Arial Narrow,Arial,sans-serif;}
+.anm:focus{outline:none;border-color:var(--braun);}
+
+.rasec{margin-top:8px;border-top:1px dashed var(--border);padding-top:6px;display:none;}
+.card.part .rasec,.card.done .rasec{display:block;}
+.rahd{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--braun);
+  text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;}
+.rahd .rai{margin-left:auto;font-size:10px;color:var(--accent2);font-weight:400;text-transform:none;letter-spacing:0;}
+.rarow{margin:4px 0;padding:5px 6px;
+  background:var(--bg);border:1px solid var(--border);border-radius:var(--r);}
+.rarow.done{background:#eef2ee;border-color:#cdd5cd;}
+.ramain{display:flex;align-items:center;gap:6px;}
+.rachk{width:18px;height:18px;flex-shrink:0;accent-color:var(--green);cursor:pointer;}
+.ratxt{flex:1;border:none;background:transparent;font-size:12px;color:var(--anthrazit);
+  font-family:Arial Narrow,Arial,sans-serif;outline:none;padding:2px 0;min-width:0;}
+.rarow.done .ratxt{text-decoration:line-through;color:#7a7a7a;}
+.rafbtn{background:transparent;border:none;color:var(--braun);cursor:pointer;font-size:15px;
+  padding:0 4px;flex-shrink:0;-webkit-tap-highlight-color:transparent;line-height:1;}
+.rafbtn:hover{color:var(--anthrazit);}
+.radel{background:transparent;border:none;color:#8b2222;cursor:pointer;font-size:13px;
+  padding:0 4px;flex-shrink:0;-webkit-tap-highlight-color:transparent;}
+.radel:hover{color:#6b1818;}
+.rameta{display:flex;align-items:center;gap:8px;margin-top:3px;padding-left:24px;
+  font-size:9px;color:var(--accent2);font-family:Arial Narrow,Arial,sans-serif;}
+.rametacol{display:flex;align-items:center;gap:3px;flex-wrap:nowrap;}
+.rametalbl{font-weight:700;color:var(--braun);text-transform:uppercase;letter-spacing:0.3px;}
+.rakuerz{width:42px;border:1px solid var(--border);background:#fff;font-size:10px;color:var(--anthrazit);
+  font-family:Arial Narrow,Arial,sans-serif;font-weight:700;text-align:center;
+  text-transform:uppercase;outline:none;padding:1px 3px;border-radius:3px;}
+.rakuerz::placeholder{color:#c0c0c0;font-weight:400;}
+.rakuerz:focus{border-color:var(--braun);}
+.rats{font-size:9px;color:var(--accent2);white-space:nowrap;font-family:Arial Narrow,Arial,sans-serif;}
+.rafg{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;padding-left:24px;}
+.rafth{position:relative;width:54px;height:54px;border-radius:4px;overflow:hidden;
+  border:1.5px solid var(--border);cursor:pointer;flex-shrink:0;}
+.rafth img{width:100%;height:100%;object-fit:cover;}
+.rafdel{position:absolute;top:1px;right:1px;background:rgba(139,34,34,.85);color:#fff;
+  border:none;border-radius:50%;width:16px;height:16px;font-size:9px;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;}
+
+/* LIGHTBOX */
+.lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;
+  align-items:center;justify-content:center;}
+.lb.on{display:flex;}
+.lb img{max-width:94vw;max-height:85vh;border-radius:8px;object-fit:contain;}
+.lbx{position:fixed;top:14px;right:14px;background:rgba(255,255,255,.15);color:#fff;
+  border:none;border-radius:50%;width:38px;height:38px;font-size:20px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;}
+
+/* FAB */
+/* FAB (alt) - bleibt für Kompatibilität */
+.fab{background:var(--braun);color:#fff;
+  border:none;border-radius:28px;padding:11px 18px;font-size:13px;font-weight:700;
+  box-shadow:0 4px 16px rgba(107,80,64,.4);cursor:pointer;
+  display:flex;align-items:center;gap:7px;z-index:50;font-family:Arial Narrow,Arial,sans-serif;
+  -webkit-tap-highlight-color:transparent;}
+.fab:active{transform:scale(.97);}
+
+/* FAB MINI - kompakt Apple-Style */
+.fab-bar{position:fixed;bottom:12px;left:0;right:0;display:flex;justify-content:center;
+  gap:6px;z-index:50;padding:0 10px;pointer-events:none;}
+.fab-mini{pointer-events:auto;display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  height:44px;padding:0 14px;border:none;cursor:pointer;color:#fff;
+  font-family:inherit;font-size:12.5px;font-weight:600;letter-spacing:-0.005em;
+  border-radius:22px;
+  box-shadow:0 6px 20px rgba(45,41,38,0.22),0 1px 2px rgba(45,41,38,0.08);
+  -webkit-tap-highlight-color:transparent;
+  transition:transform 0.18s cubic-bezier(0.4,0,0.2,1);
+  white-space:nowrap;}
+.fab-mini:active{transform:scale(0.94);}
+.fab-mini svg{flex-shrink:0;}
+.fab-label{font-weight:600;}
+.fab-primary{background:var(--anthrazit);flex:0 1 auto;}
+.fab-secondary{background:#4a3a28;flex:0 1 auto;}
+.fab-icon{width:44px;padding:0;flex:0 0 44px;}
+.fab-zipfoto{background:#1a5f7a;}
+.fab-zippdf{background:var(--braun);}
+
+@media (max-width:380px){
+  .fab-mini{height:42px;font-size:12px;padding:0 12px;}
+  .fab-icon{width:42px;flex:0 0 42px;}
+  .fab-label{display:none;}
+  .fab-primary,.fab-secondary{width:44px;padding:0;flex:0 0 44px;}
+}
+.nores{text-align:center;padding:40px;color:var(--accent2);font-size:14px;}
+</style>
+</head>
+<body>
+
+<div id="loginOv" style="position:fixed;inset:0;z-index:2000;background:#2d2926;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+  <div class="logo" style="font-size:22px;letter-spacing:3px;color:#c8a882;text-transform:uppercase;font-weight:700;margin-bottom:6px;">KPC <small style="display:block;color:#9a9a9a;font-size:11px;letter-spacing:2px;font-weight:400;">GMBH</small></div>
+  <div style="color:#fff;font-size:13px;margin:6px 0 18px;letter-spacing:1px;">Montagefortschritt &middot; Berlin Upbeat</div>
+
+  <!-- Stufe 1: Microsoft-Anmeldung -->
+  <div id="loginMsBlock" style="display:flex;flex-direction:column;align-items:center;">
+    <button id="loginMsBtn" onclick="doMsLogin()" style="background:#c8a882;color:#2d2926;border:none;border-radius:8px;padding:12px 26px;font-size:15px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif;display:flex;align-items:center;gap:10px;">
+      <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#2d2926"/><rect x="11" y="1" width="9" height="9" fill="#2d2926"/><rect x="1" y="11" width="9" height="9" fill="#2d2926"/><rect x="11" y="11" width="9" height="9" fill="#2d2926"/></svg>
+      Mit Microsoft anmelden
+    </button>
+    <div id="loginMsStatus" style="color:#9a9a9a;font-size:12px;margin-top:14px;text-align:center;min-height:16px;"></div>
+  </div>
+
+  <!-- Stufe 2: Kürzel -->
+  <div id="loginKuerzelBlock" style="display:none;flex-direction:column;align-items:center;">
+    <div style="color:#fff;font-size:15px;margin:14px 0 4px;">Dein K&uuml;rzel eingeben</div>
+    <div style="color:#9a9a9a;font-size:12px;margin-bottom:14px;text-align:center;">Wird bei jedem Eintrag mitgespeichert.</div>
+    <input id="loginInp" type="text" maxlength="5" placeholder="z.B. MS" autocomplete="off"
+      style="width:160px;text-align:center;text-transform:uppercase;font-size:22px;font-weight:700;letter-spacing:2px;padding:10px;border-radius:8px;border:1px solid #6b5040;background:#3a3530;color:#fff;font-family:Arial Narrow,Arial,sans-serif;">
+    <button onclick="setUser()" style="margin-top:16px;background:#c8a882;color:#2d2926;border:none;border-radius:8px;padding:11px 28px;font-size:15px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif;">Starten</button>
+  </div>
+</div>
+
+<header>
+  <div class="h-top">
+    <div class="logo">KPC <small>GMBH</small></div>
+    <div class="proj"><strong id="projName" onclick="switchProject()" style="cursor:pointer;">Berlin Upbeat</strong><span id="userBadge" onclick="changeUser()" style="cursor:pointer;color:#c8a882;text-decoration:underline;">–</span></div>
+  </div>
+  <div class="tabs" id="tabs"></div>
+  <div class="fbar">
+    <div class="sw">
+      <span class="si">&#128269;</span>
+      <input type="text" id="srch" placeholder="Suche: Bezeichnung, Fabrikat, Pos&#46;&#46;&#46;">
+    </div>
+  </div>
+  <div class="sbar">
+    <span class="sp sf" id="sfD" onclick="setSF('done')"><span class="sd dok"></span>Vollst&#228;ndig: <strong id="cD">0</strong></span>
+    <span class="sp sf" id="sfP" onclick="setSF('part')"><span class="sd dop"></span>Teilweise: <strong id="cP">0</strong></span>
+    <span class="sp sf" id="sfO" onclick="setSF('open')"><span class="sd" style="background:#9a9a9a"></span>Offen: <strong id="cO">0</strong></span>
+    <span class="sp sf" id="sfA" onclick="setSF('all')">Gesamt: <strong id="cT">0</strong></span>
+    <span class="sp" style="margin-left:auto" id="lastEditWrap">Zuletzt bearbeitet: <strong id="lastEdit">–</strong></span>
+  </div>
+</header>
+
+<main id="main"></main>
+<div class="lb" id="lb">
+  <button class="lbx" onclick="clb()">&#10005;</button>
+  <img id="lbi" src="" alt="">
+</div>
+
+<div class="pdfed" id="pdfed">
+  <div class="pdfed-bar">
+    <span class="ti" id="pdfedTitle">Protokoll</span>
+    <button class="pdfed-tool on" id="toolPen" onclick="pdfSetTool('pen')">&#9999;&#65039; Stift</button>
+    <button class="pdfed-tool" id="toolText" onclick="pdfSetTool('text')"><b>T</b> Text</button>
+    <button class="pdfed-tool" id="toolErase" onclick="pdfSetTool('erase')">&#129003; Radierer</button>
+    <button class="pdfed-tool save" id="toolSave" onclick="pdfSaveManual()">&#128190; Speichern</button>
+    <button class="pdfed-tool" id="toolViewEdit" onclick="pdfViewToEdit()" style="display:none;background:#3a7a3a">&#9999;&#65039; Bearbeiten</button>
+    <button class="pdfed-tool" id="toolViewDownload" onclick="pdfViewDownload()" style="display:none">&#11015;&#65039; Download</button>
+    <button class="pdfed-tool close" onclick="pdfClose()">&#10005; Schlie&#223;en</button>
+  </div>
+  <div class="pdfed-pages" id="pdfedPages"></div>
+</div>
+
+<div class="fab-bar">
+  <button class="fab-mini fab-primary" onclick="expKunde(false)" title="Kundenbericht ohne Fotos">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>
+    <span class="fab-label">Bericht</span>
+  </button>
+  <button class="fab-mini fab-secondary" onclick="expKunde(true)" title="Kundenbericht mit Fotos">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+    <span class="fab-label">+ Fotos</span>
+  </button>
+  <button class="fab-mini fab-icon fab-zipfoto" onclick="downloadZip()" title="Alle Fotos als ZIP">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+  </button>
+  <button class="fab-mini fab-icon fab-zippdf" onclick="downloadProtoZip()" title="Alle Protokolle als ZIP">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
+  </button>
+  <button class="fab-mini fab-icon" style="background:#5b4c8a;color:#fff" onclick="expRest()" title="Restarbeitenliste als PDF">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 0 2-2h11"/></svg>
+  </button>
+  <button class="fab-mini fab-icon" style="background:#b8860b;color:#fff" onclick="expTagebericht()" title="Tagesbericht">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/></svg>
+  </button>
+  
+</div>
+<input type="file" id="fi" accept="image/*" style="display:none">
+<input type="file" id="pi" accept=".pdf,.doc,.docx" style="display:none">
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.4/lib/msal-browser.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script>
+let DATA = [];   // Berlin-Upbeat-LV liegt in SharePoint (LV_berlin-upbeat.json); kein Inhalt mehr im Quelltext
+
+const ST={};
+const NOTE_TIMERS={};
+function sp(p){return p.replace(/\./g,'_');}
+
+// Save with debounce to prevent race conditions
+const SAVE_TIMERS={};
+function savePos(pos) {
+  if(SAVE_TIMERS[pos]) clearTimeout(SAVE_TIMERS[pos]);
+  SAVE_TIMERS[pos] = setTimeout(() => {
+    spListWrite(pos).catch(e => console.warn('Speichern fehlgeschlagen:', e));
+    delete SAVE_TIMERS[pos];
+  }, 400);
+}
+let ACT=DATA[0]?DATA[0].pos:null, FPOS=null;
+
+function gs(p){if(!ST[p])ST[p]={g:false,m:false,a:false,sa:false,ea:false,ib:false,ew:false,fotos:[],pdfs:[],restarbeiten:[],note:'',ts:{},by:{}};if(!ST[p].pdfs)ST[p].pdfs=[];if(!ST[p].restarbeiten)ST[p].restarbeiten=[];if(!ST[p].ts)ST[p].ts={};if(!ST[p].by)ST[p].by={};return ST[p];}
+function ist(p){const s=gs(p);if(s.g||s.m||s.a||s.ib||s.ew||s.fotos.length||s.note){const n=[s.g,s.m,s.sa,s.ea,s.ib,s.ew].filter(Boolean).length;return n===6?'done':'part';}return 'open';}
+function sp(p){return p.replace(/\./g,'_');}
+
+// BUILD TABS
+function buildTabs(){
+  const w=document.getElementById('tabs');
+  w.innerHTML='';
+  DATA.forEach(sec=>{
+    const tot=sec.subsections.reduce((a,s)=>a+s.items.length,0);
+    const b=document.createElement('button');
+    b.className='tab'+(sec.pos===ACT?' on':'');
+    b.dataset.p=sec.pos;
+    b.innerHTML=sec.label+'<span class="n">('+tot+')</span>';
+    b.onclick=()=>swTab(sec.pos);
+    w.appendChild(b);
+  });
+}
+
+function swTab(p){
+  ACT=p;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
+  document.querySelectorAll('.panel').forEach(pn=>pn.classList.toggle('on',pn.dataset.p===p));
+  // Kein restoreUI - UI ist beim Initial-Load schon gesetzt, Lazy Observer kümmert sich um neue Bilder
+  const at=document.querySelector('.tab.on');
+  if(at)at.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
+  // Window-Scroll an den Anfang des neuen Tabs
+  window.scrollTo({top: 0, behavior: 'auto'});
+}
+
+// BUILD PANELS
+function buildPanels(){
+  const main=document.getElementById('main');
+  main.innerHTML='';
+  DATA.forEach(sec=>{
+    const panel=document.createElement('div');
+    panel.className='panel'+(sec.pos===ACT?' on':'');
+    panel.dataset.p=sec.pos;
+    sec.subsections.forEach(sub=>{
+      const div=document.createElement('div');
+      div.className='bblock';
+      const sid=sp(sub.pos);
+      let cards='';
+      sub.items.forEach(item=>{
+        const id=sp(item.pos);
+        cards+=`<div class="card" id="C${id}">
+  <div class="ih">
+    <span class="pb">${item.pos}</span>
+    <div class="ii">
+      <div class="ibez">${item.bez.trim()}</div>
+      <div class="imet">${item.fabrikat?'&#127981; '+item.fabrikat.trim():''}${item.typ?' &nbsp;&#128203; '+item.typ.trim():''}</div>
+    </div>
+    <div class="img">${item.menge} ${item.einh}</div>
+  </div>
+  <div class="crow">
+    <div class="ck" id="Kg${id}" onclick="tc('${item.pos}','g')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Geliefert</span><span class="ck-ts" id="Tg${id}"></span></div>
+    <div class="ck" id="Km${id}" onclick="tc('${item.pos}','m')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Montiert</span><span class="ck-ts" id="Tm${id}"></span></div>
+    <div class="ck ck-sa" id="Ksa${id}" onclick="tc('${item.pos}','sa')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Sanitär</span><span class="ck-ts" id="Tsa${id}"></span></div>
+    <div class="ck ck-ea" id="Kea${id}" onclick="tc('${item.pos}','ea')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Elektro</span><span class="ck-ts" id="Tea${id}"></span></div>
+    <div class="ck ck-ib" id="Kib${id}" onclick="tc('${item.pos}','ib')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Inbetriebnahme</span><span class="ck-ts" id="Tib${id}"></span></div>
+    <div class="ck ck-ew" id="Kew${id}" onclick="tc('${item.pos}','ew')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Eingewiesen</span><span class="ck-ts" id="Tew${id}"></span></div>
+  </div>
+  <div class="fsec">
+    <button class="fbtn" id="FB${id}" onclick="trf('${item.pos}')">&#128247; Foto</button>
+    <button class="fbtn" style="background:#4a3a28;margin-left:6px" onclick="trpdf('${item.pos}',this)">&#128196; Protokoll</button>
+    <div class="fgrid" id="FG${id}"></div>
+    <div class="pgrid" id="PG${id}"></div>
+  </div>
+  <textarea class="anm" rows="1" placeholder="Anmerkung &#8230;" oninput="autoR(this);gs('${item.pos}').note=this.value;rc('${item.pos}');clearTimeout(NOTE_TIMERS['${item.pos}']);NOTE_TIMERS['${item.pos}']=setTimeout(()=>savePos('${item.pos}'),1500)"></textarea>
+  <div class="rasec">
+    <div class="rahd">&#128203; Restarbeiten <span class="rai" id="RAI${id}"></span></div>
+    <div id="RA${id}"></div>
+  </div>
+</div>`;
+      });
+      div.innerHTML=`<div class="bhdr" onclick="tgB(this)">
+  <span class="bpos">${sub.pos}</span>
+  <h3>${sub.bez}</h3>
+  <span class="bcnt">${sub.items.length}&nbsp;Pos.</span>
+  <span class="bprog" id="P${sid}"></span>
+  <span class="btog cl">&#9660;</span>
+</div>
+<div class="bprog-bar" id="PB${sid}"><div class="bprog-fill" id="PF${sid}" style="width:0%"></div></div>
+<div class="ilist hid" id="L${sid}">${cards}</div>`;
+      panel.appendChild(div);
+    });
+    main.appendChild(panel);
+  });
+}
+
+function tgB(h){
+  // Find ilist - skip progress bar div if present
+  let l = h.nextElementSibling;
+  if(l && l.classList.contains('bprog-bar')) l = l.nextElementSibling;
+  const t=h.querySelector('.btog');
+  if(!l) return;
+  const isClosed=l.classList.contains('hid');
+  l.classList.toggle('hid',!isClosed);
+  t.classList.toggle('cl',!isClosed);
+}
+
+// TOGGLE CHECK
+function tsFmt(iso){
+  if(!iso)return'';
+  const d=new Date(iso);
+  return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})
+    +' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+}
+let USER = localStorage.getItem('kpc_user') || '';
+function applyUserBadge(){const b=document.getElementById('userBadge');if(b)b.textContent=USER?('\u270e '+USER):'Kürzel';}
+function setUser(){
+  const v=(document.getElementById('loginInp').value||'').trim().toUpperCase();
+  if(!v){document.getElementById('loginInp').focus();return;}
+  USER=v;localStorage.setItem('kpc_user',USER);
+  document.getElementById('loginOv').style.display='none';
+  applyUserBadge();
+  openProjectFlow();
+}
+
+// Kürzel aus dem Microsoft-Konto ableiten (Initialen)
+function deriveKuerzel(account){
+  if(!account) return '';
+  const n = account.name || account.username || '';
+  const parts = n.replace(/[^A-Za-zÄÖÜäöüß ]/g,' ').trim().split(/\s+/).filter(Boolean);
+  let k = '';
+  if(parts.length>=2) k = parts[0][0] + parts[parts.length-1][0];
+  else if(parts.length===1) k = parts[0].slice(0,2);
+  return k.toUpperCase();
+}
+
+async function doMsLogin(){
+  const status=document.getElementById('loginMsStatus');
+  const btn=document.getElementById('loginMsBtn');
+  try{
+    btn.disabled=true; status.textContent='Anmeldung läuft …';
+    await msalLogin();
+    if(msalAccount) await onLoggedIn();   // Popup-Fall; bei Redirect navigiert die Seite weg
+  }catch(e){
+    btn.disabled=false;
+    status.textContent='Anmeldung fehlgeschlagen: '+(e.message||e);
+    console.error(e);
+  }
+}
+
+// Nach erfolgreichem MS-Login: IDs auflösen, dann Kürzel-Stufe oder direkt starten
+async function onLoggedIn(){
+  const status=document.getElementById('loginMsStatus');
+  if(status) status.textContent='Verbinde mit SharePoint …';
+  await resolveIds();
+  if(!USER){ USER = deriveKuerzel(msalAccount); }
+  applyUserBadge();
+  if(USER){
+    openProjectFlow();
+  } else {
+    // Kürzel-Stufe zeigen
+    document.getElementById('loginMsBlock').style.display='none';
+    const kb=document.getElementById('loginKuerzelBlock');
+    kb.style.display='flex';
+    const inp=document.getElementById('loginInp');
+    inp.addEventListener('keydown',e=>{if(e.key==='Enter')setUser();});
+    inp.focus();
+  }
+}
+
+function startData(){
+  loadState().then(()=>{ restoreUI(); upStats(); });
+}
+
+function changeUser(){
+  const v=(prompt('Kürzel ändern:',USER)||'').trim().toUpperCase();
+  if(v){USER=v;localStorage.setItem('kpc_user',USER);applyUserBadge();}
+}
+function ckLabel(s,f){const k=s.by&&s.by[f]?s.by[f]+' · ':'';return k+tsFmt(s.ts[f]);}
+function tc(pos,f){
+  const s=gs(pos);
+  s[f]=!s[f];
+  if(s[f]){ s.ts[f]=new Date().toISOString(); s.by[f]=USER; }
+  else { delete s.ts[f]; delete s.by[f]; }
+  const id=sp(pos);
+  const el=document.getElementById('K'+f+id);
+  if(el){el.classList.toggle('on',s[f]);el.querySelector('.cki').innerHTML=s[f]?'&#10003;':'&#9675;';}
+  const tsEl=document.getElementById('T'+f+id);
+  if(tsEl) tsEl.textContent=s[f]?ckLabel(s,f):'';
+  rc(pos);updRA(pos);upStats();savePos(pos);
+}
+
+function rc(pos){
+  const id=sp(pos);
+  const st=ist(pos);
+  const c=document.getElementById('C'+id);
+  if(c)c.className='card'+( st!=='open'?' '+st:'');
+  updProg(pos);
+}
+
+function updProg(pos){
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>{
+    if(!sub.items.some(i=>i.pos===pos))return;
+    const sid=sp(sub.pos);
+    const dn=sub.items.filter(i=>ist(i.pos)==='done').length;
+    const pt=sub.items.filter(i=>ist(i.pos)!=='open').length;
+    const el=document.getElementById('P'+sid);
+    if(el)el.textContent=dn>0?dn+'/'+sub.items.length+' ✓':'';
+    const bar=document.getElementById('PB'+sid);
+    const fill=document.getElementById('PF'+sid);
+    if(bar && fill && pt>0){
+      bar.classList.add('vis');
+      fill.style.width=(pt/sub.items.length*100)+'%';
+    }
+  }));
+}
+
+// FOTO
+function trf(pos){FPOS=pos;const fi=document.getElementById('fi');fi.value='';fi.click();}
+
+// Bildkomprimierung - HEIC-sicher mit Timeout
+async function tryCompressImage(file){
+  if(file.type.includes('heic')||file.type.includes('heif')) return file;
+  if(!file.type.startsWith('image/')) return file;
+  if(file.size < 500*1024) return file;
+  return new Promise((resolve)=>{
+    const timeout=setTimeout(()=>resolve(file),5000);
+    try{
+      const reader=new FileReader();
+      reader.onerror=()=>{clearTimeout(timeout);resolve(file);};
+      reader.onload=(e)=>{
+        const img=new Image();
+        img.onerror=()=>{clearTimeout(timeout);resolve(file);};
+        img.onload=()=>{
+          clearTimeout(timeout);
+          try{
+            let w=img.width,h=img.height;const max=1600;
+            if(w>max){h=h*max/w;w=max;}
+            if(h>max){w=w*max/h;h=max;}
+            const canvas=document.createElement('canvas');
+            canvas.width=w;canvas.height=h;
+            canvas.getContext('2d').drawImage(img,0,0,w,h);
+            canvas.toBlob(blob=>resolve(blob&&blob.size<file.size?blob:file),'image/jpeg',0.75);
+          }catch(err){resolve(file);}
+        };
+        img.src=e.target.result;
+      };
+      reader.readAsDataURL(file);
+    }catch(err){clearTimeout(timeout);resolve(file);}
+  });
+}
+
+document.getElementById('fi').addEventListener('change',async function(e){
+  const file=e.target.files[0];
+  if(!file||!FPOS)return;
+  showLoader('Foto wird komprimiert...');
+  try {
+    const uploadFile = await tryCompressImage(file);
+    const origKB = Math.round(file.size/1024);
+    const newKB = Math.round(uploadFile.size/1024);
+    showLoader('Foto wird hochgeladen... ('+newKB+' KB, vorher '+origKB+' KB)');
+    const fname = FPOS.replace(/\./g,'_') + '_' + Date.now() + '.jpg';
+    await spUpload(fname, uploadFile, 'image/jpeg');
+    gs(FPOS).fotos.push(fname);
+    saveFotos(FPOS);
+    updFG(FPOS);rc(FPOS);upStats();
+    hideLoader();
+  } catch(e) {
+    hideLoader();
+    console.warn('Upload fehlgeschlagen:', e.message);
+    const msg = e.name === 'AbortError' 
+      ? 'Upload-Timeout (60s). Bitte Internetverbindung prüfen.' 
+      : 'Foto-Upload fehlgeschlagen.';
+    alert(msg);
+  }
+});
+function fotoTimestamp(src){
+  // Aus URL/Filename Date.now() extrahieren -> formatiertes Datum
+  const m = src.match(/_(\d{12,14})\./);
+  if(!m) return '';
+  const ts = parseInt(m[1]);
+  if(!ts || ts < 1577836800000) return ''; // Sanity: nach 2020
+  const d = new Date(ts);
+  return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})
+       + ' ' + d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+}
+
+function updFG(pos){
+  const id=sp(pos);const s=gs(pos);
+  const g=document.getElementById('FG'+id);
+  const b=document.getElementById('FB'+id);
+  if(g){
+    g.innerHTML=s.fotos.map((src,i)=>{
+      const ts = fotoTimestamp(src);
+      return `<div class="fth-wrap"><div class="fth" onclick="olb('${pos}',${i})"><img class="fth-img" data-src="${src}" data-pos="${pos}" data-idx="${i}" id="IMG_${id}_${i}" alt="Foto"><button class="fdel" onclick="event.stopPropagation();df('${pos}',${i})">&#10005;</button></div>${ts?`<div class="fth-date">${ts}</div>`:''}</div>`;
+    }).join('');
+    // Lazy-Loading: nur Bilder im Sichtfeld werden geladen
+    s.fotos.forEach((src,i)=>{
+      const img=document.getElementById('IMG_'+id+'_'+i);
+      if(!img) return;
+      imgObserver.observe(img);
+    });
+  }
+  if(b)b.innerHTML='&#128247; Foto'+(s.fotos.length?` <span class="fcnt">${s.fotos.length}</span>`:'');
+}
+
+// Lazy-Load Observer: Bilder erst laden wenn sie sichtbar werden
+const imgObserver = ('IntersectionObserver' in window) ? new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if(!entry.isIntersecting) return;
+    const img = entry.target;
+    imgObserver.unobserve(img);
+    const src = img.dataset.src;
+    if(!src) return;
+    loadImageAsBlob(src).then(blobUrl => { if(blobUrl) img.src = blobUrl; });
+  });
+}, {rootMargin: '200px'}) : {observe: img => { 
+  // Fallback ohne IntersectionObserver: direkt laden
+  const src = img.dataset.src;
+  if(src) loadImageAsBlob(src).then(blobUrl => { if(blobUrl) img.src = blobUrl; });
+}, unobserve: ()=>{}};
+
+// Cache for blob URLs (Key = Dateiname in der Fotos-Bibliothek)
+const IMG_CACHE={};
+async function loadImageAsBlob(fname){
+  if(!fname) return '';
+  if(IMG_CACHE[fname]) return IMG_CACHE[fname];
+  try {
+    const blob=await spDownloadBlob(fname);
+    const blobUrl=URL.createObjectURL(blob);
+    IMG_CACHE[fname]=blobUrl;
+    return blobUrl;
+  } catch(e) { console.warn('Bild laden fehlgeschlagen:', e.message); return ''; }
+}
+function blobToDataURL(blob){
+  return new Promise((resolve,reject)=>{
+    const r=new FileReader();
+    r.onload=()=>resolve(r.result);
+    r.onerror=reject;
+    r.readAsDataURL(blob);
+  });
+}
+function df(pos,i){
+  const fname = gs(pos).fotos[i];
+  gs(pos).fotos.splice(i,1);
+  updFG(pos);rc(pos);upStats();
+  saveFotos(pos);
+  if(fname) spDelete(fname);
+}
+
+// LIGHTBOX
+function olb(pos,i){
+  const url=gs(pos).fotos[i];
+  loadImageAsBlob(url).then(blobUrl=>{
+    document.getElementById('lbi').src=blobUrl||url;
+  });
+  document.getElementById('lb').classList.add('on');
+}
+function clb(){document.getElementById('lb').classList.remove('on');}
+document.getElementById('lb').addEventListener('click',e=>{if(e.target===e.currentTarget)clb();});
+
+// STATS
+function upStats(){
+  let tot=0,dn=0,pt=0,op=0;
+  DATA.forEach(s=>s.subsections.forEach(sub=>sub.items.forEach(item=>{
+    tot++; const st=ist(item.pos);
+    if(st==='done')dn++; else if(st==='part')pt++; else op++;
+  })));
+  document.getElementById('cD').textContent=dn;
+  document.getElementById('cP').textContent=pt;
+  document.getElementById('cO').textContent=op;
+  document.getElementById('cT').textContent=tot;
+}
+
+// SEARCH/FILTER
+
+let SF='all';
+function setSF(f){
+  SF=(SF===f && f!=='all')?'all':f;
+  document.getElementById('sfD').classList.toggle('on',SF==='done');
+  document.getElementById('sfP').classList.toggle('on',SF==='part');
+  document.getElementById('sfO').classList.toggle('on',SF==='open');
+  document.getElementById('sfA').classList.toggle('on',SF==='all');
+  applyF();
+}
+
+function applyF(){
+  const q=document.getElementById('srch').value.toLowerCase().trim();
+  const active = q || SF!=='all';
+
+  // Bei Suche oder aktivem Statusfilter alle Bereiche aufklappen, sonst aktiven Tab
+  if(active){
+    document.querySelectorAll('.panel').forEach(pn=>pn.classList.add('on'));
+    document.querySelectorAll('.ilist.hid').forEach(l=>l.classList.remove('hid'));
+  } else {
+    document.querySelectorAll('.panel').forEach(pn=>pn.classList.toggle('on',pn.dataset.p===ACT));
+  }
+
+  document.querySelectorAll('.card').forEach(c=>{
+    const pos=c.id.slice(1).replace(/_/g,'.');
+    const bez=c.querySelector('.ibez')?.textContent.toLowerCase()||'';
+    const met=c.querySelector('.imet')?.textContent.toLowerCase()||'';
+    const txtOk=!q||bez.includes(q)||met.includes(q)||pos.toLowerCase().includes(q);
+    const done=c.classList.contains('done');
+    const part=c.classList.contains('part');
+    let stOk=true;
+    if(SF==='done') stOk=done;
+    else if(SF==='part') stOk=part;
+    else if(SF==='open') stOk=!done&&!part;
+    const show=txtOk && stOk;
+    c.style.display=show?'':'none';
+    if(show && active){
+      const ilist=c.closest('.ilist');
+      if(ilist){
+        ilist.classList.remove('hid');
+        const bar=ilist.previousElementSibling;
+        const hdr=bar&&bar.classList.contains('bprog-bar')?bar.previousElementSibling:ilist.previousElementSibling;
+        if(hdr) hdr.querySelector('.btog')?.classList.remove('cl');
+      }
+    }
+  });
+}
+
+
+
+document.getElementById('srch').addEventListener('input',applyF);
+
+
+function restoreUI() {
+  Object.keys(ST).forEach(pos => {
+    const s = ST[pos];
+    const id = sp(pos);
+    // Restore checkboxes
+    const fields = ['g','m','a','sa','ea','ib','ew'];
+    fields.forEach(f => {
+      const el = document.getElementById('K'+f+id);
+      if(el && s[f]) {
+        el.classList.add('on');
+        el.querySelector('.cki').innerHTML = '&#10003;';
+        const tsEl = document.getElementById('T'+f+id);
+        if(tsEl && s.ts && s.ts[f]) tsEl.textContent = ckLabel(s,f);
+      }
+    });
+    // Restore card color
+    const card = document.getElementById('C'+id);
+    const st = ist(pos);
+    if(card && st !== 'open') card.className = 'card ' + st;
+    // Restore note
+    const anm = card ? card.querySelector('.anm') : null;
+    if(anm && s.note) { anm.value = s.note; autoR(anm); }
+    // Restore fotos
+    if(s.fotos && s.fotos.length) updFG(pos);
+    // Restore restarbeiten
+    updRA(pos);
+    // Restore protokolle
+    if(s.pdfs && s.pdfs.length) updPG(pos);
+    // Restore progress
+    updProg(pos);
+  });
+  upStats();
+}
+
+function autoR(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
+
+// EXPORT
+
+async function downloadZip() {
+  const urls = [];
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(item=>{
+    const s=gs(item.pos);
+    if(s.fotos && s.fotos.length) s.fotos.forEach(u=>urls.push({url:u, pos:item.pos}));
+  })));
+  if(urls.length===0){alert('Keine Fotos vorhanden.');return;}
+  if(!confirm(urls.length+' Foto(s) werden als ZIP heruntergeladen. OK?'))return;
+  showLoader('Fotos werden gepackt...');
+  try{
+    const zip=new JSZip();
+    let n=1;
+    for(const f of urls){
+      try{
+        const blob=await spDownloadBlob(f.url);
+        const folder=f.pos.replace(/\./g,'_');
+        zip.file(folder+'/Foto_'+(n++)+'.jpg', blob);
+      }catch(e){ console.warn('Foto übersprungen:', e.message); }
+    }
+    const content=await zip.generateAsync({type:'blob'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(content);
+    a.download='Fotos_Berlin_Upbeat_'+new Date().toISOString().slice(0,10)+'.zip';
+    document.body.appendChild(a);a.click();a.remove();
+    hideLoader();
+  }catch(e){hideLoader();alert('ZIP fehlgeschlagen: '+e.message);}
+}
+
+
+function expTagebericht(){
+  const heute=new Date().toISOString().slice(0,10);
+  const d=new Date().toLocaleDateString('de-DE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const FELDER=[['g','Geliefert'],['m','Montiert'],['sa','Sanitär'],['ea','Elektro'],['ib','Inbetriebnahme'],['ew','Eingewiesen']];
+
+  // Einträge sammeln: pro Position alle Felder die heute gesetzt wurden
+  let rows=[];
+  DATA.forEach(sec=>{
+    sec.subsections.forEach(sub=>{
+      sub.items.forEach(it=>{
+        const s=gs(it.pos), t=s.ts||{}, by=s.by||{};
+        const heute_felder=FELDER.filter(([f])=>t[f]&&t[f].startsWith(heute));
+        if(heute_felder.length===0) return;
+        rows.push({
+          geschoss:sec.label, bereich:sub.bez,
+          pos:it.pos, bez:it.bez.trim(),
+          fabrikat:it.fabrikat.trim(), typ:it.typ.trim(),
+          felder:heute_felder.map(([f,lbl])=>({
+            f, lbl,
+            zeit:new Date(t[f]).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}),
+            kuerzel:by[f]||'–'
+          }))
+        });
+      });
+    });
+  });
+
+  if(rows.length===0){alert('Heute wurden noch keine Statusänderungen vorgenommen.');return;}
+
+  // nach Kürzel gruppieren (erster Eintrag des ersten Felds als Kürzel des Monteurs)
+  const monteure=[...new Set(rows.flatMap(r=>r.felder.map(f=>f.kuerzel)))].filter(k=>k!=='–');
+
+  let tableRows='';
+  let lastG='',lastB='';
+  rows.forEach((r,i)=>{
+    if(r.geschoss!==lastG){
+      if(lastG!=='') tableRows+='<tr><td colspan="5" style="height:10px;background:#f5f3f0;border:none"></td></tr>';
+      tableRows+=`<tr><td colspan="5" style="background:#2d2926;color:#c8a882;font-weight:700;font-size:13px;padding:7px 10px;letter-spacing:1px">${r.geschoss}: ${DATA.find(s=>s.label===r.geschoss)?.bez||''}</td></tr>`;
+      lastG=r.geschoss; lastB='';
+    }
+    if(r.bereich!==lastB){
+      tableRows+=`<tr><td colspan="5" style="background:#eeecea;color:#6b5040;font-weight:700;font-size:12px;padding:4px 10px;border-left:3px solid #c8a882">${r.bereich}</td></tr>`;
+      lastB=r.bereich;
+    }
+    const felderHtml=r.felder.map(f=>`<span style="display:inline-flex;align-items:center;gap:3px;background:#f0ece8;border-radius:4px;padding:2px 7px;margin:2px;font-size:11px;font-weight:700;color:#2d2926">${f.lbl}<span style="color:#9a9a9a;font-weight:400"> ${f.zeit}</span><span style="color:#c8a882;font-weight:700"> ${f.kuerzel}</span></span>`).join('');
+    tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">
+      <td style="padding:5px 8px;font-size:11px;color:#9a9a9a;white-space:nowrap">${r.pos}</td>
+      <td style="padding:5px 8px;font-size:12px;font-weight:700">${r.bez}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#6b5040">${r.fabrikat}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#9a9a9a">${r.typ}</td>
+      <td style="padding:5px 8px">${felderHtml}</td>
+    </tr>`;
+  });
+
+  const monteureHtml=monteure.length?`<div style="margin-bottom:8px;font-size:12px;color:#6b5040">Monteure heute: <strong>${monteure.join(', ')}</strong></div>`:'';
+
+  const repHtml=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+<title>Tagesbericht Berlin Upbeat – ${d}</title>
+<style>
+body{font-family:Arial Narrow,Arial,sans-serif;margin:0;padding:20px;color:#2d2926;}
+.kpc{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #6b5040;padding-bottom:12px;margin-bottom:20px;}
+.logo{font-size:22px;font-weight:700;letter-spacing:4px;color:#2d2926;}
+.logo small{display:block;font-size:11px;letter-spacing:2px;color:#9a9a9a;font-weight:400;}
+.meta{text-align:right;font-size:12px;color:#9a9a9a;line-height:1.6;}
+.meta strong{display:block;font-size:15px;color:#2d2926;font-weight:700;}
+h2{font-size:14px;color:#6b5040;margin:0 0 10px;font-weight:400;letter-spacing:0.5px;}
+table{width:100%;border-collapse:collapse;font-family:Arial Narrow,Arial,sans-serif;}
+th{background:#2d2926;color:#c8a882;font-size:11px;padding:7px 8px;text-align:left;font-weight:700;letter-spacing:0.5px;}
+td{border-bottom:1px solid #eeecea;vertical-align:middle;}
+.sig{margin-top:40px;display:flex;gap:60px;}
+.sig-box{flex:1;}
+.sig-line{border-top:1px solid #2d2926;padding-top:6px;font-size:11px;color:#9a9a9a;margin-top:40px;}
+@media print{body{padding:10px;}button{display:none!important;}}
+</style></head><body>
+<button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
+<div class="kpc"><div class="logo">KPC <small>GMBH</small></div>
+<div class="meta"><strong>Berlin Upbeat</strong>Tagesbericht Leistungsfeststellung<br>${d}</div></div>
+<h2>Heute durchgeführte Arbeiten – Statusänderungen ${new Date().toLocaleDateString('de-DE')}</h2>
+${monteureHtml}
+<table>
+<thead><tr>
+  <th>Pos.</th><th>Bezeichnung</th><th>Fabrikat</th><th>Typ</th>
+  <th>Heute erledigt (Uhrzeit · Kürzel)</th>
+</tr></thead>
+<tbody>${tableRows}</tbody>
+</table>
+<div class="sig">
+  <div class="sig-box"><div class="sig-line">Datum / Unterschrift Monteur</div></div>
+  <div class="sig-box"><div class="sig-line">Datum / Unterschrift Bauleitung KPC</div></div>
+</div>
+</body></html>`;
+
+  const win=window.open('','_blank');
+  win.document.write(repHtml);
+  win.document.close();
+}
+async function expKunde(withFotos=false){
+  const now=new Date();
+  const d=now.toLocaleDateString('de-DE');
+  // Customer report: only items with at least Geliefert, grouped by floor/area, clean table
+  let rows=[];
+  DATA.forEach(sec=>{
+    sec.subsections.forEach(sub=>{
+      sub.items.forEach(item=>{
+        const s=gs(item.pos);
+        if(!s.g)return; // only delivered items
+        rows.push({
+          geschoss:sec.label,
+          bereich:sub.bez,
+          pos:item.pos,
+          menge:item.menge,
+          einh:item.einh,
+          bez:item.bez.trim(),
+          fabrikat:item.fabrikat.trim(),
+          typ:item.typ.trim(),
+          g:s.g,m:s.m,a:s.a,sa:s.sa,ea:s.ea,ib:s.ib,ew:s.ew,
+          ts:s.ts||{},
+          fotos:s.fotos,note:s.note
+        });
+      });
+    });
+  });
+
+  if(rows.length===0){alert('Keine Positionen mit Status Geliefert vorhanden.');return;}
+
+  // Fotos vorab als Daten-URLs laden (das Berichts-Popup hat keinen Graph-Token)
+  const fotoData={};
+  if(withFotos){
+    showLoader('Bericht wird vorbereitet...');
+    for(const r of rows){
+      for(const src of (r.fotos||[])){
+        if(fotoData[src]!==undefined) continue;
+        try{ fotoData[src]=await blobToDataURL(await spDownloadBlob(src)); }
+        catch(e){ fotoData[src]=''; }
+      }
+    }
+    hideLoader();
+  }
+
+  // Build HTML report for customer
+  let lastG='',lastB='';
+  let tableRows='';
+  rows.forEach((r,i)=>{
+    if(r.geschoss!==lastG){
+      if(lastG!=='')tableRows+='<tr><td colspan="9" style="height:12px;background:#f5f3f0;border:none"></td></tr>';
+      tableRows+=`<tr><td colspan="9" style="background:#2d2926;color:#c8a882;font-weight:700;font-size:13px;padding:8px 10px;letter-spacing:1px">${r.geschoss}: ${DATA.find(s=>s.label===r.geschoss)?.bez||''}</td></tr>`;
+      lastG=r.geschoss; lastB='';
+    }
+    if(r.bereich!==lastB){
+      tableRows+=`<tr><td colspan="9" style="background:#eeecea;color:#6b5040;font-weight:700;font-size:12px;padding:5px 10px;border-left:3px solid #c8a882">${r.bereich}</td></tr>`;
+      lastB=r.bereich;
+    }
+    const tsShort=iso=>{if(!iso)return'';const d=new Date(iso);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});};
+    const chk=(v,f)=>{
+      if(!v)return'<span style="color:#ccc">&#8211;</span>';
+      const dt=tsShort(r.ts&&r.ts[f]);
+      return '<span style="color:#3a7a3a;font-weight:700">&#10003;</span>'+(dt?'<br><span style="font-size:8.5px;color:#9a9a9a;font-weight:400">'+dt+'</span>':'');
+    };
+    tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">
+      <td style="padding:5px 8px;font-size:11px;color:#9a9a9a;white-space:nowrap">${r.pos}</td>
+      <td style="padding:5px 8px;font-size:12px;font-weight:700">${r.bez}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#6b5040">${r.fabrikat}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#9a9a9a">${r.typ}</td>
+      <td style="padding:5px 8px;font-size:12px;font-weight:700;text-align:center;white-space:nowrap">${r.menge} ${r.einh}</td>
+      <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.g,'g')}</td>
+      <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.m,'m')}</td>
+      <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.sa,'sa')}</td>
+      <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.ea,'ea')}</td>
+      <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.ib,'ib')}</td>
+      <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.ew,'ew')}</td>
+    </tr>`;
+    if(r.note)tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}"><td colspan="9" style="padding:2px 8px 6px 28px;font-size:11px;color:#6b5040;font-style:italic">↳ ${r.note}</td></tr>`;
+    if(withFotos && r.fotos && r.fotos.length){
+      let fhtml='<td colspan="9" style="padding:4px 8px 8px 28px;"><div style="display:flex;gap:8px;flex-wrap:wrap;">';
+      r.fotos.forEach((src,fi)=>{
+        const ts = src.match(/_(\d+)\.jpg/)?.[1];
+        const dt = ts ? new Date(parseInt(ts)).toLocaleString('de-DE') : '';
+        const durl = fotoData[src]||'';
+        if(!durl) return;
+        fhtml+=`<div style="text-align:center"><img src="${durl}" style="width:120px;height:90px;object-fit:cover;border-radius:4px;border:1px solid #eee"><div style="font-size:9px;color:#9a9a9a;margin-top:2px">${dt}</div></div>`;
+      });
+      fhtml+='</div></td>';
+      tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">${fhtml}</tr>`;
+    }
+  });
+
+  const html=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+<title>Leistungsbericht Berlin Upbeat – ${d}</title>
+<style>
+body{font-family:Arial Narrow,Arial,sans-serif;margin:0;padding:20px;color:#2d2926;}
+.kpc{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #6b5040;padding-bottom:12px;margin-bottom:20px;}
+.logo{font-size:22px;font-weight:700;letter-spacing:4px;color:#2d2926;}
+.logo small{display:block;font-size:11px;letter-spacing:2px;color:#9a9a9a;font-weight:400;}
+.meta{text-align:right;font-size:12px;color:#9a9a9a;line-height:1.6;}
+.meta strong{display:block;font-size:15px;color:#2d2926;font-weight:700;}
+h2{font-size:14px;color:#6b5040;margin:0 0 16px;font-weight:400;letter-spacing:0.5px;}
+table{width:100%;border-collapse:collapse;font-family:Arial Narrow,Arial,sans-serif;}
+th{background:#2d2926;color:#c8a882;font-size:11px;padding:7px 8px;text-align:left;font-weight:700;letter-spacing:0.5px;}
+th.center{text-align:center;}
+td{border-bottom:1px solid #eeecea;vertical-align:middle;}
+.legend{margin-top:24px;font-size:11px;color:#9a9a9a;display:flex;gap:20px;}
+.legend span{display:flex;align-items:center;gap:5px;}
+.sig{margin-top:40px;display:flex;gap:60px;}
+.sig-box{flex:1;}
+.sig-line{border-top:1px solid #2d2926;padding-top:6px;font-size:11px;color:#9a9a9a;margin-top:40px;}
+@media print{body{padding:10px;}button{display:none!important;}}
+</style></head><body>
+<button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
+<div class="kpc">
+  <div class="logo">KPC <small>GMBH</small></div>
+  <div class="meta"><strong>Leistungsbericht</strong>Projekt: Berlin Upbeat<br>Datum: ${d}<br>Dok.-Nr.: LB-BU-${now.toISOString().slice(0,10).replace(/-/g,'')}</div>
+</div>
+<h2>Gelieferte und installierte Positionen – Nachweis Leistungsfeststellung</h2>
+<table>
+<thead><tr>
+  <th>Pos.-Nr.</th><th>Bezeichnung</th><th>Fabrikat</th><th>Typ</th><th class="center">Menge</th>
+  <th class="center">Geliefert</th><th class="center">Montiert</th><th class="center">Sanitär</th><th class="center">Elektro</th><th class="center">Inbetriebnahme</th><th class="center">Eingewiesen</th>
+</tr></thead>
+<tbody>${tableRows}</tbody>
+</table>
+<div class="legend">
+  <span><strong style="color:#3a7a3a">✓</strong> = bestätigt</span>
+  <span><strong style="color:#ccc">–</strong> = ausstehend</span>
+  <span>Gesamt erfasst: <strong>${rows.length} Positionen</strong></span>
+</div>
+<div class="sig">
+  <div class="sig-box"><div class="sig-line">Datum / Unterschrift KPC GmbH</div></div>
+  <div class="sig-box"><div class="sig-line">Datum / Unterschrift Auftraggeber</div></div>
+</div>
+<div style="margin-top:16px;text-align:center">
+  <button onclick="window.print()" style="padding:10px 24px;background:#6b5040;color:#fff;border:none;border-radius:4px;font-size:13px;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">Drucken / Als PDF speichern</button>
+</div>
+</body></html>`;
+
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
+
+// ── SUPABASE KONFIGURATION ──
+// ============= BACKEND: Microsoft 365 (SharePoint-Liste + Graph) =============
+const MS_CONFIG = {
+  tenantId: 'cba1b1fc-4a80-4da1-a7f1-e3e4614056eb',
+  clientId: '68f89557-eef9-4481-b45c-29919ed7b55d',
+  spHost:   'kpcfulda.sharepoint.com',
+  sitePath: '/sites/Montagefortschritt',
+  listName: 'Positionen',
+  libName:  'Fotos'
+};
+const GRAPH = 'https://graph.microsoft.com/v1.0';
+const GRAPH_SCOPES = ['User.Read','Sites.ReadWrite.All','Files.ReadWrite.All'];
+// Mobile Browser blocken Login-Popups -> Redirect-Flow verwenden
+const USE_REDIRECT = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+  || (typeof window.matchMedia==='function' && window.matchMedia('(pointer: coarse)').matches);
+
+let msalApp = null, msalAccount = null;
+const SPIDS = { siteId:null, listId:null, driveId:null };
+const ITEMID = {};   // projekt|pos -> SharePoint-Listen-Item-ID
+let PID = null;      // aktuelles Projekt (Baustelle)
+function itemKey(pos){ return (PID||'')+''+pos; }
+
+async function msalInit(){
+  msalApp = new msal.PublicClientApplication({
+    auth: {
+      clientId: MS_CONFIG.clientId,
+      authority: 'https://login.microsoftonline.com/' + MS_CONFIG.tenantId,
+      // volle App-URL (ohne index.html) -> funktioniert auch unter Unterpfaden wie /repo/ (GitHub Pages)
+      redirectUri: (window.location.origin + window.location.pathname).replace(/index\.html$/, '')
+    },
+    cache: { cacheLocation: 'localStorage' }
+  });
+  if(typeof msalApp.initialize === 'function') await msalApp.initialize();
+  const resp = await msalApp.handleRedirectPromise();
+  if(resp && resp.account) msalAccount = resp.account;
+  if(!msalAccount){
+    const accs = msalApp.getAllAccounts();
+    if(accs.length) msalAccount = accs[0];
+  }
+  if(msalAccount) msalApp.setActiveAccount(msalAccount);
+  return msalAccount;
+}
+
+async function msalLogin(){
+  if(!msalApp){
+    if(typeof msal === 'undefined') throw new Error('MSAL-Bibliothek nicht geladen (Internet/CDN prüfen)');
+    await msalInit();
+  }
+  if(USE_REDIRECT){
+    // navigiert weg; Rückkehr wird in msalInit()/handleRedirectPromise verarbeitet
+    await msalApp.loginRedirect({ scopes: GRAPH_SCOPES });
+    return null;
+  }
+  const res = await msalApp.loginPopup({ scopes: GRAPH_SCOPES, prompt: 'select_account' });
+  msalAccount = res.account;
+  msalApp.setActiveAccount(msalAccount);
+  return msalAccount;
+}
+
+async function getToken(){
+  try{
+    const res = await msalApp.acquireTokenSilent({ scopes: GRAPH_SCOPES, account: msalAccount });
+    return res.accessToken;
+  }catch(e){
+    if(USE_REDIRECT){ await msalApp.acquireTokenRedirect({ scopes: GRAPH_SCOPES }); throw e; }
+    const res = await msalApp.acquireTokenPopup({ scopes: GRAPH_SCOPES });
+    msalAccount = res.account;
+    return res.accessToken;
+  }
+}
+
+async function graph(path, opts){
+  opts = opts || {};
+  const token = await getToken();
+  const headers = Object.assign({ 'Authorization': 'Bearer ' + token }, opts.headers || {});
+  const res = await fetch(GRAPH + path, Object.assign({}, opts, { headers }));
+  if(!res.ok){ const t = await res.text(); throw new Error('Graph '+res.status+': '+t.substring(0,300)); }
+  return res;
+}
+
+async function resolveIds(){
+  const site = await (await graph('/sites/' + MS_CONFIG.spHost + ':' + MS_CONFIG.sitePath)).json();
+  SPIDS.siteId = site.id;
+  const lists = await (await graph('/sites/' + SPIDS.siteId + '/lists?$filter=' +
+    encodeURIComponent("displayName eq '" + MS_CONFIG.listName + "'"))).json();
+  if(!lists.value || !lists.value.length) throw new Error('Liste "'+MS_CONFIG.listName+'" nicht gefunden');
+  SPIDS.listId = lists.value[0].id;
+  const drives = await (await graph('/sites/' + SPIDS.siteId + '/drives')).json();
+  const drive = (drives.value||[]).find(d => d.name === MS_CONFIG.libName) || (drives.value||[])[0];
+  if(!drive) throw new Error('Bibliothek "'+MS_CONFIG.libName+'" nicht gefunden');
+  SPIDS.driveId = drive.id;
+}
+
+// ---- Liste (Positionen): laden + upsert ----
+async function spListLoadRows(){
+  const rows = [];
+  // Alle Items laden, clientseitig nach Projekt filtern (robust gegen nicht-indizierte Spalten)
+  let url = '/sites/'+SPIDS.siteId+'/lists/'+SPIDS.listId+'/items?$expand=fields&$top=2000';
+  while(url){
+    const data = await (await graph(url)).json();
+    (data.value||[]).forEach(it => {
+      const f = it.fields || {};
+      if(!f.pos) return;
+      if(PID && (f.projekt||'')!==PID) return;   // nur Items des aktuellen Projekts
+      ITEMID[itemKey(f.pos)] = it.id;
+      let row = {};
+      try{ row = f.data ? JSON.parse(f.data) : {}; }catch(e){ row = {}; }
+      row.pos = f.pos;
+      row.updated_at = it.lastModifiedDateTime || null;
+      rows.push(row);
+    });
+    url = data['@odata.nextLink'] ? data['@odata.nextLink'].replace(GRAPH,'') : null;
+  }
+  return rows;
+}
+
+function buildPosData(pos){
+  const s = gs(pos);
+  // gleiche Struktur wie früher die Supabase-Spalten (innere Felder als JSON-Strings)
+  return JSON.stringify({
+    g:s.g, m:s.m, a:s.a, sa:s.sa, ea:s.ea, ib:s.ib, ew:s.ew,
+    note:s.note,
+    fotos: JSON.stringify(s.fotos),
+    pdfs: JSON.stringify(s.pdfs||[]),
+    restarbeiten: JSON.stringify(s.restarbeiten||[]),
+    ts: JSON.stringify(s.ts||{}),
+    usr: JSON.stringify(s.by||{})
+  });
+}
+
+async function spListWrite(pos){
+  if(!SPIDS.listId || !PID) return;
+  const fields = { pos: pos, projekt: PID, data: buildPosData(pos) };
+  const id = ITEMID[itemKey(pos)];
+  if(id){
+    await graph('/sites/'+SPIDS.siteId+'/lists/'+SPIDS.listId+'/items/'+id+'/fields', {
+      method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(fields)
+    });
+  } else {
+    const res = await graph('/sites/'+SPIDS.siteId+'/lists/'+SPIDS.listId+'/items', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ fields })
+    });
+    const created = await res.json();
+    ITEMID[itemKey(pos)] = created.id;
+  }
+  updLastEdit(new Date().toISOString());
+}
+
+// ---- Storage (Fotos-Bibliothek) ----
+async function spUpload(fname, body, contentType){
+  await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encodeURIComponent(fname)+':/content', {
+    method:'PUT', headers:{'Content-Type': contentType||'application/octet-stream'}, body: body
+  });
+  return fname;
+}
+async function spDownloadBlob(fname){
+  // Metadaten holen -> vor-authentifizierte downloadUrl (CORS-fähig, ohne Token)
+  const meta = await (await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encodeURIComponent(fname))).json();
+  const dl = meta['@microsoft.graph.downloadUrl'];
+  if(!dl) throw new Error('downloadUrl fehlt');
+  const res = await fetch(dl);
+  if(!res.ok) throw new Error('Download '+res.status);
+  return await res.blob();
+}
+async function spDelete(fname){
+  try{
+    await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encodeURIComponent(fname), { method:'DELETE' });
+  }catch(e){ console.warn('Datei löschen fehlgeschlagen:', e.message); }
+}
+
+// savePos defined above with debounce queue
+
+function saveFotos(pos) {
+  spListWrite(pos).catch(e => console.warn('Speichern fehlgeschlagen:', e));
+}
+
+function saveState() { /* no-op, saving happens per position */ }
+function saveStateWithFotos() { /* no-op, saving happens per position */ }
+
+async function loadState() {
+  try {
+    showLoader('Daten werden geladen...');
+    const data = await spListLoadRows();
+    if (data) {
+      let newest = null;
+      data.forEach(row => {
+        let fotos = [], pdfs = [];
+        try { fotos = row.fotos ? JSON.parse(row.fotos) : []; } catch(e) {}
+        try { pdfs = row.pdfs ? JSON.parse(row.pdfs) : []; } catch(e) {}
+        let rest = [];
+        try { rest = row.restarbeiten ? JSON.parse(row.restarbeiten) : []; } catch(e) {}
+        let tsObj = {};
+        try { tsObj = row.ts ? JSON.parse(row.ts) : {}; } catch(e) {}
+        let byObj = {};
+        try { byObj = row.usr ? JSON.parse(row.usr) : {}; } catch(e) {}
+        ST[row.pos] = {
+          g: row.g||false, m: row.m||false, a: row.a||false,
+          sa: row.sa||false, ea: row.ea||false, ib: row.ib||false, ew: row.ew||false,
+          note: row.note||'', fotos: fotos, pdfs: pdfs, restarbeiten: rest, ts: tsObj, by: byObj
+        };
+        if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at;
+      });
+      updLastEdit(newest);
+    }
+    hideLoader();
+  } catch(e) {
+    hideLoader();
+    console.warn('Laden fehlgeschlagen:', e);
+  }
+}
+
+function updLastEdit(iso){
+  const el = document.getElementById('lastEdit');
+  if(!el) return;
+  if(!iso){ el.textContent='–'; return; }
+  const d = new Date(iso);
+  const dd = d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+  const tt = d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+  el.textContent = dd + ' ' + tt;
+}
+
+
+function showToast(msg, opts){
+  opts = opts || {};
+  let t = document.getElementById('toast');
+  if(!t){
+    t = document.createElement('div');
+    t.id = 'toast';
+    t.style.cssText = 'position:fixed;bottom:80px;left:50%;transform:translateX(-50%);color:#fff;padding:12px 22px;border-radius:24px;font-family:Arial Narrow,Arial,sans-serif;font-size:14px;font-weight:700;z-index:1500;box-shadow:0 6px 20px rgba(0,0,0,0.3);transition:opacity .3s;';
+    document.body.appendChild(t);
+  }
+  t.style.background = opts.bg || 'var(--green)';
+  t.textContent = msg;
+  t.style.opacity = '1';
+  t.style.display = 'block';
+  clearTimeout(showToast._t);
+  if(!opts.persist){
+    showToast._t = setTimeout(()=>{ t.style.opacity='0'; setTimeout(()=>{t.style.display='none'},300); }, opts.dur || 2500);
+  }
+}
+function hideToast(){
+  const t = document.getElementById('toast');
+  if(t){ t.style.opacity='0'; setTimeout(()=>{t.style.display='none'},300); }
+}
+
+function showLoader(msg) {
+  let el = document.getElementById('loader');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'loader';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(45,41,38,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;color:#c8a882;font-family:Arial Narrow,Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg || 'Wird gespeichert...';
+  el.style.display = 'flex';
+}
+function hideLoader() {
+  const el = document.getElementById('loader');
+  if (el) el.style.display = 'none';
+}
+
+async function clearState() {
+  if(confirm('Alle Einträge wirklich löschen? Das kann nicht rückgängig gemacht werden.')) {
+    try {
+      for(const p of Object.keys(ITEMID)){
+        try{ await graph('/sites/'+SPIDS.siteId+'/lists/'+SPIDS.listId+'/items/'+ITEMID[p], {method:'DELETE'}); }catch(e){}
+        delete ITEMID[p];
+      }
+      Object.keys(ST).forEach(k => delete ST[k]);
+      buildPanels();
+      upStats();
+    } catch(e) { alert('Fehler beim Löschen: ' + e.message); }
+  }
+}
+
+// Polling für Live-Updates (alle 30 Sekunden)
+setInterval(async () => {
+  if(!SPIDS.listId || !PID) return;
+  try {
+    const data = await spListLoadRows();
+    if (!data) return;
+    let changed = false;
+    let newest = null;
+    data.forEach(row => {
+      if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at;
+      const cur = ST[row.pos];
+      let newRest = cur ? cur.restarbeiten : [];
+      try { if(row.restarbeiten) newRest = JSON.parse(row.restarbeiten); } catch(e) {}
+      const restChanged = JSON.stringify(cur?cur.restarbeiten:[])!==JSON.stringify(newRest);
+      let newTs = cur ? (cur.ts||{}) : {};
+      try { if(row.ts) newTs = JSON.parse(row.ts); } catch(e) {}
+      let newBy = cur ? (cur.by||{}) : {};
+      try { if(row.usr) newBy = JSON.parse(row.usr); } catch(e) {}
+      const tsChanged = JSON.stringify(cur?(cur.ts||{}):{})!==JSON.stringify(newTs);
+      if (!cur || cur.g!==row.g || cur.m!==row.m || cur.a!==row.a ||
+          cur.sa!==row.sa || cur.ea!==row.ea || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged) {
+        let pdfs = cur ? cur.pdfs : [];
+        try { if(row.pdfs) pdfs = JSON.parse(row.pdfs); } catch(e) {}
+        ST[row.pos] = { g:row.g||false, m:row.m||false, a:row.a||false,
+          sa:row.sa||false, ea:row.ea||false, ib:row.ib||false, ew:row.ew||false,
+          note:row.note||'', fotos:cur?cur.fotos:[], pdfs:pdfs, restarbeiten:newRest, ts:newTs, by:newBy };
+        changed = true;
+        const id = row.pos.replace(/\./g,'_');
+        const fields = ['g','m','a','sa','ea','ib','ew'];
+        fields.forEach(f => {
+          const el = document.getElementById('K'+f+id);
+          if(el) { el.classList.toggle('on', ST[row.pos][f]); el.querySelector('.cki').innerHTML = ST[row.pos][f]?'&#10003;':'&#9675;'; }
+          const tsEl = document.getElementById('T'+f+id);
+          if(tsEl) tsEl.textContent = (ST[row.pos][f] && ST[row.pos].ts && ST[row.pos].ts[f]) ? tsFmt(ST[row.pos].ts[f]) : '';
+        });
+        const card = document.getElementById('C'+id);
+        const st = ist(row.pos);
+        if(card) card.className = 'card'+(st!=='open'?' '+st:'');
+        const anm = card ? card.querySelector('.anm') : null;
+        if(anm && anm !== document.activeElement) anm.value = ST[row.pos].note;
+        updProg(row.pos);
+        // Restarbeiten nur rendern wenn diese Karte nicht gerade fokussiert ist
+        if(restChanged){
+          const card2 = document.getElementById('C'+row.pos.replace(/\./g,'_'));
+          const tippt = card2 && card2.contains(document.activeElement);
+          if(!tippt) updRA(row.pos);
+        }
+      }
+    });
+    updLastEdit(newest);
+    if(changed) { upStats(); /* restoreUI nicht nötig - UI wird im Polling direkt aktualisiert */ }
+  } catch(e) {}
+}, 30000);
+
+
+
+// ── PROTOKOLL UPLOAD + PDF EDITOR ──
+let PPOS=null, PTYPE=null;
+const PROTO_TYPES=['IBN Protokoll','Einweisungsprotokoll','DGUV Protokoll'];
+
+function trpdf(pos,btn){
+  PPOS=pos;
+  let menu=document.getElementById('ptypeMenu');
+  if(!menu){
+    menu=document.createElement('div');
+    menu.id='ptypeMenu';
+    menu.className='ptype-menu';
+    menu.innerHTML=PROTO_TYPES.map(t=>`<div class="ptype-item" onclick="selectPtype('${t}')">${t}</div>`).join('');
+    document.body.appendChild(menu);
+    document.addEventListener('click',e=>{if(!e.target.closest('#ptypeMenu')&&!e.target.closest('.fbtn'))menu.classList.remove('open');});
+  }
+  const r=btn.getBoundingClientRect();
+  menu.style.top=(r.bottom+window.scrollY+4)+'px';
+  menu.style.left=r.left+'px';
+  menu.classList.add('open');
+}
+
+function selectPtype(type){
+  PTYPE=type;
+  document.getElementById('ptypeMenu')?.classList.remove('open');
+  document.getElementById('pi').value='';
+  document.getElementById('pi').click();
+}
+
+document.getElementById('pi').addEventListener('change',async function(e){
+  const file=e.target.files[0];
+  if(!file||!PPOS||!PTYPE)return;
+  showLoader(PTYPE+' wird hochgeladen...');
+  try {
+    const ext=file.name.split('.').pop();
+    const fname=PPOS.replace(/\./g,'_')+'_'+PTYPE.replace(/ /g,'_')+'_'+Date.now()+'.'+ext;
+    await spUpload(fname, file, file.type||'application/pdf');
+    if(!gs(PPOS).pdfs) gs(PPOS).pdfs=[];
+    gs(PPOS).pdfs.push({type:PTYPE,name:file.name,fname:fname});
+    saveFotos(PPOS);
+    updPG(PPOS);
+    hideLoader();
+  } catch(err){
+    hideLoader();
+    alert('Upload fehlgeschlagen: '+err.message);
+  }
+});
+
+function updPG(pos){
+  const id=sp(pos);
+  const s=gs(pos);
+  const g=document.getElementById('PG'+id);
+  if(!g) return;
+  if(!s.pdfs||!s.pdfs.length){g.innerHTML='';return;}
+  g.innerHTML=s.pdfs.map((p,i)=>{
+    const isPdf=(p.fname||p.name||'').toLowerCase().endsWith('.pdf');
+    const editBtn=isPdf?`<button class="pdoc-btn pdoc-edit" onclick="pdfOpen('${pos}',${i})" title="Ausfüllen">&#9999;&#65039;</button>`:'';
+    return `<div class="pdoc">&#128196; <span class="pdoc-name" onclick="pdfView('${pos}',${i})">${p.type}: ${p.name}</span>${editBtn}<button class="pdoc-btn pdoc-del" onclick="delProto('${pos}',${i})" title="Löschen">&#10005;</button></div>`;
+  }).join('');
+}
+
+async function dlProto(pos,i){
+  const p=gs(pos).pdfs[i];
+  if(!p)return;
+  showLoader('Wird geladen...');
+  try{
+    const blob=await spDownloadBlob(p.fname);
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download=p.name;
+    document.body.appendChild(a);a.click();a.remove();
+    hideLoader();
+  }catch(e){hideLoader();alert('Download fehlgeschlagen.');}
+}
+
+function delProto(pos,i){
+  const p=gs(pos).pdfs[i];
+  if(!p)return;
+  if(!confirm(p.type+' wirklich löschen?'))return;
+  gs(pos).pdfs.splice(i,1);
+  saveFotos(pos);
+  updPG(pos);
+  if(p.fname) spDelete(p.fname);
+}
+
+// ── PDF EDITOR (Pencil) ──
+let EDPOS=null, EDIDX=null, EDTOOL='pen', EDPAGES=[], EDDIRTY=false;
+const EDCOLOR='#000000';
+
+function pdfSetTool(t){
+  EDTOOL=t;
+  document.getElementById('toolPen').classList.toggle('on',t==='pen');
+  const te=document.getElementById('toolText');
+  if(te) te.classList.toggle('on',t==='text');
+  document.getElementById('toolErase').classList.toggle('on',t==='erase');
+  // Bei Tool-Wechsel: aktiven Text-Input finalisieren
+  if(window._activeTextInput){
+    try { window._activeTextInput.blur(); } catch(e){}
+  }
+}
+
+// Lese-Modus-Flag - im Viewer wird nicht gezeichnet und nicht gespeichert
+let EDREADONLY = false;
+
+// Toolbar passt sich an Modus an
+function pdfRenderToolbar(){
+  const showEdit = EDREADONLY;
+  const showDraw = !EDREADONLY;
+  document.getElementById('toolPen').style.display     = showDraw ? '' : 'none';
+  const tt=document.getElementById('toolText');
+  if(tt) tt.style.display = showDraw ? '' : 'none';
+  document.getElementById('toolErase').style.display   = showDraw ? '' : 'none';
+  document.getElementById('toolSave').style.display    = showDraw ? '' : 'none';
+  document.getElementById('toolViewEdit').style.display     = showEdit ? '' : 'none';
+  document.getElementById('toolViewDownload').style.display = showEdit ? '' : 'none';
+}
+
+// Klick auf Dateinamen → Viewer öffnen (read-only)
+async function pdfView(pos, i){
+  return pdfOpen(pos, i, true);
+}
+
+// Wechsel vom Viewer in den Editor
+function pdfViewToEdit(){
+  if(EDPOS===null || EDIDX===null) return;
+  EDREADONLY = false;
+  pdfRenderToolbar();
+  pdfSetTool('pen');
+  // Listener für jede Ink-Layer anhängen
+  EDPAGES.forEach(pg => attachInk(pg.ink));
+}
+
+// Download aus Viewer heraus
+function pdfViewDownload(){
+  if(EDPOS===null || EDIDX===null) return;
+  dlProto(EDPOS, EDIDX);
+}
+
+async function pdfOpen(pos, i, readonly){
+  const p=gs(pos).pdfs[i];
+  if(!p)return;
+  EDPOS=pos;EDIDX=i;EDPAGES=[];EDDIRTY=false;
+  EDREADONLY = !!readonly;
+  const titlePrefix = EDREADONLY ? '👁 ' : '';
+  document.getElementById('pdfedTitle').textContent=titlePrefix+p.type+': '+p.name;
+  pdfRenderToolbar();
+  if(!EDREADONLY) pdfSetTool('pen');
+  document.getElementById('pdfed').classList.add('on');
+  const pagesEl=document.getElementById('pdfedPages');
+  pagesEl.innerHTML='<div style="color:#c8a882;padding:40px;font-size:15px;font-weight:700">PDF wird geladen...</div>';
+  try{
+    pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    const buf=await (await spDownloadBlob(p.fname)).arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    pagesEl.innerHTML='';
+    const scale=2;
+    for(let pn=1;pn<=pdf.numPages;pn++){
+      const page=await pdf.getPage(pn);
+      const vp=page.getViewport({scale});
+      const wrap=document.createElement('div');
+      wrap.className='pdfed-pg';
+      const cv=document.createElement('canvas');
+      cv.width=vp.width;cv.height=vp.height;
+      const ink=document.createElement('canvas');
+      ink.width=vp.width;ink.height=vp.height;
+      ink.className='ink';
+      if(EDREADONLY) ink.style.pointerEvents='none'; // Im Viewer keine Touch-Capture
+      const maxW=Math.min(window.innerWidth-28, 900);
+      const dispScale=maxW/vp.width;
+      cv.style.width=ink.style.width=(vp.width*dispScale)+'px';
+      cv.style.height=ink.style.height=(vp.height*dispScale)+'px';
+      wrap.appendChild(cv);wrap.appendChild(ink);
+      pagesEl.appendChild(wrap);
+      await page.render({canvasContext:cv.getContext('2d'),viewport:vp}).promise;
+      EDPAGES.push({base:cv,ink:ink});
+      if(!EDREADONLY) attachInk(ink); // Im Viewer: keine Zeichen-Listener
+    }
+  }catch(e){
+    pagesEl.innerHTML='<div style="color:#c0392b;padding:40px;font-size:15px">PDF konnte nicht geladen werden: '+e.message+'</div>';
+  }
+}
+
+function attachInk(ink){
+  const ctx=ink.getContext('2d');
+  let drawing=false,lastX=0,lastY=0;
+  function getXY(e){
+    const r=ink.getBoundingClientRect();
+    return [(e.clientX-r.left)*(ink.width/r.width), (e.clientY-r.top)*(ink.height/r.height)];
+  }
+  // TEXT-TOOL: erstellt Textarea-Overlay, beim Bestätigen wird Text aufs Canvas gezeichnet
+  function startText(e){
+    e.preventDefault();
+    if(window._activeTextInput){
+      try { window._activeTextInput.blur(); } catch(err){}
+    }
+    const r=ink.getBoundingClientRect();
+    const wrap = ink.parentElement;
+    const wrapRect = wrap.getBoundingClientRect();
+    const [cx, cy] = getXY(e); // Canvas-Koordinaten
+    const scale = ink.width / r.width; // Display→Canvas Faktor
+    
+    const ta = document.createElement('textarea');
+    ta.className = 'pdfed-textinput';
+    ta.placeholder = 'Tippen ...';
+    ta.rows = 1;
+    ta.style.left = (e.clientX - wrapRect.left) + 'px';
+    ta.style.top  = (e.clientY - wrapRect.top - 4) + 'px';
+    ta._cx = cx; ta._cy = cy; ta._scale = scale;
+    wrap.appendChild(ta);
+    window._activeTextInput = ta;
+    
+    // Mobile Tastatur sicher öffnen
+    setTimeout(() => { ta.focus(); ta.click(); }, 50);
+    
+    ta.addEventListener('input', () => {
+      ta.style.height = 'auto';
+      ta.style.height = ta.scrollHeight + 'px';
+      // Breite mit Inhalt wachsen
+      const len = Math.max(...ta.value.split('\n').map(l => l.length));
+      ta.style.width = Math.max(200, Math.min(500, len * 11 + 30)) + 'px';
+    });
+    
+    let finalized = false;
+    function finalize(){
+      if(finalized) return; finalized = true;
+      const text = ta.value;
+      const x = ta._cx, y = ta._cy, sc = ta._scale;
+      
+      if(text.trim()){
+        // Text aufs Canvas zeichnen (Canvas-Auflösung berücksichtigen)
+        const fontSize = 18 * sc;
+        ctx.save();
+        ctx.fillStyle = '#000';
+        ctx.font = fontSize + 'px -apple-system, BlinkMacSystemFont, Arial, sans-serif';
+        ctx.textBaseline = 'top';
+        const lines = text.split('\n');
+        const lineHeight = fontSize * 1.3;
+        lines.forEach((line, idx) => {
+          if(line) ctx.fillText(line, x, y + idx * lineHeight);
+        });
+        ctx.restore();
+        EDDIRTY = true;
+      }
+      
+      ta.remove();
+      if(window._activeTextInput === ta) window._activeTextInput = null;
+    }
+    
+    ta.addEventListener('blur', finalize);
+    ta.addEventListener('keydown', (ev) => {
+      if(ev.key === 'Enter' && !ev.shiftKey && !ev.ctrlKey){
+        ev.preventDefault(); finalize();
+      } else if(ev.key === 'Escape'){
+        ev.preventDefault();
+        ta.value = ''; finalize();
+      }
+    });
+  }
+  function eraseAt(x,y){
+    // Fill circle at point - works for single tap
+    ctx.save();
+    ctx.globalCompositeOperation='destination-out';
+    ctx.fillStyle='rgba(0,0,0,1)';
+    ctx.beginPath();
+    ctx.arc(x,y,40,0,2*Math.PI);
+    ctx.fill();
+    ctx.restore();
+  }
+  function eraseLine(x1,y1,x2,y2){
+    // Stroke line between points - no gaps when wiping fast
+    ctx.save();
+    ctx.globalCompositeOperation='destination-out';
+    ctx.strokeStyle='rgba(0,0,0,1)';
+    ctx.lineWidth=80;
+    ctx.lineCap='round';
+    ctx.lineJoin='round';
+    ctx.beginPath();
+    ctx.moveTo(x1,y1);
+    ctx.lineTo(x2,y2);
+    ctx.stroke();
+    ctx.restore();
+  }
+  function start(e){
+    if(EDTOOL==='text'){
+      startText(e);
+      return;
+    }
+    e.preventDefault();
+    drawing=true;
+    [lastX,lastY]=getXY(e);
+    if(EDTOOL==='erase'){
+      eraseAt(lastX,lastY);
+      EDDIRTY=true;
+    }
+  }
+  function move(e){
+    if(!drawing)return;
+    e.preventDefault();
+    const [x,y]=getXY(e);
+    if(EDTOOL==='erase'){
+      eraseLine(lastX,lastY,x,y);
+      eraseAt(x,y);
+    } else {
+      ctx.strokeStyle=EDCOLOR;
+      ctx.fillStyle=EDCOLOR;
+      ctx.lineWidth=4;
+      ctx.lineCap='round';
+      ctx.lineJoin='round';
+      ctx.beginPath();
+      ctx.moveTo(lastX,lastY);
+      ctx.lineTo(x,y);
+      ctx.stroke();
+    }
+    [lastX,lastY]=[x,y];
+    EDDIRTY=true;
+  }
+  function end(e){drawing=false;}
+  ink.addEventListener('pointerdown',start);
+  ink.addEventListener('pointermove',move);
+  ink.addEventListener('pointerup',end);
+  ink.addEventListener('pointercancel',end);
+  ink.addEventListener('pointerleave',end);
+}
+
+async function pdfSaveData(){
+  if(EDPOS===null||EDIDX===null) return false;
+  const p=gs(EDPOS).pdfs[EDIDX];
+  if(!p) throw new Error('PDF-Eintrag nicht gefunden');
+  if(!EDPAGES.length) throw new Error('PDF wurde nicht vollständig geladen');
+  if(!window.jspdf) throw new Error('PDF-Bibliothek nicht geladen (Seite neu laden)');
+
+  // Alten Dateinamen merken (für späteres Löschen)
+  let oldFname = p.fname;
+  if(!oldFname && p.url){
+    const m = p.url.match(/\/fotos\/([^?]+)/);
+    if(m) oldFname = decodeURIComponent(m[1]);
+  }
+
+  // PDF zusammenbauen
+  const {jsPDF}=window.jspdf;
+  let doc=null;
+  EDPAGES.forEach((pg,idx)=>{
+    const merge=document.createElement('canvas');
+    merge.width=pg.base.width;merge.height=pg.base.height;
+    const mc=merge.getContext('2d');
+    mc.drawImage(pg.base,0,0);
+    mc.drawImage(pg.ink,0,0);
+    const imgData=merge.toDataURL('image/jpeg',0.7);
+    const wmm=210, hmm=merge.height*210/merge.width;
+    if(idx===0){ doc=new jsPDF({orientation:'p',unit:'mm',format:[wmm,hmm]}); }
+    else { doc.addPage([wmm,hmm]); }
+    doc.addImage(imgData,'JPEG',0,0,wmm,hmm);
+  });
+  if(!doc) throw new Error('PDF konnte nicht erstellt werden');
+  const blob=doc.output('blob');
+
+  // Strategie: NEUE Datei schreiben (INSERT, funktioniert immer)
+  // Dateiname mit aktuellem Zeitstempel = niemals Konflikt
+  const typeSlug = (p.type||'Protokoll').replace(/ /g,'_');
+  const newFname = EDPOS.replace(/\./g,'_')+'_'+typeSlug+'_'+Date.now()+'.pdf';
+
+  await spUpload(newFname, blob, 'application/pdf');
+
+  // Eintrag auf neue Datei zeigen lassen
+  p.fname = newFname;
+  saveFotos(EDPOS);
+  updPG(EDPOS);
+
+  // Alte Datei im Hintergrund löschen
+  if(oldFname && oldFname !== newFname) spDelete(oldFname);
+  return true;
+}
+
+async function pdfClose(){
+  if(EDPOS===null || EDIDX===null){
+    document.getElementById('pdfed').classList.remove('on');
+    document.getElementById('pdfedPages').innerHTML='';
+    EDPAGES=[];EDDIRTY=false;
+    return;
+  }
+  // Im Viewer-Modus: einfach schließen, nichts speichern
+  if(EDREADONLY){
+    document.getElementById('pdfed').classList.remove('on');
+    document.getElementById('pdfedPages').innerHTML='';
+    EDPAGES=[];EDPOS=null;EDIDX=null;EDDIRTY=false;EDREADONLY=false;
+    return;
+  }
+  // Sofort schließen + Speichern im Hintergrund
+  // Referenzen lokal sichern (für Hintergrund-Save und Wiederöffnen bei Fehler)
+  const savingPos = EDPOS;
+  const savingIdx = EDIDX;
+  const savingPages = EDPAGES;
+  const savingTitle = document.getElementById('pdfedTitle').textContent;
+
+  // UI sofort schließen
+  document.getElementById('pdfed').classList.remove('on');
+  document.getElementById('pdfedPages').innerHTML='';
+  EDPAGES=[];EDPOS=null;EDIDX=null;EDDIRTY=false;
+
+  showToast('Wird gespeichert ...', {persist:true, bg:'var(--braun)'});
+
+  try{
+    await pdfSaveDataBg(savingPos, savingIdx, savingPages);
+    showToast('✓ Protokoll gespeichert');
+  }catch(e){
+    hideToast();
+    alert('Speichern fehlgeschlagen!\n\n'+e.message+'\n\nDer Editor wird wieder geöffnet damit nichts verloren geht.');
+    // Editor mit ursprünglichem Zustand wieder öffnen
+    EDPOS = savingPos; EDIDX = savingIdx; EDPAGES = savingPages;
+    document.getElementById('pdfedTitle').textContent = savingTitle;
+    const pagesEl = document.getElementById('pdfedPages');
+    pagesEl.innerHTML='';
+    savingPages.forEach(pg=>{
+      const wrap = document.createElement('div');
+      wrap.className = 'pdfed-pg';
+      const maxW = Math.min(window.innerWidth-28, 900);
+      const dispScale = maxW/pg.base.width;
+      pg.base.style.width = pg.ink.style.width = (pg.base.width*dispScale)+'px';
+      pg.base.style.height = pg.ink.style.height = (pg.base.height*dispScale)+'px';
+      wrap.appendChild(pg.base); wrap.appendChild(pg.ink);
+      pagesEl.appendChild(wrap);
+      attachInk(pg.ink);
+    });
+    document.getElementById('pdfed').classList.add('on');
+  }
+}
+
+// Hintergrund-Speichern mit lokalen Referenzen (race-frei)
+async function pdfSaveDataBg(pos, idx, pages){
+  if(pos===null||idx===null) return false;
+  const p=gs(pos).pdfs[idx];
+  if(!p) throw new Error('PDF-Eintrag nicht gefunden');
+  if(!pages.length) throw new Error('PDF wurde nicht vollständig geladen');
+  if(!window.jspdf) throw new Error('PDF-Bibliothek nicht geladen (Seite neu laden)');
+
+  let oldFname = p.fname;
+  if(!oldFname && p.url){
+    const m = p.url.match(/\/fotos\/([^?]+)/);
+    if(m) oldFname = decodeURIComponent(m[1]);
+  }
+
+  const {jsPDF}=window.jspdf;
+  let doc=null;
+  pages.forEach((pg,i)=>{
+    const merge=document.createElement('canvas');
+    merge.width=pg.base.width;merge.height=pg.base.height;
+    const mc=merge.getContext('2d');
+    mc.drawImage(pg.base,0,0);
+    mc.drawImage(pg.ink,0,0);
+    const imgData=merge.toDataURL('image/jpeg',0.7);
+    const wmm=210, hmm=merge.height*210/merge.width;
+    if(i===0){ doc=new jsPDF({orientation:'p',unit:'mm',format:[wmm,hmm]}); }
+    else { doc.addPage([wmm,hmm]); }
+    doc.addImage(imgData,'JPEG',0,0,wmm,hmm);
+  });
+  if(!doc) throw new Error('PDF konnte nicht erstellt werden');
+  const blob=doc.output('blob');
+
+  const typeSlug = (p.type||'Protokoll').replace(/ /g,'_');
+  const newFname = pos.replace(/\./g,'_')+'_'+typeSlug+'_'+Date.now()+'.pdf';
+
+  await spUpload(newFname, blob, 'application/pdf');
+
+  p.fname = newFname;
+  saveFotos(pos);
+  updPG(pos);
+
+  if(oldFname && oldFname !== newFname) spDelete(oldFname);
+  return true;
+}
+
+// Manueller Speichern-Button als Sicherheitsnetz
+async function pdfSaveManual(){
+  if(EDPOS===null||EDIDX===null)return;
+  if(!EDDIRTY){ alert('Nichts zu speichern.'); return; }
+  showLoader('Protokoll wird gespeichert...');
+  try{
+    await pdfSaveData();
+    hideLoader();
+    EDDIRTY=false;
+    showToast('✓ Gespeichert');
+  }catch(e){
+    hideLoader();
+    alert('Speichern fehlgeschlagen: '+e.message);
+  }
+}
+
+async function downloadProtoZip(){
+  const all=[];
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(item=>{
+    const s=gs(item.pos);
+    if(s.pdfs&&s.pdfs.length) s.pdfs.forEach(p=>all.push({...p,pos:item.pos}));
+  })));
+  if(all.length===0){alert('Keine Protokolle vorhanden.');return;}
+  if(!confirm(all.length+' Protokoll(e) werden als ZIP heruntergeladen. OK?'))return;
+  showLoader('Protokolle werden gepackt...');
+  try{
+    const zip=new JSZip();
+    for(const p of all){
+      try{
+        const blob=await spDownloadBlob(p.fname);
+        const folder=p.pos.replace(/\./g,'_');
+        zip.file(folder+'/'+p.name, blob);
+      }catch(e){ console.warn('Protokoll übersprungen:', e.message); }
+    }
+    const content=await zip.generateAsync({type:'blob'});
+    const a=document.createElement('a');
+    a.href=URL.createObjectURL(content);
+    a.download='Protokolle_Berlin_Upbeat_'+new Date().toISOString().slice(0,10)+'.zip';
+    document.body.appendChild(a);a.click();a.remove();
+    hideLoader();
+  }catch(e){hideLoader();alert('ZIP fehlgeschlagen: '+e.message);}
+}
+
+
+const RA_TIMERS={};
+let RA_FOTO_TARGET=null;
+
+function raFmtTs(iso){
+  if(!iso)return'';
+  const d=new Date(iso);
+  return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})
+    +' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
+}
+function raEnsure(r){
+  if(typeof r.ersteller==='undefined') r.ersteller=r.kuerzel||'';
+  if(typeof r.erstelltAm==='undefined') r.erstelltAm=null;
+  if(typeof r.erledigtVon==='undefined') r.erledigtVon='';
+  if(typeof r.erledigtAm==='undefined') r.erledigtAm=r.doneAt||null;
+  if(!Array.isArray(r.fotos)) r.fotos=[];
+  return r;
+}
+function updRA(pos){
+  const id=sp(pos);
+  const s=gs(pos);
+  const g=document.getElementById('RA'+id);
+  if(!g)return;
+  if(!s.restarbeiten.length) s.restarbeiten.push({txt:'',done:false,ersteller:'',erstelltAm:null,erledigtVon:'',erledigtAm:null,fotos:[]});
+  s.restarbeiten.forEach(raEnsure);
+  g.innerHTML=s.restarbeiten.map((r,i)=>{
+    const tsErst=r.erstelltAm?raFmtTs(r.erstelltAm):'';
+    const tsErl=r.done&&r.erledigtAm?raFmtTs(r.erledigtAm):'';
+    const fotosHtml=r.fotos.length?`<div class="rafg" id="RAFG_${id}_${i}">${r.fotos.map((src,fi)=>`<div class="rafth" onclick="raOlb('${pos}',${i},${fi})"><img class="raimg" data-fref="${src}"><button class="rafdel" onclick="event.stopPropagation();raFotoDel('${pos}',${i},${fi})">&#10005;</button></div>`).join('')}</div>`:'';
+    return `<div class="rarow${r.done?' done':''}" data-i="${i}">
+      <div class="ramain">
+        <input type="checkbox" class="rachk" ${r.done?'checked':''} onchange="raToggle('${pos}',${i},this.checked)">
+        <input type="text" class="ratxt" value="${(r.txt||'').replace(/"/g,'&quot;')}" placeholder="Restarbeit ${i+1}…"
+          oninput="raSetTxt('${pos}',${i},this.value)" onkeydown="raKey(event,'${pos}',${i})">
+        <button class="rafbtn" onclick="raFoto('${pos}',${i})" title="Foto zur Restarbeit">&#128247;</button>
+        <button class="radel" onclick="raDel('${pos}',${i})" title="Zeile löschen">&#10005;</button>
+      </div>
+      <div class="rameta">
+        <div class="rametacol">
+          <span class="rametalbl">Erst.:</span>
+          <input type="text" class="rakuerz" value="${(r.ersteller||'').replace(/"/g,'&quot;')}" placeholder="Kürz." maxlength="5"
+            oninput="raSetErsteller('${pos}',${i},this.value)" onblur="raStampErstellt('${pos}',${i})">
+          <span class="rats">${tsErst}</span>
+        </div>
+        <div class="rametacol">
+          <span class="rametalbl">Erl.:</span>
+          <input type="text" class="rakuerz" value="${(r.erledigtVon||'').replace(/"/g,'&quot;')}" placeholder="Kürz." maxlength="5"
+            oninput="raSetErledigtVon('${pos}',${i},this.value)">
+          <span class="rats">${tsErl}</span>
+        </div>
+      </div>
+      ${fotosHtml}
+    </div>`;
+  }).join('');
+  g.querySelectorAll('img.raimg[data-fref]').forEach(im=>{
+    loadImageAsBlob(im.dataset.fref).then(b=>{ if(b) im.src=b; });
+  });
+  const info=document.getElementById('RAI'+id);
+  if(info){
+    const off=s.restarbeiten.filter(r=>r.txt&&!r.done).length;
+    const all=s.restarbeiten.filter(r=>r.txt).length;
+    info.textContent=all?`${all-off}/${all} erledigt`:'';
+  }
+}
+function raSetTxt(pos,i,val){
+  const s=gs(pos);
+  if(!s.restarbeiten[i])return;
+  raEnsure(s.restarbeiten[i]);
+  s.restarbeiten[i].txt=val;
+  if(val.trim() && !s.restarbeiten[i].erstelltAm) s.restarbeiten[i].erstelltAm=new Date().toISOString();
+  raDebouncedSave(pos);
+}
+function raSetErsteller(pos,i,val){
+  const s=gs(pos);
+  if(!s.restarbeiten[i])return;
+  raEnsure(s.restarbeiten[i]);
+  s.restarbeiten[i].ersteller=val.toUpperCase();
+  raDebouncedSave(pos);
+}
+function raStampErstellt(pos,i){
+  const s=gs(pos);
+  if(!s.restarbeiten[i])return;
+  if(s.restarbeiten[i].ersteller && !s.restarbeiten[i].erstelltAm){
+    s.restarbeiten[i].erstelltAm=new Date().toISOString();
+    updRA(pos);
+    raDebouncedSave(pos);
+  }
+}
+function raSetErledigtVon(pos,i,val){
+  const s=gs(pos);
+  if(!s.restarbeiten[i])return;
+  raEnsure(s.restarbeiten[i]);
+  s.restarbeiten[i].erledigtVon=val.toUpperCase();
+  raDebouncedSave(pos);
+}
+function raToggle(pos,i,done){
+  const s=gs(pos);
+  if(!s.restarbeiten[i])return;
+  raEnsure(s.restarbeiten[i]);
+  s.restarbeiten[i].done=done;
+  s.restarbeiten[i].erledigtAm=done?new Date().toISOString():null;
+  if(!done) s.restarbeiten[i].erledigtVon='';
+  updRA(pos);
+  saveFotos(pos);
+}
+function raDel(pos,i){
+  const s=gs(pos);
+  if(s.restarbeiten[i] && (s.restarbeiten[i].txt||s.restarbeiten[i].fotos.length)){
+    if(!confirm('Restarbeit wirklich löschen?'))return;
+  }
+  s.restarbeiten.splice(i,1);
+  updRA(pos);
+  saveFotos(pos);
+}
+function raKey(ev,pos,i){
+  if(ev.key!=='Enter')return;
+  ev.preventDefault();
+  const s=gs(pos);
+  s.restarbeiten.splice(i+1,0,{txt:'',done:false,ersteller:'',erstelltAm:null,erledigtVon:'',erledigtAm:null,fotos:[]});
+  updRA(pos);
+  saveFotos(pos);
+  setTimeout(()=>{
+    const id=sp(pos);
+    const newRow=document.querySelector(`#RA${id} .rarow[data-i="${i+1}"] .ratxt`);
+    if(newRow)newRow.focus();
+  },10);
+}
+function raDebouncedSave(pos){
+  if(RA_TIMERS[pos])clearTimeout(RA_TIMERS[pos]);
+  RA_TIMERS[pos]=setTimeout(()=>{
+    saveFotos(pos);
+    const id=sp(pos);
+    const s=gs(pos);
+    const info=document.getElementById('RAI'+id);
+    if(info){
+      const off=s.restarbeiten.filter(r=>r.txt&&!r.done).length;
+      const all=s.restarbeiten.filter(r=>r.txt).length;
+      info.textContent=all?`${all-off}/${all} erledigt`:'';
+    }
+    delete RA_TIMERS[pos];
+  },1000);
+}
+function raFoto(pos,idx){
+  RA_FOTO_TARGET={pos,idx};
+  let menu=document.getElementById('raFsrcMenu');
+  if(!menu){
+    menu=document.createElement('div');
+    menu.id='raFsrcMenu';
+    menu.className='ptype-menu';
+    menu.innerHTML='<div class="ptype-item" onclick="raSelectFsrc(\'cam\')">&#128247; Kamera aufnehmen</div><div class="ptype-item" onclick="raSelectFsrc(\'gal\')">&#128444; Aus Galerie wählen</div>';
+    document.body.appendChild(menu);
+    document.addEventListener('click',e=>{if(!e.target.closest('#raFsrcMenu')&&!e.target.closest('.rafbtn'))menu.classList.remove('open');});
+  }
+  const id=sp(pos);
+  const btn=document.querySelector(`#RA${id} .rarow[data-i="${idx}"] .rafbtn`);
+  if(btn){
+    const r=btn.getBoundingClientRect();
+    menu.style.top=(r.bottom+window.scrollY+4)+'px';
+    menu.style.left=Math.max(8,r.left+window.scrollX-100)+'px';
+  }
+  menu.classList.add('open');
+}
+function raSelectFsrc(src){
+  document.getElementById('raFsrcMenu')?.classList.remove('open');
+  const inp=document.createElement('input');
+  inp.type='file';
+  inp.accept='image/*';
+  if(src==='cam')inp.setAttribute('capture','environment');
+  inp.style.display='none';
+  document.body.appendChild(inp);
+  inp.addEventListener('change',raHandleFotoUpload);
+  inp.click();
+}
+async function raHandleFotoUpload(e){
+  const file=e.target.files[0];
+  e.target.remove();
+  if(!file||!RA_FOTO_TARGET)return;
+  const {pos,idx}=RA_FOTO_TARGET;
+  showLoader('Foto wird komprimiert...');
+  try{
+    const uploadFile=await tryCompressImage(file);
+    const origKB=Math.round(file.size/1024);
+    const newKB=Math.round(uploadFile.size/1024);
+    showLoader('Foto wird hochgeladen... ('+newKB+' KB, vorher '+origKB+' KB)');
+    const fname='RA_'+pos.replace(/\./g,'_')+'_'+idx+'_'+Date.now()+'.jpg';
+    await spUpload(fname, uploadFile, 'image/jpeg');
+    const s=gs(pos);
+    if(s.restarbeiten[idx]){
+      raEnsure(s.restarbeiten[idx]);
+      s.restarbeiten[idx].fotos.push(fname);
+      updRA(pos);
+      saveFotos(pos);
+    }
+    hideLoader();
+  }catch(err){
+    hideLoader();
+    console.warn('RA-Foto-Upload fehlgeschlagen:',err.message);
+    alert('Foto-Upload fehlgeschlagen.');
+  }
+  RA_FOTO_TARGET=null;
+}
+function raFotoDel(pos,idx,fi){
+  const s=gs(pos);
+  if(!s.restarbeiten[idx])return;
+  const fname=s.restarbeiten[idx].fotos[fi];
+  if(!confirm('Foto wirklich löschen?'))return;
+  s.restarbeiten[idx].fotos.splice(fi,1);
+  updRA(pos);
+  saveFotos(pos);
+  if(fname) spDelete(fname);
+}
+function raOlb(pos,idx,fi){
+  const fname=gs(pos).restarbeiten[idx]?.fotos[fi];
+  if(!fname)return;
+  loadImageAsBlob(fname).then(b=>{ document.getElementById('lbi').src=b||''; });
+  document.getElementById('lb').classList.add('on');
+}
+function expRest(){
+  const now=new Date();
+  const d=now.toLocaleDateString('de-DE');
+  let rows=[];
+  DATA.forEach(sec=>{
+    sec.subsections.forEach(sub=>{
+      sub.items.forEach(item=>{
+        const s=gs(item.pos);
+        if(!s.restarbeiten||!s.restarbeiten.length)return;
+        s.restarbeiten.forEach(r=>{
+          raEnsure(r);
+          if(!r.txt)return;
+          rows.push({
+            geschoss:sec.label, bereich:sub.bez, pos:item.pos, bez:item.bez.trim(),
+            txt:r.txt, done:r.done, ersteller:r.ersteller, erstelltAm:r.erstelltAm,
+            erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm
+          });
+        });
+      });
+    });
+  });
+  if(rows.length===0){alert('Keine Restarbeiten erfasst.');return;}
+  let lastG='',lastB='',tableRows='';
+  rows.forEach((r,i)=>{
+    if(r.geschoss!==lastG){
+      if(lastG!=='')tableRows+='<tr><td colspan="6" style="height:10px;background:#f5f3f0;border:none"></td></tr>';
+      tableRows+=`<tr><td colspan="6" style="background:#2d2926;color:#c8a882;font-weight:700;font-size:13px;padding:7px 10px;letter-spacing:1px">${r.geschoss}</td></tr>`;
+      lastG=r.geschoss; lastB='';
+    }
+    if(r.bereich!==lastB){
+      tableRows+=`<tr><td colspan="6" style="background:#eeecea;color:#6b5040;font-weight:700;font-size:12px;padding:4px 10px;border-left:3px solid #c8a882">${r.bereich}</td></tr>`;
+      lastB=r.bereich;
+    }
+    const status=r.done?'<span style="color:#3a7a3a;font-weight:700">✓ Erledigt</span>':'<span style="color:#c0392b;font-weight:700">● Offen</span>';
+    tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">
+      <td style="padding:5px 8px;font-size:10px;color:#9a9a9a;white-space:nowrap">${r.pos}</td>
+      <td style="padding:5px 8px;font-size:12px;font-weight:700">${r.bez}</td>
+      <td style="padding:5px 8px;font-size:12px">${r.txt}</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:center">${status}</td>
+      <td style="padding:5px 8px;font-size:10px;color:#6b5040">${r.ersteller||''}${r.erstelltAm?' · '+raFmtTs(r.erstelltAm):''}</td>
+      <td style="padding:5px 8px;font-size:10px;color:#3a7a3a">${r.erledigtVon||''}${r.erledigtAm?' · '+raFmtTs(r.erledigtAm):''}</td>
+    </tr>`;
+  });
+  const offen=rows.filter(r=>!r.done).length;
+  const html=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+<title>Restarbeitenliste Berlin Upbeat – ${d}</title>
+<style>body{font-family:Arial Narrow,Arial,sans-serif;margin:0;padding:20px;color:#2d2926;}
+.kpc{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #6b5040;padding-bottom:12px;margin-bottom:20px;}
+.logo{font-size:22px;font-weight:700;letter-spacing:4px;color:#2d2926;}
+.logo small{display:block;font-size:11px;letter-spacing:2px;color:#9a9a9a;font-weight:400;}
+.meta{text-align:right;font-size:12px;color:#9a9a9a;line-height:1.6;}
+.meta strong{display:block;font-size:15px;color:#2d2926;font-weight:700;}
+table{width:100%;border-collapse:collapse;font-family:Arial Narrow,Arial,sans-serif;}
+th{background:#2d2926;color:#c8a882;font-size:11px;padding:7px 8px;text-align:left;font-weight:700;letter-spacing:0.5px;}
+td{border-bottom:1px solid #eeecea;vertical-align:middle;}
+.sig{margin-top:40px;display:flex;gap:60px;}
+.sig-box{flex:1;}
+.sig-line{border-top:1px solid #2d2926;padding-top:6px;font-size:11px;color:#9a9a9a;margin-top:40px;}
+@media print{body{padding:10px;}button{display:none!important;}}</style></head><body>
+<button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
+<div class="kpc">
+  <div class="logo">KPC <small>GMBH</small></div>
+  <div class="meta"><strong>Restarbeitenliste</strong>Projekt: Berlin Upbeat<br>Datum: ${d}<br>Dok.-Nr.: RA-BU-${now.toISOString().slice(0,10).replace(/-/g,'')}</div>
+</div>
+<p style="margin-bottom:16px;font-size:13px">Gesamt: <strong>${rows.length}</strong> Restarbeiten &nbsp;|&nbsp; Offen: <strong style="color:#c0392b">${offen}</strong> &nbsp;|&nbsp; Erledigt: <strong style="color:#3a7a3a">${rows.length-offen}</strong></p>
+<table><thead><tr>
+  <th>Pos.</th><th>Gerät</th><th>Restarbeit</th><th>Status</th><th>Erstellt</th><th>Erledigt</th>
+</tr></thead><tbody>${tableRows}</tbody></table>
+<div class="sig">
+  <div class="sig-box"><div class="sig-line">Datum / Unterschrift KPC GmbH</div></div>
+  <div class="sig-box"><div class="sig-line">Datum / Unterschrift Auftraggeber</div></div>
+</div>
+<div style="margin-top:16px;text-align:center">
+  <button onclick="window.print()" style="padding:10px 24px;background:#5b4c8a;color:#fff;border:none;border-radius:4px;font-size:13px;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">Drucken / Als PDF speichern</button>
+</div></body></html>`;
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
+// ================= MEHRPROJEKT + STÜCKLISTEN-IMPORT =================
+const SEED_DATA = DATA;                 // eingebettete Berlin-Upbeat-LV als Startwert
+const LEGACY_PID = 'berlin-upbeat';
+const LEGACY_NAME = 'Berlin Upbeat';
+let PROJECTS = [];                       // [{pid,name,created,by}]
+let PENDING_LV = null;                   // geparste LV im Import-Assistenten
+
+function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function slugify(s){
+  return String(s||'projekt').toLowerCase()
+    .replace(/[ä]/g,'ae').replace(/[ö]/g,'oe').replace(/[ü]/g,'ue').replace(/ß/g,'ss')
+    .replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'').slice(0,40) || 'projekt';
+}
+
+// ---- Projekt-Registry (als Dateien in der Fotos-Bibliothek) ----
+async function spTryDownloadText(fname){
+  try{ return await (await spDownloadBlob(fname)).text(); }catch(e){ return null; }
+}
+async function spUploadText(fname, text){
+  return spUpload(fname, new Blob([text],{type:'application/json'}), 'application/json');
+}
+async function loadProjects(){
+  const txt = await spTryDownloadText('__projects.json');
+  try{ PROJECTS = txt ? (JSON.parse(txt)||[]) : []; }catch(e){ PROJECTS = []; }
+  if(!PROJECTS.length){
+    PROJECTS = [{pid:LEGACY_PID, name:LEGACY_NAME, created:new Date().toISOString(), by:USER||''}];
+    // LV nur hochladen, wenn eine eingebettete Vorlage da ist – sonst vorhandene Datei nicht überschreiben
+    if(SEED_DATA && SEED_DATA.length){ try{ await spUploadText('LV_'+LEGACY_PID+'.json', JSON.stringify(SEED_DATA)); }catch(e){} }
+    try{ await saveProjects(); }catch(e){}
+  }
+}
+async function saveProjects(){ await spUploadText('__projects.json', JSON.stringify(PROJECTS)); }
+async function loadProjectLV(pid){
+  const txt = await spTryDownloadText('LV_'+pid+'.json');
+  if(txt){ try{ return JSON.parse(txt); }catch(e){} }
+  if(pid===LEGACY_PID) return SEED_DATA;
+  throw new Error('Stückliste für Projekt nicht gefunden');
+}
+async function createProject(name, lv){
+  const pid = slugify(name)+'-'+Date.now();
+  await spUploadText('LV_'+pid+'.json', JSON.stringify(lv));
+  PROJECTS.push({pid, name, created:new Date().toISOString(), by:USER||''});
+  await saveProjects();
+  return pid;
+}
+
+// ---- Projektauswahl-Overlay ----
+function ensureProjOverlay(){
+  let ov=document.getElementById('projOv');
+  if(ov) return ov;
+  ov=document.createElement('div');
+  ov.id='projOv';
+  ov.style.cssText='position:fixed;inset:0;z-index:1900;background:#2d2926;display:none;flex-direction:column;align-items:center;justify-content:flex-start;padding:30px 18px;overflow-y:auto;';
+  document.body.appendChild(ov);
+  return ov;
+}
+async function openProjectFlow(){
+  document.getElementById('loginOv').style.display='none';
+  const ov=ensureProjOverlay();
+  ov.style.display='flex';
+  ov.innerHTML='<div style="color:#c8a882;font-size:15px;margin-top:50px">Projekte werden geladen …</div>';
+  try{ await loadProjects(); renderProjectPicker(); }
+  catch(e){ ov.innerHTML='<div style="color:#e08a8a;font-size:14px;max-width:520px;text-align:center;margin-top:50px">Projekte konnten nicht geladen werden:<br>'+escapeHtml(e.message||e)+'</div>'; console.error(e); }
+}
+function renderProjectPicker(){
+  const ov=ensureProjOverlay();
+  ov.style.display='flex';
+  const items = PROJECTS.slice().sort((a,b)=>(b.created||'').localeCompare(a.created||''));
+  ov.innerHTML =
+    '<div class="logo" style="font-size:22px;letter-spacing:3px;color:#c8a882;text-transform:uppercase;font-weight:700;margin:10px 0 4px;">KPC <small style="display:block;color:#9a9a9a;font-size:11px;letter-spacing:2px;font-weight:400;">GMBH</small></div>'+
+    '<div style="color:#fff;font-size:16px;margin:14px 0 18px;font-weight:700;letter-spacing:0.5px;">Baustelle wählen</div>'+
+    '<div style="width:100%;max-width:520px;display:flex;flex-direction:column;gap:10px;">'+
+      items.map(p=>
+        '<button onclick="selectProject(\''+p.pid+'\')" style="text-align:left;background:#3a3530;border:1px solid #6b5040;border-radius:10px;padding:14px 16px;cursor:pointer;color:#fff;font-family:inherit;display:flex;align-items:center;gap:12px;">'+
+          '<span style="font-size:20px">🏗️</span>'+
+          '<span style="flex:1"><span style="display:block;font-size:15px;font-weight:700;color:#fff">'+escapeHtml(p.name)+'</span>'+
+          '<span style="display:block;font-size:11px;color:#9a9a9a;margin-top:2px">'+(p.created?new Date(p.created).toLocaleDateString('de-DE'):'')+(p.by?(' · '+escapeHtml(p.by)):'')+'</span></span>'+
+          '<span style="color:#c8a882;font-size:18px">›</span>'+
+        '</button>'
+      ).join('')+
+    '</div>'+
+    '<button onclick="openImportWizard()" style="margin-top:20px;background:#c8a882;color:#2d2926;border:none;border-radius:10px;padding:13px 26px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">➕ Neue Baustelle aus Stückliste</button>';
+}
+function switchProject(){ openProjectFlow(); }
+
+async function selectProject(pid){
+  const ov=ensureProjOverlay();
+  ov.innerHTML='<div style="color:#c8a882;font-size:15px;margin-top:60px">Stückliste wird geladen …</div>';
+  try{
+    PID = pid;
+    DATA = await loadProjectLV(pid);
+    const proj = PROJECTS.find(p=>p.pid===pid);
+    const nm = document.getElementById('projName'); if(nm) nm.textContent = proj ? proj.name : pid;
+    Object.keys(ST).forEach(k=>delete ST[k]);
+    Object.keys(ITEMID).forEach(k=>delete ITEMID[k]);
+    Object.keys(IMG_CACHE).forEach(k=>delete IMG_CACHE[k]);
+    ACT = DATA[0] ? DATA[0].pos : null;
+    buildTabs(); buildPanels();
+    ov.style.display='none';
+    startData();
+  }catch(e){
+    alert('Projekt konnte nicht geladen werden: '+(e.message||e));
+    renderProjectPicker();
+  }
+}
+
+// ---- Import-Assistent ----
+function openImportWizard(){
+  const ov=ensureProjOverlay();
+  ov.style.display='flex';
+  ov.innerHTML =
+    '<div style="width:100%;max-width:560px;color:#fff;">'+
+    '<div style="display:flex;align-items:center;gap:10px;margin:6px 0 16px"><button onclick="renderProjectPicker()" style="background:none;border:none;color:#c8a882;font-size:22px;cursor:pointer">‹</button><span style="font-size:17px;font-weight:700">Neue Baustelle</span></div>'+
+    '<label style="display:block;font-size:13px;color:#9a9a9a;margin-bottom:5px">Projektname</label>'+
+    '<input id="impName" type="text" placeholder="z.B. Klinikum Musterstadt" style="width:100%;padding:10px;border-radius:8px;border:1px solid #6b5040;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:16px">'+
+    '<label style="display:block;font-size:13px;color:#9a9a9a;margin-bottom:5px">Stückliste (Excel .xlsx/.csv oder PDF)</label>'+
+    '<input id="impFile" type="file" accept=".xlsx,.xls,.csv,.pdf" onchange="handleImportFile(this.files[0])" style="width:100%;color:#fff;font-size:13px;margin-bottom:8px">'+
+    '<div style="font-size:11px;color:#9a9a9a;margin-bottom:14px">Empfohlen: Excel-Vorlage (saubere Spalten). PDF wird grob ausgelesen – bitte Vorschau prüfen.</div>'+
+    '<div id="impPreview"></div>'+
+    '<div id="impActions" style="margin-top:16px;display:none">'+
+      '<button onclick="confirmCreateProject()" style="background:#3a7a3a;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Baustelle anlegen</button>'+
+    '</div></div>';
+  PENDING_LV=null;
+}
+async function handleImportFile(file){
+  if(!file) return;
+  const prev=document.getElementById('impPreview');
+  const act=document.getElementById('impActions');
+  prev.innerHTML='<div style="color:#c8a882;font-size:13px">Datei wird gelesen …</div>';
+  act.style.display='none'; PENDING_LV=null;
+  try{
+    let lv, warn='';
+    if(file.name.toLowerCase().endsWith('.pdf')){
+      lv = await parsePdfToLV(file);
+      warn='PDF-Import: Fabrikat/Typ können unsauber sein. Für beste Qualität die Excel-Vorlage nutzen.';
+    } else {
+      lv = await parseExcelToLV(file);
+    }
+    PENDING_LV = lv;
+    let nSec=lv.length, nSub=0, nItem=0;
+    lv.forEach(s=>{ nSub+=s.subsections.length; s.subsections.forEach(su=>nItem+=su.items.length); });
+    if(!nItem) throw new Error('Keine Positionen erkannt. Stimmt das Format/die Spalten?');
+    const sample=[];
+    lv.forEach(s=>s.subsections.forEach(su=>su.items.forEach(it=>{ if(sample.length<8) sample.push(it); })));
+    prev.innerHTML =
+      (warn?'<div style="background:#5a4a1a;color:#ffe0a0;padding:8px 10px;border-radius:6px;font-size:12px;margin-bottom:10px">⚠ '+warn+'</div>':'')+
+      '<div style="background:#3a3530;border-radius:8px;padding:12px 14px;font-size:13px;color:#fff;margin-bottom:10px">Erkannt: <b>'+nSec+'</b> Bereiche · <b>'+nSub+'</b> Anlagen · <b style="color:#c8a882">'+nItem+'</b> Positionen</div>'+
+      '<div style="max-height:220px;overflow:auto;border:1px solid #4a443e;border-radius:8px;font-size:11px">'+
+        '<table style="width:100%;border-collapse:collapse;color:#ddd">'+
+        '<tr style="position:sticky;top:0;background:#1e1b18;color:#c8a882"><th style="text-align:left;padding:5px 7px">Pos</th><th style="text-align:left;padding:5px 7px">Bezeichnung</th><th style="text-align:left;padding:5px 7px">Fabrikat</th><th style="text-align:left;padding:5px 7px">Typ</th></tr>'+
+        sample.map(r=>'<tr><td style="padding:4px 7px;border-top:1px solid #333">'+escapeHtml(r.pos)+'</td><td style="padding:4px 7px;border-top:1px solid #333">'+escapeHtml(r.bez)+'</td><td style="padding:4px 7px;border-top:1px solid #333">'+escapeHtml(r.fabrikat)+'</td><td style="padding:4px 7px;border-top:1px solid #333">'+escapeHtml(r.typ)+'</td></tr>').join('')+
+        '</table></div>';
+    act.style.display='block';
+  }catch(e){
+    prev.innerHTML='<div style="background:#5a1a1a;color:#ffb0b0;padding:10px;border-radius:6px;font-size:13px">Konnte nicht eingelesen werden:<br>'+escapeHtml(e.message||e)+'</div>';
+    console.error(e);
+  }
+}
+async function confirmCreateProject(){
+  const name=(document.getElementById('impName').value||'').trim();
+  if(!name){ alert('Bitte einen Projektnamen eingeben.'); return; }
+  if(!PENDING_LV){ alert('Bitte zuerst eine gültige Stückliste hochladen.'); return; }
+  const act=document.getElementById('impActions');
+  act.innerHTML='<div style="color:#c8a882">Baustelle wird angelegt …</div>';
+  try{ const pid=await createProject(name, PENDING_LV); await selectProject(pid); }
+  catch(e){ alert('Anlegen fehlgeschlagen: '+(e.message||e)); openImportWizard(); }
+}
+
+// ---- Parser: Zeilen -> LV-Struktur (Hierarchie aus Positionsnummer) ----
+function rowsToLV(rows){
+  const secMap=new Map(); const order=[];
+  rows.forEach(r=>{
+    if(!r.pos) return;
+    const pos=String(r.pos).trim();
+    const parts=pos.split('.').filter(x=>x!=='');
+    if(!parts.length) return;
+    const secPos=parts[0]+'.';
+    const subPos=parts.length>=2 ? parts[0]+'.'+parts[1]+'.' : secPos;
+    let sec=secMap.get(secPos);
+    if(!sec){ sec={pos:secPos,bez:r.sectName||'',label:(r.sectLabel||secPos.replace(/\./g,'')),subsections:[],_subs:new Map()}; secMap.set(secPos,sec); order.push(sec); }
+    if(r.sectName && !sec.bez) sec.bez=r.sectName;
+    if(r.sectLabel) sec.label=r.sectLabel;
+    let sub=sec._subs.get(subPos);
+    if(!sub){ sub={pos:subPos,bez:r.anlage||'',items:[]}; sec._subs.set(subPos,sub); sec.subsections.push(sub); }
+    if(r.anlage && !sub.bez) sub.bez=r.anlage;
+    sub.items.push({pos:pos, menge:(r.menge==null?'':String(r.menge)).trim(), einh:(r.einh||'').trim(), bez:(r.bez||'').trim(), fabrikat:(r.fabrikat||'').trim(), typ:(r.typ||'').trim()});
+  });
+  order.forEach(s=>{ delete s._subs; });
+  return order;
+}
+async function parseExcelToLV(file){
+  const buf=await file.arrayBuffer();
+  const wb=XLSX.read(buf,{type:'array'});
+  const ws=wb.Sheets[wb.SheetNames[0]];
+  const aoa=XLSX.utils.sheet_to_json(ws,{header:1,blankrows:false,defval:''});
+  if(!aoa.length) throw new Error('Leere Tabelle');
+  const norm=s=>String(s||'').toLowerCase().trim();
+  let hi=-1, map={};
+  for(let i=0;i<Math.min(aoa.length,15);i++){
+    const row=aoa[i].map(norm);
+    const find=keys=>row.findIndex(c=>keys.some(k=>c.includes(k)));
+    const m={
+      sectLabel:find(['geschoss kurz','kurz','ebene kurz','label']),
+      sectName:find(['geschoss','ebene','bereich']),
+      anlage:find(['anlage','raum','abschnitt','gruppe']),
+      pos:find(['pos']),
+      menge:find(['menge','stück','stuck','anzahl','stk']),
+      einh:find(['einh','einheit']),
+      bez:find(['bezeichn','benennung','artikel']),
+      fabrikat:find(['fabrikat','hersteller','marke']),
+      typ:find(['typ','modell','art-nr','artikelnr','artikel-nr'])
+    };
+    if(m.pos>=0 && m.bez>=0){ hi=i; map=m; break; }
+  }
+  if(hi<0) throw new Error('Spaltenüberschriften nicht gefunden (mind. „Pos" und „Bezeichnung"). Bitte die Vorlage verwenden.');
+  const rows=[];
+  for(let i=hi+1;i<aoa.length;i++){
+    const r=aoa[i]; if(!r) continue;
+    const get=k=> (map[k]>=0 ? r[map[k]] : '');
+    const pos=String(get('pos')||'').trim();
+    if(!pos) continue;
+    rows.push({ sectLabel:String(get('sectLabel')||'').trim(), sectName:String(get('sectName')||'').trim(),
+      anlage:String(get('anlage')||'').trim(), pos, menge:get('menge'), einh:get('einh'),
+      bez:get('bez'), fabrikat:get('fabrikat'), typ:get('typ') });
+  }
+  const lv=rowsToLV(rows);
+  if(!lv.length) throw new Error('Keine gültigen Positionszeilen gefunden.');
+  return lv;
+}
+async function parsePdfToLV(file){
+  if(typeof pdfjsLib==='undefined') throw new Error('PDF-Bibliothek nicht geladen');
+  pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  let lines=[];
+  for(let pn=1;pn<=pdf.numPages;pn++){
+    const page=await pdf.getPage(pn);
+    const tc=await page.getTextContent();
+    const byY={};
+    tc.items.forEach(it=>{ const y=Math.round(it.transform[5]); (byY[y]=byY[y]||[]).push({x:it.transform[4],s:it.str}); });
+    Object.keys(byY).map(Number).sort((a,b)=>b-a).forEach(y=>{
+      const txt=byY[y].sort((a,b)=>a.x-b.x).map(o=>o.s).join(' ').replace(/\s+/g,' ').trim();
+      if(txt) lines.push(txt);
+    });
+  }
+  const reItem=/^(\d{2}\.\d{2}\.\d{2}\.\d{2}\.\d{2}\.[a-z]?)\s+([\d.,]+)\s+(\S+)\s+(.*)$/;
+  const reSub=/^(\d{2}\.\d{2}\.)\s+(.+)$/;
+  const reSec=/^(\d{2}\.)\s+(.+)$/;
+  const rows=[]; let curSecName='', curAnlage='';
+  lines.forEach(l=>{
+    let m;
+    if(m=l.match(reItem)){ rows.push({sectLabel:'', sectName:curSecName, anlage:curAnlage, pos:m[1], menge:m[2].replace(',','.'), einh:m[3], bez:m[4], fabrikat:'', typ:''}); }
+    else if(m=l.match(reSub)){ curAnlage=m[2].trim(); }
+    else if(m=l.match(reSec)){ curSecName=m[2].trim(); }
+  });
+  const lv=rowsToLV(rows);
+  if(!lv.length) throw new Error('Keine Positionen im PDF erkannt.');
+  return lv;
+}
+
+// INIT
+buildTabs();
+buildPanels();
+applyUserBadge();
+(async function init(){
+  const st=document.getElementById('loginMsStatus');
+  try{
+    await msalInit();
+    if(msalAccount){
+      // Bereits angemeldet (SSO) -> direkt weiter
+      await onLoggedIn();
+    }
+    // sonst: Login-Overlay mit "Mit Microsoft anmelden" ist bereits sichtbar
+  }catch(e){
+    console.error('Init/Login-Fehler:', e);
+    if(st) st.textContent='Fehler: '+(e.message||e)+' – bitte erneut anmelden.';
+  }
+})();
+</script>
+</body>
+</html>
