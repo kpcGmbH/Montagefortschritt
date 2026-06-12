@@ -4,6 +4,14 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Leistungsfeststellung – Berlin Upbeat</title>
+<!-- PWA / Offline -->
+<link rel="manifest" href="./manifest.webmanifest">
+<meta name="theme-color" content="#2d2926">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Montage">
+<link rel="apple-touch-icon" href="data:image/png;base64,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">
 <style>
 :root {
   --bg:#f5f3f0; --bg2:#eeecea; --anthrazit:#2d2926; --braun:#6b5040;
@@ -317,7 +325,8 @@ select.fs option{background:var(--anthrazit);}
     <span class="sp sf" id="sfP" onclick="setSF('part')"><span class="sd dop"></span>Teilweise: <strong id="cP">0</strong></span>
     <span class="sp sf" id="sfO" onclick="setSF('open')"><span class="sd" style="background:#9a9a9a"></span>Offen: <strong id="cO">0</strong></span>
     <span class="sp sf" id="sfA" onclick="setSF('all')">Gesamt: <strong id="cT">0</strong></span>
-    <span class="sp" style="margin-left:auto" id="lastEditWrap">Zuletzt bearbeitet: <strong id="lastEdit">–</strong></span>
+    <span class="sp" style="margin-left:auto;font-weight:700" id="syncStatus"></span>
+    <span class="sp" style="margin-left:14px" id="lastEditWrap">Zuletzt bearbeitet: <strong id="lastEdit">–</strong></span>
   </div>
 </header>
 
@@ -379,12 +388,208 @@ const ST={};
 const NOTE_TIMERS={};
 function sp(p){return p.replace(/\./g,'_');}
 
+// ============================================================================
+//  OFFLINE / PWA – IndexedDB-Persistenz, Outbox (Warteschlange) und Sync-Engine
+//  Ziel: Auf der Baustelle ohne/mit schlechtem Netz arbeiten. Jede Änderung wird
+//  sofort lokal gespeichert und in eine Warteschlange gelegt; sobald Netz da ist,
+//  lädt die App alles automatisch zu SharePoint hoch (last-write-wins pro Position).
+// ============================================================================
+const IDB_NAME='kpc_montage', IDB_VER=1;
+const IDB_STORES=['projects','lv','state','itemids','photos','outbox'];
+let _idbPromise=null;
+function idb(){
+  if(_idbPromise) return _idbPromise;
+  _idbPromise=new Promise((resolve,reject)=>{
+    let req;
+    try{ req=indexedDB.open(IDB_NAME,IDB_VER); }catch(e){ reject(e); return; }
+    req.onupgradeneeded=()=>{ const db=req.result; IDB_STORES.forEach(s=>{ if(!db.objectStoreNames.contains(s)) db.createObjectStore(s); }); };
+    req.onsuccess=()=>resolve(req.result);
+    req.onerror=()=>reject(req.error);
+  });
+  return _idbPromise;
+}
+async function idbGet(store,key){
+  try{ const db=await idb(); return await new Promise((res,rej)=>{ const r=db.transaction(store,'readonly').objectStore(store).get(key); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+  catch(e){ return undefined; }
+}
+async function idbSet(store,key,val){
+  try{ const db=await idb(); return await new Promise((res,rej)=>{ const tx=db.transaction(store,'readwrite'); tx.objectStore(store).put(val,key); tx.oncomplete=()=>res(true); tx.onerror=()=>rej(tx.error); }); }
+  catch(e){ return false; }
+}
+async function idbDel(store,key){
+  try{ const db=await idb(); return await new Promise((res,rej)=>{ const tx=db.transaction(store,'readwrite'); tx.objectStore(store).delete(key); tx.oncomplete=()=>res(true); tx.onerror=()=>rej(tx.error); }); }
+  catch(e){ return false; }
+}
+async function idbAll(store){
+  try{ const db=await idb(); return await new Promise((res,rej)=>{ const out=[]; const req=db.transaction(store,'readonly').objectStore(store).openCursor(); req.onsuccess=()=>{ const c=req.result; if(c){ out.push({key:c.key,val:c.value}); c.continue(); } else res(out); }; req.onerror=()=>rej(req.error); }); }
+  catch(e){ return []; }
+}
+
+function nowMs(){ return Date.now(); }
+const DIRTY=new Set();        // Positionen mit lokalen, noch nicht synchronisierten Änderungen
+let _flushing=false;
+
+// Netzfehler erkennen (fetch wirft TypeError, MSAL/Graph können andere Meldungen liefern)
+function isNetErr(err){
+  if(!navigator.onLine) return true;
+  if(!err) return false;
+  if(err.name==='TypeError') return true;
+  const m=((err.message||'')+'');
+  return /failed to fetch|networkerror|load failed|network request failed|err_internet|interaction_required|no_network/i.test(m);
+}
+
+// Ganzen aktuellen Stand lokal sichern (für Offline-Lesen nach Neuladen)
+async function persistCurrentState(){
+  if(!PID) return;
+  try{ await idbSet('state', PID, JSON.parse(JSON.stringify(ST))); }catch(e){}
+}
+async function persistItemIds(pid){
+  pid = pid || PID;
+  if(!pid) return;
+  try{ await idbSet('itemids', pid, Object.assign({}, ITEMID)); }catch(e){}
+}
+
+// Position in die Warteschlange legen (Häkchen/Notiz/Restarbeiten/Fotoliste)
+async function enqueuePos(pos){
+  if(!PID) return;
+  DIRTY.add(pos);
+  const fields = { pos: pos, projekt: PID, data: buildPosData(pos) };
+  await idbSet('outbox', 'pos|'+PID+'|'+pos, { kind:'pos', pid:PID, pos:pos, fields:fields, id: ITEMID[itemKey(pos)]||null, ts: nowMs() });
+  updSyncBadge();
+}
+
+// Datei (Foto/PDF) lokal ablegen + Upload in die Warteschlange legen
+async function queueUpload(fname, blob, contentType, pos){
+  try{ await idbSet('photos', fname, blob); }catch(e){ console.warn('Lokale Datei-Ablage fehlgeschlagen:', e); }
+  await idbSet('outbox', 'file|'+fname, { kind:'file', pid:PID, pos:pos, fname:fname, contentType: contentType||'application/octet-stream', ts: nowMs() });
+  updSyncBadge();
+  // Kein eigener flushOutbox() hier: nach jedem queueUpload folgt saveFotos(pos),
+  // das die Positionsdaten enqueued und EINEN Sync für Datei + Daten gemeinsam auslöst.
+  return fname;
+}
+async function removeQueuedFile(fname){
+  if(!fname) return;
+  await idbDel('outbox', 'file|'+fname);
+  await idbDel('photos', fname);
+  updSyncBadge();
+}
+
+// Datei-Blob holen: erst lokal (offline-fähig), sonst von SharePoint (und lokal cachen)
+async function getFileBlob(fname){
+  const local = await idbGet('photos', fname);
+  if(local) return local;
+  const blob = await spDownloadBlob(fname);
+  try{ await idbSet('photos', fname, blob); }catch(e){}
+  return blob;
+}
+
+// Listen-Item schreiben mit vorbereiteten Feldern (für die Sync-Engine)
+async function spListWriteFields(pos, fields, knownId, pid){
+  const key=(pid||'')+pos;
+  const id = ITEMID[key] || knownId;
+  if(id){
+    await graph('/sites/'+SPIDS.siteId+'/lists/'+SPIDS.listId+'/items/'+id+'/fields', {
+      method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(fields)
+    });
+  } else {
+    const res = await graph('/sites/'+SPIDS.siteId+'/lists/'+SPIDS.listId+'/items', {
+      method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ fields })
+    });
+    const created = await res.json();
+    ITEMID[key] = created.id;
+    await persistItemIds(pid);
+  }
+  updLastEdit(new Date().toISOString());
+}
+
+// Warteschlange abarbeiten: erst Dateien hochladen, dann Positionsdaten schreiben
+async function flushOutbox(){
+  if(_flushing) return;
+  if(!navigator.onLine){ updSyncBadge(); return; }
+  if(!SPIDS || !SPIDS.listId){ updSyncBadge(); return; }   // noch nicht eingeloggt
+  _flushing=true;
+  let before=0, after=0;
+  try{
+    const all = await idbAll('outbox');
+    before = all.length;
+    const files = all.filter(e=>e.val && e.val.kind==='file');
+    const poss  = all.filter(e=>e.val && e.val.kind==='pos');
+    for(const e of files){
+      try{
+        const blob = await idbGet('photos', e.val.fname);
+        if(blob){ await spUpload(e.val.fname, blob, e.val.contentType); }
+        await idbDel('outbox', e.key);
+      }catch(err){
+        if(isNetErr(err)) throw err;             // Netzfehler -> abbrechen, Rest bleibt in Queue
+        console.warn('Sync-Upload-Fehler (bleibt in Queue):', (err&&err.message)||err);
+      }
+    }
+    for(const e of poss){
+      try{
+        await spListWriteFields(e.val.pos, e.val.fields, e.val.id, e.val.pid);
+        await idbDel('outbox', e.key);
+        DIRTY.delete(e.val.pos);
+      }catch(err){
+        if(isNetErr(err)) throw err;
+        console.warn('Sync-Schreibfehler (bleibt in Queue):', (err&&err.message)||err);
+      }
+    }
+  }catch(err){
+    /* Netzfehler: verbleibende Einträge bleiben für den nächsten Versuch in der Queue */
+  }finally{
+    _flushing=false;
+    updSyncBadge();
+  }
+  // Wenn Fortschritt erzielt wurde, aber noch etwas in der Queue liegt (z.B. inzwischen
+  // dazugekommene Einträge), erneut synchronisieren – stoppt automatisch, wenn kein
+  // Fortschritt mehr passiert (dauerhaft fehlschlagende Einträge -> keine Endlosschleife).
+  try{ after=(await idbAll('outbox')).length; }catch(e){}
+  if(after>0 && after<before && navigator.onLine){ setTimeout(flushOutbox, 300); }
+}
+
+// DIRTY-Menge aus der Warteschlange neu aufbauen (damit das Polling lokale Änderungen nicht überschreibt)
+async function rebuildDirty(){
+  DIRTY.clear();
+  try{
+    const all=await idbAll('outbox');
+    all.forEach(e=>{ if(e.val && e.val.kind==='pos' && e.val.pid===PID) DIRTY.add(e.val.pos); });
+  }catch(e){}
+}
+
+// Statusanzeige im Kopf (Online/Offline + ausstehende Synchronisierungen)
+async function updSyncBadge(){
+  const el=document.getElementById('syncStatus');
+  if(!el) return;
+  let n=0;
+  try{ n=(await idbAll('outbox')).length; }catch(e){}
+  const online = navigator.onLine;
+  el.style.display='inline-flex';
+  if(!online){
+    el.textContent = '⚠ Offline' + (n? (' · '+n+' ausstehend'):'');
+    el.style.color = '#e0a060';
+  } else if(n){
+    el.textContent = '↻ '+n+' wird synchronisiert…';
+    el.style.color = '#c8a882';
+  } else {
+    el.textContent = '✓ Synchron';
+    el.style.color = '#7faa6a';
+  }
+}
+
+window.addEventListener('online', ()=>{ updSyncBadge(); flushOutbox(); });
+window.addEventListener('offline', ()=>{ updSyncBadge(); });
+if('serviceWorker' in navigator){
+  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('SW-Registrierung fehlgeschlagen:', e)); });
+}
+// ============================================================================
+
 // Save with debounce to prevent race conditions
 const SAVE_TIMERS={};
 function savePos(pos) {
   if(SAVE_TIMERS[pos]) clearTimeout(SAVE_TIMERS[pos]);
   SAVE_TIMERS[pos] = setTimeout(() => {
-    spListWrite(pos).catch(e => console.warn('Speichern fehlgeschlagen:', e));
+    persistCurrentState();
+    enqueuePos(pos).then(()=>flushOutbox());
     delete SAVE_TIMERS[pos];
   }, 400);
 }
@@ -639,25 +844,20 @@ async function tryCompressImage(file){
 document.getElementById('fi').addEventListener('change',async function(e){
   const file=e.target.files[0];
   if(!file||!FPOS)return;
-  showLoader('Foto wird komprimiert...');
+  showLoader('Foto wird gespeichert...');
   try {
     const uploadFile = await tryCompressImage(file);
-    const origKB = Math.round(file.size/1024);
-    const newKB = Math.round(uploadFile.size/1024);
-    showLoader('Foto wird hochgeladen... ('+newKB+' KB, vorher '+origKB+' KB)');
     const fname = FPOS.replace(/\./g,'_') + '_' + Date.now() + '.jpg';
-    await spUpload(fname, uploadFile, 'image/jpeg');
+    // Lokal ablegen + in die Warteschlange legen (funktioniert auch offline, kein Warten auf Upload)
+    await queueUpload(fname, uploadFile, 'image/jpeg', FPOS);
     gs(FPOS).fotos.push(fname);
     saveFotos(FPOS);
     updFG(FPOS);rc(FPOS);upStats();
     hideLoader();
   } catch(e) {
     hideLoader();
-    console.warn('Upload fehlgeschlagen:', e.message);
-    const msg = e.name === 'AbortError' 
-      ? 'Upload-Timeout (60s). Bitte Internetverbindung prüfen.' 
-      : 'Foto-Upload fehlgeschlagen.';
-    alert(msg);
+    console.warn('Foto speichern fehlgeschlagen:', e.message);
+    alert('Foto konnte nicht gespeichert werden.');
   }
 });
 function fotoTimestamp(src){
@@ -712,7 +912,7 @@ async function loadImageAsBlob(fname){
   if(!fname) return '';
   if(IMG_CACHE[fname]) return IMG_CACHE[fname];
   try {
-    const blob=await spDownloadBlob(fname);
+    const blob=await getFileBlob(fname);
     const blobUrl=URL.createObjectURL(blob);
     IMG_CACHE[fname]=blobUrl;
     return blobUrl;
@@ -731,7 +931,7 @@ function df(pos,i){
   gs(pos).fotos.splice(i,1);
   updFG(pos);rc(pos);upStats();
   saveFotos(pos);
-  if(fname) spDelete(fname);
+  if(fname){ removeQueuedFile(fname); spDelete(fname); }
 }
 
 // LIGHTBOX
@@ -864,7 +1064,7 @@ async function downloadZip() {
     let n=1;
     for(const f of urls){
       try{
-        const blob=await spDownloadBlob(f.url);
+        const blob=await getFileBlob(f.url);
         const folder=f.pos.replace(/\./g,'_');
         zip.file(folder+'/Foto_'+(n++)+'.jpg', blob);
       }catch(e){ console.warn('Foto übersprungen:', e.message); }
@@ -1011,7 +1211,7 @@ async function expKunde(withFotos=false){
     for(const r of rows){
       for(const src of (r.fotos||[])){
         if(fotoData[src]!==undefined) continue;
-        try{ fotoData[src]=await blobToDataURL(await spDownloadBlob(src)); }
+        try{ fotoData[src]=await blobToDataURL(await getFileBlob(src)); }
         catch(e){ fotoData[src]=''; }
       }
     }
@@ -1292,15 +1492,16 @@ async function spDelete(fname){
 // savePos defined above with debounce queue
 
 function saveFotos(pos) {
-  spListWrite(pos).catch(e => console.warn('Speichern fehlgeschlagen:', e));
+  persistCurrentState();
+  enqueuePos(pos).then(()=>flushOutbox());
 }
 
 function saveState() { /* no-op, saving happens per position */ }
 function saveStateWithFotos() { /* no-op, saving happens per position */ }
 
 async function loadState() {
+  showLoader('Daten werden geladen...');
   try {
-    showLoader('Daten werden geladen...');
     const data = await spListLoadRows();
     if (data) {
       let newest = null;
@@ -1323,11 +1524,22 @@ async function loadState() {
       });
       updLastEdit(newest);
     }
-    hideLoader();
+    // Write-through: aktuellen Stand + Item-IDs lokal sichern (für Offline-Lesen)
+    try{ await idbSet('state', PID, JSON.parse(JSON.stringify(ST))); }catch(e){}
+    await persistItemIds(PID);
   } catch(e) {
-    hideLoader();
-    console.warn('Laden fehlgeschlagen:', e);
+    // Offline / Netzfehler -> letzten Stand aus dem lokalen Cache laden
+    console.warn('Online-Laden fehlgeschlagen, versuche lokalen Cache:', (e&&e.message)||e);
+    const cached = await idbGet('state', PID);
+    if (cached) {
+      Object.keys(cached).forEach(k => { ST[k] = cached[k]; });
+      const ci = await idbGet('itemids', PID);
+      if (ci) Object.assign(ITEMID, ci);
+    }
   }
+  hideLoader();
+  await rebuildDirty();   // bekannte lokale Änderungen markieren …
+  flushOutbox();          // … und (falls online) gleich synchronisieren
 }
 
 function updLastEdit(iso){
@@ -1397,6 +1609,8 @@ async function clearState() {
 // Polling für Live-Updates (alle 30 Sekunden)
 setInterval(async () => {
   if(!SPIDS.listId || !PID) return;
+  if(!navigator.onLine) return;          // offline: kein Polling
+  flushOutbox();                          // ausstehende lokale Änderungen synchronisieren
   try {
     const data = await spListLoadRows();
     if (!data) return;
@@ -1404,6 +1618,7 @@ setInterval(async () => {
     let newest = null;
     data.forEach(row => {
       if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at;
+      if (DIRTY.has(row.pos)) return;     // lokale, noch nicht synchronisierte Änderung nicht überschreiben
       const cur = ST[row.pos];
       let newRest = cur ? cur.restarbeiten : [];
       try { if(row.restarbeiten) newRest = JSON.parse(row.restarbeiten); } catch(e) {}
@@ -1481,11 +1696,11 @@ function selectPtype(type){
 document.getElementById('pi').addEventListener('change',async function(e){
   const file=e.target.files[0];
   if(!file||!PPOS||!PTYPE)return;
-  showLoader(PTYPE+' wird hochgeladen...');
+  showLoader(PTYPE+' wird gespeichert...');
   try {
     const ext=file.name.split('.').pop();
     const fname=PPOS.replace(/\./g,'_')+'_'+PTYPE.replace(/ /g,'_')+'_'+Date.now()+'.'+ext;
-    await spUpload(fname, file, file.type||'application/pdf');
+    await queueUpload(fname, file, file.type||'application/pdf', PPOS);   // lokal + Warteschlange (offline-fähig)
     if(!gs(PPOS).pdfs) gs(PPOS).pdfs=[];
     gs(PPOS).pdfs.push({type:PTYPE,name:file.name,fname:fname});
     saveFotos(PPOS);
@@ -1515,7 +1730,7 @@ async function dlProto(pos,i){
   if(!p)return;
   showLoader('Wird geladen...');
   try{
-    const blob=await spDownloadBlob(p.fname);
+    const blob=await getFileBlob(p.fname);
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
     a.download=p.name;
@@ -1531,7 +1746,7 @@ function delProto(pos,i){
   gs(pos).pdfs.splice(i,1);
   saveFotos(pos);
   updPG(pos);
-  if(p.fname) spDelete(p.fname);
+  if(p.fname){ removeQueuedFile(p.fname); spDelete(p.fname); }
 }
 
 // ── PDF EDITOR (Pencil) ──
@@ -1601,7 +1816,7 @@ async function pdfOpen(pos, i, readonly){
   pagesEl.innerHTML='<div style="color:#c8a882;padding:40px;font-size:15px;font-weight:700">PDF wird geladen...</div>';
   try{
     pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    const buf=await (await spDownloadBlob(p.fname)).arrayBuffer();
+    const buf=await (await getFileBlob(p.fname)).arrayBuffer();
     const pdf=await pdfjsLib.getDocument({data:buf}).promise;
     pagesEl.innerHTML='';
     const scale=2;
@@ -1810,7 +2025,7 @@ async function pdfSaveData(){
   const typeSlug = (p.type||'Protokoll').replace(/ /g,'_');
   const newFname = EDPOS.replace(/\./g,'_')+'_'+typeSlug+'_'+Date.now()+'.pdf';
 
-  await spUpload(newFname, blob, 'application/pdf');
+  await queueUpload(newFname, blob, 'application/pdf', EDPOS);   // lokal + Warteschlange (offline-fähig)
 
   // Eintrag auf neue Datei zeigen lassen
   p.fname = newFname;
@@ -1818,7 +2033,7 @@ async function pdfSaveData(){
   updPG(EDPOS);
 
   // Alte Datei im Hintergrund löschen
-  if(oldFname && oldFname !== newFname) spDelete(oldFname);
+  if(oldFname && oldFname !== newFname){ removeQueuedFile(oldFname); spDelete(oldFname); }
   return true;
 }
 
@@ -1910,13 +2125,13 @@ async function pdfSaveDataBg(pos, idx, pages){
   const typeSlug = (p.type||'Protokoll').replace(/ /g,'_');
   const newFname = pos.replace(/\./g,'_')+'_'+typeSlug+'_'+Date.now()+'.pdf';
 
-  await spUpload(newFname, blob, 'application/pdf');
+  await queueUpload(newFname, blob, 'application/pdf', pos);   // lokal + Warteschlange (offline-fähig)
 
   p.fname = newFname;
   saveFotos(pos);
   updPG(pos);
 
-  if(oldFname && oldFname !== newFname) spDelete(oldFname);
+  if(oldFname && oldFname !== newFname){ removeQueuedFile(oldFname); spDelete(oldFname); }
   return true;
 }
 
@@ -1949,7 +2164,7 @@ async function downloadProtoZip(){
     const zip=new JSZip();
     for(const p of all){
       try{
-        const blob=await spDownloadBlob(p.fname);
+        const blob=await getFileBlob(p.fname);
         const folder=p.pos.replace(/\./g,'_');
         zip.file(folder+'/'+p.name, blob);
       }catch(e){ console.warn('Protokoll übersprungen:', e.message); }
@@ -2141,14 +2356,11 @@ async function raHandleFotoUpload(e){
   e.target.remove();
   if(!file||!RA_FOTO_TARGET)return;
   const {pos,idx}=RA_FOTO_TARGET;
-  showLoader('Foto wird komprimiert...');
+  showLoader('Foto wird gespeichert...');
   try{
     const uploadFile=await tryCompressImage(file);
-    const origKB=Math.round(file.size/1024);
-    const newKB=Math.round(uploadFile.size/1024);
-    showLoader('Foto wird hochgeladen... ('+newKB+' KB, vorher '+origKB+' KB)');
     const fname='RA_'+pos.replace(/\./g,'_')+'_'+idx+'_'+Date.now()+'.jpg';
-    await spUpload(fname, uploadFile, 'image/jpeg');
+    await queueUpload(fname, uploadFile, 'image/jpeg', pos);   // lokal + Warteschlange (offline-fähig)
     const s=gs(pos);
     if(s.restarbeiten[idx]){
       raEnsure(s.restarbeiten[idx]);
@@ -2172,7 +2384,7 @@ function raFotoDel(pos,idx,fi){
   s.restarbeiten[idx].fotos.splice(fi,1);
   updRA(pos);
   saveFotos(pos);
-  if(fname) spDelete(fname);
+  if(fname){ removeQueuedFile(fname); spDelete(fname); }
 }
 function raOlb(pos,idx,fi){
   const fname=gs(pos).restarbeiten[idx]?.fotos[fi];
@@ -2278,23 +2490,52 @@ function slugify(s){
 async function spTryDownloadText(fname){
   try{ return await (await spDownloadBlob(fname)).text(); }catch(e){ return null; }
 }
+// Wie oben, aber: null nur bei "nicht vorhanden" (404); echte Netzfehler werden geworfen,
+// damit der Offline-Lesepfad auf den lokalen Cache zurückfallen kann statt zu "leer".
+async function spTryDownloadTextStrict(fname){
+  try{ return await (await spDownloadBlob(fname)).text(); }
+  catch(e){
+    const m=((e&&e.message)||'')+'';
+    if(/ 404|404:|itemnotfound/i.test(m)) return null;   // Datei gibt es (noch) nicht
+    throw e;                                              // Netzfehler/offline -> weiterreichen
+  }
+}
 async function spUploadText(fname, text){
   return spUpload(fname, new Blob([text],{type:'application/json'}), 'application/json');
 }
 async function loadProjects(){
-  const txt = await spTryDownloadText('__projects.json');
-  try{ PROJECTS = txt ? (JSON.parse(txt)||[]) : []; }catch(e){ PROJECTS = []; }
+  try{
+    const txt = await spTryDownloadTextStrict('__projects.json');
+    try{ PROJECTS = txt ? (JSON.parse(txt)||[]) : []; }catch(e){ PROJECTS = []; }
+  }catch(e){
+    // offline / Netzfehler -> letzten bekannten Stand aus dem lokalen Cache
+    const cached = await idbGet('projects','__list');
+    if(cached){ PROJECTS = cached; return; }
+    throw e;
+  }
   if(!PROJECTS.length){
     PROJECTS = [{pid:LEGACY_PID, name:LEGACY_NAME, created:new Date().toISOString(), by:USER||''}];
     // LV nur hochladen, wenn eine eingebettete Vorlage da ist – sonst vorhandene Datei nicht überschreiben
     if(SEED_DATA && SEED_DATA.length){ try{ await spUploadText('LV_'+LEGACY_PID+'.json', JSON.stringify(SEED_DATA)); }catch(e){} }
     try{ await saveProjects(); }catch(e){}
   }
+  try{ await idbSet('projects','__list', PROJECTS); }catch(e){}   // Write-through für Offline
 }
-async function saveProjects(){ await spUploadText('__projects.json', JSON.stringify(PROJECTS)); }
+async function saveProjects(){
+  try{ await idbSet('projects','__list', PROJECTS); }catch(e){}
+  await spUploadText('__projects.json', JSON.stringify(PROJECTS));
+}
 async function loadProjectLV(pid){
-  const txt = await spTryDownloadText('LV_'+pid+'.json');
-  if(txt){ try{ return JSON.parse(txt); }catch(e){} }
+  try{
+    const txt = await spTryDownloadTextStrict('LV_'+pid+'.json');
+    if(txt){ const lv = JSON.parse(txt); try{ await idbSet('lv', pid, lv); }catch(e){} return lv; }
+  }catch(e){
+    const cached = await idbGet('lv', pid);
+    if(cached) return cached;
+    throw e;
+  }
+  const cached = await idbGet('lv', pid);
+  if(cached) return cached;
   if(pid===LEGACY_PID) return SEED_DATA;
   throw new Error('Stückliste für Projekt nicht gefunden');
 }
@@ -2526,6 +2767,7 @@ buildPanels();
 applyUserBadge();
 (async function init(){
   const st=document.getElementById('loginMsStatus');
+  updSyncBadge();   // Online/Offline-Status + ausstehende Synchronisierungen anzeigen
   try{
     await msalInit();
     if(msalAccount){
