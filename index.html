@@ -239,9 +239,9 @@ select.fs option{background:var(--anthrazit);}
   font-size:9px;color:var(--accent2);font-family:Arial Narrow,Arial,sans-serif;}
 .rametacol{display:flex;align-items:center;gap:3px;flex-wrap:nowrap;}
 .rametalbl{font-weight:700;color:var(--braun);text-transform:uppercase;letter-spacing:0.3px;}
-.rakuerz{width:42px;border:1px solid var(--border);background:#fff;font-size:10px;color:var(--anthrazit);
-  font-family:Arial Narrow,Arial,sans-serif;font-weight:700;text-align:center;
-  text-transform:uppercase;outline:none;padding:1px 3px;border-radius:3px;}
+.rakuerz{width:96px;border:1px solid var(--border);background:#fff;font-size:10px;color:var(--anthrazit);
+  font-family:var(--font);font-weight:700;text-align:left;
+  outline:none;padding:1px 5px;border-radius:3px;}
 .rakuerz::placeholder{color:#c0c0c0;font-weight:400;}
 .rakuerz:focus{border-color:var(--braun);}
 .rats{font-size:9px;color:var(--accent2);white-space:nowrap;font-family:Arial Narrow,Arial,sans-serif;}
@@ -739,7 +739,7 @@ function tsFmt(iso){
     +' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
 }
 let USER = localStorage.getItem('kpc_user') || '';
-function applyUserBadge(){const b=document.getElementById('userBadge');if(b)b.textContent=USER?('\u270e '+USER):'Kürzel';}
+function applyUserBadge(){const b=document.getElementById('userBadge');if(b)b.textContent=USER?('\u270e '+USER):'Name';}
 function setUser(){
   const v=(document.getElementById('loginInp').value||'').trim().toUpperCase();
   if(!v){document.getElementById('loginInp').focus();return;}
@@ -749,15 +749,23 @@ function setUser(){
   openProjectFlow();
 }
 
-// Kürzel aus dem Microsoft-Konto ableiten (Initialen)
-function deriveKuerzel(account){
+// Vollen Namen aus dem Microsoft-Konto ableiten
+function deriveName(account){
   if(!account) return '';
-  const n = account.name || account.username || '';
-  const parts = n.replace(/[^A-Za-zÄÖÜäöüß ]/g,' ').trim().split(/\s+/).filter(Boolean);
-  let k = '';
-  if(parts.length>=2) k = parts[0][0] + parts[parts.length-1][0];
-  else if(parts.length===1) k = parts[0].slice(0,2);
-  return k.toUpperCase();
+  let n = (account.name || account.username || '').trim();
+  // "Nachname, Vorname" -> "Vorname Nachname"
+  if(n.includes(',')){ const p=n.split(',').map(s=>s.trim()); if(p.length===2 && p[0] && p[1]) n = p[1]+' '+p[0]; }
+  // Fallback E-Mail: vorname.nachname@... -> "Vorname Nachname"
+  if(/@/.test(n)){ n = n.split('@')[0].replace(/[._]+/g,' ').trim().replace(/\b\w/g,c=>c.toUpperCase()); }
+  return n;
+}
+// Kompakte Form für enge Stellen (Liste): "Max Mustermann" -> "Max M."; Einzelwort/Kürzel unverändert
+function shortName(name){
+  const n=String(name||'').trim();
+  if(!n) return '';
+  const parts=n.split(/\s+/);
+  if(parts.length<2) return n;
+  return parts[0]+' '+parts[parts.length-1][0].toUpperCase()+'.';
 }
 
 async function doMsLogin(){
@@ -779,19 +787,11 @@ async function onLoggedIn(){
   const status=document.getElementById('loginMsStatus');
   if(status) status.textContent='Verbinde mit SharePoint …';
   await resolveIds();
-  if(!USER){ USER = deriveKuerzel(msalAccount); }
+  // Name automatisch aus der Microsoft-Anmeldung übernehmen (Login ist maßgeblich)
+  const fromLogin = deriveName(msalAccount);
+  if(fromLogin){ USER = fromLogin; localStorage.setItem('kpc_user', USER); }
   applyUserBadge();
-  if(USER){
-    openProjectFlow();
-  } else {
-    // Kürzel-Stufe zeigen
-    document.getElementById('loginMsBlock').style.display='none';
-    const kb=document.getElementById('loginKuerzelBlock');
-    kb.style.display='flex';
-    const inp=document.getElementById('loginInp');
-    inp.addEventListener('keydown',e=>{if(e.key==='Enter')setUser();});
-    inp.focus();
-  }
+  openProjectFlow();
 }
 
 function startData(){
@@ -799,10 +799,10 @@ function startData(){
 }
 
 function changeUser(){
-  const v=(prompt('Kürzel ändern:',USER)||'').trim().toUpperCase();
+  const v=(prompt('Name ändern:',USER)||'').trim();
   if(v){USER=v;localStorage.setItem('kpc_user',USER);applyUserBadge();}
 }
-function ckLabel(s,f){const k=s.by&&s.by[f]?s.by[f]+' · ':'';return k+tsFmt(s.ts[f]);}
+function ckLabel(s,f){const k=s.by&&s.by[f]?shortName(s.by[f])+' · ':'';return k+tsFmt(s.ts[f]);}
 function tc(pos,f){
   const s=gs(pos);
   s[f]=!s[f];
@@ -2270,13 +2270,13 @@ function updRA(pos){
       <div class="rameta">
         <div class="rametacol">
           <span class="rametalbl">Erst.:</span>
-          <input type="text" class="rakuerz" value="${(r.ersteller||'').replace(/"/g,'&quot;')}" placeholder="Kürz." maxlength="5"
+          <input type="text" class="rakuerz" value="${(r.ersteller||'').replace(/"/g,'&quot;')}" placeholder="Name" maxlength="30"
             oninput="raSetErsteller('${pos}',${i},this.value)" onblur="raStampErstellt('${pos}',${i})">
           <span class="rats">${tsErst}</span>
         </div>
         <div class="rametacol">
           <span class="rametalbl">Erl.:</span>
-          <input type="text" class="rakuerz" value="${(r.erledigtVon||'').replace(/"/g,'&quot;')}" placeholder="Kürz." maxlength="5"
+          <input type="text" class="rakuerz" value="${(r.erledigtVon||'').replace(/"/g,'&quot;')}" placeholder="Name" maxlength="30"
             oninput="raSetErledigtVon('${pos}',${i},this.value)">
           <span class="rats">${tsErl}</span>
         </div>
@@ -2306,7 +2306,7 @@ function raSetErsteller(pos,i,val){
   const s=gs(pos);
   if(!s.restarbeiten[i])return;
   raEnsure(s.restarbeiten[i]);
-  s.restarbeiten[i].ersteller=val.toUpperCase();
+  s.restarbeiten[i].ersteller=val;
   raDebouncedSave(pos);
 }
 function raStampErstellt(pos,i){
@@ -2322,7 +2322,7 @@ function raSetErledigtVon(pos,i,val){
   const s=gs(pos);
   if(!s.restarbeiten[i])return;
   raEnsure(s.restarbeiten[i]);
-  s.restarbeiten[i].erledigtVon=val.toUpperCase();
+  s.restarbeiten[i].erledigtVon=val;
   raDebouncedSave(pos);
 }
 function raToggle(pos,i,done){
