@@ -3,32 +3,42 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>Leistungsfeststellung – Berlin Upbeat</title>
+<title>KPC Montagefortschritt</title>
 <!-- PWA / Offline -->
 <link rel="manifest" href="./manifest.webmanifest">
-<meta name="theme-color" content="#2d2926">
+<meta name="theme-color" content="#2b2b2b">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Montage">
+<!-- Corporate-Design-Schriften (Bodoni Moda = Überschriften, Roboto Condensed = Fließtext) -->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:wght@400;500;600;700&family=Roboto+Condensed:wght@300;400;700&display=swap" rel="stylesheet">
 <link rel="apple-touch-icon" href="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAMAAAADACAYAAABS3GwHAAAPqklEQVR42u2deXBUdwHHv/uSbO6T3CShOYgsdwKUtAVKIVTEQqf1Ki2CU6330Wl1rI5jxz88xhG1qNURryK0ZWzrQUUqEKAtJSE0xYQQsiTNbgIhm/tYssme/qFooMn+XpLdfe/t+37+YrJv3763fD+/+/fWAAVYYir1gZBbaGgyG0L9mQYGnuhZCANDT/Qsg4GhJ3qWQWL4idYIZNYMDD7Rc20gMfxEz7WBgcEneq4NJIaf6Lk2kBh+omcJJIaf6FkCieEnepZAYviJniWQGH6iZwkkfkVEzxjUUvrvfXoH/zd0xGPf2Q81zBEYlAo/A09CLcRkEoRcAAafKCWCLAGCFX5R8ENdJRJlUSoPt0pgUDL8DD1RIh8TJQi6AJPdHINPlMxKSARg8IlaszNRAInhJ1roCAdy8GRi1iPDbbyXhJcEwR41lIJZfTH8JJAFaDBkkALZ/OEYP9HKBOqNzEvBujCW/iRYzehAFrQS2/1EzzPEEps+RM9NISnQk18s/YlWaoElplKfxNKf6LkWkFj6Ez3XAtwRRnQNBSAUgLO+RK+zw6wBCGsAQigAIRSAEApACAUghAIQQgEIoQCEUABCKAAhFIAQCkAIBSCEAhBCAQihAIRQAEIoACEUgBAKQAgFIIQCEKIyIvkVEABISYyFqTAHxfnpyMlIRnpKAmJjjIg2RsLr9WLc6cHgyCi6+0dg6exD07tdsFzthY8CBJcndlbCVJg95euHTtXjbyfrZ3z+1UsK8ckH7oTBYBAeW3/5Kn558BTcHu9Nf//el+9HRmritD/b5/PB5wM8Xi9cbg+cLg/GnC7YR8cxODIKW+8wmtq6YLbYghI0yWDAioUFWL+qFPMLMqf8DqSICETGRiA+1oi5mSkoW5CPBzYAgyOjOHXuMk7UNuO6w0kBtMbKRfPwqMzwX2jpxC8Pvv6e8M8Gg8EAgwGQpAhERUYgLgYAYoE5/z/mg+uWoH/oOg6dasDp863w+QKjwqLiXGz/wEpkzUmaRa0Rh/vvWYZNd5jwt5P1qKq5pLkaQbd9gLIF+XjswTWQZIT/4rvX8OzBU3B7PIpca1pyPHZtq8DXPrEJCXHRszpXVGQEdm2rwOM7Nswq/BOJizHioc0r8cTOSiTERlMAtbO0dC4+85G1kCRx+C9ZbPj5CyfhcnsUv+75BZn45qc2Iyk+ZkbvT4iLxtcffT/WlJUE5foWFGbjG5/ajJTEOAqgVhYV5+JzH12HCEl862ZrN372/AlVhP8GGamJ+NLD9yAqMmJa70uMi8HXPnEv5uWkBfX6MtMS8fiODYiNjqIAasNUmI0vPHQ3IiPE4Wnp6MGe56vgdLlVdx+35c7BlrWL5Xf0IiR8/mPrkJuRHJLrm5uZgu1bVrETrCZK52Xii9vXyyo526724pn9VRh3ulV7P5vvWoTX376MgeFR4bEPbixDSUGmrPM2W2yoa2qH2dqNoREHRseciIsxIjczGQuLc7C2vASJceIm2B1Li1BT34bG1msUQGmK8zPw5Yc3wBglvl1LZx9+8sfjGHO6Avb5+w5V4426lvcMQUqSAVGRETBGRSIxPgY56UkoMxVgxcICYec8MkLCmrJiHDrV4Pe4wrnpqKxYILzGzp4hvHD4LC5ZbO95bWR0DM2WMTRbbPj76xfw4Mbl2LhafM7771mmegHCvglUOHcOvvLIBkQbxeFv7+rHT/54HI5xV9Cvy+vzwe3xwjHuwpDdgSu2AdQ2WvHrl97AD377GoavjwnPcfviQuExH95ULhzmbbbY8P3fHJk0/LfidLnx4pFzOHD4rIzvPh2l8zIpgFIU5KTh8R0bZXXIrtgG8ON9xzA6pvyEzo0mmGjOISs9ye+9ve+2LGEAO2wDeOZA1bRrvJO1ZlSdbRY3hZYVUwAlyMtKxRMfr0RcjFF47NXuQezed0xVs5ntXf14850Wv8cYAORnp075+t0r5vuvhbw+/OEvZ2Y8yvXS0TqMjPqvqcpN+bJG3NgHCCC5GSl4YudGxMeKw3+tdwi79x2DfXRcdfdR19SB9StL4X9sf/IOabQxEmWmfL/vrWloQ3tX/4yvz+X24GStGVvvXnrT3weGR2G2dsNstcFsscHj9VKAUJE9JwlP7qqUNVLR1TeM3c8dw4iM9rYS9PSPCI+ZqglkKswRDve+db41IJLeuawIzdZumC02mK029AzYwbVACpCZlognd22SNVPa3T+C3c8dxZDdodr7kTNqNdXaG1NRtt/3DdkdaJbR6ZXTd3rqmb+A+wEUJj0lAU/u2oSUxFhxyTpgx4+eO4rBEYfqhRYxNsWIlWjG13qtX/NLmSkA/r9Y7Ku7KpGWJF6D4vZ4sXvfMVkTSEpz5/Ii4TG9UzQ35mal+C+5uwaY/nAQICUxDl/dVYk5KQmylwUsLslV/X2ZinKw/H15fo/xeL3o6hvGZKszY4z+h367eoeZ/nAQYG15ybQ3o3yoskxWU0kplpXm4fMfWyecwGpp75l0rVKqjJpQDfMd7AQrRGx0FB7ecjuePXhKsWswGAyIkAwwRkUiLsaI1KQ45GamYMXCAr874CZy5l/vTn5/MuY+ArnUgwJAmxtiyk0FqGtqD/pn7dxagZ1bKwJ6zv6h6zh7wTLpa0YZC/7GximA7p8K8fCWVZpZt34rLx45N+UMrpyNPnK2gVIADeMYd8HW57+jl5wQiw9vKtfcvZ2sNeOdSx3wN9IlZzCAhKkA4y439hyowr5DNeJO9Ir5mF+QqZl7q2lowwv/qIVoxSZk7OMlYSiAy+3Bz58/gZaOHpitNrx9sV24oGzntgpZu8SUxO3x4KWjdfjNK6fhFTwZYtguXtqRlBDD9IebAG6PB7948dRN69r/dLROuNoxe04S7lu3WKX35EV1fRu+/YtX8dpbF2W9Z3BkVDjLO5PnGIGjQOrF4/XiV396A42tnTf9vW/QjqNnmoR7aDevWYTaRiuudg+G7Jp9ALxeLzweL8adbow5XRi5Po4huwO2vmF0dA3gYus12B3j05amp3/E71KKPD/LqKfLtz/7QfQO2NFs+c/qzyu2Ac0sswgLAbw+H/a+/Cb+1Xxl0tcPv3kBd5UVIzlh6smvCEnCzq0V+MHvXgvYw6fgZ0tksLFe6/crQFFeOgwGw6zvNTcjGflZqcjPSkXZgv8sv77ucMJstWlCCM03gXw+H37357f8tvXHnW68cuwd4bmK8tJxz6rSsKgRzYKVngmx0SjOS5/155SZCt7zt/hYI8oW5OOhzSvxrc9smXLPAgUIAFVnm1HT0AY5s6aWzj7IeYKCnEV1aqf+8lXhMWvKS2b9bNF1gl1nl63dwl1jFGAWyF3T4gPw4j/OCY+LNkbikftWa16A/qHraGnv9ntMxdJCWUuup+KusmJhYRGKmXaOAsmk9UoPahoswuOWzp+LVYvmaf5+T5677Pf1CEnCow/cOaMh4OSEWDxYWSYclRMNQ1OAEPPysTpZE0XbP7BK1p5iNVPbaBHOhhfnZeCL29fL2n2GCYsJv/LIBuGDcE+ff1fVO+50KcDA8CiOnBaPpyfGx+Aj967Q9L16vT68LKPzv6g4B089+n4UyegUF2Sn4Vuf3uL3aRQ3RuZeO90IDoOqkCOnG7GmvETYfr1reTFq6tvQ1Nal2Xt951IHahutwiZdfnYqnvrkZjS2dOLti+1o7ejBkN0Bp8uDxPhoFOWl4/bFt6HMVAA5y+hOnG3WxOZ4XQrgcnvw8tE6PPahNcJjP751NZ5+9lVVPSF6uux/tQZ5WSnISU8WLgtZXJI76x1zXb3DsmoeNoEU5OwFC1o6eiDnceTb1i+F1kfK9hw4gcGR4O+Ddrrc2PvKm5opMHS9JvbgkXOyZijvvWOhsM2rdnoH7fjh7/8Z1GbJuMuNZw6cQPu1fnAxnAawdPbhjIyHQ0mSAbu23SHr55TUTM+AHd/dexgNMibJpsuQ3YGf7q+C2WoDV4NqiFeOn5f1OwDzctJkPWZc7Vx3OLHn+RP4/V/PBOyJeNX1bXj62UPCiTd2glXIkN2Bw29cwAMbl0PO8+7rmjrQO2jX/H2/db4V5xqtWFtegrtXzhd2kDHJJFdtoxVVNc2ylphQABXzzzNNWLuiBOmCZwsZoyKx477V+On+42Fx306XG8drLuF4zSXMzUyBqSgbRXkZyJqTiLSkeEQbIxEhSRgdc2J0zInBEQcsnX1o7ehBs6VLs78NrCkBfrzvGEKxkeYbs3i+5Tf3/FXzQbjaPfjfvRCXwB1hhIA7wkgQqK6pFh5TsbqCXxQF0E/gRe+hEBRAF8EXnYsiUADNB19OiKc6B0WgAJoM/3QDO/H4yc5ZXVNNCSiAuoMfqIBOJQNrA3AYNNzDL+e8gexrUAAy69GaYJfIk30GJaAAqgh/KKEEFEC34acEFEA1KN0JZSeYAihW+qslfKJhU0IBVDe7G8zPpwQUIOyaHjdCHajJNkIBNNv0qa6pFs4/sBagAGHf9GLIKUDYt/39fbaoJqIgFEDTbf+ZBJh9AQpAEQkFCOdmF8NPAcJ69Ge24edoEAUghAKw6UMoAMNPKID65w/YVqcAYRn+QASbpT8F0HTJL5KATR8KoNt1Oww/BYBeZmjZzqcAmg603ADLlSBYpb8ad61RANYEwvX8DC0F4II1QgHCaW/AbJ4LqsV9yxSAJfmM3x/oGoM1EAXQjEQMKwUIu9GgUIecoz8UQPX7hCcLZiDCyrY/+PsAoagFtLC2h6U/awBdPYaQTR8KwMclEgqgt8eS8+dUKYBuJWD4KYAqJQi2CJN9BsNPAVQ1wRUsCUL5g3zgMCiZrgRTLXUO1NJmBp8CaHKeYLoyBOLX5gkFUE1tEKjmEYNPAcJGBAafAnC4lIGnABw1IuAwKCEUgBAKQAgFIIQCEEIBCFGvAI99Z////r336R38NklImJi1iRlkDUAIBSBEIQHYDCKhbP6oQoDZtsEIUTJ7UkOT2cBagOix9G9oMhsktZhIiBKZk7RgKiHBypQULCMpAQlW+APZ4pButIXYFCJ6avrcyLwUzAtkLUDUNOsLJXaE3bgB1g5Ejf1I6dYqIVjVFGsDMpvwB7IAnZj1m0K/xFTq09rNEAZf1QL4K/0pAlEiH1MKoIQElIGhVyr8kwoQTAnYFyBKDqVP1s8NuQAUgSjVApAtQKgkoBAMfKiYapTT79BnqCUgJJThB7gjjIA7wmZkDiFaL/1l1QCUgIRr+GU3gSgBCcfwT6sPQAlIuIV/2p1gSkDCKfwzGgWiBCRcwg8I5gFEcJ6AaDX4AZkHYG1AtBz+WdcArA2IVoMf8Jlg1gZEa+EPaA3AGoFoJfQhEYAyEC20KhRptlAIopZm9L8B8YeG+9kcejMAAAAASUVORK5CYII=">
 <style>
 :root {
-  --bg:#f5f3f0; --bg2:#eeecea; --anthrazit:#2d2926; --braun:#6b5040;
-  --accent:#c8a882; --accent2:#9a9a9a; --white:#fff;
+  /* KPC Corporate Design – Farben aus dem Styleguide (Logo-Visual + Web-Abstufungen) */
+  --bg:#f5f3f0; --bg2:#eeecea; --anthrazit:#2b2b2b; --braun:#895500;
+  --accent:#d7c1ae; --accent2:#a8a8a8; --white:#fff;
+  --ocker:#895500; --grau:#676c6e; --grau-d:#424242; --tan:#d7c1ae; --tan-m:#928474;
   --green:#3a7a3a; --gl:#e8f4e8; --yl:#fef9e7; --border:#d4cdc6;
   --r:6px;
-  --font:'Roboto Condensed',Arial Narrow,sans-serif;
+  --font:'Roboto Condensed','Arial Narrow',Arial,sans-serif;
+  --serif:'Bodoni Moda',Georgia,'Times New Roman',serif;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:Arial Narrow,Arial,sans-serif;background:var(--bg);color:var(--anthrazit);font-size:14px;}
+body{font-family:var(--font);background:var(--bg);color:var(--anthrazit);font-size:14px;}
+h1,h2,h3,.serif{font-family:var(--serif);}
 
 /* HEADER */
 header{background:var(--anthrazit);position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.3);}
 .h-top{display:flex;align-items:center;justify-content:space-between;padding:9px 14px 7px;border-bottom:2px solid var(--braun);}
 .logo{font-weight:700;font-size:17px;letter-spacing:3px;color:var(--accent);text-transform:uppercase;}
 .logo small{display:block;color:var(--accent2);font-weight:400;font-size:10px;letter-spacing:2px;}
+.logo-img{height:38px;width:auto;display:block;}
 .proj{font-size:12px;color:var(--accent2);text-align:right;line-height:1.4;}
+.proj strong{font-family:var(--serif);}
 .proj strong{display:block;color:#fff;font-size:13px;font-weight:700;}
 
 /* TABS */
@@ -59,6 +69,13 @@ select.fs option{background:var(--anthrazit);}
 .sf.on{background:rgba(255,255,255,.22);box-shadow:inset 0 0 0 1px rgba(255,255,255,.35);}
 .sd{width:8px;height:8px;border-radius:50%;}
 .dok{background:#5cb85c;} .dop{background:#e8aa40;}
+/* Gewerk-Umschalter */
+.gwbar{display:none;gap:6px;flex-wrap:wrap;align-items:center;}
+.gw{background:var(--anthrazit);color:rgba(255,255,255,.8);border:1px solid #4a443e;border-radius:16px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;-webkit-tap-highlight-color:transparent;}
+.gw:hover{background:#3a3530;}
+.gw.on{background:var(--accent);color:#2b2b2b;border-color:var(--accent);}
+.gtag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:8px;margin-left:4px;vertical-align:middle;color:#fff;}
+.gtag.gM{background:#6b7a8a;} .gtag.gE{background:#b8860b;} .gtag.gS{background:#3f7a8a;}
 .sp strong{color:#fff;}
 
 /* PANELS */
@@ -124,7 +141,7 @@ select.fs option{background:var(--anthrazit);}
 .pdfed-pages{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px;display:flex;flex-direction:column;align-items:center;gap:14px;}
 .pdfed-pg{position:relative;background:#fff;box-shadow:0 4px 16px rgba(0,0,0,.3);line-height:0;}
 .pdfed-textinput{position:absolute;z-index:100;background:rgba(255,250,200,0.97);
-  border:2px solid #c8a882;color:#000;font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;
+  border:2px solid #d7c1ae;color:#000;font-family:-apple-system,BlinkMacSystemFont,Arial,sans-serif;
   font-size:16px;padding:5px 8px;border-radius:6px;outline:none;
   min-width:200px;min-height:30px;resize:none;line-height:1.3;
   box-shadow:0 4px 16px rgba(0,0,0,0.35);overflow:hidden;
@@ -285,33 +302,33 @@ select.fs option{background:var(--anthrazit);}
 </head>
 <body>
 
-<div id="loginOv" style="position:fixed;inset:0;z-index:2000;background:#2d2926;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
-  <div class="logo" style="font-size:22px;letter-spacing:3px;color:#c8a882;text-transform:uppercase;font-weight:700;margin-bottom:6px;">KPC <small style="display:block;color:#9a9a9a;font-size:11px;letter-spacing:2px;font-weight:400;">GMBH</small></div>
-  <div style="color:#fff;font-size:13px;margin:6px 0 18px;letter-spacing:1px;">Montagefortschritt &middot; Berlin Upbeat</div>
+<div id="loginOv" style="position:fixed;inset:0;z-index:2000;background:#2b2b2b;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;">
+  <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDI0LjAuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkViZW5lXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCAyNTEuNyAxODEiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDI1MS43IDE4MTsiIHhtbDpzcGFjZT0icHJlc2VydmUiPgo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPgoJLnN0MHtmaWxsOiNGRkZGRkY7ZW5hYmxlLWJhY2tncm91bmQ6bmV3ICAgIDt9Cgkuc3Qxe2ZpbGw6I0ZGRkZGRjt9Cgkuc3Qye2ZpbGw6Izg5NTYxMzt9Cgkuc3Qze2ZpbGw6IzY3NkM2RTt9Cjwvc3R5bGU+CjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0xMC44LDgxLjVjNS03LjQsMTcuNy0yNS4zLDI0LjYtMzUuNmgxMi4xYy02LjcsOS41LTEzLjksMTkuMi0yMC45LDI4LjhsMjMsNDYuN0gzNy4zbC0xOC4xLTM4CgljLTIsMi44LTYuMSw4LjQtOC40LDExLjJ2MjYuN0gwQzAsODAuOSwwLDQwLjQsMCwwYzMuNiwwLDcuMiwwLDEwLjgsMEMxMC44LDI3LjIsMTAuOCw1NC4zLDEwLjgsODEuNXoiLz4KPHBhdGggY2xhc3M9InN0MCIgZD0iTTE0OS44LDk4LjNjLTAuMyw0LjEtMS45LDI0LjQtMjQuMiwyNC40Yy0xOS42LDAtMjUuMS0xNy40LTI1LjEtMzkuM2MwLTIxLjMsNi45LTM4LjgsMjYuMS0zOC44CgljMjEuOSwwLDIyLjksMjAuMiwyMywyMy44aC0xMS4yYy0wLjEtMi45LTEuMi0xNC40LTEyLTE0LjRjLTEwLjgsMC0xNC45LDEyLTE0LjksMjkuM2MwLDE4LjcsNC4yLDMwLDE0LjMsMzAKCWMxMC44LDAsMTIuMi0xMS4xLDEyLjgtMTVMMTQ5LjgsOTguM0wxNDkuOCw5OC4zeiIvPgo8cGF0aCBjbGFzcz0ic3QwIiBkPSJNNDkuOSwxODFWNjcuOGMwLTEwLjMsMC0xNy4zLTAuMS0yMmgxMC42YzAuMSwxLjQsMC41LDYuNCwwLjUsMTAuMmMyLjUtNi41LDcuOS0xMS4zLDE3LjgtMTEuMwoJYzE0LjMsMCwyMiwxMi42LDIyLDM3LjhjMCwyNy4yLTkuNCw0MC4yLTI0LjIsNDAuMmMtOSwwLTEzLjUtNC4zLTE1LjgtOVYxODFINDkuOXogTTc1LjMsNTQuMWMtMTEuNywwLTE0LjksMTEuMi0xNC45LDI5CglTNjIuMSwxMTMsNzQuNSwxMTNjOS45LDAsMTUtMTEuNiwxNS0zMEM4OS42LDYzLjksODUuMiw1NC4xLDc1LjMsNTQuMXoiLz4KPGc+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNNzkuNCwxNTIuNWwwLjEsMC42bDAuMS0wLjdsMi40LTkuMUg4M2wyLjQsOWwwLjIsMC45bDAuMi0wLjhsMi4xLTkuMWgxLjNsLTIuOSwxMS44aC0xbC0yLjYtOS40bC0wLjEtMC4zCgkJdjAuM2wtMi41LDkuNGgtMWwtMi45LTExLjhoMS4zTDc5LjQsMTUyLjV6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNOTUuOCwxNTUuNGMtMS40LDAtMi41LTAuNC0zLjMtMS4zYy0wLjgtMC45LTEuMi0yLjItMS4yLTMuOXYtMS40YzAtMS43LDAuNC0zLjEsMS4yLTQuMQoJCWMwLjctMSwxLjgtMS41LDMuMS0xLjVjMS4zLDAsMi4yLDAuNCwzLDEuM3MxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFzMS40LDEuMSwyLjQsMS4xCgkJYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44Qzk4LjYsMTU0LjgsOTcuNCwxNTUuNCw5NS44LDE1NS40eiBNOTUuNiwxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEM5OC4zLDE0NS40LDk3LjQsMTQ0LjMsOTUuNiwxNDQuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMDkuOCwxNDAuM3YzaDIuMXYxLjFoLTIuMXY3LjljMCwwLjYsMC4xLDEuMiwwLjMsMS40YzAuMiwwLjQsMC41LDAuNCwxLDAuNGMwLjIsMCwwLjQsMCwwLjktMC4xdjEuMQoJCWMtMC4zLDAuMS0wLjcsMC4yLTEuMiwwLjJjLTEuNCwwLTIuMS0xLTIuMS0zdi04LjFoLTEuOHYtMS4xaDEuOHYtM0wxMDkuOCwxNDAuM0wxMDkuOCwxNDAuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMTYuMSwxNDUuMmMwLjQtMC42LDAuOC0xLjIsMS4zLTEuNWMwLjUtMC40LDEuMi0wLjUsMS45LTAuNWMyLjEsMCwzLjEsMS4zLDMuMSw0LjF2OGgtMS4ydi03LjgKCQljMC0xLjEtMC4yLTEuOS0wLjUtMi4zYy0wLjQtMC40LTAuOS0wLjctMS43LTAuN2MtMC42LDAtMS4yLDAuMy0xLjcsMC43Yy0wLjUsMC40LTAuOSwxLjItMS4yLDJ2OC4yaC0xLjN2LTE1LjFoMS4zTDExNi4xLDE0NS4yCgkJTDExNi4xLDE0NS4yeiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTEyNiwxMzkuOWMwLTAuMywwLjEtMC40LDAuMi0wLjZjMC4yLTAuMiwwLjQtMC4zLDAuNi0wLjNzMC40LDAuMSwwLjYsMC4zYzAuMiwwLjIsMC4yLDAuNCwwLjIsMC42CgkJYzAsMC4zLTAuMSwwLjQtMC4yLDAuNmMtMC4yLDAuMi0wLjQsMC4zLTAuNiwwLjNjLTAuMywwLTAuNC0wLjEtMC42LTAuM1MxMjYsMTQwLjIsMTI2LDEzOS45eiBNMTI3LjQsMTU1LjJoLTEuM3YtMTEuOGgxLjNWMTU1LjJ6CgkJIi8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTMyLjMsMTQzLjN2MS45YzAuNC0wLjYsMC44LTEuMiwxLjMtMS41YzAuNS0wLjQsMS4yLTAuNSwxLjktMC41YzIuMSwwLDMuMSwxLjMsMy4xLDQuMXY4aC0xLjJ2LTcuOAoJCWMwLTEuMS0wLjItMS45LTAuNS0yLjNjLTAuNC0wLjQtMC45LTAuNy0xLjctMC43Yy0wLjYsMC0xLjIsMC4zLTEuNywwLjdjLTAuNSwwLjQtMC45LDEuMi0xLjIsMnY4LjJoLTEuM3YtMTEuOGgxLjJWMTQzLjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTQ0LjgsMTQ5LjNsLTEuMywxLjN2NC42aC0xLjN2LTE1aDEuM3Y4LjlsMS0xLjNsMy43LTQuNWgxLjVsLTQuMSw1bDQuNiw2LjhoLTEuNEwxNDQuOCwxNDkuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xNTIuMywxNTguMmwtMC44LTAuNWMwLjYtMC45LDEtMS44LDEtMi44di0xLjdoMS4zdjEuM0MxNTMuOCwxNTYsMTUzLjIsMTU3LjMsMTUyLjMsMTU4LjJ6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTY1LjEsMTUyLjVsMC4xLDAuNmwwLjEtMC43bDIuNC05LjFoMWwyLjQsOWwwLjIsMC45bDAuMi0wLjhsMi4xLTkuMWgxLjNsLTIuOSwxMS44aC0xLjFsLTIuNi05LjRsLTAuMS0wLjMKCQl2MC4zbC0yLjUsOS40aC0xLjFsLTIuOS0xMS44aDEuM0wxNjUuMSwxNTIuNXoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xODEuNCwxNTUuNGMtMS40LDAtMi41LTAuNC0zLjMtMS4zYy0wLjgtMC45LTEuMi0yLjItMS4yLTMuOXYtMS40YzAtMS43LDAuNC0zLjEsMS4yLTQuMQoJCWMwLjctMSwxLjgtMS41LDMuMS0xLjVjMS4zLDAsMi4yLDAuNCwzLDEuM3MxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFjMC42LDAuNywxLjQsMS4xLDIuNCwxLjEKCQljMS4yLDAsMi4xLTAuNCwyLjktMS4zbDAuNiwwLjhDMTg0LjIsMTU0LjgsMTgzLjEsMTU1LjQsMTgxLjQsMTU1LjR6IE0xODEuMywxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMxODMuOSwxNDUuNCwxODMuMSwxNDQuMywxODEuMywxNDQuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xOTcuNCwxNTQuM2MwLjgsMCwxLjUtMC4zLDItMC43YzAuNC0wLjQsMC43LTEuMiwwLjctMi4xaDEuMmMtMC4xLDEuMy0wLjQsMi4xLTEuMiwyLjlzLTEuNiwxLjEtMi43LDEuMQoJCWMtMS40LDAtMi41LTAuNC0zLjItMS4zcy0xLjEtMi4yLTEuMS00di0xLjRjMC0xLjgsMC40LTMuMSwxLjEtNC4xczEuOC0xLjMsMy4yLTEuM2MxLjIsMCwyLjEsMC40LDIuOCwxLjFzMS4xLDEuOCwxLjEsMy4xaC0xLjIKCQljMC0xLTAuMy0xLjctMC43LTIuMmMtMC40LTAuNS0xLjEtMC44LTItMC44Yy0xLjEsMC0xLjgsMC40LTIuMywxLjFzLTAuNywxLjgtMC43LDMuMnYxLjNjMCwxLjUsMC4zLDIuNiwwLjcsMy4zCgkJQzE5NS41LDE1My45LDE5Ni4zLDE1NC4zLDE5Ny40LDE1NC4zeiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIwOC44LDE0NC41Yy0wLjMtMC4xLTAuNS0wLjEtMC44LTAuMWMtMC43LDAtMS4zLDAuMy0xLjcsMC43Yy0wLjQsMC40LTAuOCwxLjEtMSwxLjl2OC4xSDIwNHYtMTEuOGgxLjJ2MS44CgkJYzAuNS0xLjMsMS41LTIsMi43LTJjMC40LDAsMC41LDAuMSwwLjcsMC4yTDIwOC44LDE0NC41eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIxNS4yLDE1NS40Yy0xLjQsMC0yLjUtMC40LTMuMy0xLjNjLTAuOC0wLjktMS4yLTIuMi0xLjItMy45di0xLjRjMC0xLjcsMC40LTMuMSwxLjItNC4xCgkJYzAuNy0xLDEuOC0xLjUsMy4xLTEuNWMxLjMsMCwyLjIsMC40LDMsMS4zczEsMi4xLDEuMSwzLjl2MS4ySDIxMnYwLjZjMCwxLjMsMC4zLDIuNCwwLjksMy4xYzAuNSwwLjcsMS40LDEuMSwyLjQsMS4xCgkJYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44QzIxOCwxNTQuOCwyMTYuOCwxNTUuNCwyMTUuMiwxNTUuNHogTTIxNSwxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMyMTcuNywxNDUuNCwyMTYuOCwxNDQuMywyMTUsMTQ0LjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMjI4LjIsMTU1LjJjLTAuMS0wLjQtMC4yLTAuOS0wLjItMS42Yy0wLjQsMC42LTAuOCwxLjEtMS40LDEuM2MtMC41LDAuNC0xLjIsMC40LTEuOSwwLjQKCQljLTEsMC0xLjgtMC4zLTIuNC0wLjljLTAuNS0wLjUtMC45LTEuNC0wLjktMi41YzAtMS4yLDAuNC0yLjEsMS4yLTIuOHMxLjktMSwzLjMtMWgyLjF2LTEuNmMwLTAuOC0wLjItMS40LTAuNi0xLjgKCQljLTAuNC0wLjQtMS4xLTAuNS0xLjktMC41Yy0wLjcsMC0xLjMsMC4yLTEuOSwwLjZjLTAuNCwwLjQtMC43LDEtMC43LDEuN2gtMS4zYzAtMSwwLjQtMS44LDEuMS0yLjVzMS42LTEsMi44LTFzMi4xLDAuMywyLjcsMC45CgkJYzAuNiwwLjYsMC45LDEuNCwwLjksMi42djUuOGMwLDEuMiwwLjEsMi4xLDAuNCwyLjZ2MC4xTDIyOC4yLDE1NS4yTDIyOC4yLDE1NS4yeiBNMjI0LjksMTU0LjJjMC43LDAsMS4zLTAuMiwxLjktMC41CgkJYzAuNS0wLjQsMS0wLjksMS4zLTEuNXYtMi45aC0yYy0xLjEsMC0yLDAuMy0yLjUsMC43Yy0wLjUsMC40LTAuOCwxLjItMC44LDJDMjIyLjcsMTUzLjUsMjIzLjQsMTU0LjIsMjI0LjksMTU0LjJ6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMjM0LjcsMTQwLjN2M2gyLjF2MS4xaC0yLjF2Ny45YzAsMC42LDAuMSwxLjIsMC4zLDEuNGMwLjIsMC40LDAuNSwwLjQsMSwwLjRjMC4yLDAsMC40LDAsMC45LTAuMXYxLjEKCQljLTAuMywwLjEtMC43LDAuMi0xLjIsMC4yYy0xLjQsMC0yLjEtMS0yLjEtM3YtOC4xaC0xLjh2LTEuMWgxLjh2LTNMMjM0LjcsMTQwLjNMMjM0LjcsMTQwLjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMjQzLjcsMTU1LjRjLTEuNCwwLTIuNS0wLjQtMy4zLTEuM2MtMC44LTAuOS0xLjItMi4yLTEuMi0zLjl2LTEuNGMwLTEuNywwLjQtMy4xLDEuMi00LjEKCQljMC43LTEsMS44LTEuNSwzLjEtMS41YzEuMywwLDIuMiwwLjQsMywxLjNjMC43LDAuOCwxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFjMC42LDAuNywxLjQsMS4xLDIuNCwxLjEKCQljMS4yLDAsMi4xLTAuNCwyLjktMS4zbDAuNiwwLjhDMjQ2LjQsMTU0LjgsMjQ1LjMsMTU1LjQsMjQzLjcsMTU1LjR6IE0yNDMuNSwxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMyNDYuMiwxNDUuNCwyNDUuMywxNDQuMywyNDMuNSwxNDQuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0yNTAuMiwxNTguMmwtMC44LTAuNWMwLjYtMC45LDEtMS44LDEtMi44di0xLjdoMS4zdjEuM0MyNTEuNywxNTYsMjUxLjMsMTU3LjMsMjUwLjIsMTU4LjJ6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNNzkuNCwxNzhsMC4xLDAuNmwwLjEtMC43bDIuNC05LjFIODNsMi40LDlsMC4yLDAuOWwwLjItMC44bDIuMS05LjFoMS4zbC0yLjksMTEuOGgtMWwtMi42LTkuNGwtMC4xLTAuM3YwLjMKCQlsLTIuNSw5LjRoLTFsLTIuOS0xMS44aDEuM0w3OS40LDE3OHoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik05NS44LDE4MWMtMS40LDAtMi41LTAuNC0zLjMtMS4zcy0xLjItMi4yLTEuMi0zLjl2LTEuNGMwLTEuNywwLjQtMy4xLDEuMi00LjFjMC43LTEsMS44LTEuNSwzLjEtMS41CgkJYzEuMywwLDIuMiwwLjQsMywxLjNjMC43LDAuOCwxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFzMS40LDEuMSwyLjQsMS4xYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44CgkJQzk4LjYsMTgwLjQsOTcuNCwxODEsOTUuOCwxODF6IE05NS42LDE2OS44Yy0xLDAtMS43LDAuNC0yLjIsMWMtMC41LDAuNy0wLjgsMS43LTAuOCwzaDUuOHYtMC40Qzk4LjMsMTcxLDk3LjQsMTY5LjgsOTUuNiwxNjkuOHoiCgkJLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMDkuNCwxODAuN2gtMS4zdi0xNi44aDEuM1YxODAuN3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMTIuNiwxNzQuM2MwLTEuNywwLjQtMywxLjItNGMwLjgtMSwxLjgtMS41LDMuMS0xLjVjMS4zLDAsMi40LDAuNCwzLjEsMS40czEuMiwyLjMsMS4yLDR2MS4zCgkJYzAsMS43LTAuNCwzLjEtMS4yLDRjLTAuOCwxLTEuOCwxLjQtMy4xLDEuNGMtMS4zLDAtMi4zLTAuNC0zLjEtMS40Yy0wLjgtMS0xLjItMi4yLTEuMi0zLjlWMTc0LjN6IE0xMTMuOCwxNzUuNAoJCWMwLDEuMywwLjMsMi40LDAuOCwzLjJjMC41LDAuOCwxLjMsMS4yLDIuMywxLjJzMS44LTAuNCwyLjMtMS4yYzAuNS0wLjgsMC44LTEuOCwwLjgtMy4ydi0xLjNjMC0xLjMtMC4zLTIuNC0wLjgtMy4yCgkJYy0wLjUtMC44LTEuMy0xLjItMi4zLTEuMnMtMS43LDAuNC0yLjIsMS4yYy0wLjUsMC44LTAuOCwxLjgtMC45LDMuMVYxNzUuNHoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMjcuNiwxNzguOGwzLTkuOWgxLjNsLTMuNywxMS44aC0xbC0zLjctMTEuOGgxLjNMMTI3LjYsMTc4Ljh6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTM4LjMsMTgxYy0xLjQsMC0yLjUtMC40LTMuMy0xLjNjLTAuOC0wLjktMS4yLTIuMi0xLjItMy45di0xLjRjMC0xLjcsMC40LTMuMSwxLjItNC4xCgkJYzAuNy0xLDEuOC0xLjUsMy4xLTEuNWMxLjMsMCwyLjIsMC40LDMsMS4zYzAuNywwLjgsMSwyLjEsMS4xLDMuOXYxLjJIMTM1djAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFzMS40LDEuMSwyLjQsMS4xCgkJYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44QzE0MS4xLDE4MC40LDEzOS45LDE4MSwxMzguMywxODF6IE0xMzguMSwxNjkuOGMtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMxNDAuOCwxNzEsMTM5LjgsMTY5LjgsMTM4LjEsMTY5Ljh6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTUzLjIsMTc1LjNsLTEsMS4ydjQuMmgtMnYtMTYuOGgydjEwbDMuNy01LjFoMi4zbC0zLjgsNC45bDQuMyw2LjloLTIuM0wxNTMuMiwxNzUuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xNjQuMiwxNjUuOGMwLDAuNC0wLjEsMC42LTAuMywwLjhjLTAuMiwwLjItMC40LDAuNC0wLjgsMC40Yy0wLjQsMC0wLjYtMC4xLTAuOC0wLjQKCQljLTAuMi0wLjItMC4zLTAuNC0wLjMtMC44YzAtMC40LDAuMS0wLjYsMC4zLTAuOGMwLjItMC4zLDAuNC0wLjQsMC44LTAuNGMwLjQsMCwwLjYsMC4xLDAuOCwwLjRTMTY0LjIsMTY1LjQsMTY0LjIsMTY1Ljh6CgkJIE0xNjQsMTgwLjdoLTJ2LTExLjhoMlYxODAuN3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xNzEuMSwxNjZ2Mi45aDEuOHYxLjVoLTEuOHY3LjNjMCwwLjQsMC4xLDAuOCwwLjMsMS4xczAuNCwwLjQsMC44LDAuNGMwLjMsMCwwLjUsMCwwLjgtMC4xdjEuNgoJCWMtMC40LDAuMi0wLjksMC4yLTEuMywwLjJjLTAuOCwwLTEuMy0wLjMtMS44LTAuOGMtMC40LTAuNS0wLjYtMS4zLTAuNi0yLjN2LTcuM2gtMS44di0xLjVoMS44VjE2NkwxNzEuMSwxNjZMMTcxLjEsMTY2eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTE4MSwxNzkuM2MwLjYsMCwxLjItMC4yLDEuNS0wLjZjMC40LTAuNCwwLjYtMSwwLjYtMS43aDEuOGMwLDEuMi0wLjQsMi4xLTEuMywyLjljLTAuOCwwLjgtMS43LDEuMi0yLjgsMS4yCgkJYy0xLjQsMC0yLjYtMC40LTMuMy0xLjNjLTAuOC0wLjktMS4yLTIuMy0xLjItNC4xdi0xLjNjMC0xLjgsMC40LTMuMSwxLjItNC4xYzAuOC0wLjksMS45LTEuNCwzLjMtMS40YzEuMywwLDIuMSwwLjQsMi45LDEuMgoJCWMwLjcsMC44LDEuMSwxLjgsMS4yLDMuMWgtMS44YzAtMC45LTAuMy0xLjUtMC42LTJjLTAuNC0wLjQtMC45LTAuNi0xLjUtMC42Yy0wLjksMC0xLjUsMC4zLTEuOSwwLjhjLTAuNCwwLjUtMC42LDEuNS0wLjYsMi44djEuNQoJCWMwLDEuNCwwLjIsMi40LDAuNiwzQzE3OS40LDE3OSwxODAuMSwxNzkuMywxODEsMTc5LjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTkwLjcsMTcwLjFjMC43LTEsMS43LTEuNCwyLjktMS40YzIuMSwwLDMuMSwxLjQsMy4yLDQuMnY3LjloLTJWMTczYzAtMC45LTAuMi0xLjYtMC40LTIKCQljLTAuMy0wLjQtMC44LTAuNi0xLjQtMC42Yy0wLjQsMC0wLjksMC4yLTEuMywwLjRjLTAuNCwwLjQtMC43LDAuNy0wLjksMS4zdjguNmgtMlYxNjZoMkwxOTAuNywxNzAuMUwxOTAuNywxNzAuMXoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0yMDUuNCwxODFjLTEuNCwwLTIuNi0wLjQtMy40LTEuM2MtMC44LTAuOS0xLjItMi4xLTEuMi0zLjl2LTEuNGMwLTEuOCwwLjQtMy4xLDEuMi00LjFzMS45LTEuNSwzLjItMS41CgkJYzEuMywwLDIuNCwwLjQsMy4xLDEuM3MxLjEsMi4yLDEuMSw0LjF2MS4zaC02LjZ2MC4zYzAsMS4zLDAuMywyLjIsMC43LDIuOHMxLjIsMC45LDIuMSwwLjljMC41LDAsMS4xLTAuMSwxLjUtMC40CgkJYzAuNC0wLjIsMC44LTAuNSwxLjMtMWwxLDEuM0MyMDguNCwxODAuMywyMDcuMSwxODEsMjA1LjQsMTgxeiBNMjA1LjIsMTcwLjNjLTAuOCwwLTEuNCwwLjMtMS44LDAuOGMtMC40LDAuNS0wLjYsMS40LTAuNiwyLjZoNC43CgkJdi0wLjNjLTAuMS0xLjItMC4zLTItMC42LTIuNEMyMDYuNCwxNzAuNiwyMDUuOSwxNzAuMywyMDUuMiwxNzAuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0yMTUuMSwxNjguOWwwLjEsMS4zYzAuNy0xLDEuNy0xLjUsMi45LTEuNWMyLjEsMCwzLjEsMS40LDMuMiw0LjJ2Ny45aC0ydi03LjhjMC0wLjktMC4yLTEuNi0wLjQtMgoJCWMtMC4zLTAuNC0wLjgtMC42LTEuNC0wLjZjLTAuNCwwLTAuOSwwLjItMS4zLDAuNGMtMC40LDAuNC0wLjcsMC43LTAuOSwxLjN2OC42aC0ydi0xMS44TDIxNS4xLDE2OC45TDIxNS4xLDE2OC45eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIzMS40LDE3Ny43YzAtMC40LTAuMi0wLjgtMC40LTEuMWMtMC40LTAuMy0wLjktMC42LTEuOC0xLjFjLTEuMS0wLjQtMS44LTAuOC0yLjItMS4xcy0wLjctMC42LTEtMS4xCgkJYy0wLjItMC40LTAuNC0wLjktMC40LTEuNGMwLTEsMC40LTEuOCwxLjEtMi40YzAuNy0wLjYsMS42LTEsMi43LTFjMS4yLDAsMi4xLDAuNCwyLjgsMWMwLjcsMC43LDEuMSwxLjUsMS4xLDIuNmgtMgoJCWMwLTAuNS0wLjItMS0wLjUtMS4zYy0wLjQtMC40LTAuOC0wLjUtMS4zLTAuNWMtMC41LDAtMSwwLjItMS4zLDAuNGMtMC40LDAuMy0wLjQsMC43LTAuNCwxLjJjMCwwLjQsMC4xLDAuNywwLjQsMQoJCWMwLjMsMC4zLDAuOCwwLjUsMS43LDFjMS40LDAuNSwyLjQsMS4xLDMsMS42YzAuNSwwLjUsMC44LDEuMywwLjgsMi4xYzAsMS4xLTAuNCwxLjktMS4xLDIuNXMtMS43LDAuOS0yLjksMC45CgkJYy0xLjMsMC0yLjItMC40LTMtMS4xcy0xLjItMS42LTEuMi0yLjdoMmMwLDAuNiwwLjIsMS4yLDAuNiwxLjVjMC40LDAuNCwwLjksMC41LDEuNiwwLjVjMC42LDAsMS4yLTAuMiwxLjQtMC40CgkJQzIzMS4yLDE3OC42LDIzMS40LDE3OC4yLDIzMS40LDE3Ny43eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIzNi42LDE4MGMwLTAuMywwLjEtMC40LDAuMy0wLjZjMC4yLTAuMiwwLjQtMC4zLDAuNi0wLjNjMC4zLDAsMC40LDAuMSwwLjYsMC4zYzAuMiwwLjIsMC4zLDAuNCwwLjMsMC43CgkJcy0wLjEsMC40LTAuMywwLjZjLTAuMiwwLjItMC40LDAuMy0wLjYsMC4zYy0wLjMsMC0wLjUtMC4xLTAuNi0wLjNDMjM2LjYsMTgwLjMsMjM2LjUsMTgwLjIsMjM2LjYsMTgweiIvPgo8L2c+CjxyZWN0IHk9IjEzMi4yIiBjbGFzcz0ic3QyIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+CjxyZWN0IHg9IjI0LjkiIHk9IjEzMi4yIiBjbGFzcz0ic3QzIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+Cjwvc3ZnPgo=" alt="kpc GmbH – we think, we create, we love kitchens" style="width:230px;max-width:64vw;height:auto;margin-bottom:18px;">
+  <div style="color:#fff;font-size:13px;margin:6px 0 18px;letter-spacing:1px;">Montagefortschritt &middot; Leistungsfeststellung</div>
 
   <!-- Stufe 1: Microsoft-Anmeldung -->
   <div id="loginMsBlock" style="display:flex;flex-direction:column;align-items:center;">
-    <button id="loginMsBtn" onclick="doMsLogin()" style="background:#c8a882;color:#2d2926;border:none;border-radius:8px;padding:12px 26px;font-size:15px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif;display:flex;align-items:center;gap:10px;">
-      <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#2d2926"/><rect x="11" y="1" width="9" height="9" fill="#2d2926"/><rect x="1" y="11" width="9" height="9" fill="#2d2926"/><rect x="11" y="11" width="9" height="9" fill="#2d2926"/></svg>
+    <button id="loginMsBtn" onclick="doMsLogin()" style="background:#d7c1ae;color:#2b2b2b;border:none;border-radius:8px;padding:12px 26px;font-size:15px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif;display:flex;align-items:center;gap:10px;">
+      <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#2b2b2b"/><rect x="11" y="1" width="9" height="9" fill="#2b2b2b"/><rect x="1" y="11" width="9" height="9" fill="#2b2b2b"/><rect x="11" y="11" width="9" height="9" fill="#2b2b2b"/></svg>
       Mit Microsoft anmelden
     </button>
-    <div id="loginMsStatus" style="color:#9a9a9a;font-size:12px;margin-top:14px;text-align:center;min-height:16px;"></div>
+    <div id="loginMsStatus" style="color:#a8a8a8;font-size:12px;margin-top:14px;text-align:center;min-height:16px;"></div>
   </div>
 
   <!-- Stufe 2: Kürzel -->
   <div id="loginKuerzelBlock" style="display:none;flex-direction:column;align-items:center;">
     <div style="color:#fff;font-size:15px;margin:14px 0 4px;">Dein K&uuml;rzel eingeben</div>
-    <div style="color:#9a9a9a;font-size:12px;margin-bottom:14px;text-align:center;">Wird bei jedem Eintrag mitgespeichert.</div>
+    <div style="color:#a8a8a8;font-size:12px;margin-bottom:14px;text-align:center;">Wird bei jedem Eintrag mitgespeichert.</div>
     <input id="loginInp" type="text" maxlength="5" placeholder="z.B. MS" autocomplete="off"
-      style="width:160px;text-align:center;text-transform:uppercase;font-size:22px;font-weight:700;letter-spacing:2px;padding:10px;border-radius:8px;border:1px solid #6b5040;background:#3a3530;color:#fff;font-family:Arial Narrow,Arial,sans-serif;">
-    <button onclick="setUser()" style="margin-top:16px;background:#c8a882;color:#2d2926;border:none;border-radius:8px;padding:11px 28px;font-size:15px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif;">Starten</button>
+      style="width:160px;text-align:center;text-transform:uppercase;font-size:22px;font-weight:700;letter-spacing:2px;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-family:Arial Narrow,Arial,sans-serif;">
+    <button onclick="setUser()" style="margin-top:16px;background:#d7c1ae;color:#2b2b2b;border:none;border-radius:8px;padding:11px 28px;font-size:15px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif;">Starten</button>
   </div>
 </div>
 
 <header>
   <div class="h-top">
-    <div class="logo">KPC <small>GMBH</small></div>
-    <div class="proj"><strong id="projName" onclick="switchProject()" style="cursor:pointer;">Berlin Upbeat</strong><span id="userBadge" onclick="changeUser()" style="cursor:pointer;color:#c8a882;text-decoration:underline;">–</span></div>
+    <img class="logo-img" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDI0LjAuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkViZW5lXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCAxNDkuOCAxODEiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDE0OS44IDE4MTsiIHhtbDpzcGFjZT0icHJlc2VydmUiPgo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPgoJLnN0MHtmaWxsOiNGRkZGRkY7fQoJLnN0MXtmaWxsOiM4OTU2MTM7fQoJLnN0MntmaWxsOiM2NzZDNkU7fQo8L3N0eWxlPgo8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMTAuOCw4MS41YzUtNy40LDE3LjctMjUuMywyNC42LTM1LjZoMTIuMWMtNi43LDkuNS0xMy45LDE5LjItMjAuOSwyOC44bDIzLDQ2LjdIMzcuM2wtMTguMS0zOAoJYy0yLDIuOC02LjEsOC40LTguNCwxMS4ydjI2LjdIMEMwLDgwLjksMCw0MC40LDAsMGMzLjYsMCw3LjIsMCwxMC44LDBDMTAuOCwyNy4yLDEwLjgsNTQuMywxMC44LDgxLjV6Ii8+CjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0xNDkuOCw5OC4zYy0wLjMsNC4xLTEuOSwyNC40LTI0LjIsMjQuNGMtMTkuNiwwLTI1LjEtMTcuNC0yNS4xLTM5LjNjMC0yMS4zLDYuOS0zOC44LDI2LjEtMzguOAoJYzIxLjksMCwyMi45LDIwLjIsMjMsMjMuOGgtMTEuMmMtMC4xLTIuOS0xLjItMTQuNC0xMi0xNC40cy0xNC45LDEyLTE0LjksMjkuM2MwLDE4LjcsNC4yLDMwLDE0LjMsMzBjMTAuOCwwLDEyLjItMTEuMSwxMi44LTE1CglIMTQ5LjhMMTQ5LjgsOTguM3oiLz4KPHBhdGggY2xhc3M9InN0MCIgZD0iTTQ5LjksMTgxVjY3LjhjMC0xMC4zLDAtMTcuMy0wLjEtMjJoMTAuNmMwLjEsMS40LDAuNSw2LjQsMC41LDEwLjJjMi41LTYuNSw3LjktMTEuMywxNy44LTExLjMKCWMxNC4zLDAsMjIsMTIuNiwyMiwzNy44YzAsMjcuMi05LjQsNDAuMi0yNC4yLDQwLjJjLTksMC0xMy41LTQuMy0xNS44LTlWMTgxSDQ5Ljl6IE03NS4zLDU0LjFjLTExLjcsMC0xNC45LDExLjItMTQuOSwyOQoJUzYyLjEsMTEzLDc0LjUsMTEzYzkuOSwwLDE1LTExLjYsMTUtMzBDODkuNiw2My45LDg1LjIsNTQuMSw3NS4zLDU0LjF6Ii8+CjxyZWN0IHk9IjEzMi4yIiBjbGFzcz0ic3QxIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+CjxyZWN0IHg9IjI0LjkiIHk9IjEzMi4yIiBjbGFzcz0ic3QyIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+Cjwvc3ZnPgo=" alt="kpc GmbH" />
+    <div class="proj"><strong id="projName" onclick="switchProject()" style="cursor:pointer;">Baustelle wählen</strong><span id="userBadge" onclick="changeUser()" style="cursor:pointer;color:#d7c1ae;text-decoration:underline;">–</span></div>
   </div>
   <div class="tabs" id="tabs"></div>
   <div class="fbar">
@@ -320,10 +337,16 @@ select.fs option{background:var(--anthrazit);}
       <input type="text" id="srch" placeholder="Suche: Bezeichnung, Fabrikat, Pos&#46;&#46;&#46;">
     </div>
   </div>
+  <div class="fbar gwbar" id="gwbar">
+    <button class="gw on" data-t="all" onclick="setTF('all')">Alle</button>
+    <button class="gw" data-t="M" onclick="setTF('M')">&#128295; Montage</button>
+    <button class="gw" data-t="E" onclick="setTF('E')">&#9889; Elektro</button>
+    <button class="gw" data-t="S" onclick="setTF('S')">&#128703; Sanit&#228;r</button>
+  </div>
   <div class="sbar">
     <span class="sp sf" id="sfD" onclick="setSF('done')"><span class="sd dok"></span>Vollst&#228;ndig: <strong id="cD">0</strong></span>
     <span class="sp sf" id="sfP" onclick="setSF('part')"><span class="sd dop"></span>Teilweise: <strong id="cP">0</strong></span>
-    <span class="sp sf" id="sfO" onclick="setSF('open')"><span class="sd" style="background:#9a9a9a"></span>Offen: <strong id="cO">0</strong></span>
+    <span class="sp sf" id="sfO" onclick="setSF('open')"><span class="sd" style="background:#a8a8a8"></span>Offen: <strong id="cO">0</strong></span>
     <span class="sp sf" id="sfA" onclick="setSF('all')">Gesamt: <strong id="cT">0</strong></span>
     <span class="sp" style="margin-left:auto;font-weight:700" id="syncStatus"></span>
     <span class="sp" style="margin-left:14px" id="lastEditWrap">Zuletzt bearbeitet: <strong id="lastEdit">–</strong></span>
@@ -569,7 +592,7 @@ async function updSyncBadge(){
     el.style.color = '#e0a060';
   } else if(n){
     el.textContent = '↻ '+n+' wird synchronisiert…';
-    el.style.color = '#c8a882';
+    el.style.color = '#d7c1ae';
   } else {
     el.textContent = '✓ Synchron';
     el.style.color = '#7faa6a';
@@ -640,12 +663,12 @@ function buildPanels(){
       let cards='';
       sub.items.forEach(item=>{
         const id=sp(item.pos);
-        cards+=`<div class="card" id="C${id}">
+        cards+=`<div class="card" id="C${id}" data-gew="${(item.gew||[]).join('')}">
   <div class="ih">
     <span class="pb">${item.pos}</span>
     <div class="ii">
       <div class="ibez">${item.bez.trim()}</div>
-      <div class="imet">${item.fabrikat?'&#127981; '+item.fabrikat.trim():''}${item.typ?' &nbsp;&#128203; '+item.typ.trim():''}</div>
+      <div class="imet">${item.fabrikat?'&#127981; '+item.fabrikat.trim():''}${item.typ?' &nbsp;&#128203; '+item.typ.trim():''}${gewBadge(item.gew)}</div>
     </div>
     <div class="img">${item.menge} ${item.einh}</div>
   </div>
@@ -683,6 +706,18 @@ function buildPanels(){
     });
     main.appendChild(panel);
   });
+  updGewerkSwitcher();
+}
+
+// Gewerk-Umschalter nur zeigen, wenn die Baustelle Gewerk-Daten hat; Ansicht auf "Alle" zurücksetzen
+function updGewerkSwitcher(){
+  const has = DATA.some(s=>s.subsections.some(sub=>sub.items.some(it=>it.gew&&it.gew.length)));
+  TF='all';
+  const bar=document.getElementById('gwbar');
+  if(bar){
+    bar.style.display = has ? 'flex' : 'none';
+    bar.querySelectorAll('.gw').forEach(b=>b.classList.toggle('on', b.dataset.t==='all'));
+  }
 }
 
 function tgB(h){
@@ -949,6 +984,7 @@ document.getElementById('lb').addEventListener('click',e=>{if(e.target===e.curre
 function upStats(){
   let tot=0,dn=0,pt=0,op=0;
   DATA.forEach(s=>s.subsections.forEach(sub=>sub.items.forEach(item=>{
+    if(TF!=='all'){ const g=item.gew||[]; if(!g.includes(TF)) return; }   // nur Positionen des gewählten Gewerks
     tot++; const st=ist(item.pos);
     if(st==='done')dn++; else if(st==='part')pt++; else op++;
   })));
@@ -970,9 +1006,17 @@ function setSF(f){
   applyF();
 }
 
+let TF='all';   // Gewerk-Filter: 'all' | 'M' | 'E' | 'S'
+function setTF(t){
+  TF=t;
+  document.querySelectorAll('#gwbar .gw').forEach(b=>b.classList.toggle('on', b.dataset.t===TF));
+  applyF();
+  upStats();
+}
+
 function applyF(){
   const q=document.getElementById('srch').value.toLowerCase().trim();
-  const active = q || SF!=='all';
+  const active = q || SF!=='all' || TF!=='all';
 
   // Bei Suche oder aktivem Statusfilter alle Bereiche aufklappen, sonst aktiven Tab
   if(active){
@@ -993,7 +1037,8 @@ function applyF(){
     if(SF==='done') stOk=done;
     else if(SF==='part') stOk=part;
     else if(SF==='open') stOk=!done&&!part;
-    const show=txtOk && stOk;
+    const gwOk = TF==='all' || (c.dataset.gew||'').includes(TF);
+    const show=txtOk && stOk && gwOk;
     c.style.display=show?'':'none';
     if(show && active){
       const ilist=c.closest('.ilist');
@@ -1004,6 +1049,13 @@ function applyF(){
         if(hdr) hdr.querySelector('.btog')?.classList.remove('cl');
       }
     }
+  });
+
+  // Bei aktivem Filter Anlagen-Blöcke ohne sichtbare Position ausblenden
+  document.querySelectorAll('.bblock').forEach(bb=>{
+    if(!active){ bb.style.display=''; return; }
+    const anyVisible=Array.from(bb.querySelectorAll('.card')).some(c=>c.style.display!=='none');
+    bb.style.display=anyVisible?'':'none';
   });
 }
 
@@ -1072,7 +1124,7 @@ async function downloadZip() {
     const content=await zip.generateAsync({type:'blob'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(content);
-    a.download='Fotos_Berlin_Upbeat_'+new Date().toISOString().slice(0,10)+'.zip';
+    a.download='Fotos_'+curProjSlug()+'_'+new Date().toISOString().slice(0,10)+'.zip';
     document.body.appendChild(a);a.click();a.remove();
     hideLoader();
   }catch(e){hideLoader();alert('ZIP fehlgeschlagen: '+e.message);}
@@ -1116,46 +1168,46 @@ function expTagebericht(){
   rows.forEach((r,i)=>{
     if(r.geschoss!==lastG){
       if(lastG!=='') tableRows+='<tr><td colspan="5" style="height:10px;background:#f5f3f0;border:none"></td></tr>';
-      tableRows+=`<tr><td colspan="5" style="background:#2d2926;color:#c8a882;font-weight:700;font-size:13px;padding:7px 10px;letter-spacing:1px">${r.geschoss}: ${DATA.find(s=>s.label===r.geschoss)?.bez||''}</td></tr>`;
+      tableRows+=`<tr><td colspan="5" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:7px 10px;letter-spacing:1px">${r.geschoss}: ${DATA.find(s=>s.label===r.geschoss)?.bez||''}</td></tr>`;
       lastG=r.geschoss; lastB='';
     }
     if(r.bereich!==lastB){
-      tableRows+=`<tr><td colspan="5" style="background:#eeecea;color:#6b5040;font-weight:700;font-size:12px;padding:4px 10px;border-left:3px solid #c8a882">${r.bereich}</td></tr>`;
+      tableRows+=`<tr><td colspan="5" style="background:#eeecea;color:#895500;font-weight:700;font-size:12px;padding:4px 10px;border-left:3px solid #d7c1ae">${r.bereich}</td></tr>`;
       lastB=r.bereich;
     }
-    const felderHtml=r.felder.map(f=>`<span style="display:inline-flex;align-items:center;gap:3px;background:#f0ece8;border-radius:4px;padding:2px 7px;margin:2px;font-size:11px;font-weight:700;color:#2d2926">${f.lbl}<span style="color:#9a9a9a;font-weight:400"> ${f.zeit}</span><span style="color:#c8a882;font-weight:700"> ${f.kuerzel}</span></span>`).join('');
+    const felderHtml=r.felder.map(f=>`<span style="display:inline-flex;align-items:center;gap:3px;background:#f0ece8;border-radius:4px;padding:2px 7px;margin:2px;font-size:11px;font-weight:700;color:#2b2b2b">${f.lbl}<span style="color:#a8a8a8;font-weight:400"> ${f.zeit}</span><span style="color:#d7c1ae;font-weight:700"> ${f.kuerzel}</span></span>`).join('');
     tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">
-      <td style="padding:5px 8px;font-size:11px;color:#9a9a9a;white-space:nowrap">${r.pos}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#a8a8a8;white-space:nowrap">${r.pos}</td>
       <td style="padding:5px 8px;font-size:12px;font-weight:700">${r.bez}</td>
-      <td style="padding:5px 8px;font-size:11px;color:#6b5040">${r.fabrikat}</td>
-      <td style="padding:5px 8px;font-size:11px;color:#9a9a9a">${r.typ}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#895500">${r.fabrikat}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#a8a8a8">${r.typ}</td>
       <td style="padding:5px 8px">${felderHtml}</td>
     </tr>`;
   });
 
-  const monteureHtml=monteure.length?`<div style="margin-bottom:8px;font-size:12px;color:#6b5040">Monteure heute: <strong>${monteure.join(', ')}</strong></div>`:'';
+  const monteureHtml=monteure.length?`<div style="margin-bottom:8px;font-size:12px;color:#895500">Monteure heute: <strong>${monteure.join(', ')}</strong></div>`:'';
 
   const repHtml=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
-<title>Tagesbericht Berlin Upbeat – ${d}</title>
+<title>Tagesbericht ${escapeHtml(curProjName())} – ${d}</title>
 <style>
-body{font-family:Arial Narrow,Arial,sans-serif;margin:0;padding:20px;color:#2d2926;}
-.kpc{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #6b5040;padding-bottom:12px;margin-bottom:20px;}
-.logo{font-size:22px;font-weight:700;letter-spacing:4px;color:#2d2926;}
-.logo small{display:block;font-size:11px;letter-spacing:2px;color:#9a9a9a;font-weight:400;}
-.meta{text-align:right;font-size:12px;color:#9a9a9a;line-height:1.6;}
-.meta strong{display:block;font-size:15px;color:#2d2926;font-weight:700;}
-h2{font-size:14px;color:#6b5040;margin:0 0 10px;font-weight:400;letter-spacing:0.5px;}
+body{font-family:Arial Narrow,Arial,sans-serif;margin:0;padding:20px;color:#2b2b2b;}
+.kpc{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #895500;padding-bottom:12px;margin-bottom:20px;}
+.logo{font-size:22px;font-weight:700;letter-spacing:4px;color:#2b2b2b;}
+.logo small{display:block;font-size:11px;letter-spacing:2px;color:#a8a8a8;font-weight:400;}
+.meta{text-align:right;font-size:12px;color:#a8a8a8;line-height:1.6;}
+.meta strong{display:block;font-size:15px;color:#2b2b2b;font-weight:700;}
+h2{font-size:14px;color:#895500;margin:0 0 10px;font-weight:400;letter-spacing:0.5px;}
 table{width:100%;border-collapse:collapse;font-family:Arial Narrow,Arial,sans-serif;}
-th{background:#2d2926;color:#c8a882;font-size:11px;padding:7px 8px;text-align:left;font-weight:700;letter-spacing:0.5px;}
+th{background:#2b2b2b;color:#d7c1ae;font-size:11px;padding:7px 8px;text-align:left;font-weight:700;letter-spacing:0.5px;}
 td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 .sig{margin-top:40px;display:flex;gap:60px;}
 .sig-box{flex:1;}
-.sig-line{border-top:1px solid #2d2926;padding-top:6px;font-size:11px;color:#9a9a9a;margin-top:40px;}
+.sig-line{border-top:1px solid #2b2b2b;padding-top:6px;font-size:11px;color:#a8a8a8;margin-top:40px;}
 @media print{body{padding:10px;}button{display:none!important;}}
 </style></head><body>
 <button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
 <div class="kpc"><div class="logo">KPC <small>GMBH</small></div>
-<div class="meta"><strong>Berlin Upbeat</strong>Tagesbericht Leistungsfeststellung<br>${d}</div></div>
+<div class="meta"><strong>${escapeHtml(curProjName())}</strong>Tagesbericht Leistungsfeststellung<br>${d}</div></div>
 <h2>Heute durchgeführte Arbeiten – Statusänderungen ${new Date().toLocaleDateString('de-DE')}</h2>
 ${monteureHtml}
 <table>
@@ -1224,24 +1276,24 @@ async function expKunde(withFotos=false){
   rows.forEach((r,i)=>{
     if(r.geschoss!==lastG){
       if(lastG!=='')tableRows+='<tr><td colspan="9" style="height:12px;background:#f5f3f0;border:none"></td></tr>';
-      tableRows+=`<tr><td colspan="9" style="background:#2d2926;color:#c8a882;font-weight:700;font-size:13px;padding:8px 10px;letter-spacing:1px">${r.geschoss}: ${DATA.find(s=>s.label===r.geschoss)?.bez||''}</td></tr>`;
+      tableRows+=`<tr><td colspan="9" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:8px 10px;letter-spacing:1px">${r.geschoss}: ${DATA.find(s=>s.label===r.geschoss)?.bez||''}</td></tr>`;
       lastG=r.geschoss; lastB='';
     }
     if(r.bereich!==lastB){
-      tableRows+=`<tr><td colspan="9" style="background:#eeecea;color:#6b5040;font-weight:700;font-size:12px;padding:5px 10px;border-left:3px solid #c8a882">${r.bereich}</td></tr>`;
+      tableRows+=`<tr><td colspan="9" style="background:#eeecea;color:#895500;font-weight:700;font-size:12px;padding:5px 10px;border-left:3px solid #d7c1ae">${r.bereich}</td></tr>`;
       lastB=r.bereich;
     }
     const tsShort=iso=>{if(!iso)return'';const d=new Date(iso);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});};
     const chk=(v,f)=>{
       if(!v)return'<span style="color:#ccc">&#8211;</span>';
       const dt=tsShort(r.ts&&r.ts[f]);
-      return '<span style="color:#3a7a3a;font-weight:700">&#10003;</span>'+(dt?'<br><span style="font-size:8.5px;color:#9a9a9a;font-weight:400">'+dt+'</span>':'');
+      return '<span style="color:#3a7a3a;font-weight:700">&#10003;</span>'+(dt?'<br><span style="font-size:8.5px;color:#a8a8a8;font-weight:400">'+dt+'</span>':'');
     };
     tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">
-      <td style="padding:5px 8px;font-size:11px;color:#9a9a9a;white-space:nowrap">${r.pos}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#a8a8a8;white-space:nowrap">${r.pos}</td>
       <td style="padding:5px 8px;font-size:12px;font-weight:700">${r.bez}</td>
-      <td style="padding:5px 8px;font-size:11px;color:#6b5040">${r.fabrikat}</td>
-      <td style="padding:5px 8px;font-size:11px;color:#9a9a9a">${r.typ}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#895500">${r.fabrikat}</td>
+      <td style="padding:5px 8px;font-size:11px;color:#a8a8a8">${r.typ}</td>
       <td style="padding:5px 8px;font-size:12px;font-weight:700;text-align:center;white-space:nowrap">${r.menge} ${r.einh}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.g,'g')}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.m,'m')}</td>
@@ -1250,7 +1302,7 @@ async function expKunde(withFotos=false){
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.ib,'ib')}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.ew,'ew')}</td>
     </tr>`;
-    if(r.note)tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}"><td colspan="9" style="padding:2px 8px 6px 28px;font-size:11px;color:#6b5040;font-style:italic">↳ ${r.note}</td></tr>`;
+    if(r.note)tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}"><td colspan="9" style="padding:2px 8px 6px 28px;font-size:11px;color:#895500;font-style:italic">↳ ${r.note}</td></tr>`;
     if(withFotos && r.fotos && r.fotos.length){
       let fhtml='<td colspan="9" style="padding:4px 8px 8px 28px;"><div style="display:flex;gap:8px;flex-wrap:wrap;">';
       r.fotos.forEach((src,fi)=>{
@@ -1258,7 +1310,7 @@ async function expKunde(withFotos=false){
         const dt = ts ? new Date(parseInt(ts)).toLocaleString('de-DE') : '';
         const durl = fotoData[src]||'';
         if(!durl) return;
-        fhtml+=`<div style="text-align:center"><img src="${durl}" style="width:120px;height:90px;object-fit:cover;border-radius:4px;border:1px solid #eee"><div style="font-size:9px;color:#9a9a9a;margin-top:2px">${dt}</div></div>`;
+        fhtml+=`<div style="text-align:center"><img src="${durl}" style="width:120px;height:90px;object-fit:cover;border-radius:4px;border:1px solid #eee"><div style="font-size:9px;color:#a8a8a8;margin-top:2px">${dt}</div></div>`;
       });
       fhtml+='</div></td>';
       tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">${fhtml}</tr>`;
@@ -1266,30 +1318,30 @@ async function expKunde(withFotos=false){
   });
 
   const html=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
-<title>Leistungsbericht Berlin Upbeat – ${d}</title>
+<title>Leistungsbericht ${escapeHtml(curProjName())} – ${d}</title>
 <style>
-body{font-family:Arial Narrow,Arial,sans-serif;margin:0;padding:20px;color:#2d2926;}
-.kpc{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #6b5040;padding-bottom:12px;margin-bottom:20px;}
-.logo{font-size:22px;font-weight:700;letter-spacing:4px;color:#2d2926;}
-.logo small{display:block;font-size:11px;letter-spacing:2px;color:#9a9a9a;font-weight:400;}
-.meta{text-align:right;font-size:12px;color:#9a9a9a;line-height:1.6;}
-.meta strong{display:block;font-size:15px;color:#2d2926;font-weight:700;}
-h2{font-size:14px;color:#6b5040;margin:0 0 16px;font-weight:400;letter-spacing:0.5px;}
+body{font-family:Arial Narrow,Arial,sans-serif;margin:0;padding:20px;color:#2b2b2b;}
+.kpc{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #895500;padding-bottom:12px;margin-bottom:20px;}
+.logo{font-size:22px;font-weight:700;letter-spacing:4px;color:#2b2b2b;}
+.logo small{display:block;font-size:11px;letter-spacing:2px;color:#a8a8a8;font-weight:400;}
+.meta{text-align:right;font-size:12px;color:#a8a8a8;line-height:1.6;}
+.meta strong{display:block;font-size:15px;color:#2b2b2b;font-weight:700;}
+h2{font-size:14px;color:#895500;margin:0 0 16px;font-weight:400;letter-spacing:0.5px;}
 table{width:100%;border-collapse:collapse;font-family:Arial Narrow,Arial,sans-serif;}
-th{background:#2d2926;color:#c8a882;font-size:11px;padding:7px 8px;text-align:left;font-weight:700;letter-spacing:0.5px;}
+th{background:#2b2b2b;color:#d7c1ae;font-size:11px;padding:7px 8px;text-align:left;font-weight:700;letter-spacing:0.5px;}
 th.center{text-align:center;}
 td{border-bottom:1px solid #eeecea;vertical-align:middle;}
-.legend{margin-top:24px;font-size:11px;color:#9a9a9a;display:flex;gap:20px;}
+.legend{margin-top:24px;font-size:11px;color:#a8a8a8;display:flex;gap:20px;}
 .legend span{display:flex;align-items:center;gap:5px;}
 .sig{margin-top:40px;display:flex;gap:60px;}
 .sig-box{flex:1;}
-.sig-line{border-top:1px solid #2d2926;padding-top:6px;font-size:11px;color:#9a9a9a;margin-top:40px;}
+.sig-line{border-top:1px solid #2b2b2b;padding-top:6px;font-size:11px;color:#a8a8a8;margin-top:40px;}
 @media print{body{padding:10px;}button{display:none!important;}}
 </style></head><body>
 <button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
 <div class="kpc">
   <div class="logo">KPC <small>GMBH</small></div>
-  <div class="meta"><strong>Leistungsbericht</strong>Projekt: Berlin Upbeat<br>Datum: ${d}<br>Dok.-Nr.: LB-BU-${now.toISOString().slice(0,10).replace(/-/g,'')}</div>
+  <div class="meta"><strong>Leistungsbericht</strong>Projekt: ${escapeHtml(curProjName())}<br>Datum: ${d}<br>Dok.-Nr.: LB-${curProjCode()}-${now.toISOString().slice(0,10).replace(/-/g,'')}</div>
 </div>
 <h2>Gelieferte und installierte Positionen – Nachweis Leistungsfeststellung</h2>
 <table>
@@ -1309,7 +1361,7 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
   <div class="sig-box"><div class="sig-line">Datum / Unterschrift Auftraggeber</div></div>
 </div>
 <div style="margin-top:16px;text-align:center">
-  <button onclick="window.print()" style="padding:10px 24px;background:#6b5040;color:#fff;border:none;border-radius:4px;font-size:13px;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">Drucken / Als PDF speichern</button>
+  <button onclick="window.print()" style="padding:10px 24px;background:#895500;color:#fff;border:none;border-radius:4px;font-size:13px;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">Drucken / Als PDF speichern</button>
 </div>
 </body></html>`;
 
@@ -1581,7 +1633,7 @@ function showLoader(msg) {
   if (!el) {
     el = document.createElement('div');
     el.id = 'loader';
-    el.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(45,41,38,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;color:#c8a882;font-family:Arial Narrow,Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;';
+    el.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(45,41,38,0.7);z-index:9999;display:flex;align-items:center;justify-content:center;color:#d7c1ae;font-family:Arial Narrow,Arial,sans-serif;font-size:16px;font-weight:700;letter-spacing:1px;';
     document.body.appendChild(el);
   }
   el.textContent = msg || 'Wird gespeichert...';
@@ -1813,7 +1865,7 @@ async function pdfOpen(pos, i, readonly){
   if(!EDREADONLY) pdfSetTool('pen');
   document.getElementById('pdfed').classList.add('on');
   const pagesEl=document.getElementById('pdfedPages');
-  pagesEl.innerHTML='<div style="color:#c8a882;padding:40px;font-size:15px;font-weight:700">PDF wird geladen...</div>';
+  pagesEl.innerHTML='<div style="color:#d7c1ae;padding:40px;font-size:15px;font-weight:700">PDF wird geladen...</div>';
   try{
     pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
     const buf=await (await getFileBlob(p.fname)).arrayBuffer();
@@ -2172,7 +2224,7 @@ async function downloadProtoZip(){
     const content=await zip.generateAsync({type:'blob'});
     const a=document.createElement('a');
     a.href=URL.createObjectURL(content);
-    a.download='Protokolle_Berlin_Upbeat_'+new Date().toISOString().slice(0,10)+'.zip';
+    a.download='Protokolle_'+curProjSlug()+'_'+new Date().toISOString().slice(0,10)+'.zip';
     document.body.appendChild(a);a.click();a.remove();
     hideLoader();
   }catch(e){hideLoader();alert('ZIP fehlgeschlagen: '+e.message);}
@@ -2418,43 +2470,43 @@ function expRest(){
   rows.forEach((r,i)=>{
     if(r.geschoss!==lastG){
       if(lastG!=='')tableRows+='<tr><td colspan="6" style="height:10px;background:#f5f3f0;border:none"></td></tr>';
-      tableRows+=`<tr><td colspan="6" style="background:#2d2926;color:#c8a882;font-weight:700;font-size:13px;padding:7px 10px;letter-spacing:1px">${r.geschoss}</td></tr>`;
+      tableRows+=`<tr><td colspan="6" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:7px 10px;letter-spacing:1px">${r.geschoss}</td></tr>`;
       lastG=r.geschoss; lastB='';
     }
     if(r.bereich!==lastB){
-      tableRows+=`<tr><td colspan="6" style="background:#eeecea;color:#6b5040;font-weight:700;font-size:12px;padding:4px 10px;border-left:3px solid #c8a882">${r.bereich}</td></tr>`;
+      tableRows+=`<tr><td colspan="6" style="background:#eeecea;color:#895500;font-weight:700;font-size:12px;padding:4px 10px;border-left:3px solid #d7c1ae">${r.bereich}</td></tr>`;
       lastB=r.bereich;
     }
     const status=r.done?'<span style="color:#3a7a3a;font-weight:700">✓ Erledigt</span>':'<span style="color:#c0392b;font-weight:700">● Offen</span>';
     tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">
-      <td style="padding:5px 8px;font-size:10px;color:#9a9a9a;white-space:nowrap">${r.pos}</td>
+      <td style="padding:5px 8px;font-size:10px;color:#a8a8a8;white-space:nowrap">${r.pos}</td>
       <td style="padding:5px 8px;font-size:12px;font-weight:700">${r.bez}</td>
       <td style="padding:5px 8px;font-size:12px">${r.txt}</td>
       <td style="padding:5px 8px;font-size:11px;text-align:center">${status}</td>
-      <td style="padding:5px 8px;font-size:10px;color:#6b5040">${r.ersteller||''}${r.erstelltAm?' · '+raFmtTs(r.erstelltAm):''}</td>
+      <td style="padding:5px 8px;font-size:10px;color:#895500">${r.ersteller||''}${r.erstelltAm?' · '+raFmtTs(r.erstelltAm):''}</td>
       <td style="padding:5px 8px;font-size:10px;color:#3a7a3a">${r.erledigtVon||''}${r.erledigtAm?' · '+raFmtTs(r.erledigtAm):''}</td>
     </tr>`;
   });
   const offen=rows.filter(r=>!r.done).length;
   const html=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
-<title>Restarbeitenliste Berlin Upbeat – ${d}</title>
-<style>body{font-family:Arial Narrow,Arial,sans-serif;margin:0;padding:20px;color:#2d2926;}
-.kpc{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #6b5040;padding-bottom:12px;margin-bottom:20px;}
-.logo{font-size:22px;font-weight:700;letter-spacing:4px;color:#2d2926;}
-.logo small{display:block;font-size:11px;letter-spacing:2px;color:#9a9a9a;font-weight:400;}
-.meta{text-align:right;font-size:12px;color:#9a9a9a;line-height:1.6;}
-.meta strong{display:block;font-size:15px;color:#2d2926;font-weight:700;}
+<title>Restarbeitenliste ${escapeHtml(curProjName())} – ${d}</title>
+<style>body{font-family:Arial Narrow,Arial,sans-serif;margin:0;padding:20px;color:#2b2b2b;}
+.kpc{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #895500;padding-bottom:12px;margin-bottom:20px;}
+.logo{font-size:22px;font-weight:700;letter-spacing:4px;color:#2b2b2b;}
+.logo small{display:block;font-size:11px;letter-spacing:2px;color:#a8a8a8;font-weight:400;}
+.meta{text-align:right;font-size:12px;color:#a8a8a8;line-height:1.6;}
+.meta strong{display:block;font-size:15px;color:#2b2b2b;font-weight:700;}
 table{width:100%;border-collapse:collapse;font-family:Arial Narrow,Arial,sans-serif;}
-th{background:#2d2926;color:#c8a882;font-size:11px;padding:7px 8px;text-align:left;font-weight:700;letter-spacing:0.5px;}
+th{background:#2b2b2b;color:#d7c1ae;font-size:11px;padding:7px 8px;text-align:left;font-weight:700;letter-spacing:0.5px;}
 td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 .sig{margin-top:40px;display:flex;gap:60px;}
 .sig-box{flex:1;}
-.sig-line{border-top:1px solid #2d2926;padding-top:6px;font-size:11px;color:#9a9a9a;margin-top:40px;}
+.sig-line{border-top:1px solid #2b2b2b;padding-top:6px;font-size:11px;color:#a8a8a8;margin-top:40px;}
 @media print{body{padding:10px;}button{display:none!important;}}</style></head><body>
 <button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
 <div class="kpc">
   <div class="logo">KPC <small>GMBH</small></div>
-  <div class="meta"><strong>Restarbeitenliste</strong>Projekt: Berlin Upbeat<br>Datum: ${d}<br>Dok.-Nr.: RA-BU-${now.toISOString().slice(0,10).replace(/-/g,'')}</div>
+  <div class="meta"><strong>Restarbeitenliste</strong>Projekt: ${escapeHtml(curProjName())}<br>Datum: ${d}<br>Dok.-Nr.: RA-${curProjCode()}-${now.toISOString().slice(0,10).replace(/-/g,'')}</div>
 </div>
 <p style="margin-bottom:16px;font-size:13px">Gesamt: <strong>${rows.length}</strong> Restarbeiten &nbsp;|&nbsp; Offen: <strong style="color:#c0392b">${offen}</strong> &nbsp;|&nbsp; Erledigt: <strong style="color:#3a7a3a">${rows.length-offen}</strong></p>
 <table><thead><tr>
@@ -2480,6 +2532,17 @@ let PROJECTS = [];                       // [{pid,name,created,by}]
 let PENDING_LV = null;                   // geparste LV im Import-Assistenten
 
 function escapeHtml(s){return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+// Name der aktuell gewählten Baustelle (für Berichte, Titel, Dateinamen)
+function curProjName(){
+  const p=(typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS.find(x=>x.pid===PID):null;
+  const el=document.getElementById('projName');
+  return (p&&p.name) || (el&&el.textContent&&el.textContent.trim()) || 'Projekt';
+}
+// Kurzcode aus dem Projektnamen (z.B. "Berlin Upbeat" -> "BU") für Dok.-Nummern
+function curProjCode(){
+  return (curProjName().match(/\b[A-Za-zÄÖÜäöü0-9]/g)||['P']).join('').toUpperCase().slice(0,4);
+}
+function curProjSlug(){ return curProjName().replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || 'Projekt'; }
 function slugify(s){
   return String(s||'projekt').toLowerCase()
     .replace(/[ä]/g,'ae').replace(/[ö]/g,'oe').replace(/[ü]/g,'ue').replace(/ß/g,'ss')
@@ -2553,7 +2616,7 @@ function ensureProjOverlay(){
   if(ov) return ov;
   ov=document.createElement('div');
   ov.id='projOv';
-  ov.style.cssText='position:fixed;inset:0;z-index:1900;background:#2d2926;display:none;flex-direction:column;align-items:center;justify-content:flex-start;padding:30px 18px;overflow-y:auto;';
+  ov.style.cssText='position:fixed;inset:0;z-index:1900;background:#2b2b2b;display:none;flex-direction:column;align-items:center;justify-content:flex-start;padding:30px 18px;overflow-y:auto;';
   document.body.appendChild(ov);
   return ov;
 }
@@ -2561,7 +2624,7 @@ async function openProjectFlow(){
   document.getElementById('loginOv').style.display='none';
   const ov=ensureProjOverlay();
   ov.style.display='flex';
-  ov.innerHTML='<div style="color:#c8a882;font-size:15px;margin-top:50px">Projekte werden geladen …</div>';
+  ov.innerHTML='<div style="color:#d7c1ae;font-size:15px;margin-top:50px">Projekte werden geladen …</div>';
   try{ await loadProjects(); renderProjectPicker(); }
   catch(e){ ov.innerHTML='<div style="color:#e08a8a;font-size:14px;max-width:520px;text-align:center;margin-top:50px">Projekte konnten nicht geladen werden:<br>'+escapeHtml(e.message||e)+'</div>'; console.error(e); }
 }
@@ -2570,25 +2633,25 @@ function renderProjectPicker(){
   ov.style.display='flex';
   const items = PROJECTS.slice().sort((a,b)=>(b.created||'').localeCompare(a.created||''));
   ov.innerHTML =
-    '<div class="logo" style="font-size:22px;letter-spacing:3px;color:#c8a882;text-transform:uppercase;font-weight:700;margin:10px 0 4px;">KPC <small style="display:block;color:#9a9a9a;font-size:11px;letter-spacing:2px;font-weight:400;">GMBH</small></div>'+
+    '<img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDI0LjAuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkViZW5lXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCAyNTEuNyAxODEiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDI1MS43IDE4MTsiIHhtbDpzcGFjZT0icHJlc2VydmUiPgo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPgoJLnN0MHtmaWxsOiNGRkZGRkY7ZW5hYmxlLWJhY2tncm91bmQ6bmV3ICAgIDt9Cgkuc3Qxe2ZpbGw6I0ZGRkZGRjt9Cgkuc3Qye2ZpbGw6Izg5NTYxMzt9Cgkuc3Qze2ZpbGw6IzY3NkM2RTt9Cjwvc3R5bGU+CjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0xMC44LDgxLjVjNS03LjQsMTcuNy0yNS4zLDI0LjYtMzUuNmgxMi4xYy02LjcsOS41LTEzLjksMTkuMi0yMC45LDI4LjhsMjMsNDYuN0gzNy4zbC0xOC4xLTM4CgljLTIsMi44LTYuMSw4LjQtOC40LDExLjJ2MjYuN0gwQzAsODAuOSwwLDQwLjQsMCwwYzMuNiwwLDcuMiwwLDEwLjgsMEMxMC44LDI3LjIsMTAuOCw1NC4zLDEwLjgsODEuNXoiLz4KPHBhdGggY2xhc3M9InN0MCIgZD0iTTE0OS44LDk4LjNjLTAuMyw0LjEtMS45LDI0LjQtMjQuMiwyNC40Yy0xOS42LDAtMjUuMS0xNy40LTI1LjEtMzkuM2MwLTIxLjMsNi45LTM4LjgsMjYuMS0zOC44CgljMjEuOSwwLDIyLjksMjAuMiwyMywyMy44aC0xMS4yYy0wLjEtMi45LTEuMi0xNC40LTEyLTE0LjRjLTEwLjgsMC0xNC45LDEyLTE0LjksMjkuM2MwLDE4LjcsNC4yLDMwLDE0LjMsMzAKCWMxMC44LDAsMTIuMi0xMS4xLDEyLjgtMTVMMTQ5LjgsOTguM0wxNDkuOCw5OC4zeiIvPgo8cGF0aCBjbGFzcz0ic3QwIiBkPSJNNDkuOSwxODFWNjcuOGMwLTEwLjMsMC0xNy4zLTAuMS0yMmgxMC42YzAuMSwxLjQsMC41LDYuNCwwLjUsMTAuMmMyLjUtNi41LDcuOS0xMS4zLDE3LjgtMTEuMwoJYzE0LjMsMCwyMiwxMi42LDIyLDM3LjhjMCwyNy4yLTkuNCw0MC4yLTI0LjIsNDAuMmMtOSwwLTEzLjUtNC4zLTE1LjgtOVYxODFINDkuOXogTTc1LjMsNTQuMWMtMTEuNywwLTE0LjksMTEuMi0xNC45LDI5CglTNjIuMSwxMTMsNzQuNSwxMTNjOS45LDAsMTUtMTEuNiwxNS0zMEM4OS42LDYzLjksODUuMiw1NC4xLDc1LjMsNTQuMXoiLz4KPGc+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNNzkuNCwxNTIuNWwwLjEsMC42bDAuMS0wLjdsMi40LTkuMUg4M2wyLjQsOWwwLjIsMC45bDAuMi0wLjhsMi4xLTkuMWgxLjNsLTIuOSwxMS44aC0xbC0yLjYtOS40bC0wLjEtMC4zCgkJdjAuM2wtMi41LDkuNGgtMWwtMi45LTExLjhoMS4zTDc5LjQsMTUyLjV6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNOTUuOCwxNTUuNGMtMS40LDAtMi41LTAuNC0zLjMtMS4zYy0wLjgtMC45LTEuMi0yLjItMS4yLTMuOXYtMS40YzAtMS43LDAuNC0zLjEsMS4yLTQuMQoJCWMwLjctMSwxLjgtMS41LDMuMS0xLjVjMS4zLDAsMi4yLDAuNCwzLDEuM3MxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFzMS40LDEuMSwyLjQsMS4xCgkJYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44Qzk4LjYsMTU0LjgsOTcuNCwxNTUuNCw5NS44LDE1NS40eiBNOTUuNiwxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEM5OC4zLDE0NS40LDk3LjQsMTQ0LjMsOTUuNiwxNDQuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMDkuOCwxNDAuM3YzaDIuMXYxLjFoLTIuMXY3LjljMCwwLjYsMC4xLDEuMiwwLjMsMS40YzAuMiwwLjQsMC41LDAuNCwxLDAuNGMwLjIsMCwwLjQsMCwwLjktMC4xdjEuMQoJCWMtMC4zLDAuMS0wLjcsMC4yLTEuMiwwLjJjLTEuNCwwLTIuMS0xLTIuMS0zdi04LjFoLTEuOHYtMS4xaDEuOHYtM0wxMDkuOCwxNDAuM0wxMDkuOCwxNDAuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMTYuMSwxNDUuMmMwLjQtMC42LDAuOC0xLjIsMS4zLTEuNWMwLjUtMC40LDEuMi0wLjUsMS45LTAuNWMyLjEsMCwzLjEsMS4zLDMuMSw0LjF2OGgtMS4ydi03LjgKCQljMC0xLjEtMC4yLTEuOS0wLjUtMi4zYy0wLjQtMC40LTAuOS0wLjctMS43LTAuN2MtMC42LDAtMS4yLDAuMy0xLjcsMC43Yy0wLjUsMC40LTAuOSwxLjItMS4yLDJ2OC4yaC0xLjN2LTE1LjFoMS4zTDExNi4xLDE0NS4yCgkJTDExNi4xLDE0NS4yeiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTEyNiwxMzkuOWMwLTAuMywwLjEtMC40LDAuMi0wLjZjMC4yLTAuMiwwLjQtMC4zLDAuNi0wLjNzMC40LDAuMSwwLjYsMC4zYzAuMiwwLjIsMC4yLDAuNCwwLjIsMC42CgkJYzAsMC4zLTAuMSwwLjQtMC4yLDAuNmMtMC4yLDAuMi0wLjQsMC4zLTAuNiwwLjNjLTAuMywwLTAuNC0wLjEtMC42LTAuM1MxMjYsMTQwLjIsMTI2LDEzOS45eiBNMTI3LjQsMTU1LjJoLTEuM3YtMTEuOGgxLjNWMTU1LjJ6CgkJIi8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTMyLjMsMTQzLjN2MS45YzAuNC0wLjYsMC44LTEuMiwxLjMtMS41YzAuNS0wLjQsMS4yLTAuNSwxLjktMC41YzIuMSwwLDMuMSwxLjMsMy4xLDQuMXY4aC0xLjJ2LTcuOAoJCWMwLTEuMS0wLjItMS45LTAuNS0yLjNjLTAuNC0wLjQtMC45LTAuNy0xLjctMC43Yy0wLjYsMC0xLjIsMC4zLTEuNywwLjdjLTAuNSwwLjQtMC45LDEuMi0xLjIsMnY4LjJoLTEuM3YtMTEuOGgxLjJWMTQzLjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTQ0LjgsMTQ5LjNsLTEuMywxLjN2NC42aC0xLjN2LTE1aDEuM3Y4LjlsMS0xLjNsMy43LTQuNWgxLjVsLTQuMSw1bDQuNiw2LjhoLTEuNEwxNDQuOCwxNDkuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xNTIuMywxNTguMmwtMC44LTAuNWMwLjYtMC45LDEtMS44LDEtMi44di0xLjdoMS4zdjEuM0MxNTMuOCwxNTYsMTUzLjIsMTU3LjMsMTUyLjMsMTU4LjJ6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTY1LjEsMTUyLjVsMC4xLDAuNmwwLjEtMC43bDIuNC05LjFoMWwyLjQsOWwwLjIsMC45bDAuMi0wLjhsMi4xLTkuMWgxLjNsLTIuOSwxMS44aC0xLjFsLTIuNi05LjRsLTAuMS0wLjMKCQl2MC4zbC0yLjUsOS40aC0xLjFsLTIuOS0xMS44aDEuM0wxNjUuMSwxNTIuNXoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xODEuNCwxNTUuNGMtMS40LDAtMi41LTAuNC0zLjMtMS4zYy0wLjgtMC45LTEuMi0yLjItMS4yLTMuOXYtMS40YzAtMS43LDAuNC0zLjEsMS4yLTQuMQoJCWMwLjctMSwxLjgtMS41LDMuMS0xLjVjMS4zLDAsMi4yLDAuNCwzLDEuM3MxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFjMC42LDAuNywxLjQsMS4xLDIuNCwxLjEKCQljMS4yLDAsMi4xLTAuNCwyLjktMS4zbDAuNiwwLjhDMTg0LjIsMTU0LjgsMTgzLjEsMTU1LjQsMTgxLjQsMTU1LjR6IE0xODEuMywxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMxODMuOSwxNDUuNCwxODMuMSwxNDQuMywxODEuMywxNDQuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xOTcuNCwxNTQuM2MwLjgsMCwxLjUtMC4zLDItMC43YzAuNC0wLjQsMC43LTEuMiwwLjctMi4xaDEuMmMtMC4xLDEuMy0wLjQsMi4xLTEuMiwyLjlzLTEuNiwxLjEtMi43LDEuMQoJCWMtMS40LDAtMi41LTAuNC0zLjItMS4zcy0xLjEtMi4yLTEuMS00di0xLjRjMC0xLjgsMC40LTMuMSwxLjEtNC4xczEuOC0xLjMsMy4yLTEuM2MxLjIsMCwyLjEsMC40LDIuOCwxLjFzMS4xLDEuOCwxLjEsMy4xaC0xLjIKCQljMC0xLTAuMy0xLjctMC43LTIuMmMtMC40LTAuNS0xLjEtMC44LTItMC44Yy0xLjEsMC0xLjgsMC40LTIuMywxLjFzLTAuNywxLjgtMC43LDMuMnYxLjNjMCwxLjUsMC4zLDIuNiwwLjcsMy4zCgkJQzE5NS41LDE1My45LDE5Ni4zLDE1NC4zLDE5Ny40LDE1NC4zeiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIwOC44LDE0NC41Yy0wLjMtMC4xLTAuNS0wLjEtMC44LTAuMWMtMC43LDAtMS4zLDAuMy0xLjcsMC43Yy0wLjQsMC40LTAuOCwxLjEtMSwxLjl2OC4xSDIwNHYtMTEuOGgxLjJ2MS44CgkJYzAuNS0xLjMsMS41LTIsMi43LTJjMC40LDAsMC41LDAuMSwwLjcsMC4yTDIwOC44LDE0NC41eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIxNS4yLDE1NS40Yy0xLjQsMC0yLjUtMC40LTMuMy0xLjNjLTAuOC0wLjktMS4yLTIuMi0xLjItMy45di0xLjRjMC0xLjcsMC40LTMuMSwxLjItNC4xCgkJYzAuNy0xLDEuOC0xLjUsMy4xLTEuNWMxLjMsMCwyLjIsMC40LDMsMS4zczEsMi4xLDEuMSwzLjl2MS4ySDIxMnYwLjZjMCwxLjMsMC4zLDIuNCwwLjksMy4xYzAuNSwwLjcsMS40LDEuMSwyLjQsMS4xCgkJYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44QzIxOCwxNTQuOCwyMTYuOCwxNTUuNCwyMTUuMiwxNTUuNHogTTIxNSwxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMyMTcuNywxNDUuNCwyMTYuOCwxNDQuMywyMTUsMTQ0LjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMjI4LjIsMTU1LjJjLTAuMS0wLjQtMC4yLTAuOS0wLjItMS42Yy0wLjQsMC42LTAuOCwxLjEtMS40LDEuM2MtMC41LDAuNC0xLjIsMC40LTEuOSwwLjQKCQljLTEsMC0xLjgtMC4zLTIuNC0wLjljLTAuNS0wLjUtMC45LTEuNC0wLjktMi41YzAtMS4yLDAuNC0yLjEsMS4yLTIuOHMxLjktMSwzLjMtMWgyLjF2LTEuNmMwLTAuOC0wLjItMS40LTAuNi0xLjgKCQljLTAuNC0wLjQtMS4xLTAuNS0xLjktMC41Yy0wLjcsMC0xLjMsMC4yLTEuOSwwLjZjLTAuNCwwLjQtMC43LDEtMC43LDEuN2gtMS4zYzAtMSwwLjQtMS44LDEuMS0yLjVzMS42LTEsMi44LTFzMi4xLDAuMywyLjcsMC45CgkJYzAuNiwwLjYsMC45LDEuNCwwLjksMi42djUuOGMwLDEuMiwwLjEsMi4xLDAuNCwyLjZ2MC4xTDIyOC4yLDE1NS4yTDIyOC4yLDE1NS4yeiBNMjI0LjksMTU0LjJjMC43LDAsMS4zLTAuMiwxLjktMC41CgkJYzAuNS0wLjQsMS0wLjksMS4zLTEuNXYtMi45aC0yYy0xLjEsMC0yLDAuMy0yLjUsMC43Yy0wLjUsMC40LTAuOCwxLjItMC44LDJDMjIyLjcsMTUzLjUsMjIzLjQsMTU0LjIsMjI0LjksMTU0LjJ6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMjM0LjcsMTQwLjN2M2gyLjF2MS4xaC0yLjF2Ny45YzAsMC42LDAuMSwxLjIsMC4zLDEuNGMwLjIsMC40LDAuNSwwLjQsMSwwLjRjMC4yLDAsMC40LDAsMC45LTAuMXYxLjEKCQljLTAuMywwLjEtMC43LDAuMi0xLjIsMC4yYy0xLjQsMC0yLjEtMS0yLjEtM3YtOC4xaC0xLjh2LTEuMWgxLjh2LTNMMjM0LjcsMTQwLjNMMjM0LjcsMTQwLjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMjQzLjcsMTU1LjRjLTEuNCwwLTIuNS0wLjQtMy4zLTEuM2MtMC44LTAuOS0xLjItMi4yLTEuMi0zLjl2LTEuNGMwLTEuNywwLjQtMy4xLDEuMi00LjEKCQljMC43LTEsMS44LTEuNSwzLjEtMS41YzEuMywwLDIuMiwwLjQsMywxLjNjMC43LDAuOCwxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFjMC42LDAuNywxLjQsMS4xLDIuNCwxLjEKCQljMS4yLDAsMi4xLTAuNCwyLjktMS4zbDAuNiwwLjhDMjQ2LjQsMTU0LjgsMjQ1LjMsMTU1LjQsMjQzLjcsMTU1LjR6IE0yNDMuNSwxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMyNDYuMiwxNDUuNCwyNDUuMywxNDQuMywyNDMuNSwxNDQuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0yNTAuMiwxNTguMmwtMC44LTAuNWMwLjYtMC45LDEtMS44LDEtMi44di0xLjdoMS4zdjEuM0MyNTEuNywxNTYsMjUxLjMsMTU3LjMsMjUwLjIsMTU4LjJ6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNNzkuNCwxNzhsMC4xLDAuNmwwLjEtMC43bDIuNC05LjFIODNsMi40LDlsMC4yLDAuOWwwLjItMC44bDIuMS05LjFoMS4zbC0yLjksMTEuOGgtMWwtMi42LTkuNGwtMC4xLTAuM3YwLjMKCQlsLTIuNSw5LjRoLTFsLTIuOS0xMS44aDEuM0w3OS40LDE3OHoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik05NS44LDE4MWMtMS40LDAtMi41LTAuNC0zLjMtMS4zcy0xLjItMi4yLTEuMi0zLjl2LTEuNGMwLTEuNywwLjQtMy4xLDEuMi00LjFjMC43LTEsMS44LTEuNSwzLjEtMS41CgkJYzEuMywwLDIuMiwwLjQsMywxLjNjMC43LDAuOCwxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFzMS40LDEuMSwyLjQsMS4xYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44CgkJQzk4LjYsMTgwLjQsOTcuNCwxODEsOTUuOCwxODF6IE05NS42LDE2OS44Yy0xLDAtMS43LDAuNC0yLjIsMWMtMC41LDAuNy0wLjgsMS43LTAuOCwzaDUuOHYtMC40Qzk4LjMsMTcxLDk3LjQsMTY5LjgsOTUuNiwxNjkuOHoiCgkJLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMDkuNCwxODAuN2gtMS4zdi0xNi44aDEuM1YxODAuN3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMTIuNiwxNzQuM2MwLTEuNywwLjQtMywxLjItNGMwLjgtMSwxLjgtMS41LDMuMS0xLjVjMS4zLDAsMi40LDAuNCwzLjEsMS40czEuMiwyLjMsMS4yLDR2MS4zCgkJYzAsMS43LTAuNCwzLjEtMS4yLDRjLTAuOCwxLTEuOCwxLjQtMy4xLDEuNGMtMS4zLDAtMi4zLTAuNC0zLjEtMS40Yy0wLjgtMS0xLjItMi4yLTEuMi0zLjlWMTc0LjN6IE0xMTMuOCwxNzUuNAoJCWMwLDEuMywwLjMsMi40LDAuOCwzLjJjMC41LDAuOCwxLjMsMS4yLDIuMywxLjJzMS44LTAuNCwyLjMtMS4yYzAuNS0wLjgsMC44LTEuOCwwLjgtMy4ydi0xLjNjMC0xLjMtMC4zLTIuNC0wLjgtMy4yCgkJYy0wLjUtMC44LTEuMy0xLjItMi4zLTEuMnMtMS43LDAuNC0yLjIsMS4yYy0wLjUsMC44LTAuOCwxLjgtMC45LDMuMVYxNzUuNHoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMjcuNiwxNzguOGwzLTkuOWgxLjNsLTMuNywxMS44aC0xbC0zLjctMTEuOGgxLjNMMTI3LjYsMTc4Ljh6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTM4LjMsMTgxYy0xLjQsMC0yLjUtMC40LTMuMy0xLjNjLTAuOC0wLjktMS4yLTIuMi0xLjItMy45di0xLjRjMC0xLjcsMC40LTMuMSwxLjItNC4xCgkJYzAuNy0xLDEuOC0xLjUsMy4xLTEuNWMxLjMsMCwyLjIsMC40LDMsMS4zYzAuNywwLjgsMSwyLjEsMS4xLDMuOXYxLjJIMTM1djAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFzMS40LDEuMSwyLjQsMS4xCgkJYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44QzE0MS4xLDE4MC40LDEzOS45LDE4MSwxMzguMywxODF6IE0xMzguMSwxNjkuOGMtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMxNDAuOCwxNzEsMTM5LjgsMTY5LjgsMTM4LjEsMTY5Ljh6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTUzLjIsMTc1LjNsLTEsMS4ydjQuMmgtMnYtMTYuOGgydjEwbDMuNy01LjFoMi4zbC0zLjgsNC45bDQuMyw2LjloLTIuM0wxNTMuMiwxNzUuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xNjQuMiwxNjUuOGMwLDAuNC0wLjEsMC42LTAuMywwLjhjLTAuMiwwLjItMC40LDAuNC0wLjgsMC40Yy0wLjQsMC0wLjYtMC4xLTAuOC0wLjQKCQljLTAuMi0wLjItMC4zLTAuNC0wLjMtMC44YzAtMC40LDAuMS0wLjYsMC4zLTAuOGMwLjItMC4zLDAuNC0wLjQsMC44LTAuNGMwLjQsMCwwLjYsMC4xLDAuOCwwLjRTMTY0LjIsMTY1LjQsMTY0LjIsMTY1Ljh6CgkJIE0xNjQsMTgwLjdoLTJ2LTExLjhoMlYxODAuN3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xNzEuMSwxNjZ2Mi45aDEuOHYxLjVoLTEuOHY3LjNjMCwwLjQsMC4xLDAuOCwwLjMsMS4xczAuNCwwLjQsMC44LDAuNGMwLjMsMCwwLjUsMCwwLjgtMC4xdjEuNgoJCWMtMC40LDAuMi0wLjksMC4yLTEuMywwLjJjLTAuOCwwLTEuMy0wLjMtMS44LTAuOGMtMC40LTAuNS0wLjYtMS4zLTAuNi0yLjN2LTcuM2gtMS44di0xLjVoMS44VjE2NkwxNzEuMSwxNjZMMTcxLjEsMTY2eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTE4MSwxNzkuM2MwLjYsMCwxLjItMC4yLDEuNS0wLjZjMC40LTAuNCwwLjYtMSwwLjYtMS43aDEuOGMwLDEuMi0wLjQsMi4xLTEuMywyLjljLTAuOCwwLjgtMS43LDEuMi0yLjgsMS4yCgkJYy0xLjQsMC0yLjYtMC40LTMuMy0xLjNjLTAuOC0wLjktMS4yLTIuMy0xLjItNC4xdi0xLjNjMC0xLjgsMC40LTMuMSwxLjItNC4xYzAuOC0wLjksMS45LTEuNCwzLjMtMS40YzEuMywwLDIuMSwwLjQsMi45LDEuMgoJCWMwLjcsMC44LDEuMSwxLjgsMS4yLDMuMWgtMS44YzAtMC45LTAuMy0xLjUtMC42LTJjLTAuNC0wLjQtMC45LTAuNi0xLjUtMC42Yy0wLjksMC0xLjUsMC4zLTEuOSwwLjhjLTAuNCwwLjUtMC42LDEuNS0wLjYsMi44djEuNQoJCWMwLDEuNCwwLjIsMi40LDAuNiwzQzE3OS40LDE3OSwxODAuMSwxNzkuMywxODEsMTc5LjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTkwLjcsMTcwLjFjMC43LTEsMS43LTEuNCwyLjktMS40YzIuMSwwLDMuMSwxLjQsMy4yLDQuMnY3LjloLTJWMTczYzAtMC45LTAuMi0xLjYtMC40LTIKCQljLTAuMy0wLjQtMC44LTAuNi0xLjQtMC42Yy0wLjQsMC0wLjksMC4yLTEuMywwLjRjLTAuNCwwLjQtMC43LDAuNy0wLjksMS4zdjguNmgtMlYxNjZoMkwxOTAuNywxNzAuMUwxOTAuNywxNzAuMXoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0yMDUuNCwxODFjLTEuNCwwLTIuNi0wLjQtMy40LTEuM2MtMC44LTAuOS0xLjItMi4xLTEuMi0zLjl2LTEuNGMwLTEuOCwwLjQtMy4xLDEuMi00LjFzMS45LTEuNSwzLjItMS41CgkJYzEuMywwLDIuNCwwLjQsMy4xLDEuM3MxLjEsMi4yLDEuMSw0LjF2MS4zaC02LjZ2MC4zYzAsMS4zLDAuMywyLjIsMC43LDIuOHMxLjIsMC45LDIuMSwwLjljMC41LDAsMS4xLTAuMSwxLjUtMC40CgkJYzAuNC0wLjIsMC44LTAuNSwxLjMtMWwxLDEuM0MyMDguNCwxODAuMywyMDcuMSwxODEsMjA1LjQsMTgxeiBNMjA1LjIsMTcwLjNjLTAuOCwwLTEuNCwwLjMtMS44LDAuOGMtMC40LDAuNS0wLjYsMS40LTAuNiwyLjZoNC43CgkJdi0wLjNjLTAuMS0xLjItMC4zLTItMC42LTIuNEMyMDYuNCwxNzAuNiwyMDUuOSwxNzAuMywyMDUuMiwxNzAuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0yMTUuMSwxNjguOWwwLjEsMS4zYzAuNy0xLDEuNy0xLjUsMi45LTEuNWMyLjEsMCwzLjEsMS40LDMuMiw0LjJ2Ny45aC0ydi03LjhjMC0wLjktMC4yLTEuNi0wLjQtMgoJCWMtMC4zLTAuNC0wLjgtMC42LTEuNC0wLjZjLTAuNCwwLTAuOSwwLjItMS4zLDAuNGMtMC40LDAuNC0wLjcsMC43LTAuOSwxLjN2OC42aC0ydi0xMS44TDIxNS4xLDE2OC45TDIxNS4xLDE2OC45eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIzMS40LDE3Ny43YzAtMC40LTAuMi0wLjgtMC40LTEuMWMtMC40LTAuMy0wLjktMC42LTEuOC0xLjFjLTEuMS0wLjQtMS44LTAuOC0yLjItMS4xcy0wLjctMC42LTEtMS4xCgkJYy0wLjItMC40LTAuNC0wLjktMC40LTEuNGMwLTEsMC40LTEuOCwxLjEtMi40YzAuNy0wLjYsMS42LTEsMi43LTFjMS4yLDAsMi4xLDAuNCwyLjgsMWMwLjcsMC43LDEuMSwxLjUsMS4xLDIuNmgtMgoJCWMwLTAuNS0wLjItMS0wLjUtMS4zYy0wLjQtMC40LTAuOC0wLjUtMS4zLTAuNWMtMC41LDAtMSwwLjItMS4zLDAuNGMtMC40LDAuMy0wLjQsMC43LTAuNCwxLjJjMCwwLjQsMC4xLDAuNywwLjQsMQoJCWMwLjMsMC4zLDAuOCwwLjUsMS43LDFjMS40LDAuNSwyLjQsMS4xLDMsMS42YzAuNSwwLjUsMC44LDEuMywwLjgsMi4xYzAsMS4xLTAuNCwxLjktMS4xLDIuNXMtMS43LDAuOS0yLjksMC45CgkJYy0xLjMsMC0yLjItMC40LTMtMS4xcy0xLjItMS42LTEuMi0yLjdoMmMwLDAuNiwwLjIsMS4yLDAuNiwxLjVjMC40LDAuNCwwLjksMC41LDEuNiwwLjVjMC42LDAsMS4yLTAuMiwxLjQtMC40CgkJQzIzMS4yLDE3OC42LDIzMS40LDE3OC4yLDIzMS40LDE3Ny43eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIzNi42LDE4MGMwLTAuMywwLjEtMC40LDAuMy0wLjZjMC4yLTAuMiwwLjQtMC4zLDAuNi0wLjNjMC4zLDAsMC40LDAuMSwwLjYsMC4zYzAuMiwwLjIsMC4zLDAuNCwwLjMsMC43CgkJcy0wLjEsMC40LTAuMywwLjZjLTAuMiwwLjItMC40LDAuMy0wLjYsMC4zYy0wLjMsMC0wLjUtMC4xLTAuNi0wLjNDMjM2LjYsMTgwLjMsMjM2LjUsMTgwLjIsMjM2LjYsMTgweiIvPgo8L2c+CjxyZWN0IHk9IjEzMi4yIiBjbGFzcz0ic3QyIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+CjxyZWN0IHg9IjI0LjkiIHk9IjEzMi4yIiBjbGFzcz0ic3QzIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+Cjwvc3ZnPgo=" alt="kpc GmbH" style="width:200px;max-width:60vw;height:auto;margin:10px 0 8px;">'+
     '<div style="color:#fff;font-size:16px;margin:14px 0 18px;font-weight:700;letter-spacing:0.5px;">Baustelle wählen</div>'+
     '<div style="width:100%;max-width:520px;display:flex;flex-direction:column;gap:10px;">'+
       items.map(p=>
-        '<button onclick="selectProject(\''+p.pid+'\')" style="text-align:left;background:#3a3530;border:1px solid #6b5040;border-radius:10px;padding:14px 16px;cursor:pointer;color:#fff;font-family:inherit;display:flex;align-items:center;gap:12px;">'+
+        '<button onclick="selectProject(\''+p.pid+'\')" style="text-align:left;background:#3a3530;border:1px solid #895500;border-radius:10px;padding:14px 16px;cursor:pointer;color:#fff;font-family:inherit;display:flex;align-items:center;gap:12px;">'+
           '<span style="font-size:20px">🏗️</span>'+
           '<span style="flex:1"><span style="display:block;font-size:15px;font-weight:700;color:#fff">'+escapeHtml(p.name)+'</span>'+
-          '<span style="display:block;font-size:11px;color:#9a9a9a;margin-top:2px">'+(p.created?new Date(p.created).toLocaleDateString('de-DE'):'')+(p.by?(' · '+escapeHtml(p.by)):'')+'</span></span>'+
-          '<span style="color:#c8a882;font-size:18px">›</span>'+
+          '<span style="display:block;font-size:11px;color:#a8a8a8;margin-top:2px">'+(p.created?new Date(p.created).toLocaleDateString('de-DE'):'')+(p.by?(' · '+escapeHtml(p.by)):'')+'</span></span>'+
+          '<span style="color:#d7c1ae;font-size:18px">›</span>'+
         '</button>'
       ).join('')+
     '</div>'+
-    '<button onclick="openImportWizard()" style="margin-top:20px;background:#c8a882;color:#2d2926;border:none;border-radius:10px;padding:13px 26px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">➕ Neue Baustelle aus Stückliste</button>';
+    '<button onclick="openImportWizard()" style="margin-top:20px;background:#d7c1ae;color:#2b2b2b;border:none;border-radius:10px;padding:13px 26px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">➕ Neue Baustelle aus Stückliste</button>';
 }
 function switchProject(){ openProjectFlow(); }
 
 async function selectProject(pid){
   const ov=ensureProjOverlay();
-  ov.innerHTML='<div style="color:#c8a882;font-size:15px;margin-top:60px">Stückliste wird geladen …</div>';
+  ov.innerHTML='<div style="color:#d7c1ae;font-size:15px;margin-top:60px">Stückliste wird geladen …</div>';
   try{
     PID = pid;
     DATA = await loadProjectLV(pid);
@@ -2613,12 +2676,12 @@ function openImportWizard(){
   ov.style.display='flex';
   ov.innerHTML =
     '<div style="width:100%;max-width:560px;color:#fff;">'+
-    '<div style="display:flex;align-items:center;gap:10px;margin:6px 0 16px"><button onclick="renderProjectPicker()" style="background:none;border:none;color:#c8a882;font-size:22px;cursor:pointer">‹</button><span style="font-size:17px;font-weight:700">Neue Baustelle</span></div>'+
-    '<label style="display:block;font-size:13px;color:#9a9a9a;margin-bottom:5px">Projektname</label>'+
-    '<input id="impName" type="text" placeholder="z.B. Klinikum Musterstadt" style="width:100%;padding:10px;border-radius:8px;border:1px solid #6b5040;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:16px">'+
-    '<label style="display:block;font-size:13px;color:#9a9a9a;margin-bottom:5px">Stückliste (Excel .xlsx/.csv oder PDF)</label>'+
+    '<div style="display:flex;align-items:center;gap:10px;margin:6px 0 16px"><button onclick="renderProjectPicker()" style="background:none;border:none;color:#d7c1ae;font-size:22px;cursor:pointer">‹</button><span style="font-size:17px;font-weight:700">Neue Baustelle</span></div>'+
+    '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Projektname</label>'+
+    '<input id="impName" type="text" placeholder="z.B. Klinikum Musterstadt" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:16px">'+
+    '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Stückliste (Excel .xlsx/.csv oder PDF)</label>'+
     '<input id="impFile" type="file" accept=".xlsx,.xls,.csv,.pdf" onchange="handleImportFile(this.files[0])" style="width:100%;color:#fff;font-size:13px;margin-bottom:8px">'+
-    '<div style="font-size:11px;color:#9a9a9a;margin-bottom:14px">Empfohlen: Excel-Vorlage (saubere Spalten). PDF wird grob ausgelesen – bitte Vorschau prüfen.</div>'+
+    '<div style="font-size:11px;color:#a8a8a8;margin-bottom:14px">Empfohlen: Excel-Vorlage (saubere Spalten). PDF wird grob ausgelesen – bitte Vorschau prüfen.</div>'+
     '<div id="impPreview"></div>'+
     '<div id="impActions" style="margin-top:16px;display:none">'+
       '<button onclick="confirmCreateProject()" style="background:#3a7a3a;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Baustelle anlegen</button>'+
@@ -2629,7 +2692,7 @@ async function handleImportFile(file){
   if(!file) return;
   const prev=document.getElementById('impPreview');
   const act=document.getElementById('impActions');
-  prev.innerHTML='<div style="color:#c8a882;font-size:13px">Datei wird gelesen …</div>';
+  prev.innerHTML='<div style="color:#d7c1ae;font-size:13px">Datei wird gelesen …</div>';
   act.style.display='none'; PENDING_LV=null;
   try{
     let lv, warn='';
@@ -2647,10 +2710,10 @@ async function handleImportFile(file){
     lv.forEach(s=>s.subsections.forEach(su=>su.items.forEach(it=>{ if(sample.length<8) sample.push(it); })));
     prev.innerHTML =
       (warn?'<div style="background:#5a4a1a;color:#ffe0a0;padding:8px 10px;border-radius:6px;font-size:12px;margin-bottom:10px">⚠ '+warn+'</div>':'')+
-      '<div style="background:#3a3530;border-radius:8px;padding:12px 14px;font-size:13px;color:#fff;margin-bottom:10px">Erkannt: <b>'+nSec+'</b> Bereiche · <b>'+nSub+'</b> Anlagen · <b style="color:#c8a882">'+nItem+'</b> Positionen</div>'+
+      '<div style="background:#3a3530;border-radius:8px;padding:12px 14px;font-size:13px;color:#fff;margin-bottom:10px">Erkannt: <b>'+nSec+'</b> Bereiche · <b>'+nSub+'</b> Anlagen · <b style="color:#d7c1ae">'+nItem+'</b> Positionen</div>'+
       '<div style="max-height:220px;overflow:auto;border:1px solid #4a443e;border-radius:8px;font-size:11px">'+
         '<table style="width:100%;border-collapse:collapse;color:#ddd">'+
-        '<tr style="position:sticky;top:0;background:#1e1b18;color:#c8a882"><th style="text-align:left;padding:5px 7px">Pos</th><th style="text-align:left;padding:5px 7px">Bezeichnung</th><th style="text-align:left;padding:5px 7px">Fabrikat</th><th style="text-align:left;padding:5px 7px">Typ</th></tr>'+
+        '<tr style="position:sticky;top:0;background:#1e1b18;color:#d7c1ae"><th style="text-align:left;padding:5px 7px">Pos</th><th style="text-align:left;padding:5px 7px">Bezeichnung</th><th style="text-align:left;padding:5px 7px">Fabrikat</th><th style="text-align:left;padding:5px 7px">Typ</th></tr>'+
         sample.map(r=>'<tr><td style="padding:4px 7px;border-top:1px solid #333">'+escapeHtml(r.pos)+'</td><td style="padding:4px 7px;border-top:1px solid #333">'+escapeHtml(r.bez)+'</td><td style="padding:4px 7px;border-top:1px solid #333">'+escapeHtml(r.fabrikat)+'</td><td style="padding:4px 7px;border-top:1px solid #333">'+escapeHtml(r.typ)+'</td></tr>').join('')+
         '</table></div>';
     act.style.display='block';
@@ -2664,9 +2727,25 @@ async function confirmCreateProject(){
   if(!name){ alert('Bitte einen Projektnamen eingeben.'); return; }
   if(!PENDING_LV){ alert('Bitte zuerst eine gültige Stückliste hochladen.'); return; }
   const act=document.getElementById('impActions');
-  act.innerHTML='<div style="color:#c8a882">Baustelle wird angelegt …</div>';
+  act.innerHTML='<div style="color:#d7c1ae">Baustelle wird angelegt …</div>';
   try{ const pid=await createProject(name, PENDING_LV); await selectProject(pid); }
   catch(e){ alert('Anlegen fehlgeschlagen: '+(e.message||e)); openImportWizard(); }
+}
+
+// Gewerk-Text -> Codes ['M','E','S'] (Montage / Elektro / Sanitär), mehrere möglich
+function parseGewerk(v){
+  const s=String(v==null?'':v).toLowerCase();
+  if(!s.trim()) return [];
+  const out=[];
+  if(/montag|\bm\b/.test(s)) out.push('M');
+  if(/elektr|strom|\be\b/.test(s)) out.push('E');
+  if(/sanit|wasser|\bs\b/.test(s)) out.push('S');
+  return out;
+}
+const GEWERK_LABEL={M:'Montage',E:'Elektro',S:'Sanitär'};
+function gewBadge(gew){
+  if(!gew||!gew.length) return '';
+  return ' '+gew.map(g=>'<span class="gtag g'+g+'">'+(GEWERK_LABEL[g]||g)+'</span>').join('');
 }
 
 // ---- Parser: Zeilen -> LV-Struktur (Hierarchie aus Positionsnummer) ----
@@ -2686,7 +2765,7 @@ function rowsToLV(rows){
     let sub=sec._subs.get(subPos);
     if(!sub){ sub={pos:subPos,bez:r.anlage||'',items:[]}; sec._subs.set(subPos,sub); sec.subsections.push(sub); }
     if(r.anlage && !sub.bez) sub.bez=r.anlage;
-    sub.items.push({pos:pos, menge:(r.menge==null?'':String(r.menge)).trim(), einh:(r.einh||'').trim(), bez:(r.bez||'').trim(), fabrikat:(r.fabrikat||'').trim(), typ:(r.typ||'').trim()});
+    sub.items.push({pos:pos, menge:(r.menge==null?'':String(r.menge)).trim(), einh:(r.einh||'').trim(), bez:(r.bez||'').trim(), fabrikat:(r.fabrikat||'').trim(), typ:(r.typ||'').trim(), gew:parseGewerk(r.gewerk)});
   });
   order.forEach(s=>{ delete s._subs; });
   return order;
@@ -2711,7 +2790,8 @@ async function parseExcelToLV(file){
       einh:find(['einh','einheit']),
       bez:find(['bezeichn','benennung','artikel']),
       fabrikat:find(['fabrikat','hersteller','marke']),
-      typ:find(['typ','modell','art-nr','artikelnr','artikel-nr'])
+      typ:find(['typ','modell','art-nr','artikelnr','artikel-nr']),
+      gewerk:find(['gewerk','gewerke','arbeit'])
     };
     if(m.pos>=0 && m.bez>=0){ hi=i; map=m; break; }
   }
@@ -2724,7 +2804,7 @@ async function parseExcelToLV(file){
     if(!pos) continue;
     rows.push({ sectLabel:String(get('sectLabel')||'').trim(), sectName:String(get('sectName')||'').trim(),
       anlage:String(get('anlage')||'').trim(), pos, menge:get('menge'), einh:get('einh'),
-      bez:get('bez'), fabrikat:get('fabrikat'), typ:get('typ') });
+      bez:get('bez'), fabrikat:get('fabrikat'), typ:get('typ'), gewerk:get('gewerk') });
   }
   const lv=rowsToLV(rows);
   if(!lv.length) throw new Error('Keine gültigen Positionszeilen gefunden.');
