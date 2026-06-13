@@ -2,7 +2,7 @@
 // Cacht die App-Shell + CDN-Bibliotheken (cache-first), damit die App offline startet.
 // Microsoft Graph / Login / SharePoint werden NIE gecacht (network-only) – Daten und
 // Tokens laufen ausschließlich live. Bei jeder Veröffentlichung CACHE-Version erhöhen.
-const CACHE = 'kpc-montage-v1';
+const CACHE = 'kpc-montage-v3';
 
 const SHELL = [
   './',
@@ -16,8 +16,8 @@ const SHELL = [
   'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'
 ];
 
-// Hosts, deren GET-Antworten gecacht werden dürfen (Bibliotheken).
-const CACHE_HOSTS = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net'];
+// Hosts, deren GET-Antworten gecacht werden dürfen (Bibliotheken + CD-Schriften).
+const CACHE_HOSTS = ['cdnjs.cloudflare.com', 'cdn.jsdelivr.net', 'fonts.googleapis.com', 'fonts.gstatic.com'];
 
 self.addEventListener('install', e => {
   e.waitUntil((async () => {
