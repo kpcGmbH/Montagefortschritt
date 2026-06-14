@@ -910,6 +910,42 @@ async function gtsAltbestand(firma){
   try{ restoreUI(); }catch(e){}
   alert('Fertig: '+n+' Positionen der Firma '+firma+' zugeordnet (wird synchronisiert).');
 }
+
+// Bestehende (flach abgelegte) Fotos/Protokolle in Ordner Baustelle/Etage/Anlage verschieben.
+// Aufruf: bilderEinordnen(true) = nur Vorschau (Konsole), bilderEinordnen() = ausführen. Idempotent.
+async function bilderEinordnen(dry, limit){
+  if(!PID){ alert('Bitte zuerst die Baustelle öffnen.'); return; }
+  let moves=[];
+  for(const sec of DATA){ for(const sub of sec.subsections){ for(const it of sub.items){
+    const pos=it.pos, s=ST[pos]; if(!s) continue; const folder=folderFor(pos);
+    (s.fotos||[]).forEach((ref,i)=>{ if(ref && ref.indexOf('/')<0) moves.push({pos,kind:'foto',i,old:ref,neu:folder+'/'+ref}); });
+    (s.pdfs||[]).forEach((p,i)=>{ if(p && p.fname && p.fname.indexOf('/')<0) moves.push({pos,kind:'pdf',i,old:p.fname,neu:folder+'/'+p.fname}); });
+    (s.restarbeiten||[]).forEach((r,ri)=>{ (r.fotos||[]).forEach((ref,fi)=>{ if(ref && ref.indexOf('/')<0) moves.push({pos,kind:'ra',ri,fi,old:ref,neu:folder+'/'+ref}); }); });
+  }}}
+  if(dry){
+    try{ console.table(moves.map(m=>({pos:m.pos,von:m.old,nach:m.neu}))); }catch(e){ console.log(moves); }
+    alert('Vorschau: '+moves.length+' Datei(en) würden verschoben. Details in der Konsole. Zum Ausführen: bilderEinordnen()');
+    return moves;
+  }
+  if(limit && limit>0) moves=moves.slice(0,limit);
+  if(!moves.length){ alert('Nichts zu verschieben – alles bereits einsortiert.'); return; }
+  if(!confirm(moves.length+' Datei(en) in Ordner Baustelle/Etage/Anlage verschieben?\n(Einmalig, kann gefahrlos wiederholt werden.)')) return;
+  let ok=0, fail=0; const changed=new Set();
+  for(const m of moves){
+    try{
+      await spMove(m.old, m.neu);
+      const s=ST[m.pos];
+      if(m.kind==='foto'){ if(s.fotos[m.i]===m.old) s.fotos[m.i]=m.neu; }
+      else if(m.kind==='pdf'){ if(s.pdfs[m.i] && s.pdfs[m.i].fname===m.old) s.pdfs[m.i].fname=m.neu; }
+      else if(m.kind==='ra'){ const r=s.restarbeiten[m.ri]; if(r && r.fotos[m.fi]===m.old) r.fotos[m.fi]=m.neu; }
+      changed.add(m.pos); ok++;
+    }catch(e){ console.warn('Verschieben fehlgeschlagen:', m.old, (e&&e.message)||e); fail++; }
+  }
+  for(const pos of changed){ await enqueuePos(pos); }
+  await flushOutbox();
+  try{ restoreUI(); }catch(e){}
+  alert('Fertig: '+ok+' verschoben, '+fail+' fehlgeschlagen.'+(fail?' (Fehlgeschlagene bleiben unverändert nutzbar – ggf. erneut ausführen.)':''));
+}
 function ckLabel(s,f){const k=s.by&&s.by[f]?shortName(s.by[f])+' · ':'';return k+tsFmt(s.ts[f]);}
 function tc(pos,f){
   const s=gs(pos);
@@ -990,7 +1026,7 @@ document.getElementById('fi').addEventListener('change',async function(e){
   showLoader('Foto wird gespeichert...');
   try {
     const uploadFile = await tryCompressImage(file);
-    const fname = FPOS.replace(/\./g,'_') + '_' + Date.now() + '.jpg';
+    const fname = folderFor(FPOS) + '/' + FPOS.replace(/\./g,'_') + '_' + Date.now() + '.jpg';
     // Lokal ablegen + in die Warteschlange legen (funktioniert auch offline, kein Warten auf Upload)
     await queueUpload(fname, uploadFile, 'image/jpeg', FPOS);
     gs(FPOS).fotos.push(fname);
@@ -1628,15 +1664,41 @@ async function spListWrite(pos){
 }
 
 // ---- Storage (Fotos-Bibliothek) ----
+// Pfad pro Segment encodieren (Schrägstriche als Ordnertrenner erhalten)
+function encPath(p){ return String(p).split('/').map(encodeURIComponent).join('/'); }
+// Ordnernamen säubern (SharePoint-unzulässige Zeichen entfernen)
+function safeName(s){ return String(s==null?'':s).replace(/[\\/:*?"<>|#%]/g,'-').replace(/\s+/g,' ').trim().replace(/[. ]+$/,'').slice(0,80) || '_'; }
+// Zielordner für eine Position: Baustelle / Etage / Anlage
+function folderFor(pos){
+  for(const sec of DATA){ for(const sub of sec.subsections){ if(sub.items.some(i=>i.pos===pos)){
+    return [safeName(curProjName()), safeName(sec.label||sec.pos), safeName(sub.bez||sub.pos)].join('/');
+  }}}
+  return safeName(curProjName());
+}
+// Ordnerpfad anlegen (idempotent; je Ebene, vorhandene werden übersprungen)
+async function ensureFolder(path){
+  const segs=String(path).split('/').filter(Boolean); let parent='';
+  for(const seg of segs){
+    const base='/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId;
+    const ep = parent ? base+'/root:/'+encPath(parent)+':/children' : base+'/root/children';
+    try{
+      await graph(ep, {method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({name:seg, folder:{}, '@microsoft.graph.conflictBehavior':'fail'})});
+    }catch(e){ if(!/409|nameAlreadyExists|already exists/i.test((e&&e.message)||'')) console.warn('Ordner anlegen ('+seg+'):',(e&&e.message)||e); }
+    parent = parent ? parent+'/'+seg : seg;
+  }
+}
 async function spUpload(fname, body, contentType){
-  await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encodeURIComponent(fname)+':/content', {
+  const i=fname.lastIndexOf('/');
+  if(i>0) await ensureFolder(fname.slice(0,i));
+  await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encPath(fname)+':/content', {
     method:'PUT', headers:{'Content-Type': contentType||'application/octet-stream'}, body: body
   });
   return fname;
 }
 async function spDownloadBlob(fname){
   // Metadaten holen -> vor-authentifizierte downloadUrl (CORS-fähig, ohne Token)
-  const meta = await (await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encodeURIComponent(fname))).json();
+  const meta = await (await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encPath(fname))).json();
   const dl = meta['@microsoft.graph.downloadUrl'];
   if(!dl) throw new Error('downloadUrl fehlt');
   const res = await fetch(dl);
@@ -1645,8 +1707,25 @@ async function spDownloadBlob(fname){
 }
 async function spDelete(fname){
   try{
-    await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encodeURIComponent(fname), { method:'DELETE' });
+    await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encPath(fname), { method:'DELETE' });
   }catch(e){ console.warn('Datei löschen fehlgeschlagen:', e.message); }
+}
+// Datei in Zielordner verschieben (für Migration). Gibt true zurück, auch wenn schon verschoben.
+async function spMove(oldRef, newRef){
+  const folder=newRef.slice(0,newRef.lastIndexOf('/'));
+  const name=newRef.slice(newRef.lastIndexOf('/')+1);
+  await ensureFolder(folder);
+  const base='/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId;
+  let src;
+  try{ src = await (await graph(base+'/root:/'+encPath(oldRef))).json(); }
+  catch(e){
+    // evtl. bereits verschoben -> prüfe Ziel
+    try{ await graph(base+'/root:/'+encPath(newRef)); return true; }catch(e2){ throw e; }
+  }
+  const fmeta = await (await graph(base+'/root:/'+encPath(folder))).json();
+  await graph(base+'/items/'+src.id, {method:'PATCH', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({parentReference:{id:fmeta.id}, name:name})});
+  return true;
 }
 
 // savePos defined above with debounce queue
@@ -1859,7 +1938,7 @@ document.getElementById('pi').addEventListener('change',async function(e){
   showLoader(PTYPE+' wird gespeichert...');
   try {
     const ext=file.name.split('.').pop();
-    const fname=PPOS.replace(/\./g,'_')+'_'+PTYPE.replace(/ /g,'_')+'_'+Date.now()+'.'+ext;
+    const fname=folderFor(PPOS)+'/'+PPOS.replace(/\./g,'_')+'_'+PTYPE.replace(/ /g,'_')+'_'+Date.now()+'.'+ext;
     await queueUpload(fname, file, file.type||'application/pdf', PPOS);   // lokal + Warteschlange (offline-fähig)
     if(!gs(PPOS).pdfs) gs(PPOS).pdfs=[];
     gs(PPOS).pdfs.push({type:PTYPE,name:file.name,fname:fname});
@@ -2183,7 +2262,7 @@ async function pdfSaveData(){
   // Strategie: NEUE Datei schreiben (INSERT, funktioniert immer)
   // Dateiname mit aktuellem Zeitstempel = niemals Konflikt
   const typeSlug = (p.type||'Protokoll').replace(/ /g,'_');
-  const newFname = EDPOS.replace(/\./g,'_')+'_'+typeSlug+'_'+Date.now()+'.pdf';
+  const newFname = folderFor(EDPOS)+'/'+EDPOS.replace(/\./g,'_')+'_'+typeSlug+'_'+Date.now()+'.pdf';
 
   await queueUpload(newFname, blob, 'application/pdf', EDPOS);   // lokal + Warteschlange (offline-fähig)
 
@@ -2283,7 +2362,7 @@ async function pdfSaveDataBg(pos, idx, pages){
   const blob=doc.output('blob');
 
   const typeSlug = (p.type||'Protokoll').replace(/ /g,'_');
-  const newFname = pos.replace(/\./g,'_')+'_'+typeSlug+'_'+Date.now()+'.pdf';
+  const newFname = folderFor(pos)+'/'+pos.replace(/\./g,'_')+'_'+typeSlug+'_'+Date.now()+'.pdf';
 
   await queueUpload(newFname, blob, 'application/pdf', pos);   // lokal + Warteschlange (offline-fähig)
 
@@ -2519,7 +2598,7 @@ async function raHandleFotoUpload(e){
   showLoader('Foto wird gespeichert...');
   try{
     const uploadFile=await tryCompressImage(file);
-    const fname='RA_'+pos.replace(/\./g,'_')+'_'+idx+'_'+Date.now()+'.jpg';
+    const fname=folderFor(pos)+'/RA_'+pos.replace(/\./g,'_')+'_'+idx+'_'+Date.now()+'.jpg';
     await queueUpload(fname, uploadFile, 'image/jpeg', pos);   // lokal + Warteschlange (offline-fähig)
     const s=gs(pos);
     if(s.restarbeiten[idx]){
