@@ -773,7 +773,15 @@ function tsFmt(iso){
     +' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
 }
 let USER = localStorage.getItem('kpc_user') || '';
-function applyUserBadge(){const b=document.getElementById('userBadge');if(b)b.textContent=USER?('\u270e '+USER):'Name';}
+// Ausf\u00fchrer: eigene Monteure (Name) oder Fremdfirma (z.B. GTS) \u2013 wird je H\u00e4kchen mitgestempelt
+let FIRMEN = (()=>{ try{ return JSON.parse(localStorage.getItem('kpc_firmen')||'["GTS"]'); }catch(e){ return ['GTS']; } })();
+function ausfTyp(){ return localStorage.getItem('kpc_user_typ')||'monteur'; }
+function istFirma(name){ return FIRMEN.includes(name) || (ausfTyp()==='firma' && name===USER); }
+function applyUserBadge(){
+  const b=document.getElementById('userBadge'); if(!b) return;
+  if(!USER){ b.textContent='Ausf\u00fchrer'; return; }
+  b.textContent = (istFirma(USER)?'\ud83c\udfe2 ':'\u270e ')+USER;
+}
 
 // \u2500\u2500 Erscheinungsbild: Automatik / Hell / Dunkel \u2500\u2500
 const THEME_MODES=['auto','light','dark'];
@@ -844,7 +852,7 @@ async function onLoggedIn(){
   await resolveIds();
   // Name automatisch aus der Microsoft-Anmeldung übernehmen (Login ist maßgeblich)
   const fromLogin = deriveName(msalAccount);
-  if(fromLogin){ USER = fromLogin; localStorage.setItem('kpc_user', USER); }
+  if(fromLogin){ USER = fromLogin; localStorage.setItem('kpc_user', USER); localStorage.setItem('kpc_user_typ','monteur'); }
   applyUserBadge();
   openProjectFlow();
 }
@@ -853,9 +861,54 @@ function startData(){
   loadState().then(()=>{ restoreUI(); upStats(); });
 }
 
-function changeUser(){
-  const v=(prompt('Name ändern:',USER)||'').trim();
-  if(v){USER=v;localStorage.setItem('kpc_user',USER);applyUserBadge();}
+function setAusfuehrer(typ,name){
+  name=(name||'').trim(); if(!name) return false;
+  USER=name; localStorage.setItem('kpc_user',USER); localStorage.setItem('kpc_user_typ',typ);
+  if(typ==='firma' && !FIRMEN.includes(name)){ FIRMEN.push(name); localStorage.setItem('kpc_firmen',JSON.stringify(FIRMEN)); }
+  applyUserBadge(); return true;
+}
+function confirmAusfuehrer(){
+  const typ=(document.querySelector('input[name=atyp]:checked')||{}).value||'monteur';
+  const name= typ==='firma' ? document.getElementById('ausfFirma').value : document.getElementById('ausfName').value;
+  if(setAusfuehrer(typ,name)){ const ov=document.getElementById('ausfOv'); if(ov) ov.remove(); }
+  else alert('Bitte Name bzw. Firma eingeben.');
+}
+function chooseAusfuehrer(){
+  let ov=document.getElementById('ausfOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='ausfOv'; ov.style.cssText='position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+  const curName=(ausfTyp()!=='firma' && USER)?USER:(deriveName(msalAccount)||'');
+  const curFirma=(ausfTyp()==='firma' && USER)?USER:(FIRMEN[0]||'GTS');
+  const esc=s=>String(s||'').replace(/"/g,'&quot;');
+  ov.innerHTML=`<div style="background:var(--surface);color:var(--text);border-radius:12px;max-width:430px;width:100%;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.45)">
+    <div style="font-size:17px;font-weight:700;margin-bottom:4px">Ausführer wählen</div>
+    <div style="font-size:12px;color:var(--accent2);margin-bottom:16px">Wird bei jedem Häkchen mitgespeichert – für die spätere Zuordnung zu Firmen bzw. eigenen Monteuren.</div>
+    <label style="display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:6px"><input type="radio" name="atyp" value="monteur" ${ausfTyp()!=='firma'?'checked':''}> 👷 Eigene Monteure</label>
+    <input id="ausfName" type="text" value="${esc(curName)}" placeholder="Name" style="margin:0 0 14px 26px;width:calc(100% - 26px);padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit">
+    <label style="display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:6px"><input type="radio" name="atyp" value="firma" ${ausfTyp()==='firma'?'checked':''}> 🏢 Fremdfirma</label>
+    <input id="ausfFirma" type="text" value="${esc(curFirma)}" placeholder="Firma (z.B. GTS)" style="margin:0 0 18px 26px;width:calc(100% - 26px);padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit">
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button onclick="(document.getElementById('ausfOv')||{}).remove&&document.getElementById('ausfOv').remove()" style="padding:9px 16px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-family:inherit">Abbrechen</button>
+      <button onclick="confirmAusfuehrer()" style="padding:9px 18px;border:none;background:var(--accent);color:#2b2b2b;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Übernehmen</button>
+    </div></div>`;
+  ov.style.display='flex';
+}
+function changeUser(){ chooseAusfuehrer(); }
+
+// Einmalig: bereits abgehakte Punkte der aktuellen Baustelle der Fa. GTS als Ausführer zuschreiben
+// (nur dort, wo noch kein Ausführer steht). Aufruf nach Öffnen der Baustelle, z.B. in der Konsole: gtsAltbestand()
+async function gtsAltbestand(firma){
+  firma=firma||'GTS';
+  if(!PID){ alert('Bitte zuerst die Baustelle öffnen.'); return; }
+  if(!confirm('Einmalig: alle bereits abgehakten ANSCHLUSSARBEITEN (Sanitär + Elektro) dieser Baustelle der Firma '+firma+' als Ausführer zuschreiben (nur wo noch keiner hinterlegt ist)?')) return;
+  const fields=['sa','ea']; let n=0;   // nur Anschlussarbeiten – Montage/Lieferung/IBN/Einweisung NICHT
+  for(const pos of Object.keys(ST)){
+    const s=ST[pos]; if(!s) continue; s.by=s.by||{}; let d=false;
+    fields.forEach(f=>{ if(s[f] && !s.by[f]){ s.by[f]=firma; d=true; } });
+    if(d){ n++; await enqueuePos(pos); }
+  }
+  await flushOutbox();
+  try{ restoreUI(); }catch(e){}
+  alert('Fertig: '+n+' Positionen der Firma '+firma+' zugeordnet (wird synchronisiert).');
 }
 function ckLabel(s,f){const k=s.by&&s.by[f]?shortName(s.by[f])+' · ':'';return k+tsFmt(s.ts[f]);}
 function tc(pos,f){
