@@ -426,7 +426,7 @@ select.fs option{background:var(--anthrazit);}
   <button class="fab-mini fab-icon" style="background:#5b4c8a;color:#fff" onclick="expRest()" title="Restarbeitenliste als PDF">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 0 2-2h11"/></svg>
   </button>
-  <button class="fab-mini fab-icon" style="background:#b8860b;color:#fff" onclick="expTagebericht()" title="Tagesbericht">
+  <button class="fab-mini fab-icon" style="background:#b8860b;color:#fff" onclick="openTagesberichtDialog()" title="Tagesbericht (Datum wählen)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/></svg>
   </button>
   
@@ -1391,24 +1391,66 @@ async function downloadZip() {
 }
 
 
-function expTagebericht(){
-  const heute=new Date().toISOString().slice(0,10);
-  const d=new Date().toLocaleDateString('de-DE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+// Lokales Kalenderdatum (YYYY-MM-DD) eines ISO-Zeitstempels – für tagesgenaue Filterung.
+function localDay(iso){
+  const d=new Date(iso); if(isNaN(d)) return '';
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function tbClose(){ const o=document.getElementById('tbOv'); if(o) o.remove(); }
+function tbPick(day){ const el=document.getElementById('tbDate'); if(el) el.value=day; }
+function runTagesbericht(){ const el=document.getElementById('tbDate'); const v=el?el.value:''; if(!v){ alert('Bitte ein Datum wählen.'); return; } tbClose(); expTagebericht(v); }
+// Datumsauswahl für den Tagesbericht – mit Schnellauswahl der Tage mit Aktivität.
+function openTagesberichtDialog(){
+  const FELDER=['g','m','sa','ea','ib','ew'];
+  const counts={};
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+    const t=gs(it.pos).ts||{};
+    FELDER.forEach(f=>{ if(t[f]){ const day=localDay(t[f]); if(day) counts[day]=(counts[day]||0)+1; } });
+  })));
+  const days=Object.keys(counts).sort((a,b)=>b.localeCompare(a));   // neueste zuerst
+  const today=localDay(new Date().toISOString());
+  const def=counts[today]?today:(days[0]||today);
+  let ov=document.getElementById('tbOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='tbOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) tbClose(); };
+  const chips=days.length
+    ? '<div style="display:flex;flex-wrap:wrap;gap:6px;margin:8px 0 2px">'+days.slice(0,14).map(day=>{
+        const lbl=new Date(day+'T12:00:00').toLocaleDateString('de-DE',{weekday:'short',day:'2-digit',month:'2-digit'});
+        return '<button type="button" onclick="tbPick(\''+day+'\')" style="background:#3a3530;border:1px solid #895500;color:#fff;border-radius:8px;padding:6px 10px;font-size:12px;cursor:pointer;font-family:inherit">'+lbl+' <span style="color:#d7c1ae">('+counts[day]+')</span></button>';
+      }).join('')+'</div>'
+    : '<div style="color:#a8a8a8;font-size:12px;margin:8px 0">Noch keine erfassten Statusänderungen vorhanden.</div>';
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:22px;max-width:440px;width:100%;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:17px;font-weight:700;margin-bottom:4px">Tagesbericht</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:14px">Tag wählen – der Bericht zeigt alle an diesem Tag erledigten Schritte inkl. Monteur.</div>'+
+    '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Datum</label>'+
+    '<input id="tbDate" type="date" value="'+def+'" max="'+today+'" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;box-sizing:border-box">'+
+    (days.length?'<div style="font-size:12px;color:#a8a8a8;margin-top:12px">Tage mit Aktivität (Schritte):</div>':'')+
+    chips+
+    '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">'+
+      '<button type="button" onclick="tbClose()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
+      '<button type="button" onclick="runTagesbericht()" style="background:#b8860b;border:none;color:#fff;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Bericht erstellen</button>'+
+    '</div>'+
+  '</div>';
+}
+function expTagebericht(dateStr){
+  const tag=dateStr||localDay(new Date().toISOString());
+  const dObj=new Date(tag+'T12:00:00');
+  const d=dObj.toLocaleDateString('de-DE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   const FELDER=[['g','Geliefert'],['m','Montiert'],['sa','Sanitär'],['ea','Elektro'],['ib','Inbetriebnahme'],['ew','Eingewiesen']];
 
-  // Einträge sammeln: pro Position alle Felder die heute gesetzt wurden
+  // Einträge sammeln: pro Position alle Felder, die an diesem Tag gesetzt wurden
   let rows=[];
   DATA.forEach(sec=>{
     sec.subsections.forEach(sub=>{
       sub.items.forEach(it=>{
         const s=gs(it.pos), t=s.ts||{}, by=s.by||{};
-        const heute_felder=FELDER.filter(([f])=>t[f]&&t[f].startsWith(heute));
-        if(heute_felder.length===0) return;
+        const tag_felder=FELDER.filter(([f])=>t[f]&&localDay(t[f])===tag);
+        if(tag_felder.length===0) return;
         rows.push({
           geschoss:sec.label, bereich:sub.bez,
           pos:it.pos, bez:it.bez.trim(),
           fabrikat:it.fabrikat.trim(), typ:it.typ.trim(),
-          felder:heute_felder.map(([f,lbl])=>({
+          felder:tag_felder.map(([f,lbl])=>({
             f, lbl,
             zeit:new Date(t[f]).toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'}),
             kuerzel:by[f]||'–'
@@ -1418,7 +1460,7 @@ function expTagebericht(){
     });
   });
 
-  if(rows.length===0){alert('Heute wurden noch keine Statusänderungen vorgenommen.');return;}
+  if(rows.length===0){alert('Am '+dObj.toLocaleDateString('de-DE')+' wurden keine Statusänderungen vorgenommen.');return;}
 
   // nach Kürzel gruppieren (erster Eintrag des ersten Felds als Kürzel des Monteurs)
   const monteure=[...new Set(rows.flatMap(r=>r.felder.map(f=>f.kuerzel)))].filter(k=>k!=='–');
@@ -1445,7 +1487,7 @@ function expTagebericht(){
     </tr>`;
   });
 
-  const monteureHtml=monteure.length?`<div style="margin-bottom:8px;font-size:12px;color:#895500">Monteure heute: <strong>${monteure.join(', ')}</strong></div>`:'';
+  const monteureHtml=monteure.length?`<div style="margin-bottom:8px;font-size:12px;color:#895500">Monteure an diesem Tag: <strong>${monteure.join(', ')}</strong></div>`:'';
 
   const repHtml=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
 <title>Tagesbericht ${escapeHtml(curProjName())} – ${d}</title>
@@ -1468,7 +1510,7 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 <button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
 <div class="kpc"><div class="logo">KPC <small>GMBH</small></div>
 <div class="meta"><strong>${escapeHtml(curProjName())}</strong>Tagesbericht Leistungsfeststellung<br>${d}</div></div>
-<h2>Heute durchgeführte Arbeiten – Statusänderungen ${new Date().toLocaleDateString('de-DE')}</h2>
+<h2>Durchgeführte Arbeiten – Statusänderungen am ${dObj.toLocaleDateString('de-DE')}</h2>
 ${monteureHtml}
 <table>
 <thead><tr>
