@@ -946,53 +946,6 @@ async function bilderEinordnen(dry, limit){
   try{ restoreUI(); }catch(e){}
   alert('Fertig: '+ok+' verschoben, '+fail+' fehlgeschlagen.'+(fail?' (Fehlgeschlagene bleiben unverändert nutzbar – ggf. erneut ausführen.)':''));
 }
-// Base64-Data-URI -> Blob
-function dataURItoBlob(uri){
-  const c=String(uri).split(','); const mime=(c[0].match(/data:([^;]+)/)||[,'image/jpeg'])[1];
-  const bin=atob(c[1]||''); const arr=new Uint8Array(bin.length);
-  for(let i=0;i<bin.length;i++) arr[i]=bin.charCodeAt(i);
-  return new Blob([arr],{type:mime});
-}
-// EINMALIGE Migration: Mensa GGS aus dem alten Supabase-Tool übernehmen.
-// Voraussetzung: LV_mensa-ggs.json liegt in der Fotos-Bibliothek. Aufruf (online, eingeloggt): migrateMensa()
-async function migrateMensa(){
-  if(!SPIDS || !SPIDS.listId){ alert('Bitte zuerst einloggen.'); return; }
-  if(!confirm('Mensa GGS migrieren?\nLegt die Baustelle an und überträgt Stati + Fotos aus dem alten Tool. Einmalig ausführen (kann wiederholt werden – bereits Vorhandenes wird übersprungen).')) return;
-  const PIDM='mensa-ggs', NAME='Mensa GGS';
-  const SBU='https://ngjjbvobpuqzralnpjfz.supabase.co';
-  const SBK='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5nampidm9icHVxenJhbG5wamZ6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYzMzg2MTIsImV4cCI6MjA5MTkxNDYxMn0.CYjcCuX9LNNGqP67k4CtlINy4qBpa75KS-dI7gm5rlo';
-  try{
-    await loadProjects();
-    if(!PROJECTS.find(p=>p.pid===PIDM)){ PROJECTS.push({pid:PIDM,name:NAME,created:new Date().toISOString(),by:'Migration'}); await saveProjects(); }
-    let lv; try{ lv=await loadProjectLV(PIDM); }catch(e){ alert('LV_mensa-ggs.json nicht gefunden – bitte zuerst in die Fotos-Bibliothek hochladen.'); return; }
-    PID=PIDM; DATA=lv;
-    Object.keys(ST).forEach(k=>delete ST[k]); Object.keys(ITEMID).forEach(k=>delete ITEMID[k]);
-    try{ await spListLoadRows(); }catch(e){}        // bereits migrierte erkennen (Idempotenz)
-    let rows;
-    try{ rows=await (await fetch(SBU+'/rest/v1/positionen_mensa_ggs?select=*',{headers:{apikey:SBK,Authorization:'Bearer '+SBK}})).json(); }
-    catch(e){ alert('Altes Tool (Supabase) nicht erreichbar: '+(e.message||e)); return; }
-    const tv=v=>v===true||String(v).toLowerCase()==='true';
-    let np=0,nf=0,skip=0;
-    for(const row of rows){
-      const pos=row.pos; if(!pos) continue;
-      if(ITEMID[itemKey(pos)]){ skip++; continue; }
-      const s=gs(pos);
-      s.g=tv(row.g); s.m=tv(row.m); s.a=tv(row.a); s.ib=tv(row.ib); s.ew=tv(row.ew); s.note=row.note||'';
-      let fl=[]; try{ fl=JSON.parse(row.fotos||'[]'); }catch(e){}
-      s.fotos=[]; let idx=0;
-      for(const uri of fl){
-        if(!/^data:/.test(uri||'')) continue;
-        try{ const blob=dataURItoBlob(uri);
-          const fname=folderFor(pos)+'/'+pos.replace(/[^0-9a-zA-Z]/g,'_')+'_'+String(row.updated_at||'').slice(0,10)+'_'+(idx++)+'.jpg';
-          await spUpload(fname, blob, 'image/jpeg'); s.fotos.push(fname); nf++;
-        }catch(e){ console.warn('Foto übersprungen', pos, (e&&e.message)||e); }
-      }
-      try{ await spListWrite(pos); np++; if(np%10===0) console.log('Migration:',np,'Pos,',nf,'Fotos…'); }
-      catch(e){ console.warn('Schreiben fehlgeschlagen', pos, (e&&e.message)||e); }
-    }
-    alert('Mensa-Migration fertig: '+np+' Positionen, '+nf+' Fotos übertragen.'+(skip?(' '+skip+' bereits vorhanden, übersprungen.'):''));
-  }catch(e){ alert('Migration abgebrochen: '+(e.message||e)); console.error(e); }
-}
 function ckLabel(s,f){const k=s.by&&s.by[f]?shortName(s.by[f])+' · ':'';return k+tsFmt(s.ts[f]);}
 function tc(pos,f){
   const s=gs(pos);
@@ -1562,7 +1515,6 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 }
 
 
-// ── SUPABASE KONFIGURATION ──
 // ============= BACKEND: Microsoft 365 (SharePoint-Liste + Graph) =============
 const MS_CONFIG = {
   tenantId: 'cba1b1fc-4a80-4da1-a7f1-e3e4614056eb',
