@@ -1,5 +1,7 @@
 # Projekt Montagefortschritt – Zusammenfassung
 
+Stand: 2026-06-15
+
 ## Ziel
 Nachbau und Weiterentwicklung der KPC-Leistungsfeststellungs-App
 (Original: https://carpedings-cpu.github.io/KPC-Berlin-Upbeat/) – mit Umzug
@@ -18,8 +20,8 @@ Bibliotheken (pdf.js, jsPDF, JSZip, MSAL, SheetJS) per CDN.
 2. **Backend-Entscheidung:** Daten sollen im KPC-Tenant bleiben → Umstieg von
    Supabase auf **SharePoint-Liste + Microsoft Graph** (statt OneDrive, das
    kein Multi-User-Schreiben kann).
-3. **Entra-App registriert** (Single-Tenant, SPA), Graph-Rechte
-   `User.Read`, `Sites.ReadWrite.All`, `Files.ReadWrite.All` + Admin-Consent.
+3. **Entra-App registriert** (Single-Tenant, SPA), Graph-Rechte + Admin-Consent.
+   *(2026-06 auf `User.Read` + `Sites.Selected` eingeengt – siehe Meilenstein 22.)*
 4. **SharePoint** eingerichtet: Site `…/sites/Montagefortschritt`, Liste
    **Positionen** (Spalten `pos`, `data`, `projekt`), Bibliothek **Fotos**.
 5. **Datenschicht umgebaut:** Login via MSAL, Speichern/Laden über Graph,
@@ -57,6 +59,18 @@ Bibliotheken (pdf.js, jsPDF, JSZip, MSAL, SheetJS) per CDN.
 19. **Foto-/Protokoll-Ablage in Ordnern:** neue Dateien automatisch nach
     **Baustelle / Etage / Anlage**; Altbestand per einmaliger Migration einsortierbar
     (Details unten).
+20. **Zweites Projekt Mensa GGS** übernommen: Stückliste aus dem alten Tool, Fortschritt
+    + Fotos aus dessen Supabase migriert; Migrationsfunktion danach aus dem Code entfernt.
+21. **Drittes Projekt Göttingen Kita Montessori 261038** vorbereitet (Stückliste-Entwurf,
+    frische Baustelle ohne Anschlussarbeiten) – Import über den Assistenten.
+22. **Sicherheits-Härtung (Least Privilege):** Supabase-anon-Key + Migrationscode aus dem
+    Quelltext entfernt; Graph-Rechte von `Sites.ReadWrite.All`/`Files.ReadWrite.All` auf
+    **`Sites.Selected`** reduziert – die App ist nur noch für **diese eine** SharePoint-Site
+    schreibberechtigt. Details in `SICHERHEIT.md`.
+23. **Gewerk-bewusster Status + IBN-Regel + „Angeschlossen"-Filter** (Details unten).
+24. **Zusammenarbeit (zwei Entwicklerinnen):** Git als gemeinsame Quelle, `.gitignore`,
+    Entwickler-Übergabe (`UEBERGABE-ENTWICKLUNG.md`) + `GIT-WORKFLOW.md`, wiederverwendbarer
+    KPC-PDF-Generator unter `tools/` (Details unten).
 
 ## Aktueller Stand: PRODUKTIV ✅
 - **Live-URL:** https://kpcgmbh.github.io/Montagefortschritt/  (großes „M",
@@ -64,6 +78,16 @@ Bibliotheken (pdf.js, jsPDF, JSZip, MSAL, SheetJS) per CDN.
 - Login (Microsoft, nur KPC-Konten) + Datenzugriff funktionieren auf
   **Desktop und Handy**.
 - Der Trupp braucht nur diese URL – kein localhost, kein Tunnel.
+
+## Projekte
+- **Berlin Upbeat** (`berlin-upbeat`): 388 Positionen, alle Gewerke klassifiziert,
+  Anschlussarbeiten der Fa. GTS zugeordnet. Echtdaten migriert.
+- **Mensa GGS** (`mensa-ggs`): aus altem Tool migriert (Fortschritt + Fotos).
+- **Göttingen Kita Montessori 261038**: frische Baustelle. Stückliste-Entwurf
+  (20 Positionen, mit Gewerk-Vorschlag + Prüf-Markierungen) liegt in
+  `Montagefortschritt1/Kita Montessori/KitaMontessori_Stueckliste_mit_Anschluessen.xlsx`.
+  **Offen:** Johannes prüft die Gewerk-Spalte, dann Import über „➕ Neue Baustelle aus
+  Stückliste" (Projektname „Göttingen Kita Montessori 261038").
 
 ## Wichtige Eckdaten
 - **Entra-App:** „Montagefortschritt“, Client-ID `68f89557-eef9-4481-b45c-29919ed7b55d`,
@@ -89,7 +113,7 @@ als **Icon auf dem Homescreen** installierbar (Standalone, ohne Browser-Leiste).
   (last-write-wins pro Position). Status im Kopf: „✓ Synchron“ / „↻ N wird
   synchronisiert“ / „⚠ Offline · N ausstehend“.
 - **Update der Cache-Version:** bei jeder Veröffentlichung mit SW-/Shell-Änderung in
-  `sw.js` die Konstante `CACHE` hochzählen (aktuell `kpc-montage-v7`), sonst sehen
+  `sw.js` die Konstante `CACHE` hochzählen (aktuell `kpc-montage-v8`), sonst sehen
   Geräte u.U. die alte Shell. Beim nächsten Online-Aufruf aktualisiert sich der Cache
   automatisch.
 
@@ -106,6 +130,20 @@ Oben im Kopf ein Umschalter **Alle | 🔧 Montage | ⚡ Elektro | 🚿 Sanitär*
 - **Der Umschalter erscheint nur**, wenn die Baustelle Gewerk-Daten hat.
 - **Berlin Upbeat ist vollständig klassifiziert** (alle 388 Positionen, alle Etagen) –
   siehe Abschnitt „Anschlussarbeiten aus Installationsplänen".
+
+## Status-Logik je Gewerk (Stand 2026-06-15) ✅
+Die Kartenfarbe (Offen / Teilweise / Vollständig) richtet sich nach dem **aktiven
+Gewerk-Filter**, damit jeder Trupp seinen eigenen Fortschritt sieht:
+- **Montage** vollständig = *Geliefert* + *Montiert*.
+- **Sanitär** vollständig = *Sanitär-Anschluss* **+ Inbetriebnahme**.
+- **Elektro** vollständig = *Elektro-Anschluss* **+ Inbetriebnahme**.
+- **Ansicht „Alle"** = alle für die Gewerke der Position nötigen Haken (IBN nur, wenn S/E
+  vorhanden). Behebt, dass reine Montage-Positionen früher nie „vollständig" wurden.
+- **„Eingewiesen"** ist reiner Nachweis und beeinflusst die Statusfarbe nicht.
+- **Neuer Statusleisten-Chip „Angeschlossen"** = angeschlossen, aber **IBN noch offen**
+  (passend zum aktiven Gewerk) – zeigt die offene Restarbeit bis „vollständig".
+- **Technisch (`index.html`):** `GEW_FIELDS` (M→g,m / S→sa,ib / E→ea,ib), Index `POSGEW`
+  (pos→Gewerke), `ist(pos, ctx)` mit Kontext = Gewerk-Filter, `angeschl(pos)`.
 
 ## Anschlussarbeiten aus Installationsplänen (Upbeat) ✅
 Quelle: KPC-Installationspläne je Etage (`Montagefortschritt1/Installationspläne/`,
@@ -184,17 +222,37 @@ Angelehnt an den KPC-Styleguide (abgelegt unter
   neu erzeugen → in SharePoint **überschreiben** (Häkchen bleiben). Niemals als neue
   Baustelle importieren (würde den Abhak-Stand löschen).
 
-## Sicherheit
+## Sicherheit  (Details: `SICHERHEIT.md`)
 - Im öffentlichen Code stehen **keine Geheimnisse** (Client-/Tenant-ID sind
   öffentlich). Alle Daten sind durch **Microsoft-Login + SharePoint-
   Berechtigungen** geschützt; ohne KPC-Konto kein Zugriff.
+- **Least Privilege:** Graph-Rechte = `User.Read` + **`Sites.Selected`**; die App ist
+  per Site-Permission (Graph `POST /sites/{id}/permissions`, Rolle `write`) **nur für die
+  Montagefortschritt-Site** freigeschaltet – kein Zugriff auf andere SharePoint-Sites.
+  Site-ID: `kpcfulda.sharepoint.com,cc689847-31ac-45ab-9013-1ccdb9a270a0,7402b249-9a82-4250-a85e-4475ba31cb60`.
+- Alter Supabase-anon-Key + Migrationscode wurden aus dem Quelltext entfernt.
 - Stücklisten neuer Baustellen liegen in SharePoint, nicht im Quelltext.
 
-## Nur lokal (NICHT ins öffentliche Repo)
-`cloudflared`, `mobil-test.command`, `*-setup.md`, `supabase-setup.sql`,
-`Vorlage_Stueckliste.xlsx`, `_seed-berlin-upbeat.json` (LV-Backup),
-Ordner `Montagefortschritt1/Installationspläne/` (Etagenpläne + Arbeitsdateien
-`Upbeat_Stueckliste_mit_Anschluessen.xlsx`, generierte `LV_berlin-upbeat.json`).
+## Zusammenarbeit (zwei Entwicklerinnen) — Git ist die gemeinsame Quelle
+- Die Kollegin ist die Autorin der **Ursprungs-App** (Supabase); Onboarding +
+  Architektur-Delta stehen in `UEBERGABE-ENTWICKLUNG.md`.
+- **Gearbeitet wird über das GitHub-Repo, nicht über einen geteilten OneDrive-Ordner**
+  (OneDrive merged Code nicht → Konflikt-Kopien; Pages deployt nur aus dem Repo).
+  Ablauf: `git pull` → Branch → ändern/testen → Pull Request → Merge nach `main`
+  (= live). Kurzanleitung inkl. Rollback/Releases: `GIT-WORKFLOW.md`.
+- **Versionierung/Rollback:** jeder Commit ist ein Schnappschuss; fehlerhafte Änderung per
+  **„Revert"** zurückrollen, stabile Stände als **Release-Tags** markieren.
+- **PDF-Branding:** `tools/md2pdf_kpc.py` erzeugt aus jeder `.md` ein PDF im KPC-Design
+  (Schrift liegt in `tools/fonts/`, läuft auch auf Windows). `pip install markdown fpdf2`.
+
+## Was wo liegt
+- **Im Repo** (`kpcgmbh/Montagefortschritt`, public): `index.html`, `sw.js`,
+  `manifest.webmanifest`, `Vorlage_Stueckliste.xlsx`, alle `*.md` (Doku), `tools/`,
+  `.gitignore`. PWA-Theme-Farbe aktuell `#2d2926`.
+- **Nur lokal / OneDrive (per `.gitignore` ausgeschlossen):** `cloudflared`,
+  `*.command`, generierte `*.pdf`, `supabase-setup.sql`, `_seed-*.json`,
+  `Montagefortschritt1/` (Installationspläne, Stücklisten, Pläne, Fotos der Projekte).
+  OneDrive ist gut für **Material**, der Code gehört ins Repo.
 
 ## Offene optionale Erweiterungen
 - Offline: Anlegen einer **neuen Baustelle** funktioniert weiterhin nur online
