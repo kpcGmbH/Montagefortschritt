@@ -653,7 +653,29 @@ function savePos(pos) {
 let ACT=DATA[0]?DATA[0].pos:null, FPOS=null;
 
 function gs(p){if(!ST[p])ST[p]={g:false,m:false,a:false,sa:false,ea:false,ib:false,ew:false,fotos:[],pdfs:[],restarbeiten:[],note:'',ts:{},by:{}};if(!ST[p].pdfs)ST[p].pdfs=[];if(!ST[p].restarbeiten)ST[p].restarbeiten=[];if(!ST[p].ts)ST[p].ts={};if(!ST[p].by)ST[p].by={};return ST[p];}
-function ist(p){const s=gs(p);if(s.g||s.m||s.a||s.ib||s.ew||s.fotos.length||s.note){const n=[s.g,s.m,s.sa,s.ea,s.ib,s.ew].filter(Boolean).length;return n===6?'done':'part';}return 'open';}
+// Gewerk -> die Haken, die dieses Gewerk "erledigen":
+//   Montage (M) = Geliefert + Montiert,  Sanitär (S) = Sanitär-Anschluss,  Elektro (E) = Elektro-Anschluss.
+// Inbetriebnahme/Eingewiesen sind gewerkübergreifende Nachweise und zählen NICHT in den Erledigt-Status.
+const GEW_FIELDS={M:['g','m'],S:['sa'],E:['ea']};
+const POSGEW={};   // pos -> ['M','S','E'] aus dem LV (beim Aufbau der Panels gefüllt)
+function relFields(p){
+  const gw=POSGEW[p]||[]; const set=new Set();
+  gw.forEach(g=>(GEW_FIELDS[g]||[]).forEach(f=>set.add(f)));
+  if(!set.size){ set.add('g'); set.add('m'); }   // ohne Gewerk-Angabe wie Montage behandeln
+  return [...set];
+}
+// Status einer Position. ctx='all' -> alle für ihre Gewerke nötigen Haken;
+// ctx='M'/'S'/'E' -> nur die Haken dieses Gewerks (für die gefilterte Ansicht).
+function ist(p, ctx){
+  const s=gs(p); ctx=ctx||'all';
+  const fields = (ctx==='all') ? relFields(p) : (GEW_FIELDS[ctx]||relFields(p));
+  if(!fields.length) return 'open';
+  const n=fields.filter(f=>s[f]).length;
+  if(n===fields.length) return 'done';
+  if(n>0) return 'part';
+  if(ctx==='all' && (s.note || (s.fotos&&s.fotos.length))) return 'part';
+  return 'open';
+}
 function sp(p){return p.replace(/\./g,'_');}
 
 // BUILD TABS
@@ -686,6 +708,8 @@ function swTab(p){
 function buildPanels(){
   const main=document.getElementById('main');
   main.innerHTML='';
+  Object.keys(POSGEW).forEach(k=>delete POSGEW[k]);   // Gewerk-Index neu aufbauen
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ POSGEW[it.pos]=it.gew||[]; })));
   DATA.forEach(sec=>{
     const panel=document.createElement('div');
     panel.className='panel'+(sec.pos===ACT?' on':'');
@@ -962,7 +986,7 @@ function tc(pos,f){
 
 function rc(pos){
   const id=sp(pos);
-  const st=ist(pos);
+  const st=ist(pos, TF);
   const c=document.getElementById('C'+id);
   if(c)c.className='card'+( st!=='open'?' '+st:'');
   updProg(pos);
@@ -972,15 +996,18 @@ function updProg(pos){
   DATA.forEach(sec=>sec.subsections.forEach(sub=>{
     if(!sub.items.some(i=>i.pos===pos))return;
     const sid=sp(sub.pos);
-    const dn=sub.items.filter(i=>ist(i.pos)==='done').length;
-    const pt=sub.items.filter(i=>ist(i.pos)!=='open').length;
+    // Bei aktivem Gewerk-Filter nur die Positionen dieses Gewerks zählen
+    const items=(TF==='all')?sub.items:sub.items.filter(i=>(POSGEW[i.pos]||[]).includes(TF));
+    const tot=items.length;
+    const dn=items.filter(i=>ist(i.pos,TF)==='done').length;
+    const pt=items.filter(i=>ist(i.pos,TF)!=='open').length;
     const el=document.getElementById('P'+sid);
-    if(el)el.textContent=dn>0?dn+'/'+sub.items.length+' ✓':'';
+    if(el)el.textContent=(tot&&dn>0)?dn+'/'+tot+' ✓':'';
     const bar=document.getElementById('PB'+sid);
     const fill=document.getElementById('PF'+sid);
-    if(bar && fill && pt>0){
-      bar.classList.add('vis');
-      fill.style.width=(pt/sub.items.length*100)+'%';
+    if(bar && fill){
+      if(tot>0 && pt>0){ bar.classList.add('vis'); fill.style.width=(pt/tot*100)+'%'; }
+      else { bar.classList.remove('vis'); fill.style.width='0%'; }
     }
   }));
 }
@@ -1129,7 +1156,7 @@ function upStats(){
   let tot=0,dn=0,pt=0,op=0;
   DATA.forEach(s=>s.subsections.forEach(sub=>sub.items.forEach(item=>{
     if(TF!=='all'){ const g=item.gew||[]; if(!g.includes(TF)) return; }   // nur Positionen des gewählten Gewerks
-    tot++; const st=ist(item.pos);
+    tot++; const st=ist(item.pos, TF);
     if(st==='done')dn++; else if(st==='part')pt++; else op++;
   })));
   document.getElementById('cD').textContent=dn;
@@ -1154,6 +1181,14 @@ let TF='all';   // Gewerk-Filter: 'all' | 'M' | 'E' | 'S'
 function setTF(t){
   TF=t;
   document.querySelectorAll('#gwbar .gw').forEach(b=>b.classList.toggle('on', b.dataset.t===TF));
+  // Kartenfarben + Bereichsfortschritt für das gewählte Gewerk neu berechnen
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>{
+    sub.items.forEach(it=>{
+      const c=document.getElementById('C'+sp(it.pos));
+      if(c){ const st=ist(it.pos,TF); c.className='card'+(st!=='open'?' '+st:''); }
+    });
+    if(sub.items[0]) updProg(sub.items[0].pos);
+  }));
   applyF();
   upStats();
 }
@@ -1225,7 +1260,7 @@ function restoreUI() {
     });
     // Restore card color
     const card = document.getElementById('C'+id);
-    const st = ist(pos);
+    const st = ist(pos, TF);
     if(card && st !== 'open') card.className = 'card ' + st;
     // Restore note
     const anm = card ? card.querySelector('.anm') : null;
@@ -1883,7 +1918,7 @@ setInterval(async () => {
           if(tsEl) tsEl.textContent = (ST[row.pos][f] && ST[row.pos].ts && ST[row.pos].ts[f]) ? tsFmt(ST[row.pos].ts[f]) : '';
         });
         const card = document.getElementById('C'+id);
-        const st = ist(row.pos);
+        const st = ist(row.pos, TF);
         if(card) card.className = 'card'+(st!=='open'?' '+st:'');
         const anm = card ? card.querySelector('.anm') : null;
         if(anm && anm !== document.activeElement) anm.value = ST[row.pos].note;
