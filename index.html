@@ -3111,7 +3111,8 @@ async function migriere(oldUrl, projektname){
       const fotos=[];
       for(const it of _mArr(r.fotos)){ try{ const p=await upFile(folder, pos.replace(/\./g,'_'), it, false); if(p) fotos.push(p); }catch(e){ ctr.fail++; console.warn('   Foto fehlgeschlagen:', e.message); } }
       const pdfs=[];
-      for(const it of _mArr(r.pdfs)){ try{ const p=await upFile(folder, pos.replace(/\./g,'_')+'_'+String((it&&it.type)||'Protokoll').replace(/\s+/g,'_'), it, true); if(p) pdfs.push({type:(it&&it.type)||'Protokoll', name:(it&&it.name)||(pos+'.pdf'), fname:p}); }catch(e){ ctr.fail++; console.warn('   PDF fehlgeschlagen:', e.message); } }
+      const protoSrc=_mArr(r.pdfs).length?_mArr(r.pdfs):_mArr(r.protokolle);   // Spalte heißt mal pdfs, mal protokolle
+      for(const it of protoSrc){ const typ=((it&&(it.type||it.typ))||'Protokoll'); try{ const p=await upFile(folder, pos.replace(/\./g,'_')+'_'+String(typ).replace(/\s+/g,'_'), it, true); if(p) pdfs.push({type:typ, name:(it&&it.name)||(pos+'.pdf'), fname:p}); }catch(e){ ctr.fail++; console.warn('   PDF fehlgeschlagen:', e.message); } }
       const data={ g:!!r.g,m:!!r.m,a:!!r.a,sa:!!r.sa,dp:false,ea:!!r.ea,ib:!!r.ib,ew:!!r.ew,
         note:r.note||'', fotos:JSON.stringify(fotos), pdfs:JSON.stringify(pdfs),
         restarbeiten:JSON.stringify(rest), ts:JSON.stringify(_mObj(r.ts)), usr:JSON.stringify(_mObj(r.usr)) };
