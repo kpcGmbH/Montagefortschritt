@@ -211,6 +211,7 @@ select.fs option{background:var(--anthrazit);}
 .ck.on{border-color:var(--green);background:var(--green);color:#fff;}
 .ck-ib.on{border-color:#5b4c8a;background:#5b4c8a;}
 .ck-sa.on{border-color:#1a5f7a;background:#1a5f7a;}
+.ck-dp.on{border-color:#2a7fa6;background:#2a7fa6;}
 .ck-ea.on{border-color:#b8860b;background:#b8860b;}
 .ck-ew.on{border-color:#1a6b6b;background:#1a6b6b;}
 .cki{font-size:13px;}
@@ -653,12 +654,13 @@ function savePos(pos) {
 }
 let ACT=DATA[0]?DATA[0].pos:null, FPOS=null;
 
-function gs(p){if(!ST[p])ST[p]={g:false,m:false,a:false,sa:false,ea:false,ib:false,ew:false,fotos:[],pdfs:[],restarbeiten:[],note:'',ts:{},by:{}};if(!ST[p].pdfs)ST[p].pdfs=[];if(!ST[p].restarbeiten)ST[p].restarbeiten=[];if(!ST[p].ts)ST[p].ts={};if(!ST[p].by)ST[p].by={};return ST[p];}
+function gs(p){if(!ST[p])ST[p]={g:false,m:false,a:false,sa:false,dp:false,ea:false,ib:false,ew:false,fotos:[],pdfs:[],restarbeiten:[],note:'',ts:{},by:{}};if(!ST[p].pdfs)ST[p].pdfs=[];if(!ST[p].restarbeiten)ST[p].restarbeiten=[];if(!ST[p].ts)ST[p].ts={};if(!ST[p].by)ST[p].by={};return ST[p];}
 // Gewerk -> die Haken, die dieses Gewerk "vollständig erledigen":
 //   Montage (M) = Geliefert + Montiert.
-//   Sanitär (S) = Sanitär-Anschluss + Inbetriebnahme,  Elektro (E) = Elektro-Anschluss + Inbetriebnahme.
+//   Sanitär (S) = Sanitär-Anschluss + Dichtheit + Inbetriebnahme,  Elektro (E) = Elektro-Anschluss + Inbetriebnahme.
 // IBN gehört also nur zu S/E (nicht zur Montage). "Eingewiesen" ist reiner Nachweis (kein Erledigt-Kriterium).
-const GEW_FIELDS={M:['g','m'],S:['sa','ib'],E:['ea','ib']};
+// Dichtheit (dp) = Dichtigkeitsprüfung; gehört zum Sanitär-Gewerk und kann später nachgezogen werden.
+const GEW_FIELDS={M:['g','m'],S:['sa','dp','ib'],E:['ea','ib']};
 // "Angeschlossen, aber IBN noch offen" für den aktiven Gewerk-Kontext (Restarbeit bis vollständig).
 function angeschl(pos){
   const s=gs(pos);
@@ -744,6 +746,7 @@ function buildPanels(){
     <div class="ck" id="Kg${id}" onclick="tc('${item.pos}','g')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Geliefert</span><span class="ck-ts" id="Tg${id}"></span></div>
     <div class="ck" id="Km${id}" onclick="tc('${item.pos}','m')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Montiert</span><span class="ck-ts" id="Tm${id}"></span></div>
     <div class="ck ck-sa" id="Ksa${id}" onclick="tc('${item.pos}','sa')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Sanitär</span><span class="ck-ts" id="Tsa${id}"></span></div>
+    <div class="ck ck-dp" id="Kdp${id}" onclick="tc('${item.pos}','dp')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Dichtheit</span><span class="ck-ts" id="Tdp${id}"></span></div>
     <div class="ck ck-ea" id="Kea${id}" onclick="tc('${item.pos}','ea')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Elektro</span><span class="ck-ts" id="Tea${id}"></span></div>
     <div class="ck ck-ib" id="Kib${id}" onclick="tc('${item.pos}','ib')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Inbetriebnahme</span><span class="ck-ts" id="Tib${id}"></span></div>
     <div class="ck ck-ew" id="Kew${id}" onclick="tc('${item.pos}','ew')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Eingewiesen</span><span class="ck-ts" id="Tew${id}"></span></div>
@@ -1353,7 +1356,7 @@ function restoreUI() {
     const s = ST[pos];
     const id = sp(pos);
     // Restore checkboxes
-    const fields = ['g','m','a','sa','ea','ib','ew'];
+    const fields = ['g','m','a','sa','dp','ea','ib','ew'];
     fields.forEach(f => {
       const el = document.getElementById('K'+f+id);
       if(el && s[f]) {
@@ -1425,7 +1428,7 @@ function tbPick(day){ const el=document.getElementById('tbDate'); if(el) el.valu
 function runTagesbericht(){ const el=document.getElementById('tbDate'); const v=el?el.value:''; if(!v){ alert('Bitte ein Datum wählen.'); return; } tbClose(); expTagebericht(v); }
 // Datumsauswahl für den Tagesbericht – mit Schnellauswahl der Tage mit Aktivität.
 function openTagesberichtDialog(){
-  const FELDER=['g','m','sa','ea','ib','ew'];
+  const FELDER=['g','m','sa','dp','ea','ib','ew'];
   const counts={};
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
     const t=gs(it.pos).ts||{};
@@ -1460,7 +1463,7 @@ function expTagebericht(dateStr){
   const tag=dateStr||localDay(new Date().toISOString());
   const dObj=new Date(tag+'T12:00:00');
   const d=dObj.toLocaleDateString('de-DE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  const FELDER=[['g','Geliefert'],['m','Montiert'],['sa','Sanitär'],['ea','Elektro'],['ib','Inbetriebnahme'],['ew','Eingewiesen']];
+  const FELDER=[['g','Geliefert'],['m','Montiert'],['sa','Sanitär'],['dp','Dichtheit'],['ea','Elektro'],['ib','Inbetriebnahme'],['ew','Eingewiesen']];
 
   // Einträge sammeln: pro Position alle Felder, die an diesem Tag gesetzt wurden
   let rows=[];
@@ -1572,7 +1575,7 @@ async function expKunde(withFotos=false){
           bez:item.bez.trim(),
           fabrikat:item.fabrikat.trim(),
           typ:item.typ.trim(),
-          g:s.g,m:s.m,a:s.a,sa:s.sa,ea:s.ea,ib:s.ib,ew:s.ew,
+          g:s.g,m:s.m,a:s.a,sa:s.sa,dp:s.dp,ea:s.ea,ib:s.ib,ew:s.ew,
           ts:s.ts||{},
           fotos:s.fotos,note:s.note
         });
@@ -1601,12 +1604,12 @@ async function expKunde(withFotos=false){
   let tableRows='';
   rows.forEach((r,i)=>{
     if(r.geschoss!==lastG){
-      if(lastG!=='')tableRows+='<tr><td colspan="9" style="height:12px;background:#f5f3f0;border:none"></td></tr>';
-      tableRows+=`<tr><td colspan="9" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:8px 10px;letter-spacing:1px">${r.geschoss}: ${DATA.find(s=>s.label===r.geschoss)?.bez||''}</td></tr>`;
+      if(lastG!=='')tableRows+='<tr><td colspan="12" style="height:12px;background:#f5f3f0;border:none"></td></tr>';
+      tableRows+=`<tr><td colspan="12" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:8px 10px;letter-spacing:1px">${r.geschoss}: ${DATA.find(s=>s.label===r.geschoss)?.bez||''}</td></tr>`;
       lastG=r.geschoss; lastB='';
     }
     if(r.bereich!==lastB){
-      tableRows+=`<tr><td colspan="9" style="background:#eeecea;color:#895500;font-weight:700;font-size:12px;padding:5px 10px;border-left:3px solid #d7c1ae">${r.bereich}</td></tr>`;
+      tableRows+=`<tr><td colspan="12" style="background:#eeecea;color:#895500;font-weight:700;font-size:12px;padding:5px 10px;border-left:3px solid #d7c1ae">${r.bereich}</td></tr>`;
       lastB=r.bereich;
     }
     const tsShort=iso=>{if(!iso)return'';const d=new Date(iso);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});};
@@ -1624,13 +1627,14 @@ async function expKunde(withFotos=false){
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.g,'g')}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.m,'m')}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.sa,'sa')}</td>
+      <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.dp,'dp')}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.ea,'ea')}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.ib,'ib')}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.ew,'ew')}</td>
     </tr>`;
-    if(r.note)tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}"><td colspan="9" style="padding:2px 8px 6px 28px;font-size:11px;color:#895500;font-style:italic">↳ ${r.note}</td></tr>`;
+    if(r.note)tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}"><td colspan="12" style="padding:2px 8px 6px 28px;font-size:11px;color:#895500;font-style:italic">↳ ${r.note}</td></tr>`;
     if(withFotos && r.fotos && r.fotos.length){
-      let fhtml='<td colspan="9" style="padding:4px 8px 8px 28px;"><div style="display:flex;gap:8px;flex-wrap:wrap;">';
+      let fhtml='<td colspan="12" style="padding:4px 8px 8px 28px;"><div style="display:flex;gap:8px;flex-wrap:wrap;">';
       r.fotos.forEach((src,fi)=>{
         const ts = src.match(/_(\d+)\.jpg/)?.[1];
         const dt = ts ? new Date(parseInt(ts)).toLocaleString('de-DE') : '';
@@ -1673,7 +1677,7 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 <table>
 <thead><tr>
   <th>Pos.-Nr.</th><th>Bezeichnung</th><th>Fabrikat</th><th>Typ</th><th class="center">Menge</th>
-  <th class="center">Geliefert</th><th class="center">Montiert</th><th class="center">Sanitär</th><th class="center">Elektro</th><th class="center">Inbetriebnahme</th><th class="center">Eingewiesen</th>
+  <th class="center">Geliefert</th><th class="center">Montiert</th><th class="center">Sanitär</th><th class="center">Dichtheit</th><th class="center">Elektro</th><th class="center">Inbetriebnahme</th><th class="center">Eingewiesen</th>
 </tr></thead>
 <tbody>${tableRows}</tbody>
 </table>
@@ -1816,7 +1820,7 @@ function buildPosData(pos){
   const s = gs(pos);
   // gleiche Struktur wie früher die Supabase-Spalten (innere Felder als JSON-Strings)
   return JSON.stringify({
-    g:s.g, m:s.m, a:s.a, sa:s.sa, ea:s.ea, ib:s.ib, ew:s.ew,
+    g:s.g, m:s.m, a:s.a, sa:s.sa, dp:s.dp, ea:s.ea, ib:s.ib, ew:s.ew,
     note:s.note,
     fotos: JSON.stringify(s.fotos),
     pdfs: JSON.stringify(s.pdfs||[]),
@@ -1937,7 +1941,7 @@ async function loadState() {
         try { byObj = row.usr ? JSON.parse(row.usr) : {}; } catch(e) {}
         ST[row.pos] = {
           g: row.g||false, m: row.m||false, a: row.a||false,
-          sa: row.sa||false, ea: row.ea||false, ib: row.ib||false, ew: row.ew||false,
+          sa: row.sa||false, dp: row.dp||false, ea: row.ea||false, ib: row.ib||false, ew: row.ew||false,
           note: row.note||'', fotos: fotos, pdfs: pdfs, restarbeiten: rest, ts: tsObj, by: byObj
         };
         if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at;
@@ -2049,15 +2053,15 @@ setInterval(async () => {
       try { if(row.usr) newBy = JSON.parse(row.usr); } catch(e) {}
       const tsChanged = JSON.stringify(cur?(cur.ts||{}):{})!==JSON.stringify(newTs);
       if (!cur || cur.g!==row.g || cur.m!==row.m || cur.a!==row.a ||
-          cur.sa!==row.sa || cur.ea!==row.ea || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged) {
+          cur.sa!==row.sa || cur.dp!==row.dp || cur.ea!==row.ea || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged) {
         let pdfs = cur ? cur.pdfs : [];
         try { if(row.pdfs) pdfs = JSON.parse(row.pdfs); } catch(e) {}
         ST[row.pos] = { g:row.g||false, m:row.m||false, a:row.a||false,
-          sa:row.sa||false, ea:row.ea||false, ib:row.ib||false, ew:row.ew||false,
+          sa:row.sa||false, dp:row.dp||false, ea:row.ea||false, ib:row.ib||false, ew:row.ew||false,
           note:row.note||'', fotos:cur?cur.fotos:[], pdfs:pdfs, restarbeiten:newRest, ts:newTs, by:newBy };
         changed = true;
         const id = row.pos.replace(/\./g,'_');
-        const fields = ['g','m','a','sa','ea','ib','ew'];
+        const fields = ['g','m','a','sa','dp','ea','ib','ew'];
         fields.forEach(f => {
           const el = document.getElementById('K'+f+id);
           if(el) { el.classList.toggle('on', ST[row.pos][f]); el.querySelector('.cki').innerHTML = ST[row.pos][f]?'&#10003;':'&#9675;'; }
