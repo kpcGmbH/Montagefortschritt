@@ -1090,7 +1090,29 @@ function updProg(pos){
 }
 
 // FOTO
-function trf(pos){FPOS=pos;const fi=document.getElementById('fi');fi.value='';fi.click();}
+function trf(pos){ FPOS=pos; openFotoSrcDialog(); }
+// Auswahl Kamera/Galerie – verlässlich auch auf Android (Kamera über capture-Attribut).
+function openFotoSrcDialog(){
+  let ov=document.getElementById('fsrcOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='fsrcOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:20px;max-width:360px;width:100%;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:16px;font-weight:700;margin-bottom:14px">Foto hinzufügen</div>'+
+    '<button type="button" onclick="selectFotoSrc(\'cam\')" style="width:100%;background:#3a3530;border:1px solid #895500;color:#fff;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">📷 Kamera aufnehmen</button>'+
+    '<button type="button" onclick="selectFotoSrc(\'gal\')" style="width:100%;background:#3a3530;border:1px solid #895500;color:#fff;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px">🖼️ Aus Galerie wählen</button>'+
+    '<button type="button" onclick="document.getElementById(\'fsrcOv\').remove()" style="width:100%;background:none;border:1px solid #555;color:#ccc;border-radius:10px;padding:11px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
+  '</div>';
+}
+function selectFotoSrc(src){
+  const ov=document.getElementById('fsrcOv'); if(ov) ov.remove();
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='image/*';
+  if(src==='cam') inp.setAttribute('capture','environment');   // Kamera direkt (Rückkamera)
+  inp.style.display='none';
+  document.body.appendChild(inp);
+  inp.addEventListener('change', async function(e){ const f=e.target.files[0]; await doFotoUpload(f); e.target.remove(); });
+  inp.click();
+}
 
 // Bildkomprimierung - HEIC-sicher mit Timeout
 async function tryCompressImage(file){
@@ -1124,8 +1146,8 @@ async function tryCompressImage(file){
   });
 }
 
-document.getElementById('fi').addEventListener('change',async function(e){
-  const file=e.target.files[0];
+// Gemeinsame Speicher-Logik für Haupt-Fotos (egal ob Kamera oder Galerie).
+async function doFotoUpload(file){
   if(!file||!FPOS)return;
   showLoader('Foto wird gespeichert...');
   try {
@@ -1142,7 +1164,9 @@ document.getElementById('fi').addEventListener('change',async function(e){
     console.warn('Foto speichern fehlgeschlagen:', e.message);
     alert('Foto konnte nicht gespeichert werden.');
   }
-});
+}
+// Fallback: das statische Eingabefeld nutzt dieselbe Logik.
+document.getElementById('fi').addEventListener('change',function(e){ doFotoUpload(e.target.files[0]); });
 function fotoTimestamp(src){
   // Aus URL/Filename Date.now() extrahieren -> formatiertes Datum
   const m = src.match(/_(\d{12,14})\./);
