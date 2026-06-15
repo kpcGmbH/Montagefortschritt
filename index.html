@@ -1005,7 +1005,8 @@ async function bilderEinordnen(dry, limit){
 // Betrifft nur Referenzen mit Pfad, deren erste Ebene (Baustellen-Ordner) abweicht.
 // reroot(): erste Pfad-Ebene durch den aktuellen Baustellen-Ordner ersetzen.
 function konsolReroot(ref, root){
-  if(!ref || ref.indexOf('/')<0) return null;       // flach abgelegt -> siehe bilderEinordnen
+  if(!ref || /^https?:/i.test(ref)) return null;    // externe URL (z.B. Altbestand) -> nie verschieben
+  if(ref.indexOf('/')<0) return null;               // flach abgelegt -> siehe bilderEinordnen
   const i=ref.indexOf('/');
   if(ref.slice(0,i)===root) return null;            // liegt schon im aktuellen Ordner
   return root + ref.slice(i);
@@ -3058,43 +3059,69 @@ async function migriere(oldUrl, projektname){
   else { pid=await createProject(projektname, lv); console.log('  Projekt angelegt:', pid); }
 
   const prevPID=PID, prevDATA=DATA; PID=pid;
+  const ctr={files:0, fail:0};
+  // Lädt eine Supabase-URL hoch und gibt den SharePoint-Pfad zurück; bereits relative
+  // Pfade (keine http-URL) werden unverändert behalten -> idempotent bei Wiederholung.
+  async function upFile(folder, base, ref, isPdf){
+    const url=typeof ref==='string'?ref:(ref&&ref.url);
+    if(!url) return null;
+    if(!/^https?:/i.test(url)) return (typeof ref==='string')?ref:null;
+    const b=await (await fetch(url,{headers:{apikey:SBK}})).blob();
+    const ext=isPdf?'pdf':(((url.split('?')[0].split('.').pop())||'jpg').toLowerCase().slice(0,4));
+    const fn=folder+'/'+base+'_'+Date.now()+'_'+Math.floor(Math.random()*9999)+'.'+ext;
+    await spUpload(fn, b, isPdf?'application/pdf':(b.type||'image/jpeg')); ctr.files++; return fn;
+  }
+  // Restarbeiten aufbereiten: enthaltene Foto-URLs hochladen, Pfade einsetzen.
+  async function fixRest(rest, folder, pos){
+    for(const ra of rest){
+      if(ra && Array.isArray(ra.fotos)){
+        const nf=[];
+        for(let k=0;k<ra.fotos.length;k++){
+          try{ const p=await upFile(folder, 'RA_'+pos.replace(/\./g,'_')+'_'+k, ra.fotos[k], false); if(p) nf.push(p); }
+          catch(e){ ctr.fail++; console.warn('   RA-Foto fehlgeschlagen:', e.message); }
+        }
+        ra.fotos=nf;
+      }
+    }
+    return rest;
+  }
   try{
-    await spListLoadRows();                 // füllt ITEMID für dieses Projekt
-    const have=new Set(Object.keys(ITEMID).filter(k=>k.indexOf(pid)===0).map(k=>k.slice(pid.length)));
+    const existingRows = await spListLoadRows();     // füllt ITEMID + liefert aktuellen Stand
+    const byPos={}; existingRows.forEach(x=>{ byPos[x.pos]=x; });
     const rows=await (await fetch(SBU+'/rest/v1/'+TAB+'?select=*', {headers:{apikey:SBK}})).json();
-    console.log('  Supabase:', rows.length, 'Zeilen,', have.size, 'bereits vorhanden');
-    let done=0, skip=0, files=0, fail=0;
+    console.log('  Supabase:', rows.length, 'Zeilen,', existingRows.length, 'bereits vorhanden');
+    let done=0, rep=0, skip=0;
     for(const r of rows){
       const pos=r.pos; if(!pos) continue;
-      if(have.has(pos)){ skip++; continue; }
       const folder=_mFolderFor(lv, projektname, pos);
+      const rest=await fixRest(_mArr(r.restarbeiten), folder, pos);
+      const ex=byPos[pos];
+      if(ex){
+        // existiert -> nur Restarbeiten-Pfade reparieren (Status/Hauptfotos bleiben)
+        const newRest=JSON.stringify(rest);
+        if(!rest.length || (ex.restarbeiten||'[]')===newRest){ skip++; continue; }
+        const data={ g:!!ex.g,m:!!ex.m,a:!!ex.a,sa:!!ex.sa,dp:!!ex.dp,ea:!!ex.ea,ib:!!ex.ib,ew:!!ex.ew,
+          note:ex.note||'', fotos:ex.fotos||'[]', pdfs:ex.pdfs||'[]',
+          restarbeiten:newRest, ts:ex.ts||'{}', usr:ex.usr||'{}' };
+        try{ await spListWriteFields(pos,{pos:pos,projekt:pid,data:JSON.stringify(data)},null,pid); rep++; }
+        catch(e){ ctr.fail++; console.warn('   Reparatur fehlgeschlagen:', pos, e.message); }
+        continue;
+      }
+      // neu -> volle Migration (Haupt-Fotos, Protokolle, Restarbeiten-Fotos)
       const fotos=[];
-      for(const it of _mArr(r.fotos)){
-        const url=typeof it==='string'?it:(it&&it.url); if(!url) continue;
-        try{ const b=await (await fetch(url,{headers:{apikey:SBK}})).blob();
-          const ext=((url.split('?')[0].split('.').pop())||'jpg').toLowerCase().slice(0,4);
-          const fn=folder+'/'+pos.replace(/\./g,'_')+'_'+Date.now()+'_'+fotos.length+'.'+ext;
-          await spUpload(fn, b, b.type||'image/jpeg'); fotos.push(fn); files++;
-        }catch(e){ fail++; console.warn('   Foto fehlgeschlagen:', url, e.message); }
-      }
+      for(const it of _mArr(r.fotos)){ try{ const p=await upFile(folder, pos.replace(/\./g,'_'), it, false); if(p) fotos.push(p); }catch(e){ ctr.fail++; console.warn('   Foto fehlgeschlagen:', e.message); } }
       const pdfs=[];
-      for(const it of _mArr(r.pdfs)){
-        const url=it&&it.url; if(!url) continue;
-        try{ const b=await (await fetch(url,{headers:{apikey:SBK}})).blob();
-          const fn=folder+'/'+pos.replace(/\./g,'_')+'_'+String(it.type||'Protokoll').replace(/\s+/g,'_')+'_'+Date.now()+'.pdf';
-          await spUpload(fn, b, 'application/pdf'); pdfs.push({type:it.type||'Protokoll', name:it.name||(pos+'.pdf'), fname:fn}); files++;
-        }catch(e){ fail++; console.warn('   PDF fehlgeschlagen:', e.message); }
-      }
-      const data={ g:!!r.g, m:!!r.m, a:!!r.a, sa:!!r.sa, dp:false, ea:!!r.ea, ib:!!r.ib, ew:!!r.ew,
+      for(const it of _mArr(r.pdfs)){ try{ const p=await upFile(folder, pos.replace(/\./g,'_')+'_'+String((it&&it.type)||'Protokoll').replace(/\s+/g,'_'), it, true); if(p) pdfs.push({type:(it&&it.type)||'Protokoll', name:(it&&it.name)||(pos+'.pdf'), fname:p}); }catch(e){ ctr.fail++; console.warn('   PDF fehlgeschlagen:', e.message); } }
+      const data={ g:!!r.g,m:!!r.m,a:!!r.a,sa:!!r.sa,dp:false,ea:!!r.ea,ib:!!r.ib,ew:!!r.ew,
         note:r.note||'', fotos:JSON.stringify(fotos), pdfs:JSON.stringify(pdfs),
-        restarbeiten:JSON.stringify(_mArr(r.restarbeiten)), ts:JSON.stringify(_mObj(r.ts)), usr:JSON.stringify(_mObj(r.usr)) };
-      try{ await spListWriteFields(pos, {pos:pos, projekt:pid, data:JSON.stringify(data)}, null, pid); done++; }
-      catch(e){ fail++; console.warn('   Position fehlgeschlagen:', pos, e.message); }
-      if((done+skip)%10===0) console.log('   …', done, 'geschrieben,', skip, 'übersprungen');
+        restarbeiten:JSON.stringify(rest), ts:JSON.stringify(_mObj(r.ts)), usr:JSON.stringify(_mObj(r.usr)) };
+      try{ await spListWriteFields(pos,{pos:pos,projekt:pid,data:JSON.stringify(data)},null,pid); done++; }
+      catch(e){ ctr.fail++; console.warn('   Position fehlgeschlagen:', pos, e.message); }
+      if((done+skip+rep)%10===0) console.log('   …', done, 'neu,', rep, 'repariert,', skip, 'übersprungen');
     }
-    console.log('✔ Fertig:', done, 'Positionen,', files, 'Dateien,', skip, 'übersprungen,', fail, 'Fehler');
-    alert('Migration „'+projektname+'" fertig:\n'+done+' Positionen, '+files+' Dateien übertragen'
-      +(skip?(', '+skip+' bereits vorhanden'):'')+(fail?(', '+fail+' Fehler – siehe Konsole'):'')+'.');
+    console.log('✔ Fertig:', done, 'neu,', rep, 'repariert,', ctr.files, 'Dateien,', skip, 'unverändert,', ctr.fail, 'Fehler');
+    alert('Migration „'+projektname+'" fertig:\n'+done+' Positionen neu, '+rep+' repariert, '+ctr.files+' Dateien'
+      +(ctr.fail?(', '+ctr.fail+' Fehler – siehe Konsole'):'')+'.');
   } finally { PID=prevPID; DATA=prevDATA; }
 }
 
