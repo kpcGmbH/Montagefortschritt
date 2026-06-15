@@ -2872,17 +2872,41 @@ function renderProjectPicker(){
     '<div style="color:#fff;font-size:16px;margin:14px 0 18px;font-weight:700;letter-spacing:0.5px;">Baustelle wählen</div>'+
     '<div style="width:100%;max-width:520px;display:flex;flex-direction:column;gap:10px;">'+
       items.map(p=>
-        '<button onclick="selectProject(\''+p.pid+'\')" style="text-align:left;background:#3a3530;border:1px solid #895500;border-radius:10px;padding:14px 16px;cursor:pointer;color:#fff;font-family:inherit;display:flex;align-items:center;gap:12px;">'+
+        '<div onclick="selectProject(\''+p.pid+'\')" style="text-align:left;background:#3a3530;border:1px solid #895500;border-radius:10px;padding:14px 16px;cursor:pointer;color:#fff;font-family:inherit;display:flex;align-items:center;gap:12px;">'+
           '<span style="font-size:20px">🏗️</span>'+
           '<span style="flex:1"><span style="display:block;font-size:15px;font-weight:700;color:#fff">'+escapeHtml(p.name)+'</span>'+
           '<span style="display:block;font-size:11px;color:#a8a8a8;margin-top:2px">'+(p.created?new Date(p.created).toLocaleDateString('de-DE'):'')+(p.by?(' · '+escapeHtml(p.by)):'')+'</span></span>'+
+          '<button onclick="renameProject(\''+p.pid+'\',event)" title="Baustelle umbenennen" style="background:none;border:none;color:#d7c1ae;font-size:16px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">✏️</button>'+
           '<span style="color:#d7c1ae;font-size:18px">›</span>'+
-        '</button>'
+        '</div>'
       ).join('')+
     '</div>'+
     '<button onclick="openImportWizard()" style="margin-top:20px;background:#d7c1ae;color:#2b2b2b;border:none;border-radius:10px;padding:13px 26px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">➕ Neue Baustelle aus Stückliste</button>';
 }
 function switchProject(){ openProjectFlow(); }
+
+// Baustelle umbenennen (nur der Anzeigename; pid + LV-Datei bleiben unverändert,
+// damit Fortschritt und Fotos in SharePoint erhalten bleiben).
+async function renameProject(pid, ev){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  const p = PROJECTS.find(x=>x.pid===pid);
+  if(!p){ return; }
+  const eingabe = prompt('Baustelle umbenennen:', p.name);
+  if(eingabe==null) return;                       // abgebrochen
+  const name = eingabe.trim();
+  if(!name || name===p.name) return;              // leer oder unverändert
+  const alt = p.name;
+  p.name = name;
+  try{
+    await saveProjects();
+  }catch(e){
+    p.name = alt;                                 // bei Fehler zurückrollen
+    alert('Umbenennen fehlgeschlagen: '+(e.message||e));
+    return;
+  }
+  if(PID===pid){ const nm=document.getElementById('projName'); if(nm) nm.textContent = name; }
+  renderProjectPicker();
+}
 
 async function selectProject(pid){
   const ov=ensureProjOverlay();
@@ -2912,8 +2936,9 @@ function openImportWizard(){
   ov.innerHTML =
     '<div style="width:100%;max-width:560px;color:#fff;">'+
     '<div style="display:flex;align-items:center;gap:10px;margin:6px 0 16px"><button onclick="renderProjectPicker()" style="background:none;border:none;color:#d7c1ae;font-size:22px;cursor:pointer">‹</button><span style="font-size:17px;font-weight:700">Neue Baustelle</span></div>'+
-    '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Projektname</label>'+
-    '<input id="impName" type="text" placeholder="z.B. Klinikum Musterstadt" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:16px">'+
+    '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Projektname – Schema: <b>Nummer Ort Objekt</b></label>'+
+    '<input id="impName" type="text" placeholder="z.B. 0908.20 Berlin Upbeat" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:5px">'+
+    '<div style="font-size:11px;color:#a8a8a8;margin-bottom:16px">Pflichtformat: Projektnummer (z.B. 0908.20), dann Ort, dann Objekt – mit Leerzeichen, ohne Unterstriche.</div>'+
     '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Stückliste (Excel .xlsx/.csv oder PDF)</label>'+
     '<input id="impFile" type="file" accept=".xlsx,.xls,.csv,.pdf" onchange="handleImportFile(this.files[0])" style="width:100%;color:#fff;font-size:13px;margin-bottom:8px">'+
     '<div style="font-size:11px;color:#a8a8a8;margin-bottom:14px">Empfohlen: Excel-Vorlage (saubere Spalten). PDF wird grob ausgelesen – bitte Vorschau prüfen.</div>'+
@@ -2957,9 +2982,17 @@ async function handleImportFile(file){
     console.error(e);
   }
 }
+// Pflicht-Namensschema: "Nummer Ort Objekt" – Projektnummer (z.B. 0908.20),
+// dann Ort, dann Objekt; mit Leerzeichen getrennt, keine Unterstriche.
+function isValidProjName(name){
+  return /^\d{2,5}\.\d{2}\s+\S+\s+\S+/.test(String(name||'').trim());
+}
+const PROJNAME_HINT='Bitte das Schema einhalten: "Nummer Ort Objekt"\nz.B. 0908.20 Berlin Upbeat\n(Projektnummer wie 0908.20, dann Ort, dann Objekt – mit Leerzeichen, keine Unterstriche.)';
+
 async function confirmCreateProject(){
   const name=(document.getElementById('impName').value||'').trim();
   if(!name){ alert('Bitte einen Projektnamen eingeben.'); return; }
+  if(!isValidProjName(name)){ alert(PROJNAME_HINT); return; }
   if(!PENDING_LV){ alert('Bitte zuerst eine gültige Stückliste hochladen.'); return; }
   const act=document.getElementById('impActions');
   act.innerHTML='<div style="color:#d7c1ae">Baustelle wird angelegt …</div>';
