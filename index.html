@@ -657,10 +657,29 @@ let ACT=DATA[0]?DATA[0].pos:null, FPOS=null;
 function gs(p){if(!ST[p])ST[p]={g:false,m:false,a:false,sa:false,dp:false,ea:false,ib:false,ew:false,fotos:[],pdfs:[],restarbeiten:[],note:'',ts:{},by:{}};if(!ST[p].pdfs)ST[p].pdfs=[];if(!ST[p].restarbeiten)ST[p].restarbeiten=[];if(!ST[p].ts)ST[p].ts={};if(!ST[p].by)ST[p].by={};return ST[p];}
 // Gewerk -> die Haken, die dieses Gewerk "vollständig erledigen":
 //   Montage (M) = Geliefert + Montiert.
-//   Sanitär (S) = Sanitär-Anschluss + Dichtheit + Inbetriebnahme,  Elektro (E) = Elektro-Anschluss + Inbetriebnahme.
-// IBN gehört also nur zu S/E (nicht zur Montage). "Eingewiesen" ist reiner Nachweis (kein Erledigt-Kriterium).
+//   Sanitär (S) = Sanitär-Anschluss + Dichtheit,  Elektro (E) = Elektro-Anschluss + Inbetriebnahme + Einweisung.
 // Dichtheit (dp) = Dichtigkeitsprüfung; gehört zum Sanitär-Gewerk und kann später nachgezogen werden.
-const GEW_FIELDS={M:['g','m'],S:['sa','dp','ib'],E:['ea','ib']};
+const GEW_FIELDS={M:['g','m'],S:['sa','dp'],E:['ea','ib','ew']};
+// Welche Auswahlfelder bei gesetztem Gewerk-Filter sichtbar sind (Anzeige; 'all' = alle).
+const VIS_FIELDS={M:['g','m'],S:['sa','dp'],E:['ea','ib','ew']};
+// Kontext-Beschriftung: Anschluss-Felder heißen im jeweiligen Gewerk-Filter "Angeschlossen".
+const CK_LABELS={
+  g:{def:'Geliefert'}, m:{def:'Montiert'},
+  sa:{def:'Sanitär', S:'Angeschlossen'},
+  dp:{def:'Dichtheit', S:'Dichtigkeitsprüfung'},
+  ea:{def:'Elektro', E:'Angeschlossen'},
+  ib:{def:'Inbetriebnahme'}, ew:{def:'Eingewiesen', E:'Einweisung'}
+};
+// Auswahlfelder je nach aktivem Gewerk-Filter zeigen/verbergen + passend beschriften.
+function applyFieldVisibility(){
+  const allow = (TF==='all') ? null : (VIS_FIELDS[TF]||null);
+  document.querySelectorAll('.ck[data-f]').forEach(el=>{
+    const f=el.dataset.f;
+    el.style.display = (!allow || allow.includes(f)) ? '' : 'none';
+    const nm=el.querySelector('.ckn');
+    if(nm){ const m=CK_LABELS[f]||{}; nm.textContent = (TF!=='all' && m[TF]) ? m[TF] : (m.def||nm.textContent); }
+  });
+}
 // "Angeschlossen, aber IBN noch offen" für den aktiven Gewerk-Kontext (Restarbeit bis vollständig).
 function angeschl(pos){
   const s=gs(pos);
@@ -743,13 +762,13 @@ function buildPanels(){
     <div class="img">${item.menge} ${item.einh}</div>
   </div>
   <div class="crow">
-    <div class="ck" id="Kg${id}" onclick="tc('${item.pos}','g')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Geliefert</span><span class="ck-ts" id="Tg${id}"></span></div>
-    <div class="ck" id="Km${id}" onclick="tc('${item.pos}','m')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Montiert</span><span class="ck-ts" id="Tm${id}"></span></div>
-    <div class="ck ck-sa" id="Ksa${id}" onclick="tc('${item.pos}','sa')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Sanitär</span><span class="ck-ts" id="Tsa${id}"></span></div>
-    <div class="ck ck-dp" id="Kdp${id}" onclick="tc('${item.pos}','dp')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Dichtheit</span><span class="ck-ts" id="Tdp${id}"></span></div>
-    <div class="ck ck-ea" id="Kea${id}" onclick="tc('${item.pos}','ea')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Elektro</span><span class="ck-ts" id="Tea${id}"></span></div>
-    <div class="ck ck-ib" id="Kib${id}" onclick="tc('${item.pos}','ib')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Inbetriebnahme</span><span class="ck-ts" id="Tib${id}"></span></div>
-    <div class="ck ck-ew" id="Kew${id}" onclick="tc('${item.pos}','ew')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;Eingewiesen</span><span class="ck-ts" id="Tew${id}"></span></div>
+    <div class="ck" data-f="g" id="Kg${id}" onclick="tc('${item.pos}','g')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Geliefert</span></span><span class="ck-ts" id="Tg${id}"></span></div>
+    <div class="ck" data-f="m" id="Km${id}" onclick="tc('${item.pos}','m')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Montiert</span></span><span class="ck-ts" id="Tm${id}"></span></div>
+    <div class="ck ck-sa" data-f="sa" id="Ksa${id}" onclick="tc('${item.pos}','sa')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Sanitär</span></span><span class="ck-ts" id="Tsa${id}"></span></div>
+    <div class="ck ck-dp" data-f="dp" id="Kdp${id}" onclick="tc('${item.pos}','dp')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Dichtheit</span></span><span class="ck-ts" id="Tdp${id}"></span></div>
+    <div class="ck ck-ea" data-f="ea" id="Kea${id}" onclick="tc('${item.pos}','ea')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Elektro</span></span><span class="ck-ts" id="Tea${id}"></span></div>
+    <div class="ck ck-ib" data-f="ib" id="Kib${id}" onclick="tc('${item.pos}','ib')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Inbetriebnahme</span></span><span class="ck-ts" id="Tib${id}"></span></div>
+    <div class="ck ck-ew" data-f="ew" id="Kew${id}" onclick="tc('${item.pos}','ew')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Eingewiesen</span></span><span class="ck-ts" id="Tew${id}"></span></div>
   </div>
   <div class="fsec">
     <button class="fbtn" id="FB${id}" onclick="trf('${item.pos}')">&#128247; Foto</button>
@@ -789,6 +808,7 @@ function updGewerkSwitcher(){
     bar.style.display = has ? 'flex' : 'none';
     bar.querySelectorAll('.gw').forEach(b=>b.classList.toggle('on', b.dataset.t==='all'));
   }
+  applyFieldVisibility();
 }
 
 function tgB(h){
@@ -1296,6 +1316,7 @@ function setTF(t){
     });
     if(sub.items[0]) updProg(sub.items[0].pos);
   }));
+  applyFieldVisibility();
   applyF();
   upStats();
 }
