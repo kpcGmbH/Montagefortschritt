@@ -892,7 +892,7 @@ async function onLoggedIn(){
 }
 
 function startData(){
-  loadState().then(()=>{ restoreUI(); upStats(); });
+  loadState().then(()=>{ restoreUI(); upStats(); maybeOfferKonsolidieren(); });
 }
 
 function setAusfuehrer(typ,name){
@@ -979,6 +979,73 @@ async function bilderEinordnen(dry, limit){
   await flushOutbox();
   try{ restoreUI(); }catch(e){}
   alert('Fertig: '+ok+' verschoben, '+fail+' fehlgeschlagen.'+(fail?' (Fehlgeschlagene bleiben unverändert nutzbar – ggf. erneut ausführen.)':''));
+}
+// ---- Ordner konsolidieren (nach Umbenennen einer Baustelle) ----
+// Verschiebt vorhandene Fotos/Protokolle aus dem Ordner mit dem ALTEN Baustellennamen
+// in den Ordner mit dem AKTUELLEN Namen und gleicht die gespeicherten Pfade an.
+// Betrifft nur Referenzen mit Pfad, deren erste Ebene (Baustellen-Ordner) abweicht.
+// reroot(): erste Pfad-Ebene durch den aktuellen Baustellen-Ordner ersetzen.
+function konsolReroot(ref, root){
+  if(!ref || ref.indexOf('/')<0) return null;       // flach abgelegt -> siehe bilderEinordnen
+  const i=ref.indexOf('/');
+  if(ref.slice(0,i)===root) return null;            // liegt schon im aktuellen Ordner
+  return root + ref.slice(i);
+}
+function konsolMoveCount(){
+  const root=safeName(curProjName()); let n=0;
+  for(const sec of DATA){ for(const sub of sec.subsections){ for(const it of sub.items){
+    const s=ST[it.pos]; if(!s) continue;
+    (s.fotos||[]).forEach(r=>{ if(konsolReroot(r,root)) n++; });
+    (s.pdfs||[]).forEach(p=>{ if(konsolReroot(p&&p.fname,root)) n++; });
+    (s.restarbeiten||[]).forEach(r=>{ (r.fotos||[]).forEach(f=>{ if(konsolReroot(f,root)) n++; }); });
+  }}}
+  return n;
+}
+async function ordnerKonsolidieren(dry){
+  if(!PID){ alert('Bitte zuerst die Baustelle öffnen.'); return; }
+  const root=safeName(curProjName());
+  let moves=[];
+  for(const sec of DATA){ for(const sub of sec.subsections){ for(const it of sub.items){
+    const pos=it.pos, s=ST[pos]; if(!s) continue;
+    (s.fotos||[]).forEach((ref,i)=>{ const neu=konsolReroot(ref,root); if(neu) moves.push({pos,kind:'foto',i,old:ref,neu}); });
+    (s.pdfs||[]).forEach((p,i)=>{ const neu=konsolReroot(p&&p.fname,root); if(neu) moves.push({pos,kind:'pdf',i,old:p.fname,neu}); });
+    (s.restarbeiten||[]).forEach((r,ri)=>{ (r.fotos||[]).forEach((ref,fi)=>{ const neu=konsolReroot(ref,root); if(neu) moves.push({pos,kind:'ra',ri,fi,old:ref,neu}); }); });
+  }}}
+  if(dry){
+    try{ console.table(moves.map(m=>({pos:m.pos,von:m.old,nach:m.neu}))); }catch(e){ console.log(moves); }
+    alert('Vorschau: '+moves.length+' Datei(en) würden in „'+root+'" verschoben. Details in der Konsole. Zum Ausführen: ordnerKonsolidieren()');
+    return moves;
+  }
+  if(!moves.length){ alert('Nichts zu verschieben – alle Dateien liegen bereits im aktuellen Ordner.'); return; }
+  if(!confirm(moves.length+' Datei(en) in den Ordner „'+root+'" verschieben und Verknüpfungen aktualisieren?\n(Kann gefahrlos wiederholt werden.)')) return;
+  let ok=0, fail=0; const changed=new Set();
+  for(const m of moves){
+    try{
+      await spMove(m.old, m.neu);
+      const s=ST[m.pos];
+      if(m.kind==='foto'){ if(s.fotos[m.i]===m.old) s.fotos[m.i]=m.neu; }
+      else if(m.kind==='pdf'){ if(s.pdfs[m.i] && s.pdfs[m.i].fname===m.old) s.pdfs[m.i].fname=m.neu; }
+      else if(m.kind==='ra'){ const r=s.restarbeiten[m.ri]; if(r && r.fotos[m.fi]===m.old) r.fotos[m.fi]=m.neu; }
+      changed.add(m.pos); ok++;
+    }catch(e){ console.warn('Verschieben fehlgeschlagen:', m.old, (e&&e.message)||e); fail++; }
+  }
+  for(const pos of changed){ await enqueuePos(pos); }
+  await flushOutbox();
+  try{ restoreUI(); }catch(e){}
+  alert('Fertig: '+ok+' verschoben, '+fail+' fehlgeschlagen.'+(fail?' (Fehlgeschlagene bleiben unverändert nutzbar – ggf. erneut ausführen.)':''));
+}
+// Beim Öffnen einer umbenannten Baustelle einmalig anbieten, alte Dateien umzuziehen.
+const KONSOL_DECLINED=new Set();
+function maybeOfferKonsolidieren(){
+  try{
+    if(!PID || KONSOL_DECLINED.has(PID) || !navigator.onLine) return;
+    const n=konsolMoveCount(); if(!n) return;
+    if(confirm('Diese Baustelle wurde umbenannt. '+n+' vorhandene Datei(en) liegen noch im alten Ordner.\n\nJetzt in den aktuellen Ordner „'+safeName(curProjName())+'" verschieben? (Fotos/Protokolle bleiben verknüpft.)')){
+      ordnerKonsolidieren(false);
+    } else {
+      KONSOL_DECLINED.add(PID);
+    }
+  }catch(e){ console.warn('Konsolidierungs-Check:', e); }
 }
 function ckLabel(s,f){const k=s.by&&s.by[f]?shortName(s.by[f])+' · ':'';return k+tsFmt(s.ts[f]);}
 function tc(pos,f){
