@@ -3031,7 +3031,7 @@ function renderProjectPicker(){
         '<div class="projRow" data-name="'+escapeHtml(String(p.name||'').toLowerCase())+'" onclick="selectProject(\''+p.pid+'\')" style="text-align:left;background:#3a3530;border:1px solid #895500;border-radius:10px;padding:14px 16px;cursor:pointer;color:#fff;font-family:inherit;display:flex;align-items:center;gap:12px;">'+
           '<span style="font-size:20px">🏗️</span>'+
           '<span style="flex:1"><span style="display:block;font-size:15px;font-weight:700;color:#fff">'+escapeHtml(p.name)+'</span>'+
-          '<span style="display:block;font-size:11px;color:#a8a8a8;margin-top:2px">'+(p.created?new Date(p.created).toLocaleDateString('de-DE'):'')+(p.by?(' · '+escapeHtml(p.by)):'')+'</span></span>'+
+          '<span style="display:block;font-size:11px;color:#a8a8a8;margin-top:2px">'+(p.created?new Date(p.created).toLocaleDateString('de-DE'):'')+'</span></span>'+
           '<button onclick="renameProject(\''+p.pid+'\',event)" title="Baustelle umbenennen" style="background:none;border:none;color:#d7c1ae;font-size:16px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">✏️</button>'+
           '<span style="color:#d7c1ae;font-size:18px">›</span>'+
         '</div>'
