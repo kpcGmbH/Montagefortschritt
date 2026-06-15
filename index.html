@@ -380,6 +380,7 @@ select.fs option{background:var(--anthrazit);}
   <div class="sbar">
     <span class="sp sf" id="sfD" onclick="setSF('done')"><span class="sd dok"></span>Vollst&#228;ndig: <strong id="cD">0</strong></span>
     <span class="sp sf" id="sfP" onclick="setSF('part')"><span class="sd dop"></span>Teilweise: <strong id="cP">0</strong></span>
+    <span class="sp sf" id="sfC" onclick="setSF('angeschl')"><span class="sd" style="background:#2a7fa6"></span>Angeschlossen: <strong id="cC">0</strong></span>
     <span class="sp sf" id="sfO" onclick="setSF('open')"><span class="sd" style="background:#a8a8a8"></span>Offen: <strong id="cO">0</strong></span>
     <span class="sp sf" id="sfA" onclick="setSF('all')">Gesamt: <strong id="cT">0</strong></span>
     <span class="sp" style="margin-left:auto;font-weight:700" id="syncStatus"></span>
@@ -653,10 +654,19 @@ function savePos(pos) {
 let ACT=DATA[0]?DATA[0].pos:null, FPOS=null;
 
 function gs(p){if(!ST[p])ST[p]={g:false,m:false,a:false,sa:false,ea:false,ib:false,ew:false,fotos:[],pdfs:[],restarbeiten:[],note:'',ts:{},by:{}};if(!ST[p].pdfs)ST[p].pdfs=[];if(!ST[p].restarbeiten)ST[p].restarbeiten=[];if(!ST[p].ts)ST[p].ts={};if(!ST[p].by)ST[p].by={};return ST[p];}
-// Gewerk -> die Haken, die dieses Gewerk "erledigen":
-//   Montage (M) = Geliefert + Montiert,  Sanitär (S) = Sanitär-Anschluss,  Elektro (E) = Elektro-Anschluss.
-// Inbetriebnahme/Eingewiesen sind gewerkübergreifende Nachweise und zählen NICHT in den Erledigt-Status.
-const GEW_FIELDS={M:['g','m'],S:['sa'],E:['ea']};
+// Gewerk -> die Haken, die dieses Gewerk "vollständig erledigen":
+//   Montage (M) = Geliefert + Montiert.
+//   Sanitär (S) = Sanitär-Anschluss + Inbetriebnahme,  Elektro (E) = Elektro-Anschluss + Inbetriebnahme.
+// IBN gehört also nur zu S/E (nicht zur Montage). "Eingewiesen" ist reiner Nachweis (kein Erledigt-Kriterium).
+const GEW_FIELDS={M:['g','m'],S:['sa','ib'],E:['ea','ib']};
+// "Angeschlossen, aber IBN noch offen" für den aktiven Gewerk-Kontext (Restarbeit bis vollständig).
+function angeschl(pos){
+  const s=gs(pos);
+  if(s.ib) return false;                 // bereits in Betrieb genommen -> nicht mehr offen
+  if(TF==='S') return !!s.sa;
+  if(TF==='E') return !!s.ea;
+  return !!(s.sa||s.ea);                  // Alle/Montage: irgendein Anschluss gesetzt
+}
 const POSGEW={};   // pos -> ['M','S','E'] aus dem LV (beim Aufbau der Panels gefüllt)
 function relFields(p){
   const gw=POSGEW[p]||[]; const set=new Set();
@@ -1153,14 +1163,16 @@ document.getElementById('lb').addEventListener('click',e=>{if(e.target===e.curre
 
 // STATS
 function upStats(){
-  let tot=0,dn=0,pt=0,op=0;
+  let tot=0,dn=0,pt=0,op=0,ang=0;
   DATA.forEach(s=>s.subsections.forEach(sub=>sub.items.forEach(item=>{
     if(TF!=='all'){ const g=item.gew||[]; if(!g.includes(TF)) return; }   // nur Positionen des gewählten Gewerks
     tot++; const st=ist(item.pos, TF);
     if(st==='done')dn++; else if(st==='part')pt++; else op++;
+    if(angeschl(item.pos)) ang++;
   })));
   document.getElementById('cD').textContent=dn;
   document.getElementById('cP').textContent=pt;
+  document.getElementById('cC').textContent=ang;
   document.getElementById('cO').textContent=op;
   document.getElementById('cT').textContent=tot;
 }
@@ -1172,6 +1184,7 @@ function setSF(f){
   SF=(SF===f && f!=='all')?'all':f;
   document.getElementById('sfD').classList.toggle('on',SF==='done');
   document.getElementById('sfP').classList.toggle('on',SF==='part');
+  document.getElementById('sfC').classList.toggle('on',SF==='angeschl');
   document.getElementById('sfO').classList.toggle('on',SF==='open');
   document.getElementById('sfA').classList.toggle('on',SF==='all');
   applyF();
@@ -1215,6 +1228,7 @@ function applyF(){
     let stOk=true;
     if(SF==='done') stOk=done;
     else if(SF==='part') stOk=part;
+    else if(SF==='angeschl') stOk=angeschl(pos);
     else if(SF==='open') stOk=!done&&!part;
     const gwOk = TF==='all' || (c.dataset.gew||'').includes(TF);
     const show=txtOk && stOk && gwOk;
