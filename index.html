@@ -660,8 +660,6 @@ function gs(p){if(!ST[p])ST[p]={g:false,m:false,a:false,sa:false,dp:false,ea:fal
 //   Sanitär (S) = Sanitär-Anschluss + Dichtheit,  Elektro (E) = Elektro-Anschluss + Inbetriebnahme + Einweisung.
 // Dichtheit (dp) = Dichtigkeitsprüfung; gehört zum Sanitär-Gewerk und kann später nachgezogen werden.
 const GEW_FIELDS={M:['g','m'],S:['sa','dp'],E:['ea','ib','ew']};
-// Welche Auswahlfelder bei gesetztem Gewerk-Filter sichtbar sind (Anzeige; 'all' = alle).
-const VIS_FIELDS={M:['g','m'],S:['sa','dp'],E:['ea','ib','ew']};
 // Kontext-Beschriftung: Anschluss-Felder heißen im jeweiligen Gewerk-Filter "Angeschlossen".
 const CK_LABELS={
   g:{def:'Geliefert'}, m:{def:'Montiert'},
@@ -670,15 +668,23 @@ const CK_LABELS={
   ea:{def:'Elektro', E:'Angeschlossen'},
   ib:{def:'Inbetriebnahme'}, ew:{def:'Eingewiesen', E:'Einweisung'}
 };
-// Auswahlfelder je nach aktivem Gewerk-Filter zeigen/verbergen + passend beschriften.
+const ALL_CK=['g','m','sa','dp','ea','ib','ew'];
+// Auswahlfelder zeigen/verbergen + passend beschriften.
+// Gewerk-Filter -> die Felder dieses Gewerks; "Alle" -> die für die Gewerke der Position
+// relevanten Felder (= relFields). Damit ist die Anzeige deckungsgleich mit den gefilterten
+// Ansichten UND mit der "Vollständig"-Logik (ist()/relFields()).
 function applyFieldVisibility(){
-  const allow = (TF==='all') ? null : (VIS_FIELDS[TF]||null);
-  document.querySelectorAll('.ck[data-f]').forEach(el=>{
-    const f=el.dataset.f;
-    el.style.display = (!allow || allow.includes(f)) ? '' : 'none';
-    const nm=el.querySelector('.ckn');
-    if(nm){ const m=CK_LABELS[f]||{}; nm.textContent = (TF!=='all' && m[TF]) ? m[TF] : (m.def||nm.textContent); }
-  });
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+    const id=sp(it.pos);
+    const allow=(TF==='all')?relFields(it.pos):(GEW_FIELDS[TF]||relFields(it.pos));
+    ALL_CK.forEach(f=>{
+      const el=document.getElementById('K'+f+id);
+      if(!el) return;
+      el.style.display = allow.includes(f) ? '' : 'none';
+      const nm=el.querySelector('.ckn');
+      if(nm){ const m=CK_LABELS[f]||{}; nm.textContent=(TF!=='all'&&m[TF])?m[TF]:(m.def||nm.textContent); }
+    });
+  })));
 }
 // "Angeschlossen, aber IBN noch offen" für den aktiven Gewerk-Kontext (Restarbeit bis vollständig).
 function angeschl(pos){
