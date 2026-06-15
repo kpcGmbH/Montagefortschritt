@@ -660,16 +660,8 @@ function gs(p){if(!ST[p])ST[p]={g:false,m:false,a:false,sa:false,dp:false,ea:fal
 //   Sanitär (S) = Sanitär-Anschluss + Dichtheit,  Elektro (E) = Elektro-Anschluss + Inbetriebnahme + Einweisung.
 // Dichtheit (dp) = Dichtigkeitsprüfung; gehört zum Sanitär-Gewerk und kann später nachgezogen werden.
 const GEW_FIELDS={M:['g','m'],S:['sa','dp'],E:['ea','ib','ew']};
-// Kontext-Beschriftung: Anschluss-Felder heißen im jeweiligen Gewerk-Filter "Angeschlossen".
-const CK_LABELS={
-  g:{def:'Geliefert'}, m:{def:'Montiert'},
-  sa:{def:'Sanitär', S:'Angeschlossen'},
-  dp:{def:'Dichtheit', S:'Dichtigkeitsprüfung'},
-  ea:{def:'Elektro', E:'Angeschlossen'},
-  ib:{def:'Inbetriebnahme'}, ew:{def:'Eingewiesen', E:'Einweisung'}
-};
 const ALL_CK=['g','m','sa','dp','ea','ib','ew'];
-// Auswahlfelder zeigen/verbergen + passend beschriften.
+// Auswahlfelder zeigen/verbergen (feste, ausgeschriebene Beschriftung steht im Markup).
 // Gewerk-Filter -> die Felder dieses Gewerks; "Alle" -> die für die Gewerke der Position
 // relevanten Felder (= relFields). Damit ist die Anzeige deckungsgleich mit den gefilterten
 // Ansichten UND mit der "Vollständig"-Logik (ist()/relFields()).
@@ -679,10 +671,7 @@ function applyFieldVisibility(){
     const allow=(TF==='all')?relFields(it.pos):(GEW_FIELDS[TF]||relFields(it.pos));
     ALL_CK.forEach(f=>{
       const el=document.getElementById('K'+f+id);
-      if(!el) return;
-      el.style.display = allow.includes(f) ? '' : 'none';
-      const nm=el.querySelector('.ckn');
-      if(nm){ const m=CK_LABELS[f]||{}; nm.textContent=(TF!=='all'&&m[TF])?m[TF]:(m.def||nm.textContent); }
+      if(el) el.style.display = allow.includes(f) ? '' : 'none';
     });
   })));
 }
@@ -770,11 +759,11 @@ function buildPanels(){
   <div class="crow">
     <div class="ck" data-f="g" id="Kg${id}" onclick="tc('${item.pos}','g')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Geliefert</span></span><span class="ck-ts" id="Tg${id}"></span></div>
     <div class="ck" data-f="m" id="Km${id}" onclick="tc('${item.pos}','m')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Montiert</span></span><span class="ck-ts" id="Tm${id}"></span></div>
-    <div class="ck ck-sa" data-f="sa" id="Ksa${id}" onclick="tc('${item.pos}','sa')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Sanitär</span></span><span class="ck-ts" id="Tsa${id}"></span></div>
-    <div class="ck ck-dp" data-f="dp" id="Kdp${id}" onclick="tc('${item.pos}','dp')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Dichtheit</span></span><span class="ck-ts" id="Tdp${id}"></span></div>
-    <div class="ck ck-ea" data-f="ea" id="Kea${id}" onclick="tc('${item.pos}','ea')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Elektro</span></span><span class="ck-ts" id="Tea${id}"></span></div>
+    <div class="ck ck-sa" data-f="sa" id="Ksa${id}" onclick="tc('${item.pos}','sa')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Sanitäranschluss</span></span><span class="ck-ts" id="Tsa${id}"></span></div>
+    <div class="ck ck-dp" data-f="dp" id="Kdp${id}" onclick="tc('${item.pos}','dp')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Dichtigkeitsprüfung</span></span><span class="ck-ts" id="Tdp${id}"></span></div>
+    <div class="ck ck-ea" data-f="ea" id="Kea${id}" onclick="tc('${item.pos}','ea')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Elektroanschluss</span></span><span class="ck-ts" id="Tea${id}"></span></div>
     <div class="ck ck-ib" data-f="ib" id="Kib${id}" onclick="tc('${item.pos}','ib')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Inbetriebnahme</span></span><span class="ck-ts" id="Tib${id}"></span></div>
-    <div class="ck ck-ew" data-f="ew" id="Kew${id}" onclick="tc('${item.pos}','ew')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Eingewiesen</span></span><span class="ck-ts" id="Tew${id}"></span></div>
+    <div class="ck ck-ew" data-f="ew" id="Kew${id}" onclick="tc('${item.pos}','ew')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Einweisung</span></span><span class="ck-ts" id="Tew${id}"></span></div>
   </div>
   <div class="fsec">
     <button class="fbtn" id="FB${id}" onclick="trf('${item.pos}')">&#128247; Foto</button>
@@ -1490,7 +1479,7 @@ function expTagebericht(dateStr){
   const tag=dateStr||localDay(new Date().toISOString());
   const dObj=new Date(tag+'T12:00:00');
   const d=dObj.toLocaleDateString('de-DE',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
-  const FELDER=[['g','Geliefert'],['m','Montiert'],['sa','Sanitär'],['dp','Dichtheit'],['ea','Elektro'],['ib','Inbetriebnahme'],['ew','Eingewiesen']];
+  const FELDER=[['g','Geliefert'],['m','Montiert'],['sa','Sanitäranschluss'],['dp','Dichtigkeitsprüfung'],['ea','Elektroanschluss'],['ib','Inbetriebnahme'],['ew','Einweisung']];
 
   // Einträge sammeln: pro Position alle Felder, die an diesem Tag gesetzt wurden
   let rows=[];
@@ -1704,7 +1693,7 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 <table>
 <thead><tr>
   <th>Pos.-Nr.</th><th>Bezeichnung</th><th>Fabrikat</th><th>Typ</th><th class="center">Menge</th>
-  <th class="center">Geliefert</th><th class="center">Montiert</th><th class="center">Sanitär</th><th class="center">Dichtheit</th><th class="center">Elektro</th><th class="center">Inbetriebnahme</th><th class="center">Eingewiesen</th>
+  <th class="center">Geliefert</th><th class="center">Montiert</th><th class="center">Sanitäranschluss</th><th class="center">Dichtigkeitsprüfung</th><th class="center">Elektroanschluss</th><th class="center">Inbetriebnahme</th><th class="center">Einweisung</th>
 </tr></thead>
 <tbody>${tableRows}</tbody>
 </table>
