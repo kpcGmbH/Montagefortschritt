@@ -103,6 +103,8 @@ select.fs option{background:var(--anthrazit);}
 .gw.on{background:var(--accent);color:#2b2b2b;border-color:var(--accent);}
 .gtag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:8px;margin-left:4px;vertical-align:middle;color:#fff;}
 .gtag.gM{background:#6b7a8a;} .gtag.gE{background:#b8860b;} .gtag.gS{background:#3f7a8a;}
+.gtag.gEdit{background:transparent;color:var(--accent2);border:1px dashed var(--accent2);}
+.gwedit{cursor:pointer;-webkit-tap-highlight-color:transparent;}
 .sp strong{color:#fff;}
 
 /* PANELS */
@@ -753,7 +755,7 @@ function buildPanels(){
     <span class="pb">${item.pos}</span>
     <div class="ii">
       <div class="ibez">${item.bez.trim()}</div>
-      <div class="imet">${item.fabrikat?'&#127981; '+item.fabrikat.trim():''}${item.typ?' &nbsp;&#128203; '+item.typ.trim():''}${gewBadge(item.gew)}</div>
+      <div class="imet">${item.fabrikat?'&#127981; '+item.fabrikat.trim():''}${item.typ?' &nbsp;&#128203; '+item.typ.trim():''}${gewBadgeEditable(item.pos,item.gew)}</div>
     </div>
     <div class="img">${item.menge} ${item.einh}</div>
   </div>
@@ -3208,6 +3210,59 @@ const GEWERK_LABEL={M:'Montage',E:'Elektro',S:'Sanitär'};
 function gewBadge(gew){
   if(!gew||!gew.length) return '';
   return ' '+gew.map(g=>'<span class="gtag g'+g+'">'+(GEWERK_LABEL[g]||g)+'</span>').join('');
+}
+// Klickbare Gewerk-Badge je Position (Korrektur falscher Zuordnung aus der Stückliste)
+function gewBadgeEditable(pos, gew){
+  const inner=(gew&&gew.length)
+    ? gew.map(g=>'<span class="gtag g'+g+'">'+(GEWERK_LABEL[g]||g)+'</span>').join('')
+    : '<span class="gtag gEdit">&#9998; Gewerk</span>';
+  return ' <span class="gwedit" onclick="openGewerkChooser(\''+pos+'\')" title="Gewerk korrigieren">'+inner+'</span>';
+}
+function openGewerkChooser(pos){
+  const cur=POSGEW[pos]||[];
+  let ov=document.getElementById('gwOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='gwOv'; ov.style.cssText='position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px'; document.body.appendChild(ov); }
+  const row=(code)=>'<label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;cursor:pointer;font-weight:700"><input type="checkbox" value="'+code+'" '+(cur.includes(code)?'checked':'')+' style="width:18px;height:18px"> <span class="gtag g'+code+'">'+GEWERK_LABEL[code]+'</span></label>';
+  ov.innerHTML='<div style="background:var(--surface);color:var(--text);border-radius:12px;max-width:380px;width:100%;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.45)">'
+    +'<div style="font-size:16px;font-weight:700;margin-bottom:4px">Gewerk korrigieren</div>'
+    +'<div style="font-size:12px;color:var(--accent2);margin-bottom:14px">Position '+pos+' · bestimmt, welche Status-Felder gelten.</div>'
+    +row('M')+row('S')+row('E')
+    +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">'
+    +'<button onclick="(document.getElementById(\'gwOv\')||{}).remove&&document.getElementById(\'gwOv\').remove()" style="padding:9px 16px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-family:inherit">Abbrechen</button>'
+    +'<button onclick="confirmGewerk(\''+pos+'\')" style="padding:9px 18px;border:none;background:var(--accent);color:#2b2b2b;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Übernehmen</button>'
+    +'</div></div>';
+  ov.style.display='flex';
+}
+function confirmGewerk(pos){
+  const ov=document.getElementById('gwOv'); if(!ov) return;
+  const sel=[...ov.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.value);
+  ov.remove();
+  setPosGewerk(pos, sel);
+}
+function setPosGewerk(pos, gewArr){
+  let item=null;
+  DATA.forEach(s=>s.subsections.forEach(sub=>sub.items.forEach(it=>{ if(it.pos===pos) item=it; })));
+  if(!item) return;
+  item.gew=gewArr.slice();
+  POSGEW[pos]=item.gew;
+  const id=sp(pos);
+  const card=document.getElementById('C'+id);
+  if(card){
+    card.dataset.gew=item.gew.join('');
+    const imet=card.querySelector('.imet');
+    if(imet) imet.innerHTML=(item.fabrikat?'&#127981; '+item.fabrikat.trim():'')+(item.typ?' &nbsp;&#128203; '+item.typ.trim():'')+gewBadgeEditable(item.pos,item.gew);
+  }
+  applyFieldVisibility(); rc(pos); updProg(pos); upStats(); applyF();
+  // Gewerk-Umschalter einblenden, falls die Baustelle dadurch erstmals Gewerke bekommt
+  const bar=document.getElementById('gwbar');
+  if(bar && bar.style.display==='none' && DATA.some(s=>s.subsections.some(sub=>sub.items.some(it=>it.gew&&it.gew.length)))) bar.style.display='flex';
+  saveLV();
+}
+// Aktualisiertes Leistungsverzeichnis (Stückliste) der Baustelle nach SharePoint speichern
+async function saveLV(){
+  if(!PID) return;
+  try{ await spUploadText('LV_'+PID+'.json', JSON.stringify(DATA)); }
+  catch(e){ console.warn('Stückliste speichern fehlgeschlagen:', e); }
 }
 
 // ---- Parser: Zeilen -> LV-Struktur (Hierarchie aus Positionsnummer) ----
