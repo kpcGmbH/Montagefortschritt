@@ -2,7 +2,7 @@
 // Cacht die App-Shell + CDN-Bibliotheken (cache-first), damit die App offline startet.
 // Microsoft Graph / Login / SharePoint werden NIE gecacht (network-only) – Daten und
 // Tokens laufen ausschließlich live. Bei jeder Veröffentlichung CACHE-Version erhöhen.
-const CACHE = 'kpc-montage-v23';
+const CACHE = 'kpc-montage-v24';
 
 const SHELL = [
   './',
@@ -58,7 +58,8 @@ self.addEventListener('fetch', e => {
   if (sameOrigin && req.mode === 'navigate') {
     e.respondWith((async () => {
       try {
-        const net = await fetch(req);
+        // no-cache: immer beim Server revalidieren -> beim Öffnen sofort die neue Ansicht
+        const net = await fetch(req.url, {cache: 'no-cache'});
         const c = await caches.open(CACHE);
         c.put('./index.html', net.clone());
         return net;
