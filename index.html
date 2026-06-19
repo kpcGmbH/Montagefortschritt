@@ -29,14 +29,14 @@
   /* Semantische Flächen-/Textfarben (Inhaltsbereich) – HELL */
   --page:#f5f3f0; --surface:#fff; --surface2:#eeecea;
   --text:#2b2b2b; --line:#d4cdc6;
-  --done-bg:#e8f4e8; --part-bg:#fef9e7; --bprog-track:#e0ddd9; --qty:#895500;
+  --done-bg:#e8f4e8; --part-bg:#fef9e7; --bprog-track:#cfc6bb; --bprog-edge:rgba(0,0,0,.14); --qty:#895500;
 }
 /* DUNKEL – folgt automatisch dem Geräte-Modus (Helligkeit), oder per data-theme erzwingbar */
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     --page:#191919; --surface:#242424; --surface2:#2e2e2e;
     --text:#e8e6e3; --line:#3a3a3a;
-    --done-bg:#1f3a26; --part-bg:#3b331c; --bprog-track:#333; --qty:#d2a857;
+    --done-bg:#1f3a26; --part-bg:#3b331c; --bprog-track:#333; --bprog-edge:rgba(255,255,255,.07); --qty:#d2a857;
     --accent2:#9a9a9a; --border:#3a3a3a; --bg2:#2e2e2e;
   }
 }
@@ -127,9 +127,9 @@ select.fs option{background:var(--anthrazit);}
 
 
 /* FORTSCHRITTSBALKEN */
-.bprog-bar{height:4px;background:var(--bprog-track);margin:0 14px 4px;overflow:hidden;display:none;border-radius:2px;}
+.bprog-bar{height:6px;background:var(--bprog-track);margin:0 14px 5px;overflow:hidden;display:none;border-radius:3px;box-shadow:inset 0 0 0 1px var(--bprog-edge);}
 .bprog-bar.vis{display:block;}
-.bprog-fill{height:100%;background:var(--green);border-radius:2px;transition:width .3s;}
+.bprog-fill{height:100%;background:var(--green);border-radius:3px;transition:width .3s;}
 
 /* PROTOKOLL */
 .ptype-menu{display:none;position:absolute;background:var(--anthrazit);border:1px solid var(--braun);
@@ -828,6 +828,8 @@ function tsFmt(iso){
 let USER = localStorage.getItem('kpc_user') || '';
 // Ausf\u00fchrer: eigene Monteure (Name) oder Fremdfirma (z.B. GTS) \u2013 wird je H\u00e4kchen mitgestempelt
 let FIRMEN = (()=>{ try{ return JSON.parse(localStorage.getItem('kpc_firmen')||'["GTS"]'); }catch(e){ return ['GTS']; } })();
+// Feste Liste eigener Monteure für die Schnellauswahl im Ausführer-Dialog
+const MONTEURE = ['Milenko STANIC','Sava JELICIC','Luis PINHEIRO','Ivan RUSEV','Kurt HERRMANN','Boban PETROVIC','Emil SAJGO','Laszlo SIPOS'];
 function ausfTyp(){ return localStorage.getItem('kpc_user_typ')||'monteur'; }
 function istFirma(name){ return FIRMEN.includes(name) || (ausfTyp()==='firma' && name===USER); }
 function applyUserBadge(){
@@ -932,10 +934,16 @@ function chooseAusfuehrer(){
   const curName=(ausfTyp()!=='firma' && USER)?USER:(deriveName(msalAccount)||'');
   const curFirma=(ausfTyp()==='firma' && USER)?USER:(FIRMEN[0]||'GTS');
   const esc=s=>String(s||'').replace(/"/g,'&quot;');
+  const loginName=deriveName(msalAccount)||'';
+  const mList=[]; if(loginName) mList.push(loginName);
+  MONTEURE.forEach(m=>{ if(!mList.includes(m)) mList.push(m); });
+  if(curName && !mList.includes(curName)) mList.unshift(curName);
+  const monteurOptions=mList.map(n=>`<option value="${esc(n)}" ${n===curName?'selected':''}>${esc(n)}${n===loginName?' (mein Login)':''}</option>`).join('')+'<option value="">Andere …</option>';
   ov.innerHTML=`<div style="background:var(--surface);color:var(--text);border-radius:12px;max-width:430px;width:100%;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.45)">
     <div style="font-size:17px;font-weight:700;margin-bottom:4px">Ausführer wählen</div>
     <div style="font-size:12px;color:var(--accent2);margin-bottom:16px">Wird bei jedem Häkchen mitgespeichert – für die spätere Zuordnung zu Firmen bzw. eigenen Monteuren.</div>
     <label style="display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:6px"><input type="radio" name="atyp" value="monteur" ${ausfTyp()!=='firma'?'checked':''}> 👷 Eigene Monteure</label>
+    <select id="ausfMonteur" onchange="document.getElementById('ausfName').value=this.value;var r=document.querySelector('input[name=atyp][value=monteur]');if(r)r.checked=true" style="margin:0 0 8px 26px;width:calc(100% - 26px);padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit">${monteurOptions}</select>
     <input id="ausfName" type="text" value="${esc(curName)}" placeholder="Name" style="margin:0 0 14px 26px;width:calc(100% - 26px);padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit">
     <label style="display:flex;align-items:center;gap:8px;font-weight:700;margin-bottom:6px"><input type="radio" name="atyp" value="firma" ${ausfTyp()==='firma'?'checked':''}> 🏢 Fremdfirma</label>
     <input id="ausfFirma" type="text" value="${esc(curFirma)}" placeholder="Firma (z.B. GTS)" style="margin:0 0 18px 26px;width:calc(100% - 26px);padding:9px;border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);font-family:inherit">
@@ -1477,6 +1485,8 @@ function openTagesberichtDialog(){
     '</div>'+
   '</div>';
 }
+// Logo-Daten-URI aus dem Header für Berichte wiederverwenden
+function repLogo(){ return 'data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDI0LjAuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkViZW5lXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCAyNTEuNyAxODEiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDI1MS43IDE4MTsiIHhtbDpzcGFjZT0icHJlc2VydmUiPgo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPgoJLnN0MHtmaWxsOiMyYjJiMmI7ZW5hYmxlLWJhY2tncm91bmQ6bmV3ICAgIDt9Cgkuc3Qxe2ZpbGw6IzJiMmIyYjt9Cgkuc3Qye2ZpbGw6Izg5NTYxMzt9Cgkuc3Qze2ZpbGw6IzY3NkM2RTt9Cjwvc3R5bGU+CjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0xMC44LDgxLjVjNS03LjQsMTcuNy0yNS4zLDI0LjYtMzUuNmgxMi4xYy02LjcsOS41LTEzLjksMTkuMi0yMC45LDI4LjhsMjMsNDYuN0gzNy4zbC0xOC4xLTM4CgljLTIsMi44LTYuMSw4LjQtOC40LDExLjJ2MjYuN0gwQzAsODAuOSwwLDQwLjQsMCwwYzMuNiwwLDcuMiwwLDEwLjgsMEMxMC44LDI3LjIsMTAuOCw1NC4zLDEwLjgsODEuNXoiLz4KPHBhdGggY2xhc3M9InN0MCIgZD0iTTE0OS44LDk4LjNjLTAuMyw0LjEtMS45LDI0LjQtMjQuMiwyNC40Yy0xOS42LDAtMjUuMS0xNy40LTI1LjEtMzkuM2MwLTIxLjMsNi45LTM4LjgsMjYuMS0zOC44CgljMjEuOSwwLDIyLjksMjAuMiwyMywyMy44aC0xMS4yYy0wLjEtMi45LTEuMi0xNC40LTEyLTE0LjRjLTEwLjgsMC0xNC45LDEyLTE0LjksMjkuM2MwLDE4LjcsNC4yLDMwLDE0LjMsMzAKCWMxMC44LDAsMTIuMi0xMS4xLDEyLjgtMTVMMTQ5LjgsOTguM0wxNDkuOCw5OC4zeiIvPgo8cGF0aCBjbGFzcz0ic3QwIiBkPSJNNDkuOSwxODFWNjcuOGMwLTEwLjMsMC0xNy4zLTAuMS0yMmgxMC42YzAuMSwxLjQsMC41LDYuNCwwLjUsMTAuMmMyLjUtNi41LDcuOS0xMS4zLDE3LjgtMTEuMwoJYzE0LjMsMCwyMiwxMi42LDIyLDM3LjhjMCwyNy4yLTkuNCw0MC4yLTI0LjIsNDAuMmMtOSwwLTEzLjUtNC4zLTE1LjgtOVYxODFINDkuOXogTTc1LjMsNTQuMWMtMTEuNywwLTE0LjksMTEuMi0xNC45LDI5CglTNjIuMSwxMTMsNzQuNSwxMTNjOS45LDAsMTUtMTEuNiwxNS0zMEM4OS42LDYzLjksODUuMiw1NC4xLDc1LjMsNTQuMXoiLz4KPGc+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNNzkuNCwxNTIuNWwwLjEsMC42bDAuMS0wLjdsMi40LTkuMUg4M2wyLjQsOWwwLjIsMC45bDAuMi0wLjhsMi4xLTkuMWgxLjNsLTIuOSwxMS44aC0xbC0yLjYtOS40bC0wLjEtMC4zCgkJdjAuM2wtMi41LDkuNGgtMWwtMi45LTExLjhoMS4zTDc5LjQsMTUyLjV6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNOTUuOCwxNTUuNGMtMS40LDAtMi41LTAuNC0zLjMtMS4zYy0wLjgtMC45LTEuMi0yLjItMS4yLTMuOXYtMS40YzAtMS43LDAuNC0zLjEsMS4yLTQuMQoJCWMwLjctMSwxLjgtMS41LDMuMS0xLjVjMS4zLDAsMi4yLDAuNCwzLDEuM3MxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFzMS40LDEuMSwyLjQsMS4xCgkJYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44Qzk4LjYsMTU0LjgsOTcuNCwxNTUuNCw5NS44LDE1NS40eiBNOTUuNiwxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEM5OC4zLDE0NS40LDk3LjQsMTQ0LjMsOTUuNiwxNDQuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMDkuOCwxNDAuM3YzaDIuMXYxLjFoLTIuMXY3LjljMCwwLjYsMC4xLDEuMiwwLjMsMS40YzAuMiwwLjQsMC41LDAuNCwxLDAuNGMwLjIsMCwwLjQsMCwwLjktMC4xdjEuMQoJCWMtMC4zLDAuMS0wLjcsMC4yLTEuMiwwLjJjLTEuNCwwLTIuMS0xLTIuMS0zdi04LjFoLTEuOHYtMS4xaDEuOHYtM0wxMDkuOCwxNDAuM0wxMDkuOCwxNDAuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMTYuMSwxNDUuMmMwLjQtMC42LDAuOC0xLjIsMS4zLTEuNWMwLjUtMC40LDEuMi0wLjUsMS45LTAuNWMyLjEsMCwzLjEsMS4zLDMuMSw0LjF2OGgtMS4ydi03LjgKCQljMC0xLjEtMC4yLTEuOS0wLjUtMi4zYy0wLjQtMC40LTAuOS0wLjctMS43LTAuN2MtMC42LDAtMS4yLDAuMy0xLjcsMC43Yy0wLjUsMC40LTAuOSwxLjItMS4yLDJ2OC4yaC0xLjN2LTE1LjFoMS4zTDExNi4xLDE0NS4yCgkJTDExNi4xLDE0NS4yeiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTEyNiwxMzkuOWMwLTAuMywwLjEtMC40LDAuMi0wLjZjMC4yLTAuMiwwLjQtMC4zLDAuNi0wLjNzMC40LDAuMSwwLjYsMC4zYzAuMiwwLjIsMC4yLDAuNCwwLjIsMC42CgkJYzAsMC4zLTAuMSwwLjQtMC4yLDAuNmMtMC4yLDAuMi0wLjQsMC4zLTAuNiwwLjNjLTAuMywwLTAuNC0wLjEtMC42LTAuM1MxMjYsMTQwLjIsMTI2LDEzOS45eiBNMTI3LjQsMTU1LjJoLTEuM3YtMTEuOGgxLjNWMTU1LjJ6CgkJIi8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTMyLjMsMTQzLjN2MS45YzAuNC0wLjYsMC44LTEuMiwxLjMtMS41YzAuNS0wLjQsMS4yLTAuNSwxLjktMC41YzIuMSwwLDMuMSwxLjMsMy4xLDQuMXY4aC0xLjJ2LTcuOAoJCWMwLTEuMS0wLjItMS45LTAuNS0yLjNjLTAuNC0wLjQtMC45LTAuNy0xLjctMC43Yy0wLjYsMC0xLjIsMC4zLTEuNywwLjdjLTAuNSwwLjQtMC45LDEuMi0xLjIsMnY4LjJoLTEuM3YtMTEuOGgxLjJWMTQzLjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTQ0LjgsMTQ5LjNsLTEuMywxLjN2NC42aC0xLjN2LTE1aDEuM3Y4LjlsMS0xLjNsMy43LTQuNWgxLjVsLTQuMSw1bDQuNiw2LjhoLTEuNEwxNDQuOCwxNDkuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xNTIuMywxNTguMmwtMC44LTAuNWMwLjYtMC45LDEtMS44LDEtMi44di0xLjdoMS4zdjEuM0MxNTMuOCwxNTYsMTUzLjIsMTU3LjMsMTUyLjMsMTU4LjJ6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTY1LjEsMTUyLjVsMC4xLDAuNmwwLjEtMC43bDIuNC05LjFoMWwyLjQsOWwwLjIsMC45bDAuMi0wLjhsMi4xLTkuMWgxLjNsLTIuOSwxMS44aC0xLjFsLTIuNi05LjRsLTAuMS0wLjMKCQl2MC4zbC0yLjUsOS40aC0xLjFsLTIuOS0xMS44aDEuM0wxNjUuMSwxNTIuNXoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xODEuNCwxNTUuNGMtMS40LDAtMi41LTAuNC0zLjMtMS4zYy0wLjgtMC45LTEuMi0yLjItMS4yLTMuOXYtMS40YzAtMS43LDAuNC0zLjEsMS4yLTQuMQoJCWMwLjctMSwxLjgtMS41LDMuMS0xLjVjMS4zLDAsMi4yLDAuNCwzLDEuM3MxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFjMC42LDAuNywxLjQsMS4xLDIuNCwxLjEKCQljMS4yLDAsMi4xLTAuNCwyLjktMS4zbDAuNiwwLjhDMTg0LjIsMTU0LjgsMTgzLjEsMTU1LjQsMTgxLjQsMTU1LjR6IE0xODEuMywxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMxODMuOSwxNDUuNCwxODMuMSwxNDQuMywxODEuMywxNDQuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xOTcuNCwxNTQuM2MwLjgsMCwxLjUtMC4zLDItMC43YzAuNC0wLjQsMC43LTEuMiwwLjctMi4xaDEuMmMtMC4xLDEuMy0wLjQsMi4xLTEuMiwyLjlzLTEuNiwxLjEtMi43LDEuMQoJCWMtMS40LDAtMi41LTAuNC0zLjItMS4zcy0xLjEtMi4yLTEuMS00di0xLjRjMC0xLjgsMC40LTMuMSwxLjEtNC4xczEuOC0xLjMsMy4yLTEuM2MxLjIsMCwyLjEsMC40LDIuOCwxLjFzMS4xLDEuOCwxLjEsMy4xaC0xLjIKCQljMC0xLTAuMy0xLjctMC43LTIuMmMtMC40LTAuNS0xLjEtMC44LTItMC44Yy0xLjEsMC0xLjgsMC40LTIuMywxLjFzLTAuNywxLjgtMC43LDMuMnYxLjNjMCwxLjUsMC4zLDIuNiwwLjcsMy4zCgkJQzE5NS41LDE1My45LDE5Ni4zLDE1NC4zLDE5Ny40LDE1NC4zeiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIwOC44LDE0NC41Yy0wLjMtMC4xLTAuNS0wLjEtMC44LTAuMWMtMC43LDAtMS4zLDAuMy0xLjcsMC43Yy0wLjQsMC40LTAuOCwxLjEtMSwxLjl2OC4xSDIwNHYtMTEuOGgxLjJ2MS44CgkJYzAuNS0xLjMsMS41LTIsMi43LTJjMC40LDAsMC41LDAuMSwwLjcsMC4yTDIwOC44LDE0NC41eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIxNS4yLDE1NS40Yy0xLjQsMC0yLjUtMC40LTMuMy0xLjNjLTAuOC0wLjktMS4yLTIuMi0xLjItMy45di0xLjRjMC0xLjcsMC40LTMuMSwxLjItNC4xCgkJYzAuNy0xLDEuOC0xLjUsMy4xLTEuNWMxLjMsMCwyLjIsMC40LDMsMS4zczEsMi4xLDEuMSwzLjl2MS4ySDIxMnYwLjZjMCwxLjMsMC4zLDIuNCwwLjksMy4xYzAuNSwwLjcsMS40LDEuMSwyLjQsMS4xCgkJYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44QzIxOCwxNTQuOCwyMTYuOCwxNTUuNCwyMTUuMiwxNTUuNHogTTIxNSwxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMyMTcuNywxNDUuNCwyMTYuOCwxNDQuMywyMTUsMTQ0LjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMjI4LjIsMTU1LjJjLTAuMS0wLjQtMC4yLTAuOS0wLjItMS42Yy0wLjQsMC42LTAuOCwxLjEtMS40LDEuM2MtMC41LDAuNC0xLjIsMC40LTEuOSwwLjQKCQljLTEsMC0xLjgtMC4zLTIuNC0wLjljLTAuNS0wLjUtMC45LTEuNC0wLjktMi41YzAtMS4yLDAuNC0yLjEsMS4yLTIuOHMxLjktMSwzLjMtMWgyLjF2LTEuNmMwLTAuOC0wLjItMS40LTAuNi0xLjgKCQljLTAuNC0wLjQtMS4xLTAuNS0xLjktMC41Yy0wLjcsMC0xLjMsMC4yLTEuOSwwLjZjLTAuNCwwLjQtMC43LDEtMC43LDEuN2gtMS4zYzAtMSwwLjQtMS44LDEuMS0yLjVzMS42LTEsMi44LTFzMi4xLDAuMywyLjcsMC45CgkJYzAuNiwwLjYsMC45LDEuNCwwLjksMi42djUuOGMwLDEuMiwwLjEsMi4xLDAuNCwyLjZ2MC4xTDIyOC4yLDE1NS4yTDIyOC4yLDE1NS4yeiBNMjI0LjksMTU0LjJjMC43LDAsMS4zLTAuMiwxLjktMC41CgkJYzAuNS0wLjQsMS0wLjksMS4zLTEuNXYtMi45aC0yYy0xLjEsMC0yLDAuMy0yLjUsMC43Yy0wLjUsMC40LTAuOCwxLjItMC44LDJDMjIyLjcsMTUzLjUsMjIzLjQsMTU0LjIsMjI0LjksMTU0LjJ6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMjM0LjcsMTQwLjN2M2gyLjF2MS4xaC0yLjF2Ny45YzAsMC42LDAuMSwxLjIsMC4zLDEuNGMwLjIsMC40LDAuNSwwLjQsMSwwLjRjMC4yLDAsMC40LDAsMC45LTAuMXYxLjEKCQljLTAuMywwLjEtMC43LDAuMi0xLjIsMC4yYy0xLjQsMC0yLjEtMS0yLjEtM3YtOC4xaC0xLjh2LTEuMWgxLjh2LTNMMjM0LjcsMTQwLjNMMjM0LjcsMTQwLjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMjQzLjcsMTU1LjRjLTEuNCwwLTIuNS0wLjQtMy4zLTEuM2MtMC44LTAuOS0xLjItMi4yLTEuMi0zLjl2LTEuNGMwLTEuNywwLjQtMy4xLDEuMi00LjEKCQljMC43LTEsMS44LTEuNSwzLjEtMS41YzEuMywwLDIuMiwwLjQsMywxLjNjMC43LDAuOCwxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFjMC42LDAuNywxLjQsMS4xLDIuNCwxLjEKCQljMS4yLDAsMi4xLTAuNCwyLjktMS4zbDAuNiwwLjhDMjQ2LjQsMTU0LjgsMjQ1LjMsMTU1LjQsMjQzLjcsMTU1LjR6IE0yNDMuNSwxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMyNDYuMiwxNDUuNCwyNDUuMywxNDQuMywyNDMuNSwxNDQuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0yNTAuMiwxNTguMmwtMC44LTAuNWMwLjYtMC45LDEtMS44LDEtMi44di0xLjdoMS4zdjEuM0MyNTEuNywxNTYsMjUxLjMsMTU3LjMsMjUwLjIsMTU4LjJ6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNNzkuNCwxNzhsMC4xLDAuNmwwLjEtMC43bDIuNC05LjFIODNsMi40LDlsMC4yLDAuOWwwLjItMC44bDIuMS05LjFoMS4zbC0yLjksMTEuOGgtMWwtMi42LTkuNGwtMC4xLTAuM3YwLjMKCQlsLTIuNSw5LjRoLTFsLTIuOS0xMS44aDEuM0w3OS40LDE3OHoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik05NS44LDE4MWMtMS40LDAtMi41LTAuNC0zLjMtMS4zcy0xLjItMi4yLTEuMi0zLjl2LTEuNGMwLTEuNywwLjQtMy4xLDEuMi00LjFjMC43LTEsMS44LTEuNSwzLjEtMS41CgkJYzEuMywwLDIuMiwwLjQsMywxLjNjMC43LDAuOCwxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFzMS40LDEuMSwyLjQsMS4xYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44CgkJQzk4LjYsMTgwLjQsOTcuNCwxODEsOTUuOCwxODF6IE05NS42LDE2OS44Yy0xLDAtMS43LDAuNC0yLjIsMWMtMC41LDAuNy0wLjgsMS43LTAuOCwzaDUuOHYtMC40Qzk4LjMsMTcxLDk3LjQsMTY5LjgsOTUuNiwxNjkuOHoiCgkJLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMDkuNCwxODAuN2gtMS4zdi0xNi44aDEuM1YxODAuN3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMTIuNiwxNzQuM2MwLTEuNywwLjQtMywxLjItNGMwLjgtMSwxLjgtMS41LDMuMS0xLjVjMS4zLDAsMi40LDAuNCwzLjEsMS40czEuMiwyLjMsMS4yLDR2MS4zCgkJYzAsMS43LTAuNCwzLjEtMS4yLDRjLTAuOCwxLTEuOCwxLjQtMy4xLDEuNGMtMS4zLDAtMi4zLTAuNC0zLjEtMS40Yy0wLjgtMS0xLjItMi4yLTEuMi0zLjlWMTc0LjN6IE0xMTMuOCwxNzUuNAoJCWMwLDEuMywwLjMsMi40LDAuOCwzLjJjMC41LDAuOCwxLjMsMS4yLDIuMywxLjJzMS44LTAuNCwyLjMtMS4yYzAuNS0wLjgsMC44LTEuOCwwLjgtMy4ydi0xLjNjMC0xLjMtMC4zLTIuNC0wLjgtMy4yCgkJYy0wLjUtMC44LTEuMy0xLjItMi4zLTEuMnMtMS43LDAuNC0yLjIsMS4yYy0wLjUsMC44LTAuOCwxLjgtMC45LDMuMVYxNzUuNHoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMjcuNiwxNzguOGwzLTkuOWgxLjNsLTMuNywxMS44aC0xbC0zLjctMTEuOGgxLjNMMTI3LjYsMTc4Ljh6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTM4LjMsMTgxYy0xLjQsMC0yLjUtMC40LTMuMy0xLjNjLTAuOC0wLjktMS4yLTIuMi0xLjItMy45di0xLjRjMC0xLjcsMC40LTMuMSwxLjItNC4xCgkJYzAuNy0xLDEuOC0xLjUsMy4xLTEuNWMxLjMsMCwyLjIsMC40LDMsMS4zYzAuNywwLjgsMSwyLjEsMS4xLDMuOXYxLjJIMTM1djAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFzMS40LDEuMSwyLjQsMS4xCgkJYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44QzE0MS4xLDE4MC40LDEzOS45LDE4MSwxMzguMywxODF6IE0xMzguMSwxNjkuOGMtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMxNDAuOCwxNzEsMTM5LjgsMTY5LjgsMTM4LjEsMTY5Ljh6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTUzLjIsMTc1LjNsLTEsMS4ydjQuMmgtMnYtMTYuOGgydjEwbDMuNy01LjFoMi4zbC0zLjgsNC45bDQuMyw2LjloLTIuM0wxNTMuMiwxNzUuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xNjQuMiwxNjUuOGMwLDAuNC0wLjEsMC42LTAuMywwLjhjLTAuMiwwLjItMC40LDAuNC0wLjgsMC40Yy0wLjQsMC0wLjYtMC4xLTAuOC0wLjQKCQljLTAuMi0wLjItMC4zLTAuNC0wLjMtMC44YzAtMC40LDAuMS0wLjYsMC4zLTAuOGMwLjItMC4zLDAuNC0wLjQsMC44LTAuNGMwLjQsMCwwLjYsMC4xLDAuOCwwLjRTMTY0LjIsMTY1LjQsMTY0LjIsMTY1Ljh6CgkJIE0xNjQsMTgwLjdoLTJ2LTExLjhoMlYxODAuN3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xNzEuMSwxNjZ2Mi45aDEuOHYxLjVoLTEuOHY3LjNjMCwwLjQsMC4xLDAuOCwwLjMsMS4xczAuNCwwLjQsMC44LDAuNGMwLjMsMCwwLjUsMCwwLjgtMC4xdjEuNgoJCWMtMC40LDAuMi0wLjksMC4yLTEuMywwLjJjLTAuOCwwLTEuMy0wLjMtMS44LTAuOGMtMC40LTAuNS0wLjYtMS4zLTAuNi0yLjN2LTcuM2gtMS44di0xLjVoMS44VjE2NkwxNzEuMSwxNjZMMTcxLjEsMTY2eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTE4MSwxNzkuM2MwLjYsMCwxLjItMC4yLDEuNS0wLjZjMC40LTAuNCwwLjYtMSwwLjYtMS43aDEuOGMwLDEuMi0wLjQsMi4xLTEuMywyLjljLTAuOCwwLjgtMS43LDEuMi0yLjgsMS4yCgkJYy0xLjQsMC0yLjYtMC40LTMuMy0xLjNjLTAuOC0wLjktMS4yLTIuMy0xLjItNC4xdi0xLjNjMC0xLjgsMC40LTMuMSwxLjItNC4xYzAuOC0wLjksMS45LTEuNCwzLjMtMS40YzEuMywwLDIuMSwwLjQsMi45LDEuMgoJCWMwLjcsMC44LDEuMSwxLjgsMS4yLDMuMWgtMS44YzAtMC45LTAuMy0xLjUtMC42LTJjLTAuNC0wLjQtMC45LTAuNi0xLjUtMC42Yy0wLjksMC0xLjUsMC4zLTEuOSwwLjhjLTAuNCwwLjUtMC42LDEuNS0wLjYsMi44djEuNQoJCWMwLDEuNCwwLjIsMi40LDAuNiwzQzE3OS40LDE3OSwxODAuMSwxNzkuMywxODEsMTc5LjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTkwLjcsMTcwLjFjMC43LTEsMS43LTEuNCwyLjktMS40YzIuMSwwLDMuMSwxLjQsMy4yLDQuMnY3LjloLTJWMTczYzAtMC45LTAuMi0xLjYtMC40LTIKCQljLTAuMy0wLjQtMC44LTAuNi0xLjQtMC42Yy0wLjQsMC0wLjksMC4yLTEuMywwLjRjLTAuNCwwLjQtMC43LDAuNy0wLjksMS4zdjguNmgtMlYxNjZoMkwxOTAuNywxNzAuMUwxOTAuNywxNzAuMXoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0yMDUuNCwxODFjLTEuNCwwLTIuNi0wLjQtMy40LTEuM2MtMC44LTAuOS0xLjItMi4xLTEuMi0zLjl2LTEuNGMwLTEuOCwwLjQtMy4xLDEuMi00LjFzMS45LTEuNSwzLjItMS41CgkJYzEuMywwLDIuNCwwLjQsMy4xLDEuM3MxLjEsMi4yLDEuMSw0LjF2MS4zaC02LjZ2MC4zYzAsMS4zLDAuMywyLjIsMC43LDIuOHMxLjIsMC45LDIuMSwwLjljMC41LDAsMS4xLTAuMSwxLjUtMC40CgkJYzAuNC0wLjIsMC44LTAuNSwxLjMtMWwxLDEuM0MyMDguNCwxODAuMywyMDcuMSwxODEsMjA1LjQsMTgxeiBNMjA1LjIsMTcwLjNjLTAuOCwwLTEuNCwwLjMtMS44LDAuOGMtMC40LDAuNS0wLjYsMS40LTAuNiwyLjZoNC43CgkJdi0wLjNjLTAuMS0xLjItMC4zLTItMC42LTIuNEMyMDYuNCwxNzAuNiwyMDUuOSwxNzAuMywyMDUuMiwxNzAuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0yMTUuMSwxNjguOWwwLjEsMS4zYzAuNy0xLDEuNy0xLjUsMi45LTEuNWMyLjEsMCwzLjEsMS40LDMuMiw0LjJ2Ny45aC0ydi03LjhjMC0wLjktMC4yLTEuNi0wLjQtMgoJCWMtMC4zLTAuNC0wLjgtMC42LTEuNC0wLjZjLTAuNCwwLTAuOSwwLjItMS4zLDAuNGMtMC40LDAuNC0wLjcsMC43LTAuOSwxLjN2OC42aC0ydi0xMS44TDIxNS4xLDE2OC45TDIxNS4xLDE2OC45eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIzMS40LDE3Ny43YzAtMC40LTAuMi0wLjgtMC40LTEuMWMtMC40LTAuMy0wLjktMC42LTEuOC0xLjFjLTEuMS0wLjQtMS44LTAuOC0yLjItMS4xcy0wLjctMC42LTEtMS4xCgkJYy0wLjItMC40LTAuNC0wLjktMC40LTEuNGMwLTEsMC40LTEuOCwxLjEtMi40YzAuNy0wLjYsMS42LTEsMi43LTFjMS4yLDAsMi4xLDAuNCwyLjgsMWMwLjcsMC43LDEuMSwxLjUsMS4xLDIuNmgtMgoJCWMwLTAuNS0wLjItMS0wLjUtMS4zYy0wLjQtMC40LTAuOC0wLjUtMS4zLTAuNWMtMC41LDAtMSwwLjItMS4zLDAuNGMtMC40LDAuMy0wLjQsMC43LTAuNCwxLjJjMCwwLjQsMC4xLDAuNywwLjQsMQoJCWMwLjMsMC4zLDAuOCwwLjUsMS43LDFjMS40LDAuNSwyLjQsMS4xLDMsMS42YzAuNSwwLjUsMC44LDEuMywwLjgsMi4xYzAsMS4xLTAuNCwxLjktMS4xLDIuNXMtMS43LDAuOS0yLjksMC45CgkJYy0xLjMsMC0yLjItMC40LTMtMS4xcy0xLjItMS42LTEuMi0yLjdoMmMwLDAuNiwwLjIsMS4yLDAuNiwxLjVjMC40LDAuNCwwLjksMC41LDEuNiwwLjVjMC42LDAsMS4yLTAuMiwxLjQtMC40CgkJQzIzMS4yLDE3OC42LDIzMS40LDE3OC4yLDIzMS40LDE3Ny43eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIzNi42LDE4MGMwLTAuMywwLjEtMC40LDAuMy0wLjZjMC4yLTAuMiwwLjQtMC4zLDAuNi0wLjNjMC4zLDAsMC40LDAuMSwwLjYsMC4zYzAuMiwwLjIsMC4zLDAuNCwwLjMsMC43CgkJcy0wLjEsMC40LTAuMywwLjZjLTAuMiwwLjItMC40LDAuMy0wLjYsMC4zYy0wLjMsMC0wLjUtMC4xLTAuNi0wLjNDMjM2LjYsMTgwLjMsMjM2LjUsMTgwLjIsMjM2LjYsMTgweiIvPgo8L2c+CjxyZWN0IHk9IjEzMi4yIiBjbGFzcz0ic3QyIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+CjxyZWN0IHg9IjI0LjkiIHk9IjEzMi4yIiBjbGFzcz0ic3QzIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+Cjwvc3ZnPgo='; }
 function expTagebericht(dateStr){
   const tag=dateStr||localDay(new Date().toISOString());
   const dObj=new Date(tag+'T12:00:00');
@@ -1537,14 +1547,13 @@ function expTagebericht(dateStr){
   const repHtml=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
 <title>Tagesbericht ${escapeHtml(curProjName())} – ${d}</title>
 <style>
-body{font-family:Arial Narrow,Arial,sans-serif;margin:0;padding:20px;color:#2b2b2b;}
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&display=swap');body{font-family:'Roboto Condensed','Arial Narrow',Arial,sans-serif;font-weight:300;margin:0;padding:20px;color:#2b2b2b;}
 .kpc{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #895500;padding-bottom:12px;margin-bottom:20px;}
-.logo{font-size:22px;font-weight:700;letter-spacing:4px;color:#2b2b2b;}
-.logo small{display:block;font-size:11px;letter-spacing:2px;color:#a8a8a8;font-weight:400;}
+.logo-img{height:48px;width:auto;display:block;}
 .meta{text-align:right;font-size:12px;color:#a8a8a8;line-height:1.6;}
 .meta strong{display:block;font-size:15px;color:#2b2b2b;font-weight:700;}
 h2{font-size:14px;color:#895500;margin:0 0 10px;font-weight:400;letter-spacing:0.5px;}
-table{width:100%;border-collapse:collapse;font-family:Arial Narrow,Arial,sans-serif;}
+table{width:100%;border-collapse:collapse;font-family:'Roboto Condensed','Arial Narrow',Arial,sans-serif;}
 th{background:#2b2b2b;color:#d7c1ae;font-size:11px;padding:7px 8px;text-align:left;font-weight:700;letter-spacing:0.5px;}
 td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 .sig{margin-top:40px;display:flex;gap:60px;}
@@ -1553,7 +1562,7 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 @media print{body{padding:10px;}button{display:none!important;}}
 </style></head><body>
 <button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
-<div class="kpc"><div class="logo">KPC <small>GMBH</small></div>
+<div class="kpc"><img class="logo-img" src="${repLogo()}" alt="KPC GmbH">
 <div class="meta"><strong>${escapeHtml(curProjName())}</strong>Tagesbericht Leistungsfeststellung<br>${d}</div></div>
 <h2>Durchgeführte Arbeiten – Statusänderungen am ${dObj.toLocaleDateString('de-DE')}</h2>
 ${monteureHtml}
@@ -1668,14 +1677,13 @@ async function expKunde(withFotos=false){
   const html=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
 <title>Leistungsbericht ${escapeHtml(curProjName())} – ${d}</title>
 <style>
-body{font-family:Arial Narrow,Arial,sans-serif;margin:0;padding:20px;color:#2b2b2b;}
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&display=swap');body{font-family:'Roboto Condensed','Arial Narrow',Arial,sans-serif;font-weight:300;margin:0;padding:20px;color:#2b2b2b;}
 .kpc{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #895500;padding-bottom:12px;margin-bottom:20px;}
-.logo{font-size:22px;font-weight:700;letter-spacing:4px;color:#2b2b2b;}
-.logo small{display:block;font-size:11px;letter-spacing:2px;color:#a8a8a8;font-weight:400;}
+.logo-img{height:48px;width:auto;display:block;}
 .meta{text-align:right;font-size:12px;color:#a8a8a8;line-height:1.6;}
 .meta strong{display:block;font-size:15px;color:#2b2b2b;font-weight:700;}
 h2{font-size:14px;color:#895500;margin:0 0 16px;font-weight:400;letter-spacing:0.5px;}
-table{width:100%;border-collapse:collapse;font-family:Arial Narrow,Arial,sans-serif;}
+table{width:100%;border-collapse:collapse;font-family:'Roboto Condensed','Arial Narrow',Arial,sans-serif;}
 th{background:#2b2b2b;color:#d7c1ae;font-size:11px;padding:7px 8px;text-align:left;font-weight:700;letter-spacing:0.5px;}
 th.center{text-align:center;}
 td{border-bottom:1px solid #eeecea;vertical-align:middle;}
@@ -1688,7 +1696,7 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 </style></head><body>
 <button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
 <div class="kpc">
-  <div class="logo">KPC <small>GMBH</small></div>
+  <img class="logo-img" src="${repLogo()}" alt="KPC GmbH">
   <div class="meta"><strong>Leistungsbericht</strong>Projekt: ${escapeHtml(curProjName())}<br>Datum: ${d}<br>Dok.-Nr.: LB-${curProjCode()}-${now.toISOString().slice(0,10).replace(/-/g,'')}</div>
 </div>
 <h2>Gelieferte und installierte Positionen – Nachweis Leistungsfeststellung</h2>
@@ -2881,13 +2889,12 @@ function expRest(){
   const offen=rows.filter(r=>!r.done).length;
   const html=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
 <title>Restarbeitenliste ${escapeHtml(curProjName())} – ${d}</title>
-<style>body{font-family:Arial Narrow,Arial,sans-serif;margin:0;padding:20px;color:#2b2b2b;}
+<style>@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&display=swap');body{font-family:'Roboto Condensed','Arial Narrow',Arial,sans-serif;font-weight:300;margin:0;padding:20px;color:#2b2b2b;}
 .kpc{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #895500;padding-bottom:12px;margin-bottom:20px;}
-.logo{font-size:22px;font-weight:700;letter-spacing:4px;color:#2b2b2b;}
-.logo small{display:block;font-size:11px;letter-spacing:2px;color:#a8a8a8;font-weight:400;}
+.logo-img{height:48px;width:auto;display:block;}
 .meta{text-align:right;font-size:12px;color:#a8a8a8;line-height:1.6;}
 .meta strong{display:block;font-size:15px;color:#2b2b2b;font-weight:700;}
-table{width:100%;border-collapse:collapse;font-family:Arial Narrow,Arial,sans-serif;}
+table{width:100%;border-collapse:collapse;font-family:'Roboto Condensed','Arial Narrow',Arial,sans-serif;}
 th{background:#2b2b2b;color:#d7c1ae;font-size:11px;padding:7px 8px;text-align:left;font-weight:700;letter-spacing:0.5px;}
 td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 .sig{margin-top:40px;display:flex;gap:60px;}
@@ -2896,7 +2903,7 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 @media print{body{padding:10px;}button{display:none!important;}}</style></head><body>
 <button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
 <div class="kpc">
-  <div class="logo">KPC <small>GMBH</small></div>
+  <img class="logo-img" src="${repLogo()}" alt="KPC GmbH">
   <div class="meta"><strong>Restarbeitenliste</strong>Projekt: ${escapeHtml(curProjName())}<br>Datum: ${d}<br>Dok.-Nr.: RA-${curProjCode()}-${now.toISOString().slice(0,10).replace(/-/g,'')}</div>
 </div>
 <p style="margin-bottom:16px;font-size:13px">Gesamt: <strong>${rows.length}</strong> Restarbeiten &nbsp;|&nbsp; Offen: <strong style="color:#c0392b">${offen}</strong> &nbsp;|&nbsp; Erledigt: <strong style="color:#3a7a3a">${rows.length-offen}</strong></p>
