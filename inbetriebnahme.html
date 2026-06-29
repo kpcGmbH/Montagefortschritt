@@ -972,9 +972,9 @@ function applyUrlContext(){var hash=(location.hash||'').replace(/^#/,'');if(!has
   if(p.projekt!==undefined)PROJECT.name=p.projekt;if(p.ort!==undefined)PROJECT.ort=p.ort;saveProject();
   if(p.pos){IBNCTX={pos:p.pos,projekt:p.projekt||''};CUR.pos=p.pos;}
   try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
-  if(p.hersteller||p.typ){var mfr=ctxMatchMfr(p.hersteller);if(mfr){var dev=ctxMatchDev(mfr,p.typ);
-    if(dev){CUR.mfr=mfr;openForm(dev);ctxPrefill(p);return true;} goDevices(mfr);return true;}}
-  goHome();return true;}
+  if(p.hersteller||p.typ){var mfr=ctxMatchMfr(p.hersteller);var dev=mfr?ctxMatchDev(mfr,p.typ):null;
+    if(mfr&&dev){CUR.mfr=mfr;openForm(dev);ctxPrefill(p);return true;}}
+  goHome();return true;}  // kein passendes Protokoll -> Startseite (Baustelle ist gesetzt)
 DB.MKN.devices={
    'Kombidämpfer Junior Classic (ClassicPilot)':{tags:['Elektro','Wasser','Abwasser','Abluft'],desc:'Kompaktgerät · SKECOD 623 CG2',match:['junior classic','skecod 623','classicpilot'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mWasser(),mAbwasser(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1,abluft:1})},
    'Kombidämpfer FlexiCombi Classic (ClassicPilot)':{tags:['Elektro','Wasser','Abwasser','Abluft'],desc:'Tisch-/Standgerät · FKECOD 615/621/115/121/215/221 CG2',match:['flexicombi classic','cg2','classicpilot'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mWasser(),mAbwasser(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1,abluft:1})},
