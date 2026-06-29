@@ -938,6 +938,7 @@ function ctxMatchMfr(h){if(!h)return DB['Allgemein']?'Allgemein':null;var keys=O
 function ctxMatchDev(mfr,typ){if(!typ||!DB[mfr])return null;var devs=Object.keys(DB[mfr].devices),t=ctxNorm(typ),best=null,bs=0;
   devs.forEach(function(d){var dt=ctxNorm(d),score=0;
     dt.split(' ').forEach(function(w){if(w.length>=4&&t.indexOf(w)>=0)score++;});
+    (DB[mfr].devices[d].match||[]).forEach(function(w){if(w&&t.indexOf(ctxNorm(w))>=0)score+=3;});
     t.split(' ').forEach(function(w){if(w.length>=4&&dt.indexOf(w)>=0)score++;});
     if(score>bs){bs=score;best=d;}});
   return bs>0?best:null;}
@@ -962,6 +963,35 @@ function applyUrlContext(){var hash=(location.hash||'').replace(/^#/,'');if(!has
   if(p.hersteller||p.typ){var mfr=ctxMatchMfr(p.hersteller);if(mfr){var dev=ctxMatchDev(mfr,p.typ);
     if(dev){CUR.mfr=mfr;openForm(dev);ctxPrefill(p);return true;} goDevices(mfr);return true;}}
   goHome();return true;}
+DB.MKN.devices={
+   'Kombidämpfer (CL)':{tags:['Elektro','Wasser','Abwasser','Abluft'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mWasser(),mAbwasser(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1,abluft:1})},
+   'Kombidämpfer (G2)':{tags:['Elektro','Wasser','Abwasser','Abluft'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mWasser(),mAbwasser(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1,abluft:1})},
+   'Kombidämpfer (MP)':{tags:['Elektro','Küchenleitsystem','Wasser','Abwasser','Abluft'],match:['flexicombi','flexi combi'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mKLS(),mWasser(),mAbwasser(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1,abluft:1})},
+   'Kombidämpfer (MPG2)':{tags:['Elektro','Küchenleitsystem','Wasser','Abwasser','Abluft'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mKLS(),mWasser(),mAbwasser(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1,abluft:1})},
+   'Kombidämpfer SpaceCombi Team':{tags:['Elektro','Küchenleitsystem','Wasser','Abwasser'],match:['spacecombi'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mKLS(),mWasser(),mAbwasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1})},
+   'Kombidämpfer SpaceCombi MagicTeam':{tags:['Elektro','Küchenleitsystem','Wasser','Abwasser'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mKLS(),mWasser(),mAbwasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1})},
+   'FlexiChef (G3)':{tags:['Elektro','Küchenleitsystem','Wasser','Abwasser'],match:['flexichef'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mKLS(),mWasser(),mAbwasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1})},
+   'Fritteuse':{tags:['Elektro'],match:['optima','fritteuse'],kopf:mKopf(),sections:[mAllg(),mElektro(),mFunc(),mAbschluss()],sign:genSig({})},
+   'Kochkessel':{tags:['Elektro','Wasser'],match:['kochkessel'],kopf:mKopf(),sections:[mAllg(),mElektro(),mWasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1})},
+   'Kipp-Kochkessel':{tags:['Elektro','Wasser'],kopf:mKopf(),sections:[mAllg(),mElektro(),mWasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1})},
+   'Multifunktionskochkessel (DIETA)':{tags:['Elektro','Wasser','Abwasser'],match:['dieta','genier'],kopf:mKopf(),sections:[mAllg(),mElektro(),mWasser(),mAbwasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1})},
+   'Multikocher':{tags:['Elektro','Wasser','Abwasser'],match:['multikocher'],kopf:mKopf(),sections:[mAllg(),mElektro(),mWasser(),mAbwasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1})},
+   'Kipp-Braisiere':{tags:['Elektro','Küchenleitsystem','Wasser'],match:['braisiere'],kopf:mKopf(),sections:[mAllg(),mElektro(),mKLS(),mWasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1})},
+   'Kippbratpfanne Unterbau':{tags:['Elektro','Wasser'],match:['kippbratpfanne','bratpfanne'],kopf:mKopf(),sections:[mAllg(),mElektro(),mWasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1})},
+   'Stand-Braisiere MAGNUM':{tags:['Elektro','Wasser'],match:['magnum'],kopf:mKopf(),sections:[mAllg(),mElektro(),mWasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1})},
+   'Bainmarie':{tags:['Elektro','Wasser'],match:['bainmarie','bain-marie','bain marie'],kopf:mKopf(),sections:[mAllg(),mElektro(),mWasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1})},
+   'Warmhaltewanne':{tags:['Elektro','Wasser','Abwasser'],match:['warmhalte'],kopf:mKopf(),sections:[mAllg(),mElektro(),mWasser(),mAbwasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1})},
+   'Induktionsherd':{tags:['Elektro'],match:['induktionskochfeld','induktion','2023104','2023105'],kopf:mKopf(),sections:[mAllg(),mElektro(),mFunc(),mAbschluss()],sign:genSig({})},
+   'Großkochfeld-Herd':{tags:['Elektro'],match:['großkochfeld','grosskochfeld'],kopf:mKopf(),sections:[mAllg(),mElektro(),mFunc(),mAbschluss()],sign:genSig({})},
+   'Vitro-Herd':{tags:['Elektro'],match:['vitro'],kopf:mKopf(),sections:[mAllg(),mElektro(),mFunc(),mAbschluss()],sign:genSig({})},
+   'Vitro-Herd mit Backofen':{tags:['Elektro'],kopf:mKopf(),sections:[mAllg(),mElektro(),mFunc(),mAbschluss()],sign:genSig({})},
+   'Platten-Herd mit Backofen':{tags:['Elektro'],match:['platten-herd','plattenherd'],kopf:mKopf(),sections:[mAllg(),mElektro(),mFunc(),mAbschluss()],sign:genSig({})},
+   'Griddleplatte mit Backofen':{tags:['Elektro'],kopf:mKopf(),sections:[mAllg(),mElektro(),mFunc(),mAbschluss()],sign:genSig({})},
+   'Griddleplatte / Griddlepfanne':{tags:['Elektro'],match:['griddle'],kopf:mKopf(),sections:[mAllg(),mElektro(),mFunc(),mAbschluss()],sign:genSig({})},
+   'Salamander':{tags:['Elektro'],match:['salamander'],kopf:mKopf(),sections:[mAllg(),mElektro(),mFunc(),mAbschluss()],sign:genSig({})},
+   'Infragrill':{tags:['Elektro','Wasser'],match:['infragrill','grill'],kopf:mKopf(),sections:[mAllg(),mElektro(),mWasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1})},
+   'Kondensationsablufthaube':{tags:['Elektro','Abluft'],match:['ablufthaube','haube','kondensation'],kopf:mKopf(),sections:[mAllg(),mElektro(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({abluft:1})}
+};
 STD_MFRS=Object.keys(DB);loadCustom();mergeCustom();loadProject();ensureMsal().catch(function(){});renderLoginState();loadMySig();renderSigBtn();var __nav=applyUrlContext();initProjectBar();if(!__nav)goHome();
 </script>
 </body>
