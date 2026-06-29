@@ -146,6 +146,7 @@ textarea{border:1.4px solid var(--line);border-radius:8px;min-height:64px;resize
 .modal-box h3{margin:0 0 6px;font-weight:400;font-size:20px;color:var(--black)}
 .modal-actions{display:flex;gap:10px;align-items:center;margin-top:16px}
 #wrap_mysig{height:170px}
+.draftbar{background:#fbf5ec;border:1px solid var(--copper);color:var(--copper-d);border-radius:10px;padding:9px 13px;margin:0 0 14px;font-size:14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .hidden{display:none!important}
 .foot{margin-top:40px;text-align:center;color:var(--gray);font-size:12.5px;padding:18px 0}
 .foot .claim{font-style:italic;color:var(--copper-d);margin-top:3px}
@@ -458,6 +459,7 @@ Winterhalter:{label:'Winterhalter',desc:'Spülmaschinen · Inbetriebnahmekarte &
 
 /* ---------- App-Zustand & Routing ---------- */
 let CUR={mfr:null,dev:null};
+let DRAFTAVAIL=false;
 let STATE={};
 const $=(id)=>document.getElementById(id);
 const view=$('view');
@@ -510,7 +512,7 @@ function applyPrefills(){if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev]
     }});}
 
 function storeKey(){return 'ibn:'+CUR.mfr+':'+CUR.dev+(CUR.pos?(':'+CUR.pos):'');}
-function saveState(){ if(CUR.dev){try{localStorage.setItem(storeKey(),JSON.stringify(STATE));}catch(e){}} updateProgress(); }
+function saveState(){ if(CUR.fresh)CUR.fresh=false; if(CUR.dev){try{localStorage.setItem(storeKey(),JSON.stringify(STATE));}catch(e){}} updateProgress(); }
 function loadState(){ try{STATE=JSON.parse(localStorage.getItem(storeKey())||'{}')||{};}catch(e){STATE={};} }
 
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
@@ -536,24 +538,28 @@ function goHome(){
 }
 
 function goDevices(m){
-  if(m)CUR.mfr=m;CUR.dev=null;CUR.pos=null;$('actionbar').classList.add('hidden');setCrumbs();
+  if(m)CUR.mfr=m;CUR.dev=null;CUR.pos=null;CUR.fresh=false;$('actionbar').classList.add('hidden');setCrumbs();
   const d=DB[CUR.mfr];let h='<div class="hero"><h1>'+d.label+'</h1><p>'+d.desc+'</p></div><div class="rows">';
   for(const dev in d.devices){const o=d.devices[dev];
     const tags=(o.tags||[]).map(t=>'<span class="tag">'+t+'</span>').join('');
     const dq=dev.replace(/'/g,"\\'");
     const act=o.__custom?('<span class="rowact"><button title="Bearbeiten" onclick="event.stopPropagation();editDevice(\''+dq+'\')">✎</button><button title="Löschen" onclick="event.stopPropagation();deleteDevice(\''+dq+'\')">🗑</button></span>'):'<span class="arrow">›</span>';
-    h+='<div class="row-item" onclick="openForm(\''+dq+'\')"><div class="ico">▤</div>'+
+    h+='<div class="row-item" onclick="pickDevice(\''+dq+'\')"><div class="ico">▤</div>'+
        '<div><h4>'+dev+tags+(o.__custom?' <span class="tag tcustom">eigen</span>':'')+'</h4><div class="sub">'+(o.desc?esc(o.desc):((o.sections.length)+' Abschnitte'))+'</div></div>'+act+'</div>';}
   h+='<div class="row-item rowadd" onclick="openEditor()"><div class="ico">＋</div><div><h4>Neues Protokoll hinzufügen</h4><div class="sub">PDF importieren oder selbst anlegen</div></div></div>';
   h+='</div>';view.innerHTML=h;window.scrollTo(0,0);
 }
 
 /* ---------- Formular rendern ---------- */
+function pickDevice(dev){CUR.dev=dev;CUR.pos=null;CUR.fresh=true;DRAFTAVAIL=false;
+  try{var raw=localStorage.getItem('ibn:'+CUR.mfr+':'+dev);if(raw){var o=JSON.parse(raw);DRAFTAVAIL=Object.keys(o).filter(function(k){return k!=='__auto';}).length>0;}}catch(e){}
+  STATE={};openForm(dev);}
+function continueDraft(){CUR.fresh=false;DRAFTAVAIL=false;loadState();openForm(CUR.dev,true);toast('Entwurf fortgesetzt');}
 function openForm(dev,keepScroll){
-  CUR.dev=dev;loadState();applyPrefills();setCrumbs();
+  CUR.dev=dev;if(!(CUR.fresh&&!CUR.pos))loadState();applyPrefills();setCrumbs();
   const o=DB[CUR.mfr].devices[dev];
   let h='<div class="formhead"><h2>'+CUR.mfr+' · '+dev+'</h2><div class="sub">Inbetriebnahmeprotokoll · Leistungsfeststellung</div>'+
-        '<div class="progress"><i id="prog"></i></div></div>';
+        '<div class="progress"><i id="prog"></i></div></div>'+((CUR.fresh&&!CUR.pos&&DRAFTAVAIL)?'<div class="draftbar">📝 Für dieses Gerät existiert ein früherer Entwurf. <button class="btn ghost small" onclick="continueDraft()">Letzten Entwurf fortsetzen</button></div>':'');
   // Kopfdaten
   h+='<div class="section"><div class="sh"><span class="bar"></span><h3>Allgemeine Angaben</h3></div><div class="body"><div class="grid2">';
   o.kopf.forEach((f,i)=>{h+=fieldHTML('k'+i,f);});
@@ -931,7 +937,7 @@ function renderLoginState(){const b=$('loginBtn');if(!b)return;
   if(TECH.name){b.classList.add('on');b.innerHTML='\u{1F464} '+esc(TECH.name)+' \u00A0\u2715';b.title='Abmelden';}
   else{b.classList.remove('on');b.textContent='Mit Microsoft anmelden';b.title='Anmelden, um den Techniker-Namen automatisch zu übernehmen';}}
 window.msLogin=msLogin;window.msLogout=msLogout;
-window.goHome=goHome;window.goDevices=goDevices;window.openForm=openForm;
+window.goHome=goHome;window.goDevices=goDevices;window.openForm=openForm;window.pickDevice=pickDevice;window.continueDraft=continueDraft;
 window.setVal=setVal;window.setCheck=setCheck;window.setCmt=setCmt;window.toggleOpt=toggleOpt;window.setSig=setSig;
 window.clearPad=clearPad;window.resetForm=resetForm;window.exportPDF=exportPDF;
 window.openMySig=openMySig;window.closeMySig=closeMySig;window.clearMySig=clearMySig;window.saveMySig=saveMySig;
