@@ -501,9 +501,9 @@ function applyPrefills(){if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev]
   o.sections.forEach(function(s,si){s.items.forEach(function(it,ii){var key='s'+si+'i'+ii;
     if(it.k==='text'&&/Datum|Durchgeführt am/i.test(it.l))setAuto(key,today,function(){return STATE[key];},function(v){STATE[key]=v;});});});
   o.sign.roles.forEach(function(r,gi){var gk='g'+gi,g=STATE[gk]||{};STATE[gk]=g;
-    var ortVal=(PROJECT.ort?PROJECT.ort+', ':'')+today;
-    setAuto(gk+'.ort',ortVal,function(){return g.ort;},function(v){g.ort=v;});
     if(isTech(r,o.sign.mode)){
+      var ortVal=(PROJECT.ort?PROJECT.ort+', ':'')+today;
+      setAuto(gk+'.ort',ortVal,function(){return g.ort;},function(v){g.ort=v;});
       setAuto(gk+'.firma',KPC_FIRMA,function(){return g.firma;},function(v){g.firma=v;});
       setAuto(gk+'.name',TECH.name,function(){return g.name;},function(v){g.name=v;});
       if(MYSIG)setAuto(gk+'.img',MYSIG,function(){return g.img;},function(v){g.img=v;});
@@ -730,7 +730,9 @@ function exportPDF(){
     doc.setTextColor(20,20,20);doc.setFontSize(9.5);doc.text(lines,mL+3,y);y+=lines.length*4.4+2;
   }
   function sigBlock(key,role,mode){
-    const g=STATE[key]||{};ensure(34);
+    const g=STATE[key]||{};
+    if(isKunde(role)&&!(g.img||g.firma||g.name||g.ort))return;  // leere (optionale) Kundenunterschrift nicht ins PDF
+    ensure(34);
     doc.setFont('RC');doc.setFontSize(9.5);doc.setTextColor(...copper);
     const head=(mode==='ausgefuehrt'?('Die '+role+' wurde ausgeführt von:'):('Unterschrift · '+role))+(isKunde(role)?' (optional)':'');
     doc.text(head,mL,y);y+=5.5;
@@ -764,9 +766,12 @@ function exportPDF(){
     });
     y+=2;
   });
-  // Unterschriften
-  secHead('Abschluss & Unterschriften');
-  o.sign.roles.forEach((r,gi)=>sigBlock('g'+gi,r,o.sign.mode));
+  // Unterschriften (leere optionale Kundenunterschriften werden weggelassen)
+  const anySig=o.sign.roles.some(function(r,gi){const g=STATE['g'+gi]||{};return !(isKunde(r)&&!(g.img||g.firma||g.name||g.ort));});
+  if(anySig){
+    secHead('Abschluss & Unterschriften');
+    o.sign.roles.forEach((r,gi)=>sigBlock('g'+gi,r,o.sign.mode));
+  }
 
   const fname=('Inbetriebnahme_'+CUR.mfr+'_'+CUR.dev).replace(/[^\wäöüÄÖÜ.-]+/g,'_').replace(/_+/g,'_');
   var __durl=null;try{__durl=doc.output('datauristring');}catch(e){}
