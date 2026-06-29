@@ -542,7 +542,7 @@ function goDevices(m){
     const dq=dev.replace(/'/g,"\\'");
     const act=o.__custom?('<span class="rowact"><button title="Bearbeiten" onclick="event.stopPropagation();editDevice(\''+dq+'\')">✎</button><button title="Löschen" onclick="event.stopPropagation();deleteDevice(\''+dq+'\')">🗑</button></span>'):'<span class="arrow">›</span>';
     h+='<div class="row-item" onclick="openForm(\''+dq+'\')"><div class="ico">▤</div>'+
-       '<div><h4>'+dev+tags+(o.__custom?' <span class="tag tcustom">eigen</span>':'')+'</h4><div class="sub">'+(o.sections.length)+' Abschnitte</div></div>'+act+'</div>';}
+       '<div><h4>'+dev+tags+(o.__custom?' <span class="tag tcustom">eigen</span>':'')+'</h4><div class="sub">'+(o.desc?esc(o.desc):((o.sections.length)+' Abschnitte'))+'</div></div>'+act+'</div>';}
   h+='<div class="row-item rowadd" onclick="openEditor()"><div class="ico">＋</div><div><h4>Neues Protokoll hinzufügen</h4><div class="sub">PDF importieren oder selbst anlegen</div></div></div>';
   h+='</div>';view.innerHTML=h;window.scrollTo(0,0);
 }
@@ -964,12 +964,12 @@ function applyUrlContext(){var hash=(location.hash||'').replace(/^#/,'');if(!has
     if(dev){CUR.mfr=mfr;openForm(dev);ctxPrefill(p);return true;} goDevices(mfr);return true;}}
   goHome();return true;}
 DB.MKN.devices={
-   'Kombidämpfer (CL)':{tags:['Elektro','Wasser','Abwasser','Abluft'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mWasser(),mAbwasser(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1,abluft:1})},
-   'Kombidämpfer (G2)':{tags:['Elektro','Wasser','Abwasser','Abluft'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mWasser(),mAbwasser(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1,abluft:1})},
-   'Kombidämpfer (MP)':{tags:['Elektro','Küchenleitsystem','Wasser','Abwasser','Abluft'],match:['flexicombi','flexi combi'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mKLS(),mWasser(),mAbwasser(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1,abluft:1})},
-   'Kombidämpfer (MPG2)':{tags:['Elektro','Küchenleitsystem','Wasser','Abwasser','Abluft'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mKLS(),mWasser(),mAbwasser(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1,abluft:1})},
-   'Kombidämpfer SpaceCombi Team':{tags:['Elektro','Küchenleitsystem','Wasser','Abwasser'],match:['spacecombi'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mKLS(),mWasser(),mAbwasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1})},
-   'Kombidämpfer SpaceCombi MagicTeam':{tags:['Elektro','Küchenleitsystem','Wasser','Abwasser'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mKLS(),mWasser(),mAbwasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1})},
+   'Kombidämpfer Junior Classic (ClassicPilot)':{tags:['Elektro','Wasser','Abwasser','Abluft'],desc:'Kompaktgerät · SKECOD 623 CG2',match:['junior classic','skecod 623','classicpilot'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mWasser(),mAbwasser(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1,abluft:1})},
+   'Kombidämpfer FlexiCombi Classic (ClassicPilot)':{tags:['Elektro','Wasser','Abwasser','Abluft'],desc:'Tisch-/Standgerät · FKECOD 615/621/115/121/215/221 CG2',match:['flexicombi classic','cg2','classicpilot'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mWasser(),mAbwasser(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1,abluft:1})},
+   'Kombidämpfer SpaceCombi (MagicPilot)':{tags:['Elektro','Küchenleitsystem','Wasser','Abwasser','Abluft'],desc:'Kompaktgerät · SKECOD 610 TG2',match:['spacecombi','skecod 610','magicpilot'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mKLS(),mWasser(),mAbwasser(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1,abluft:1})},
+   'Kombidämpfer FlexiCombi (MagicPilot)':{tags:['Elektro','Küchenleitsystem','Wasser','Abwasser','Abluft'],desc:'Tisch-/Standgerät · FKECOD 615/621/115/121/215/221 G2',match:['flexicombi','fkecod','magicpilot'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mKLS(),mWasser(),mAbwasser(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1,abluft:1})},
+   'Kombidämpfer SpaceCombi Team':{tags:['Elektro','Küchenleitsystem','Wasser','Abwasser'],desc:'Stapelgerät · TKECOD 610 O',match:['spacecombi team','tkecod 610 o'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mKLS(),mWasser(),mAbwasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1})},
+   'Kombidämpfer SpaceCombi MagicTeam':{tags:['Elektro','Küchenleitsystem','Wasser','Abwasser'],desc:'Stapelgerät, MagicPilot · TKECOD 610 T',match:['spacecombi magicteam','magic team','tkecod 610 t'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mKLS(),mWasser(),mAbwasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1})},
    'FlexiChef (G3)':{tags:['Elektro','Küchenleitsystem','Wasser','Abwasser'],match:['flexichef'],kopf:mKopf(),sections:[mAllg(true),mElektro(),mKLS(),mWasser(),mAbwasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1})},
    'Fritteuse':{tags:['Elektro'],match:['optima','fritteuse'],kopf:mKopf(),sections:[mAllg(),mElektro(),mFunc(),mAbschluss()],sign:genSig({})},
    'Kochkessel':{tags:['Elektro','Wasser'],match:['kochkessel'],kopf:mKopf(),sections:[mAllg(),mElektro(),mWasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1})},
