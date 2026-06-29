@@ -2132,6 +2132,12 @@ setInterval(async () => {
 let PPOS=null, PTYPE=null;
 const PROTO_TYPES=['IBN Protokoll','Einweisungsprotokoll','DGUV Protokoll'];
 
+// ── IBN digital: Übergabe an die Inbetriebnahme-App (gleiche Origin) ──
+const IBN_URL='inbetriebnahme.html';
+function itemByPos(pos){for(const s of DATA)for(const su of s.subsections)for(const it of su.items)if(it.pos===pos)return it;return null;}
+function openIbnDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.classList.remove('open');const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
+  const url=IBN_URL+'#projekt='+q(curProjName())+'&ort='+q('')+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez);
+  window.open(url,'_blank','noopener');}
 function trpdf(pos,btn){
   PPOS=pos;
   let menu=document.getElementById('ptypeMenu');
@@ -2139,7 +2145,7 @@ function trpdf(pos,btn){
     menu=document.createElement('div');
     menu.id='ptypeMenu';
     menu.className='ptype-menu';
-    menu.innerHTML=PROTO_TYPES.map(t=>`<div class="ptype-item" onclick="selectPtype('${t}')">${t}</div>`).join('');
+    menu.innerHTML=PROTO_TYPES.map(t=>`<div class="ptype-item" onclick="selectPtype('${t}')">${t}</div>`).join('')+'<div class="ptype-item" style="border-top:1px solid var(--braun);color:#bfe3b4" onclick="openIbnDigital()">📝 IBN digital ausfüllen</div>';
     document.body.appendChild(menu);
     document.addEventListener('click',e=>{if(!e.target.closest('#ptypeMenu')&&!e.target.closest('.fbtn'))menu.classList.remove('open');});
   }
