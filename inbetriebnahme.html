@@ -486,6 +486,7 @@ function saveProject(){try{localStorage.setItem('ibn:project',JSON.stringify({na
 function initProjectBar(){var a=$('bsProj'),b=$('bsOrt');
   if(a){a.value=PROJECT.name;a.oninput=function(){PROJECT.name=a.value;saveProject();};a.onchange=function(){if(CUR.dev){applyPrefills();openForm(CUR.dev,true);}};}
   if(b){b.value=PROJECT.ort;b.oninput=function(){PROJECT.ort=b.value;saveProject();};b.onchange=function(){if(CUR.dev){applyPrefills();openForm(CUR.dev,true);}};}}
+function isKunde(role){return /kunde/i.test(role);}
 function isTech(role,mode){if(mode==='ausgefuehrt')return true;if(/Kunde/i.test(role))return false;if(/Vertriebspartner/i.test(role))return false;return true;}
 function applyPrefills(){if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev];const today=todayDE();
   STATE.__auto=STATE.__auto||{};
@@ -613,7 +614,7 @@ function sigFields(role,mode){const tech=isTech(role,mode);const f=[];
   f.push(['ort','Ort, Datum']);return f;}
 function sigHTML(key,role,mode){
   const g=STATE[key]||{};
-  const head=mode==='ausgefuehrt'?('Die '+role+' wurde ausgeführt von:'):('Unterschrift · '+role);
+  const head=(mode==='ausgefuehrt'?('Die '+role+' wurde ausgeführt von:'):('Unterschrift · '+role))+(isKunde(role)?' (optional)':'');
   let h='<div class="sig"><h4>'+head+'</h4><div class="sigfields">';
   sigFields(role,mode).forEach(function(fp){var fk=fp[0],lab=fp[1];
     h+='<div><label class="fieldlbl">'+lab+'</label><input type="text" value="'+esc(g[fk]||'')+'" oninput="setSig(\''+key+'\',\''+fk+'\',this.value)"></div>';});
@@ -731,7 +732,7 @@ function exportPDF(){
   function sigBlock(key,role,mode){
     const g=STATE[key]||{};ensure(34);
     doc.setFont('RC');doc.setFontSize(9.5);doc.setTextColor(...copper);
-    const head=mode==='ausgefuehrt'?('Die '+role+' wurde ausgeführt von:'):('Unterschrift · '+role);
+    const head=(mode==='ausgefuehrt'?('Die '+role+' wurde ausgeführt von:'):('Unterschrift · '+role))+(isKunde(role)?' (optional)':'');
     doc.text(head,mL,y);y+=5.5;
     doc.setTextColor(20,20,20);doc.setFontSize(9);
     kvInline(sigFields(role,mode).map(function(fp){return [fp[1],g[fp[0]]];}));
