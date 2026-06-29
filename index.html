@@ -2138,6 +2138,27 @@ function itemByPos(pos){for(const s of DATA)for(const su of s.subsections)for(co
 function openIbnDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.classList.remove('open');const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
   const url=IBN_URL+'#projekt='+q(curProjName())+'&ort='+q('')+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez);
   window.open(url,'_blank','noopener');}
+// ── Empfang des fertigen IBN-PDFs aus der IBN-App und Ablage bei der Position ──
+const _ibnSeen=new Set();
+function _dataURLtoBlob(d){const a=d.split(',');const mime=((a[0].match(/:(.*?);/))||[])[1]||'application/pdf';const bin=atob(a[1]);const n=bin.length;const u=new Uint8Array(n);for(let i=0;i<n;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime});}
+async function ibnReceive(p){
+  if(!p||!p.pos||!p.pdf||!p.id||_ibnSeen.has(p.id))return; _ibnSeen.add(p.id);
+  if(!PID){ alert('IBN-Protokoll empfangen, aber es ist keine Baustelle geöffnet. Bitte Baustelle öffnen – das Protokoll wird dann automatisch übernommen.'); _ibnSeen.delete(p.id); return; }
+  try{
+    const pos=p.pos, type=p.ptype||'IBN Protokoll';
+    const blob=_dataURLtoBlob(p.pdf);
+    const fname=folderFor(pos)+'/'+pos.replace(/\./g,'_')+'_'+type.replace(/ /g,'_')+'_'+Date.now()+'.pdf';
+    await queueUpload(fname, blob, 'application/pdf', pos);
+    if(!gs(pos).pdfs) gs(pos).pdfs=[];
+    gs(pos).pdfs.push({type:type, name:p.name||(type+'.pdf'), fname:fname});
+    saveFotos(pos); updPG(pos);
+    showToast('✓ IBN-Protokoll bei Position '+pos+' abgelegt');
+  }catch(e){ alert('IBN-Protokoll konnte nicht abgelegt werden: '+((e&&e.message)||e)); }
+}
+function ibnCheckPending(){ try{var v=localStorage.getItem('ibn:return'); if(v){ localStorage.removeItem('ibn:return'); ibnReceive(JSON.parse(v)); } }catch(e){} }
+window.addEventListener('message',function(e){ if(e.origin===location.origin && e.data && e.data.__ibnReturn) ibnReceive(e.data.payload); });
+window.addEventListener('storage',function(e){ if(e.key==='ibn:return' && e.newValue){ var p; try{p=JSON.parse(e.newValue);}catch(x){return;} try{localStorage.removeItem('ibn:return');}catch(x){} ibnReceive(p); } });
+window.addEventListener('focus',ibnCheckPending);
 function trpdf(pos,btn){
   PPOS=pos;
   let menu=document.getElementById('ptypeMenu');

@@ -768,8 +768,10 @@ function exportPDF(){
   o.sign.roles.forEach((r,gi)=>sigBlock('g'+gi,r,o.sign.mode));
 
   const fname=('Inbetriebnahme_'+CUR.mfr+'_'+CUR.dev).replace(/[^\wäöüÄÖÜ.-]+/g,'_').replace(/_+/g,'_');
+  var __durl=null;try{__durl=doc.output('datauristring');}catch(e){}
   doc.save(fname+'.pdf');
-  toast('PDF erstellt');
+  if(__durl&&ibnSendBack(__durl,fname+'.pdf'))toast('PDF erstellt & an Position '+IBNCTX.pos+' in der App abgelegt – du kannst zurück zur Montagefortschritt-App.');
+  else toast('PDF erstellt');
 }
 
 /* ===== Eigene Protokolle: PDF-Import + Editor ===== */
@@ -945,10 +947,17 @@ function ctxPrefill(p){if(!CUR.dev)return;var o=DB[CUR.mfr].devices[CUR.dev];var
     else if(p.pos&&!STATE[key]&&/Position|Standort/i.test(f.l)){STATE[key]=p.pos;ch=true;}
     else if(p.sn&&!STATE[key]&&/Seriennummer|Serien-?Nr/i.test(f.l)){STATE[key]=p.sn;ch=true;}});
   if(ch){saveState();openForm(CUR.dev,true);}}
+let IBNCTX=null;
+function ibnSendBack(durl,name){if(!IBNCTX||!IBNCTX.pos)return false;
+  var payload={id:String(Date.now())+'_'+IBNCTX.pos,pos:IBNCTX.pos,pdf:durl,name:name,ptype:'IBN Protokoll',projekt:IBNCTX.projekt||''};
+  try{localStorage.setItem('ibn:return',JSON.stringify(payload));}catch(e){}
+  try{if(window.opener&&!window.opener.closed)window.opener.postMessage({__ibnReturn:true,payload:payload},location.origin);}catch(e){}
+  return true;}
 function applyUrlContext(){var hash=(location.hash||'').replace(/^#/,'');if(!hash)return false;
   var p={};hash.split('&').forEach(function(kv){var i=kv.indexOf('=');if(i>0)try{p[decodeURIComponent(kv.slice(0,i))]=decodeURIComponent(kv.slice(i+1));}catch(e){}});
   if(!p.projekt&&!p.ort&&!p.hersteller&&!p.typ)return false;
   if(p.projekt!==undefined)PROJECT.name=p.projekt;if(p.ort!==undefined)PROJECT.ort=p.ort;saveProject();
+  if(p.pos)IBNCTX={pos:p.pos,projekt:p.projekt||''};
   try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
   if(p.hersteller||p.typ){var mfr=ctxMatchMfr(p.hersteller);if(mfr){var dev=ctxMatchDev(mfr,p.typ);
     if(dev){CUR.mfr=mfr;openForm(dev);ctxPrefill(p);return true;} goDevices(mfr);return true;}}
