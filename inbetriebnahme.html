@@ -509,7 +509,7 @@ function applyPrefills(){if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev]
       if(MYSIG)setAuto(gk+'.img',MYSIG,function(){return g.img;},function(v){g.img=v;});
     }});}
 
-function storeKey(){return 'ibn:'+CUR.mfr+':'+CUR.dev;}
+function storeKey(){return 'ibn:'+CUR.mfr+':'+CUR.dev+(CUR.pos?(':'+CUR.pos):'');}
 function saveState(){ if(CUR.dev){try{localStorage.setItem(storeKey(),JSON.stringify(STATE));}catch(e){}} updateProgress(); }
 function loadState(){ try{STATE=JSON.parse(localStorage.getItem(storeKey())||'{}')||{};}catch(e){STATE={};} }
 
@@ -523,7 +523,7 @@ function setCrumbs(){
 }
 
 function goHome(){
-  CUR={mfr:null,dev:null};$('actionbar').classList.add('hidden');setCrumbs();
+  CUR={mfr:null,dev:null,pos:null};$('actionbar').classList.add('hidden');setCrumbs();
   let h='<div class="hero"><h1>Inbetriebnahmeprotokolle</h1><p>Hersteller wählen, Gerätetyp auswählen, Protokoll digital ausfüllen und als kpc-PDF exportieren.</p>'
    +'<div class="hometools"><button class="btn ghost small" onclick="openEditor()">＋ Neues Protokoll</button>'
    +'<button class="btn ghost small" onclick="exportCustom()">Eigene exportieren</button>'
@@ -536,7 +536,7 @@ function goHome(){
 }
 
 function goDevices(m){
-  if(m)CUR.mfr=m;CUR.dev=null;$('actionbar').classList.add('hidden');setCrumbs();
+  if(m)CUR.mfr=m;CUR.dev=null;CUR.pos=null;$('actionbar').classList.add('hidden');setCrumbs();
   const d=DB[CUR.mfr];let h='<div class="hero"><h1>'+d.label+'</h1><p>'+d.desc+'</p></div><div class="rows">';
   for(const dev in d.devices){const o=d.devices[dev];
     const tags=(o.tags||[]).map(t=>'<span class="tag">'+t+'</span>').join('');
@@ -956,7 +956,7 @@ function ctxPrefill(p){if(!CUR.dev)return;var o=DB[CUR.mfr].devices[CUR.dev];var
   if(ch){saveState();openForm(CUR.dev,true);}}
 let IBNCTX=null;
 function ibnSendBack(durl,name){if(!IBNCTX||!IBNCTX.pos)return false;
-  var payload={id:String(Date.now())+'_'+IBNCTX.pos,pos:IBNCTX.pos,pdf:durl,name:name,ptype:'IBN Protokoll',projekt:IBNCTX.projekt||''};
+  var payload={id:String(Date.now())+'_'+IBNCTX.pos,pos:IBNCTX.pos,pdf:durl,name:name,ptype:'IBN Protokoll',projekt:IBNCTX.projekt||'',mfr:CUR.mfr,dev:CUR.dev,state:STATE,replaceFname:(IBNCTX.replaceFname||'')};
   try{localStorage.setItem('ibn:return',JSON.stringify(payload));}catch(e){}
   try{if(window.opener&&!window.opener.closed)window.opener.postMessage({__ibnReturn:true,payload:payload},location.origin);}catch(e){}
   return true;}
@@ -964,7 +964,7 @@ function applyUrlContext(){var hash=(location.hash||'').replace(/^#/,'');if(!has
   var p={};hash.split('&').forEach(function(kv){var i=kv.indexOf('=');if(i>0)try{p[decodeURIComponent(kv.slice(0,i))]=decodeURIComponent(kv.slice(i+1));}catch(e){}});
   if(!p.projekt&&!p.ort&&!p.hersteller&&!p.typ)return false;
   if(p.projekt!==undefined)PROJECT.name=p.projekt;if(p.ort!==undefined)PROJECT.ort=p.ort;saveProject();
-  if(p.pos)IBNCTX={pos:p.pos,projekt:p.projekt||''};
+  if(p.pos){IBNCTX={pos:p.pos,projekt:p.projekt||''};CUR.pos=p.pos;}
   try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
   if(p.hersteller||p.typ){var mfr=ctxMatchMfr(p.hersteller);if(mfr){var dev=ctxMatchDev(mfr,p.typ);
     if(dev){CUR.mfr=mfr;openForm(dev);ctxPrefill(p);return true;} goDevices(mfr);return true;}}
@@ -998,7 +998,14 @@ DB.MKN.devices={
    'Infragrill':{tags:['Elektro','Wasser'],match:['infragrill','grill'],kopf:mKopf(),sections:[mAllg(),mElektro(),mWasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1})},
    'Kondensationsablufthaube':{tags:['Elektro','Abluft'],match:['ablufthaube','haube','kondensation'],kopf:mKopf(),sections:[mAllg(),mElektro(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({abluft:1})}
 };
-STD_MFRS=Object.keys(DB);loadCustom();mergeCustom();loadProject();ensureMsal().catch(function(){});renderLoginState();loadMySig();renderSigBtn();var __nav=applyUrlContext();initProjectBar();if(!__nav)goHome();
+function applyLoadState(){var raw;try{raw=localStorage.getItem('ibn:load');}catch(e){return false;}if(!raw)return false;try{localStorage.removeItem('ibn:load');}catch(e){}
+  var o;try{o=JSON.parse(raw);}catch(e){return false;}
+  if(!o||!o.mfr||!o.dev||!DB[o.mfr]||!DB[o.mfr].devices[o.dev])return false;
+  CUR.mfr=o.mfr;CUR.pos=o.pos||null;IBNCTX=o.pos?{pos:o.pos,projekt:o.projekt||'',replaceFname:o.editFname||''}:null;
+  if(o.projekt!==undefined){PROJECT.name=o.projekt||PROJECT.name;}
+  try{localStorage.setItem('ibn:'+o.mfr+':'+o.dev+(o.pos?(':'+o.pos):''),JSON.stringify(o.state||{}));}catch(e){}
+  openForm(o.dev);toast('Protokoll zum Bearbeiten geladen');return true;}
+STD_MFRS=Object.keys(DB);loadCustom();mergeCustom();loadProject();ensureMsal().catch(function(){});renderLoginState();loadMySig();renderSigBtn();var __nav=applyLoadState()||applyUrlContext();initProjectBar();if(!__nav)goHome();
 </script>
 </body>
 </html>

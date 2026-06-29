@@ -2141,18 +2141,41 @@ function openIbnDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.c
 // ── Empfang des fertigen IBN-PDFs aus der IBN-App und Ablage bei der Position ──
 const _ibnSeen=new Set();
 function _dataURLtoBlob(d){const a=d.split(',');const mime=((a[0].match(/:(.*?);/))||[])[1]||'application/pdf';const bin=atob(a[1]);const n=bin.length;const u=new Uint8Array(n);for(let i=0;i<n;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime});}
+async function editIbnProto(pos,i){
+  const p=gs(pos).pdfs[i]; if(!p||!p.dataFname){alert('Für dieses Protokoll sind keine bearbeitbaren Daten gespeichert.');return;}
+  showLoader('IBN-Protokoll wird geladen...');
+  try{
+    const blob=await getFileBlob(p.dataFname);
+    const o=JSON.parse(await blob.text());
+    o.pos=pos; o.editFname=p.fname;
+    localStorage.setItem('ibn:load', JSON.stringify(o));
+    hideLoader();
+    window.open(IBN_URL,'_blank','noopener');
+  }catch(e){hideLoader();alert('Konnte IBN-Protokoll nicht laden: '+((e&&e.message)||e));}
+}
 async function ibnReceive(p){
   if(!p||!p.pos||!p.pdf||!p.id||_ibnSeen.has(p.id))return; _ibnSeen.add(p.id);
   if(!PID){ alert('IBN-Protokoll empfangen, aber es ist keine Baustelle geöffnet. Bitte Baustelle öffnen – das Protokoll wird dann automatisch übernommen.'); _ibnSeen.delete(p.id); return; }
   try{
-    const pos=p.pos, type=p.ptype||'IBN Protokoll';
-    const blob=_dataURLtoBlob(p.pdf);
-    const fname=folderFor(pos)+'/'+pos.replace(/\./g,'_')+'_'+type.replace(/ /g,'_')+'_'+Date.now()+'.pdf';
-    await queueUpload(fname, blob, 'application/pdf', pos);
+    const pos=p.pos, type=p.ptype||'IBN Protokoll', ts=Date.now();
+    const base=folderFor(pos)+'/'+pos.replace(/\./g,'_')+'_'+type.replace(/ /g,'_')+'_'+ts;
+    const fname=base+'.pdf';
+    await queueUpload(fname, _dataURLtoBlob(p.pdf), 'application/pdf', pos);
+    let dataFname='';
+    if(p.state){ dataFname=base+'_data.json';
+      const jb=new Blob([JSON.stringify({mfr:p.mfr||'',dev:p.dev||'',pos:pos,projekt:p.projekt||'',state:p.state})],{type:'application/json'});
+      await queueUpload(dataFname, jb, 'application/json', pos);
+    }
     if(!gs(pos).pdfs) gs(pos).pdfs=[];
-    gs(pos).pdfs.push({type:type, name:p.name||(type+'.pdf'), fname:fname});
+    const entry={type:type, name:p.name||(type+'.pdf'), fname:fname, ibn:true, mfr:p.mfr||'', dev:p.dev||'', dataFname:dataFname};
+    let replaced=false;
+    if(p.replaceFname){ const arr=gs(pos).pdfs, idx=arr.findIndex(x=>x.fname===p.replaceFname);
+      if(idx>=0){ const old=arr[idx]; arr[idx]=entry; replaced=true;
+        if(old.fname){removeQueuedFile(old.fname);spDelete(old.fname);}
+        if(old.dataFname){removeQueuedFile(old.dataFname);spDelete(old.dataFname);} } }
+    if(!replaced) gs(pos).pdfs.push(entry);
     saveFotos(pos); updPG(pos);
-    showToast('✓ IBN-Protokoll bei Position '+pos+' abgelegt');
+    showToast('✓ IBN-Protokoll bei Position '+pos+(replaced?' aktualisiert':' abgelegt'));
   }catch(e){ alert('IBN-Protokoll konnte nicht abgelegt werden: '+((e&&e.message)||e)); }
 }
 function ibnCheckPending(){ try{var v=localStorage.getItem('ibn:return'); if(v){ localStorage.removeItem('ibn:return'); ibnReceive(JSON.parse(v)); } }catch(e){} }
@@ -2210,8 +2233,9 @@ function updPG(pos){
   if(!s.pdfs||!s.pdfs.length){g.innerHTML='';return;}
   g.innerHTML=s.pdfs.map((p,i)=>{
     const isPdf=(p.fname||p.name||'').toLowerCase().endsWith('.pdf');
-    const editBtn=isPdf?`<button class="pdoc-btn pdoc-edit" onclick="pdfOpen('${pos}',${i})" title="Ausfüllen">&#9999;&#65039;</button>`:'';
-    return `<div class="pdoc">&#128196; <span class="pdoc-name" onclick="pdfView('${pos}',${i})">${p.type}: ${p.name}</span>${editBtn}<button class="pdoc-btn pdoc-del" onclick="delProto('${pos}',${i})" title="Löschen">&#10005;</button></div>`;
+    const ibnBtn=p.dataFname?`<button class="pdoc-btn pdoc-edit" onclick="editIbnProto('${pos}',${i})" title="IBN digital bearbeiten">&#9999;&#65039;</button>`:'';
+    const editBtn=(isPdf&&!p.dataFname)?`<button class="pdoc-btn pdoc-edit" onclick="pdfOpen('${pos}',${i})" title="Ausfüllen">&#9999;&#65039;</button>`:'';
+    return `<div class="pdoc">&#128196; <span class="pdoc-name" onclick="pdfView('${pos}',${i})">${p.type}: ${p.name}</span>${ibnBtn}${editBtn}<button class="pdoc-btn pdoc-del" onclick="delProto('${pos}',${i})" title="Löschen">&#10005;</button></div>`;
   }).join('');
 }
 
@@ -2237,6 +2261,7 @@ function delProto(pos,i){
   saveFotos(pos);
   updPG(pos);
   if(p.fname){ removeQueuedFile(p.fname); spDelete(p.fname); }
+  if(p.dataFname){ removeQueuedFile(p.dataFname); spDelete(p.dataFname); }
 }
 
 // ── PDF EDITOR (Pencil) ──
