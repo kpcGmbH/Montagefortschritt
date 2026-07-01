@@ -1364,7 +1364,7 @@ function openEtageFotos(idx){
   renderEtageOverlay(idx);
 }
 
-let ETF_FILTER='';
+let ETF_FILTER='', ETF_VALS=[];
 function renderEtageOverlay(idx){
   const sec=DATA[idx]; if(!sec) return;
   const ov=ensureEtOv();
@@ -1372,14 +1372,15 @@ function renderEtageOverlay(idx){
   const all=e.efotos.map((r,oi)=>({r,oi})).sort((a,b)=>(a.r.ts||0)-(b.r.ts||0)); // chronologisch = Verlauf
   const kats=[]; e.efotos.forEach(r=>{ if(r.kat && kats.indexOf(r.kat)<0) kats.push(r.kat); });
   const shown=all.filter(x=>!ETF_FILTER || x.r.kat===ETF_FILTER);
-  const chip=(lbl,val)=>'<button class="etf'+(ETF_FILTER===val?' on':'')+'" onclick="etSetFilter('+idx+','+JSON.stringify(val)+')">'+escapeHtml(lbl)+'</button>';
+  const fvals=[''].concat(kats); ETF_VALS=fvals;   // Index 0 = „Alle"; per Index adressiert (attribut-quoting-sicher)
+  const chip=(fi)=>'<button class="etf'+(ETF_FILTER===fvals[fi]?' on':'')+'" onclick="etSetFilter('+idx+','+fi+')">'+escapeHtml(fi===0?'Alle':fvals[fi])+'</button>';
   ov.innerHTML=
     '<div class="ethdr">'+
       '<button class="etclose" onclick="closeEtOv()">&#8249;</button>'+
       '<div class="etttl"><div class="ett1">&#128248; Anlagenfotos</div><div class="ett2">'+escapeHtml(sec.label||sec.pos)+(sec.bez?(' · '+escapeHtml(sec.bez)):'')+'<span id="ETB_addcnt"></span></div></div>'+
     '</div>'+
     '<div class="etadd"><button class="etaddbtn" onclick="etAddStart('+idx+')">&#128247; Foto hinzufügen</button></div>'+
-    (kats.length?('<div class="etfilter">'+chip('Alle','')+kats.map(k=>chip(k,k)).join('')+'</div>'):'')+
+    (kats.length?('<div class="etfilter">'+fvals.map((v,fi)=>chip(fi)).join('')+'</div>'):'')+
     '<div class="etbody">'+
       (shown.length? '<div class="etgrid">'+shown.map(x=>{
         const ts=x.r.ts?new Date(x.r.ts):null;
@@ -1396,7 +1397,7 @@ function renderEtageOverlay(idx){
   shown.forEach(x=>{ const img=document.getElementById('ETIMG_'+idx+'_'+x.oi); if(img) loadImageAsBlob(x.r.fname).then(u=>{ if(u) img.src=u; }); });
   updEtageBar(idx);
 }
-function etSetFilter(idx,val){ ETF_FILTER=val||''; renderEtageOverlay(idx); }
+function etSetFilter(idx,fi){ ETF_FILTER=ETF_VALS[fi]||''; renderEtageOverlay(idx); }
 
 // Kategorie-Auswahl (feste Liste + Freitext), dann Quelle (Kamera/Galerie)
 function etAddStart(idx){
@@ -1407,42 +1408,50 @@ function etAddStart(idx){
   ov.innerHTML=
     '<div class="etkat-sheet">'+
       '<div class="etkat-h">Kategorie wählen</div>'+
-      '<div class="etkat-chips">'+EFOTO_KATS.map(k=>'<button class="etkat-chip" onclick="etKatPick(this,'+JSON.stringify(k)+')">'+escapeHtml(k)+'</button>').join('')+'</div>'+
+      '<div class="etkat-chips">'+EFOTO_KATS.map((k,i)=>'<button class="etkat-chip" onclick="etKatPick(this,'+i+')">'+escapeHtml(k)+'</button>').join('')+'</div>'+
       '<input id="etKatFree" type="text" placeholder="oder eigene Kategorie …" oninput="etKatFree(this.value)" style="width:100%;box-sizing:border-box;padding:11px 13px;border-radius:10px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin:4px 0 12px">'+
       '<div class="etkat-src">'+
         '<button class="etsrc" onclick="etPickFile(\'cam\')">&#128247; Kamera</button>'+
-        '<button class="etsrc" onclick="etPickFile(\'gal\')">&#128444;&#65039; Galerie</button>'+
+        '<button class="etsrc" onclick="etPickFile(\'gal\')">&#128444;&#65039; Galerie <span style="opacity:.7;font-weight:400">(mehrere)</span></button>'+
       '</div>'+
       '<button class="etkat-cancel" onclick="document.getElementById(\'etKatOv\').remove()">Abbrechen</button>'+
     '</div>';
 }
-function etKatPick(btn,k){ EF_KAT=k; const f=document.getElementById('etKatFree'); if(f)f.value=''; document.querySelectorAll('.etkat-chip').forEach(c=>c.classList.remove('on')); btn.classList.add('on'); }
+function etKatPick(btn,i){ EF_KAT=EFOTO_KATS[i]; const f=document.getElementById('etKatFree'); if(f)f.value=''; document.querySelectorAll('.etkat-chip').forEach(c=>c.classList.remove('on')); btn.classList.add('on'); }
 function etKatFree(v){ EF_KAT=(v||'').trim(); document.querySelectorAll('.etkat-chip').forEach(c=>c.classList.remove('on')); }
 function etPickFile(src){
   if(!EF_KAT){ alert('Bitte zuerst eine Kategorie wählen oder eingeben.'); return; }
   const inp=document.createElement('input');
   inp.type='file'; inp.accept='image/*';
-  if(src==='cam') inp.setAttribute('capture','environment');
+  if(src==='cam') inp.setAttribute('capture','environment');   // Kamera: ein Bild pro Aufnahme (Browser-Limit)
+  else inp.multiple=true;                                       // Galerie: mehrere auf einmal
   inp.style.display='none'; document.body.appendChild(inp);
-  inp.addEventListener('change', async function(ev){ const f=ev.target.files[0]; const ov=document.getElementById('etKatOv'); if(ov) ov.remove(); await etDoUpload(EF_IDX, EF_KAT, f); inp.remove(); });
+  inp.addEventListener('change', async function(ev){ const files=Array.prototype.slice.call(ev.target.files||[]); const ov=document.getElementById('etKatOv'); if(ov) ov.remove(); await etDoUpload(EF_IDX, EF_KAT, files); inp.remove(); });
   inp.click();
 }
-async function etDoUpload(idx, kat, file){
+async function etDoUpload(idx, kat, files){
   const sec=DATA[idx];
-  if(!file||!sec){ return; }
+  if(!sec) return;
+  if(files && !Array.isArray(files)) files=[files];         // Einzeldatei -> Liste
+  files=(files||[]).filter(Boolean);
+  if(!files.length) return;
   if(!PID){ alert('Keine Baustelle geöffnet.'); return; }
-  showLoader('Foto wird gespeichert...');
-  try{
-    const uf=await tryCompressImage(file);
-    const ts=Date.now();
-    const key=EKEY(sec);
-    const fname=etageFolder(sec)+'/'+safeName(kat)+'_'+ts+'.jpg';
-    await queueUpload(fname, uf, 'image/jpeg', key);
-    gsE(key).efotos.push({fname:fname, kat:kat, ts:ts, by:USER||''});
-    saveEtage(key);
-    hideLoader();
-    renderEtageOverlay(idx);
-  }catch(e){ hideLoader(); console.warn('Etagenfoto speichern fehlgeschlagen:', e&&e.message); alert('Foto konnte nicht gespeichert werden.'); }
+  const key=EKEY(sec); const n=files.length; let ok=0;
+  for(let i=0;i<n;i++){
+    showLoader(n>1 ? ('Foto '+(i+1)+' von '+n+' wird gespeichert …') : 'Foto wird gespeichert...');
+    try{
+      const uf=await tryCompressImage(files[i]);
+      const ts=Date.now()+i;                                  // eindeutiger Zeitstempel je Bild
+      const fname=etageFolder(sec)+'/'+safeName(kat)+'_'+ts+'.jpg';
+      await queueUpload(fname, uf, 'image/jpeg', key);
+      gsE(key).efotos.push({fname:fname, kat:kat, ts:ts, by:USER||''});
+      ok++;
+    }catch(e){ console.warn('Etagenfoto übersprungen:', e&&e.message); }
+  }
+  if(ok) saveEtage(key);
+  hideLoader();
+  renderEtageOverlay(idx);
+  if(ok<n) alert((n-ok)+' von '+n+' Foto(s) konnten nicht gespeichert werden.');
 }
 function etDel(idx, oi){
   const sec=DATA[idx]; if(!sec) return;
