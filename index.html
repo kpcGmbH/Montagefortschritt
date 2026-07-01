@@ -328,8 +328,6 @@ select.fs option{background:var(--surface);color:var(--text);}
 .fab-primary{background:var(--anthrazit);flex:0 1 auto;}
 .fab-secondary{background:#4a3a28;flex:0 1 auto;}
 .fab-icon{width:44px;padding:0;flex:0 0 44px;}
-.fab-zipfoto{background:#1a5f7a;}
-.fab-zippdf{background:var(--braun);}
 
 @media (max-width:380px){
   .fab-mini{height:42px;font-size:12px;padding:0 12px;}
@@ -338,6 +336,39 @@ select.fs option{background:var(--surface);color:var(--text);}
   .fab-primary,.fab-secondary{width:44px;padding:0;flex:0 0 44px;}
 }
 .nores{text-align:center;padding:40px;color:var(--accent2);font-size:14px;}
+
+/* ── ANLAGENFOTOS PRO ETAGE ── */
+.etbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 14px;background:var(--bhdr-bg);border-bottom:1px solid var(--line);}
+.etbtn{display:inline-flex;align-items:center;gap:7px;padding:8px 15px;background:var(--braun);color:#fff;border:none;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+.etbtn:active{opacity:.85;}
+.etcnt{background:var(--accent);color:var(--anthrazit);font-size:11px;min-width:18px;text-align:center;padding:0 6px;border-radius:10px;font-weight:700;}
+.ethint{font-size:11px;color:var(--accent2);}
+@media (max-width:520px){.ethint{display:none;}}
+.ethdr{display:flex;align-items:center;gap:8px;padding:14px 12px 12px;background:var(--chrome-bg);border-bottom:1px solid var(--line);}
+.etclose{background:none;border:none;color:var(--chrome-accent);font-size:30px;line-height:1;cursor:pointer;padding:0 6px;}
+.etttl .ett1{font-size:15px;font-weight:700;color:var(--chrome-accent);}
+.etttl .ett2{font-size:12px;color:var(--accent2);margin-top:1px;}
+.etadd{padding:12px 14px;background:var(--chrome-bg);}
+.etaddbtn{width:100%;display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px;background:var(--braun);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;}
+.etfilter{display:flex;gap:7px;flex-wrap:wrap;padding:0 14px 10px;background:var(--chrome-bg);}
+.etf{background:var(--chrome-bg2);color:var(--text);border:1px solid var(--line);border-radius:16px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+.etf.on{background:var(--braun);color:#fff;border-color:var(--braun);}
+.etbody{flex:1;overflow-y:auto;padding:14px;background:var(--bg);}
+.etempty{text-align:center;color:var(--accent2);font-size:14px;padding:44px 20px;line-height:1.7;}
+.etgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:14px;}
+.etcell{display:flex;flex-direction:column;gap:5px;}
+.etkat{font-size:11px;font-weight:700;color:var(--braun);text-transform:uppercase;letter-spacing:.4px;}
+.etth{position:relative;width:100%;aspect-ratio:4/3;border-radius:10px;overflow:hidden;border:2px solid var(--border);cursor:pointer;background:var(--bg2);}
+.etth img{width:100%;height:100%;object-fit:cover;}
+.etmeta{font-size:11px;color:var(--accent2);font-variant-numeric:tabular-nums;}
+.etkat-sheet{width:100%;max-width:520px;background:var(--chrome-bg);border-radius:16px 16px 0 0;padding:18px 16px calc(18px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(0,0,0,.3);}
+.etkat-h{font-size:16px;font-weight:700;color:var(--text);margin-bottom:12px;}
+.etkat-chips{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:12px;}
+.etkat-chip{background:var(--chrome-bg2);color:var(--text);border:1px solid var(--line);border-radius:18px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+.etkat-chip.on{background:var(--braun);color:#fff;border-color:var(--braun);}
+.etkat-src{display:flex;gap:10px;margin-bottom:10px;}
+.etsrc{flex:1;padding:13px;background:#3a3530;border:1px solid #895500;color:#fff;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
+.etkat-cancel{width:100%;padding:11px;background:none;border:1px solid var(--line);color:var(--accent2);border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit;}
 </style>
 <script>
 /* Gespeicherte Hell/Dunkel-Wahl vor dem Rendern anwenden (verhindert Aufblitzen) */
@@ -430,12 +461,6 @@ select.fs option{background:var(--surface);color:var(--text);}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
     <span class="fab-label">+ Fotos</span>
   </button>
-  <button class="fab-mini fab-icon fab-zipfoto" onclick="downloadZip()" title="Alle Fotos als ZIP">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-  </button>
-  <button class="fab-mini fab-icon fab-zippdf" onclick="downloadProtoZip()" title="Alle Protokolle als ZIP">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/></svg>
-  </button>
   <button class="fab-mini fab-icon" style="background:#5b4c8a;color:#fff" onclick="expRest()" title="Restarbeitenliste als PDF">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 0 2-2h11"/></svg>
   </button>
@@ -449,7 +474,6 @@ select.fs option{background:var(--surface);color:var(--text);}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.4/lib/msal-browser.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script>
@@ -749,10 +773,16 @@ function buildPanels(){
   main.innerHTML='';
   Object.keys(POSGEW).forEach(k=>delete POSGEW[k]);   // Gewerk-Index neu aufbauen
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ POSGEW[it.pos]=it.gew||[]; })));
-  DATA.forEach(sec=>{
+  DATA.forEach((sec,secIdx)=>{
     const panel=document.createElement('div');
     panel.className='panel'+(sec.pos===ACT?' on':'');
     panel.dataset.p=sec.pos;
+    // Anlagen-/Übersichtsfotos dieser Etage (mit Kategorie + Verlauf)
+    const etbar=document.createElement('div');
+    etbar.className='etbar';
+    etbar.innerHTML='<button class="etbtn" onclick="openEtageFotos('+secIdx+')">&#128248; Anlagenfotos <span class="etcnt" id="ETC'+secIdx+'"></span></button>'+
+      '<span class="ethint">Fotos der ganzen Anlage je Kategorie – Montageverlauf</span>';
+    panel.appendChild(etbar);
     sec.subsections.forEach(sub=>{
       const div=document.createElement('div');
       div.className='bblock';
@@ -1292,6 +1322,145 @@ function olb(pos,i){
 function clb(){document.getElementById('lb').classList.remove('on');}
 document.getElementById('lb').addEventListener('click',e=>{if(e.target===e.currentTarget)clb();});
 
+// ============================================================================
+// ── ANLAGENFOTOS PRO ETAGE (Übersichtsfotos je Geschoss, mit Kategorie + Verlauf) ──
+// Ablage: synthetische List-Zeile pro Etage (Key '§E§'+sec.pos) -> nutzt die
+// bestehende Offline-Outbox, Live-Sync und den Write-Through-Cache wie Positionen.
+// Dateien liegen in SharePoint unter  Baustelle / Etage / _Anlagenfotos / <Kat>_<ts>.jpg
+const EFOTO_KATS=['Montagebeginn','Aktueller Montagestand','Anlieferung','Sanitär fertig','Elektro fertig','Inbetriebnahme','Fertigstellung','Übergabe','Mängel'];
+function isEKey(k){ return typeof k==='string' && k.indexOf('§E§')===0; }
+function EKEY(sec){ return '§E§'+(sec&&typeof sec==='object'?sec.pos:sec); }
+function gsE(key){ if(!ST[key]) ST[key]={__etage:true, efotos:[]}; if(!Array.isArray(ST[key].efotos)) ST[key].efotos=[]; return ST[key]; }
+function etageFolder(sec){ return safeName(curProjName())+'/'+safeName(sec.label||sec.pos)+'/_Anlagenfotos'; }
+function saveEtage(key){ persistCurrentState(); touchProject(PID); enqueuePos(key).then(()=>flushOutbox()); }
+
+function updEtageBar(idx){
+  const sec=DATA[idx]; if(!sec) return;
+  const e=ST[EKEY(sec)]; const n=(e&&e.efotos)?e.efotos.length:0;
+  const c=document.getElementById('ETC'+idx);
+  if(c) c.textContent=n?n:'';
+  const b=document.getElementById('ETB_addcnt'); // (Overlay-Titel, falls offen)
+  if(b && EF_IDX===idx) b.textContent=n?(' · '+n+' Foto'+(n>1?'s':'')):'';
+}
+function updAllEtageBars(){ DATA.forEach((s,i)=>updEtageBar(i)); }
+
+let EF_IDX=null, EF_KAT='';
+function ensureEtOv(){
+  let ov=document.getElementById('etOv');
+  if(ov) return ov;
+  ov=document.createElement('div');
+  ov.id='etOv';
+  ov.style.cssText='position:fixed;inset:0;z-index:1850;background:var(--chrome-bg,#2b2b2b);display:none;flex-direction:column;';
+  document.body.appendChild(ov);
+  return ov;
+}
+function closeEtOv(){ const ov=document.getElementById('etOv'); if(ov) ov.style.display='none'; }
+
+function openEtageFotos(idx){
+  const sec=DATA[idx]; if(!sec) return;
+  EF_IDX=idx; ETF_FILTER='';
+  const ov=ensureEtOv();
+  ov.style.display='flex';
+  renderEtageOverlay(idx);
+}
+
+let ETF_FILTER='';
+function renderEtageOverlay(idx){
+  const sec=DATA[idx]; if(!sec) return;
+  const ov=ensureEtOv();
+  const e=gsE(EKEY(sec));
+  const all=e.efotos.map((r,oi)=>({r,oi})).sort((a,b)=>(a.r.ts||0)-(b.r.ts||0)); // chronologisch = Verlauf
+  const kats=[]; e.efotos.forEach(r=>{ if(r.kat && kats.indexOf(r.kat)<0) kats.push(r.kat); });
+  const shown=all.filter(x=>!ETF_FILTER || x.r.kat===ETF_FILTER);
+  const chip=(lbl,val)=>'<button class="etf'+(ETF_FILTER===val?' on':'')+'" onclick="etSetFilter('+idx+','+JSON.stringify(val)+')">'+escapeHtml(lbl)+'</button>';
+  ov.innerHTML=
+    '<div class="ethdr">'+
+      '<button class="etclose" onclick="closeEtOv()">&#8249;</button>'+
+      '<div class="etttl"><div class="ett1">&#128248; Anlagenfotos</div><div class="ett2">'+escapeHtml(sec.label||sec.pos)+(sec.bez?(' · '+escapeHtml(sec.bez)):'')+'<span id="ETB_addcnt"></span></div></div>'+
+    '</div>'+
+    '<div class="etadd"><button class="etaddbtn" onclick="etAddStart('+idx+')">&#128247; Foto hinzufügen</button></div>'+
+    (kats.length?('<div class="etfilter">'+chip('Alle','')+kats.map(k=>chip(k,k)).join('')+'</div>'):'')+
+    '<div class="etbody">'+
+      (shown.length? '<div class="etgrid">'+shown.map(x=>{
+        const ts=x.r.ts?new Date(x.r.ts):null;
+        const dstr=ts?(ts.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})+' '+ts.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'})):'';
+        return '<div class="etcell">'+
+          '<div class="etkat">'+escapeHtml(x.r.kat||'—')+'</div>'+
+          '<div class="etth" onclick="olbEt('+idx+','+x.oi+')"><img id="ETIMG_'+idx+'_'+x.oi+'" alt="Foto"><button class="fdel" onclick="event.stopPropagation();etDel('+idx+','+x.oi+')">&#10005;</button></div>'+
+          '<div class="etmeta">'+dstr+(x.r.by?(' · '+escapeHtml(x.r.by)):'')+'</div>'+
+        '</div>';
+      }).join('')+'</div>'
+      : '<div class="etempty">Noch keine Anlagenfotos für diese Etage.<br>Mit „Foto hinzufügen" den aktuellen Montagestand festhalten.</div>')+
+    '</div>';
+  // Thumbnails laden
+  shown.forEach(x=>{ const img=document.getElementById('ETIMG_'+idx+'_'+x.oi); if(img) loadImageAsBlob(x.r.fname).then(u=>{ if(u) img.src=u; }); });
+  updEtageBar(idx);
+}
+function etSetFilter(idx,val){ ETF_FILTER=val||''; renderEtageOverlay(idx); }
+
+// Kategorie-Auswahl (feste Liste + Freitext), dann Quelle (Kamera/Galerie)
+function etAddStart(idx){
+  EF_IDX=idx; EF_KAT='';
+  let ov=document.getElementById('etKatOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='etKatOv'; document.body.appendChild(ov); }
+  ov.style.cssText='position:fixed;inset:0;z-index:1900;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;';
+  ov.innerHTML=
+    '<div class="etkat-sheet">'+
+      '<div class="etkat-h">Kategorie wählen</div>'+
+      '<div class="etkat-chips">'+EFOTO_KATS.map(k=>'<button class="etkat-chip" onclick="etKatPick(this,'+JSON.stringify(k)+')">'+escapeHtml(k)+'</button>').join('')+'</div>'+
+      '<input id="etKatFree" type="text" placeholder="oder eigene Kategorie …" oninput="etKatFree(this.value)" style="width:100%;box-sizing:border-box;padding:11px 13px;border-radius:10px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin:4px 0 12px">'+
+      '<div class="etkat-src">'+
+        '<button class="etsrc" onclick="etPickFile(\'cam\')">&#128247; Kamera</button>'+
+        '<button class="etsrc" onclick="etPickFile(\'gal\')">&#128444;&#65039; Galerie</button>'+
+      '</div>'+
+      '<button class="etkat-cancel" onclick="document.getElementById(\'etKatOv\').remove()">Abbrechen</button>'+
+    '</div>';
+}
+function etKatPick(btn,k){ EF_KAT=k; const f=document.getElementById('etKatFree'); if(f)f.value=''; document.querySelectorAll('.etkat-chip').forEach(c=>c.classList.remove('on')); btn.classList.add('on'); }
+function etKatFree(v){ EF_KAT=(v||'').trim(); document.querySelectorAll('.etkat-chip').forEach(c=>c.classList.remove('on')); }
+function etPickFile(src){
+  if(!EF_KAT){ alert('Bitte zuerst eine Kategorie wählen oder eingeben.'); return; }
+  const inp=document.createElement('input');
+  inp.type='file'; inp.accept='image/*';
+  if(src==='cam') inp.setAttribute('capture','environment');
+  inp.style.display='none'; document.body.appendChild(inp);
+  inp.addEventListener('change', async function(ev){ const f=ev.target.files[0]; const ov=document.getElementById('etKatOv'); if(ov) ov.remove(); await etDoUpload(EF_IDX, EF_KAT, f); inp.remove(); });
+  inp.click();
+}
+async function etDoUpload(idx, kat, file){
+  const sec=DATA[idx];
+  if(!file||!sec){ return; }
+  if(!PID){ alert('Keine Baustelle geöffnet.'); return; }
+  showLoader('Foto wird gespeichert...');
+  try{
+    const uf=await tryCompressImage(file);
+    const ts=Date.now();
+    const key=EKEY(sec);
+    const fname=etageFolder(sec)+'/'+safeName(kat)+'_'+ts+'.jpg';
+    await queueUpload(fname, uf, 'image/jpeg', key);
+    gsE(key).efotos.push({fname:fname, kat:kat, ts:ts, by:USER||''});
+    saveEtage(key);
+    hideLoader();
+    renderEtageOverlay(idx);
+  }catch(e){ hideLoader(); console.warn('Etagenfoto speichern fehlgeschlagen:', e&&e.message); alert('Foto konnte nicht gespeichert werden.'); }
+}
+function etDel(idx, oi){
+  const sec=DATA[idx]; if(!sec) return;
+  const key=EKEY(sec); const e=gsE(key);
+  const rec=e.efotos[oi]; if(!rec) return;
+  if(!confirm('Dieses Anlagenfoto löschen?')) return;
+  e.efotos.splice(oi,1);
+  saveEtage(key);
+  if(rec.fname){ removeQueuedFile(rec.fname); spDelete(rec.fname); }
+  renderEtageOverlay(idx);
+}
+function olbEt(idx, oi){
+  const sec=DATA[idx]; if(!sec) return;
+  const rec=gsE(EKEY(sec)).efotos[oi]; if(!rec) return;
+  loadImageAsBlob(rec.fname).then(u=>{ document.getElementById('lbi').src=u||rec.fname; });
+  document.getElementById('lb').classList.add('on');
+}
+
 // STATS
 function upStats(){
   let tot=0,dn=0,pt=0,op=0,ang=0;
@@ -1391,6 +1560,7 @@ document.getElementById('srch').addEventListener('input',applyF);
 
 function restoreUI() {
   Object.keys(ST).forEach(pos => {
+    if(isEKey(pos)) return;             // Etagen-Fotozeilen haben keine Positions-UI
     const s = ST[pos];
     const id = sp(pos);
     // Restore checkboxes
@@ -1421,39 +1591,13 @@ function restoreUI() {
     updProg(pos);
   });
   upStats();
+  updAllEtageBars();
 }
 
 function autoR(el){el.style.height='auto';el.style.height=el.scrollHeight+'px';}
 
 // EXPORT
 
-async function downloadZip() {
-  const urls = [];
-  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(item=>{
-    const s=gs(item.pos);
-    if(s.fotos && s.fotos.length) s.fotos.forEach(u=>urls.push({url:u, pos:item.pos}));
-  })));
-  if(urls.length===0){alert('Keine Fotos vorhanden.');return;}
-  if(!confirm(urls.length+' Foto(s) werden als ZIP heruntergeladen. OK?'))return;
-  showLoader('Fotos werden gepackt...');
-  try{
-    const zip=new JSZip();
-    let n=1;
-    for(const f of urls){
-      try{
-        const blob=await getFileBlob(f.url);
-        const folder=f.pos.replace(/\./g,'_');
-        zip.file(folder+'/Foto_'+(n++)+'.jpg', blob);
-      }catch(e){ console.warn('Foto übersprungen:', e.message); }
-    }
-    const content=await zip.generateAsync({type:'blob'});
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(content);
-    a.download='Fotos_'+curProjSlug()+'_'+new Date().toISOString().slice(0,10)+'.zip';
-    document.body.appendChild(a);a.click();a.remove();
-    hideLoader();
-  }catch(e){hideLoader();alert('ZIP fehlgeschlagen: '+e.message);}
-}
 
 
 // Lokales Kalenderdatum (YYYY-MM-DD) eines ISO-Zeitstempels – für tagesgenaue Filterung.
@@ -1855,6 +1999,8 @@ async function spListLoadRows(){
 }
 
 function buildPosData(pos){
+  // Synthetische Etagen-Zeile (Anlagen-/Übersichtsfotos je Geschoss) – eigene Struktur
+  if(isEKey(pos)){ const e=gsE(pos); return JSON.stringify({__etage:true, efotos:e.efotos||[]}); }
   const s = gs(pos);
   // gleiche Struktur wie früher die Supabase-Spalten (innere Felder als JSON-Strings)
   return JSON.stringify({
@@ -1968,6 +2114,7 @@ async function loadState() {
     if (data) {
       let newest = null;
       data.forEach(row => {
+        if(row.__etage || isEKey(row.pos)){ ST[row.pos] = {__etage:true, efotos: Array.isArray(row.efotos)?row.efotos:[]}; if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at; return; }
         let fotos = [], pdfs = [];
         try { fotos = row.fotos ? JSON.parse(row.fotos) : []; } catch(e) {}
         try { pdfs = row.pdfs ? JSON.parse(row.pdfs) : []; } catch(e) {}
@@ -2081,6 +2228,7 @@ setInterval(async () => {
     let newest = null;
     data.forEach(row => {
       if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at;
+      if (row.__etage || isEKey(row.pos)){ if(!DIRTY.has(row.pos) && !ST[row.pos]){ ST[row.pos]={__etage:true, efotos:Array.isArray(row.efotos)?row.efotos:[]}; } return; }
       if (DIRTY.has(row.pos)) return;     // lokale, noch nicht synchronisierte Änderung nicht überschreiben
       const cur = ST[row.pos];
       let newRest = cur ? cur.restarbeiten : [];
@@ -2666,33 +2814,6 @@ async function pdfSaveManual(){
   }
 }
 
-async function downloadProtoZip(){
-  const all=[];
-  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(item=>{
-    const s=gs(item.pos);
-    if(s.pdfs&&s.pdfs.length) s.pdfs.forEach(p=>all.push({...p,pos:item.pos}));
-  })));
-  if(all.length===0){alert('Keine Protokolle vorhanden.');return;}
-  if(!confirm(all.length+' Protokoll(e) werden als ZIP heruntergeladen. OK?'))return;
-  showLoader('Protokolle werden gepackt...');
-  try{
-    const zip=new JSZip();
-    for(const p of all){
-      try{
-        const blob=await getFileBlob(p.fname);
-        const folder=p.pos.replace(/\./g,'_');
-        zip.file(folder+'/'+p.name, blob);
-      }catch(e){ console.warn('Protokoll übersprungen:', e.message); }
-    }
-    const content=await zip.generateAsync({type:'blob'});
-    const a=document.createElement('a');
-    a.href=URL.createObjectURL(content);
-    a.download='Protokolle_'+curProjSlug()+'_'+new Date().toISOString().slice(0,10)+'.zip';
-    document.body.appendChild(a);a.click();a.remove();
-    hideLoader();
-  }catch(e){hideLoader();alert('ZIP fehlgeschlagen: '+e.message);}
-}
-
 
 const RA_TIMERS={};
 let RA_FOTO_TARGET=null;
@@ -3028,7 +3149,6 @@ function curProjName(){
 function curProjCode(){
   return (curProjName().match(/\b[A-Za-zÄÖÜäöü0-9]/g)||['P']).join('').toUpperCase().slice(0,4);
 }
-function curProjSlug(){ return curProjName().replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || 'Projekt'; }
 function slugify(s){
   return String(s||'projekt').toLowerCase()
     .replace(/[ä]/g,'ae').replace(/[ö]/g,'oe').replace(/[ü]/g,'ue').replace(/ß/g,'ss')
