@@ -418,6 +418,7 @@ select.fs option{background:var(--surface);color:var(--text);}
     <img class="logo-img" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDI0LjAuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkViZW5lXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCAxNDkuOCAxODEiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDE0OS44IDE4MTsiIHhtbDpzcGFjZT0icHJlc2VydmUiPgo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPgoJLnN0MHtmaWxsOiNGRkZGRkY7fQoJLnN0MXtmaWxsOiM4OTU2MTM7fQoJLnN0MntmaWxsOiM2NzZDNkU7fQo8L3N0eWxlPgo8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMTAuOCw4MS41YzUtNy40LDE3LjctMjUuMywyNC42LTM1LjZoMTIuMWMtNi43LDkuNS0xMy45LDE5LjItMjAuOSwyOC44bDIzLDQ2LjdIMzcuM2wtMTguMS0zOAoJYy0yLDIuOC02LjEsOC40LTguNCwxMS4ydjI2LjdIMEMwLDgwLjksMCw0MC40LDAsMGMzLjYsMCw3LjIsMCwxMC44LDBDMTAuOCwyNy4yLDEwLjgsNTQuMywxMC44LDgxLjV6Ii8+CjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0xNDkuOCw5OC4zYy0wLjMsNC4xLTEuOSwyNC40LTI0LjIsMjQuNGMtMTkuNiwwLTI1LjEtMTcuNC0yNS4xLTM5LjNjMC0yMS4zLDYuOS0zOC44LDI2LjEtMzguOAoJYzIxLjksMCwyMi45LDIwLjIsMjMsMjMuOGgtMTEuMmMtMC4xLTIuOS0xLjItMTQuNC0xMi0xNC40cy0xNC45LDEyLTE0LjksMjkuM2MwLDE4LjcsNC4yLDMwLDE0LjMsMzBjMTAuOCwwLDEyLjItMTEuMSwxMi44LTE1CglIMTQ5LjhMMTQ5LjgsOTguM3oiLz4KPHBhdGggY2xhc3M9InN0MCIgZD0iTTQ5LjksMTgxVjY3LjhjMC0xMC4zLDAtMTcuMy0wLjEtMjJoMTAuNmMwLjEsMS40LDAuNSw2LjQsMC41LDEwLjJjMi41LTYuNSw3LjktMTEuMywxNy44LTExLjMKCWMxNC4zLDAsMjIsMTIuNiwyMiwzNy44YzAsMjcuMi05LjQsNDAuMi0yNC4yLDQwLjJjLTksMC0xMy41LTQuMy0xNS44LTlWMTgxSDQ5Ljl6IE03NS4zLDU0LjFjLTExLjcsMC0xNC45LDExLjItMTQuOSwyOQoJUzYyLjEsMTEzLDc0LjUsMTEzYzkuOSwwLDE1LTExLjYsMTUtMzBDODkuNiw2My45LDg1LjIsNTQuMSw3NS4zLDU0LjF6Ii8+CjxyZWN0IHk9IjEzMi4yIiBjbGFzcz0ic3QxIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+CjxyZWN0IHg9IjI0LjkiIHk9IjEzMi4yIiBjbGFzcz0ic3QyIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+Cjwvc3ZnPgo=" alt="kpc GmbH" />
     <div class="h-right">
       <button id="themeBtn" class="theme-btn" onclick="cycleTheme()" title="Erscheinungsbild: Automatik / Hell / Dunkel"><span id="themeIcon">🌓</span><span id="themeLbl">Auto</span></button>
+      <button class="theme-btn" onclick="openEinweisung()" title="Einweisung: Geräte-Einweisung protokollieren">📋 Einweisung</button>
       <div class="proj"><strong id="projName" onclick="switchProject()" style="cursor:pointer;">Baustelle wählen</strong><span id="userBadge" onclick="changeUser()" style="cursor:pointer;color:#d7c1ae;text-decoration:underline;">–</span></div>
     </div>
   </div>
@@ -978,8 +979,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 30;
+const APP_VERSION = 31;
 const CHANGELOG = [
+  { v:31, titel:'Neu: Einweisung', punkte:[
+    'Neuer Button „📋 Einweisung": Geräte-Einweisungen je Bereich/Termin protokollieren – mit Unterschrift, PDF-Ablage in SharePoint und automatischer Rückmeldung „Einweisung erledigt" an die Positionen.' ]},
   { v:30, titel:'Restarbeitenliste: Fotos & Excel', punkte:[
     'Restarbeiten-Bericht zeigt jetzt die Fotos direkt mit an – umschaltbar („Fotos an/aus"), auch beim Drucken.',
     'Neuer Excel-Export der Restarbeitenliste.' ]},
@@ -2352,6 +2355,14 @@ setInterval(async () => {
 // ── PROTOKOLL UPLOAD + PDF EDITOR ──
 let PPOS=null, PTYPE=null;
 const PROTO_TYPES=['IBN Protokoll','Einweisungsprotokoll','DGUV Protokoll'];
+
+// ── Einweisung: projektweite Einweisungs-App öffnen (gleiche Origin, Kontext per Hash) ──
+const EINWEISUNG_URL='einweisung.html';
+function openEinweisung(){
+  if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
+  const url=EINWEISUNG_URL+'#pid='+encodeURIComponent(PID)+'&projekt='+encodeURIComponent(curProjName());
+  window.open(url,'_blank','noopener');
+}
 
 // ── IBN digital: Übergabe an die Inbetriebnahme-App (gleiche Origin) ──
 const IBN_URL='inbetriebnahme.html';

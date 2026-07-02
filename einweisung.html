@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Einweisung – KPC GmbH</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&display=swap');
+:root{
+  /* KPC Corporate Design */
+  --bg:#f5f3f0; --bg2:#eeecea; --anthrazit:#2b2b2b; --braun:#895500;
+  --accent:#d7c1ae; --accent2:#a8a8a8; --white:#fff; --green:#3a7a3a; --gl:#e8f4e8;
+  --border:#d4cdc6; --lila:#5b4c8a; --line:#d4cdc6; --text:#2b2b2b; --r:8px;
+  --chrome-bg:#efeae3; --chrome-accent:#895500;
+  --font:'Roboto Condensed','Arial Narrow',Arial,sans-serif;
+}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){
+  --bg:#191919; --bg2:#2e2e2e; --accent2:#9a9a9a; --border:#3a3a3a; --line:#3a3a3a;
+  --text:#e8e6e3; --white:#242424; --gl:#1f3a26; --chrome-bg:#2b2b2b; --chrome-accent:#d7c1ae;
+}}
+:root[data-theme="dark"]{
+  --bg:#191919; --bg2:#2e2e2e; --accent2:#9a9a9a; --border:#3a3a3a; --line:#3a3a3a;
+  --text:#e8e6e3; --white:#242424; --gl:#1f3a26; --chrome-bg:#2b2b2b; --chrome-accent:#d7c1ae;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;font-weight:300;-webkit-tap-highlight-color:transparent;}
+button{font-family:inherit;}
+
+/* LOGIN */
+#loginOv{position:fixed;inset:0;background:var(--anthrazit);z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;color:#fff;}
+#loginOv .logo{font-size:26px;font-weight:700;letter-spacing:5px;color:var(--accent);}
+#loginOv .logo small{display:block;font-size:12px;letter-spacing:3px;color:var(--accent2);font-weight:400;text-align:center;margin-top:2px;}
+#loginOv h2{font-size:16px;font-weight:700;letter-spacing:1px;margin:22px 0 6px;}
+#loginOv p{font-size:12px;color:var(--accent2);margin-bottom:20px;max-width:320px;text-align:center;line-height:1.5;}
+.ms-btn{display:inline-flex;align-items:center;gap:10px;background:var(--accent);color:#2b2b2b;border:none;border-radius:8px;padding:13px 24px;font-size:15px;font-weight:700;cursor:pointer;}
+#loginMsStatus{font-size:12px;color:var(--accent2);margin-top:14px;min-height:16px;text-align:center;max-width:340px;}
+
+/* HEADER */
+header{background:var(--chrome-bg);position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.18);}
+.h-top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px 7px;border-bottom:2px solid var(--braun);background:var(--anthrazit);}
+.logo-img{height:36px;width:auto;display:block;flex-shrink:0;}
+.ew-label{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:2px;margin-left:2px;}
+.h-right{display:flex;align-items:center;gap:10px;}
+.theme-btn{display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);color:var(--accent);border-radius:16px;padding:5px 11px;font-size:11px;cursor:pointer;font-family:var(--font);white-space:nowrap;-webkit-tap-highlight-color:transparent;}
+.theme-btn:hover{background:rgba(255,255,255,.14);}
+.proj{font-size:12px;color:var(--accent2);text-align:right;line-height:1.35;}
+.proj strong{display:block;color:#fff;font-size:13px;font-weight:700;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.userbadge{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:4px 10px;font-size:11px;font-weight:700;color:#fff;}
+
+/* MAIN */
+main{padding:14px 12px 40px;max-width:900px;margin:0 auto;}
+.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;}
+.btn-primary{background:var(--braun);color:#fff;border:none;border-radius:10px;padding:12px 18px;font-size:15px;font-weight:700;cursor:pointer;}
+.btn-primary:active{opacity:.85;}
+.summary{font-size:12px;color:var(--accent2);}
+
+/* ETAGE / BEREICH / GERÄT */
+.etblock{background:var(--white);border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:12px;overflow:hidden;}
+.ethd{background:var(--bg2);padding:11px 14px;display:flex;align-items:center;gap:10px;cursor:pointer;border-left:4px solid var(--accent);}
+.ethd h3{font-size:14px;font-weight:700;color:var(--braun);flex:1;}
+.ethd .cnt{font-size:11px;color:var(--green);font-weight:700;white-space:nowrap;}
+.ethd .tog{font-size:11px;opacity:.4;transition:transform .18s;}
+.ethd .tog.cl{transform:rotate(-90deg);}
+.etbody{display:block;}
+.etbody.hid{display:none;}
+.berhd{font-size:11px;font-weight:700;color:var(--accent2);padding:8px 14px 2px;letter-spacing:.3px;text-transform:uppercase;}
+.grow{display:flex;align-items:flex-start;gap:10px;padding:8px 14px;border-top:1px solid var(--bg2);}
+.gmark{width:20px;height:20px;border-radius:5px;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:12px;color:#fff;margin-top:1px;}
+.grow.ein .gmark{background:var(--green);border-color:var(--green);}
+.gi{flex:1;min-width:0;}
+.gbez{font-size:13px;font-weight:700;line-height:1.3;}
+.gmeta{font-size:10px;color:var(--accent2);margin-top:1px;}
+.gstat{font-size:10px;white-space:nowrap;text-align:right;}
+.gstat .ok{color:var(--green);font-weight:700;}
+.gstat .off{color:var(--accent2);}
+
+/* CARDS */
+.card{background:var(--white);border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:12px;overflow:hidden;}
+.card-h{background:var(--bg2);padding:11px 14px;border-left:4px solid var(--accent);font-size:14px;font-weight:700;color:var(--braun);}
+.card-b{padding:10px 14px;}
+
+/* PROTOKOLL-HISTORIE */
+.prow{display:flex;align-items:center;gap:10px;padding:9px 14px;border-top:1px solid var(--bg2);font-size:12px;}
+.prow:first-child{border-top:none;}
+.prow .pmain{flex:1;min-width:0;}
+.prow .pt{font-weight:700;color:var(--text);}
+.prow .pm{font-size:11px;color:var(--accent2);margin-top:1px;}
+.plink{background:var(--braun);color:#fff;border:none;border-radius:8px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap;}
+
+/* OVERLAY (Sitzung) */
+.ov{position:fixed;inset:0;z-index:1500;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:0;}
+.sheet{width:100%;max-width:640px;min-height:100%;background:var(--bg);display:flex;flex-direction:column;}
+.sheet-h{position:sticky;top:0;background:var(--anthrazit);color:#fff;display:flex;align-items:center;gap:10px;padding:13px 14px;z-index:2;}
+.sheet-h .ttl{flex:1;font-size:15px;font-weight:700;}
+.sheet-close{background:none;border:none;color:#fff;font-size:26px;line-height:1;cursor:pointer;padding:0 6px;}
+.sheet-b{padding:14px 12px 30px;}
+.step-title{font-size:13px;font-weight:700;color:var(--braun);margin:4px 0 10px;letter-spacing:.3px;}
+.opt{display:block;width:100%;text-align:left;background:var(--white);border:2px solid var(--border);border-radius:10px;padding:14px;font-size:15px;font-weight:700;color:var(--text);cursor:pointer;margin-bottom:10px;}
+.opt small{display:block;font-weight:400;font-size:12px;color:var(--accent2);margin-top:3px;}
+.selbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
+.chip{background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;color:var(--text);}
+.selrow{display:flex;align-items:flex-start;gap:10px;padding:8px 6px;border-bottom:1px solid var(--bg2);cursor:pointer;}
+.selbox{width:22px;height:22px;border:2px solid var(--border);border-radius:6px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;margin-top:1px;}
+.selrow.on .selbox{background:var(--braun);border-color:var(--braun);}
+.selrow.done{opacity:.55;}
+.sub-bereich{font-size:11px;font-weight:700;color:var(--accent2);text-transform:uppercase;letter-spacing:.3px;padding:10px 6px 2px;}
+.sck{display:flex;align-items:flex-start;gap:8px;padding:5px 0 5px 34px;cursor:pointer;font-size:12px;}
+.sckb{width:17px;height:17px;border:2px solid var(--border);border-radius:4px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:#fff;font-size:10px;margin-top:1px;}
+.sck.on .sckb{background:var(--lila);border-color:var(--lila);}
+.fld{margin-bottom:12px;}
+.fld label{display:block;font-size:12px;color:var(--accent2);margin-bottom:4px;font-weight:700;}
+.fld input{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-family:inherit;background:var(--white);color:var(--text);}
+.sigwrap{border:1px dashed var(--border);border-radius:8px;background:var(--white);}
+#sigCanvas{width:100%;height:160px;display:block;touch-action:none;border-radius:8px;}
+.sigtools{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-top:1px solid var(--bg2);}
+.sigtools button{background:none;border:none;color:var(--braun);font-size:12px;font-weight:700;cursor:pointer;}
+.finish{width:100%;background:var(--green);color:#fff;border:none;border-radius:12px;padding:15px;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px;}
+.finish:disabled{background:var(--accent2);opacity:.6;}
+.hint{font-size:11px;color:var(--accent2);margin:2px 2px 12px;line-height:1.5;}
+.empty{text-align:center;color:var(--accent2);font-size:13px;padding:36px 20px;line-height:1.6;}
+
+/* LOADER / TOAST */
+#loader{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9500;display:none;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:700;}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:12px 22px;border-radius:24px;font-size:14px;font-weight:700;z-index:9600;display:none;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:90vw;text-align:center;}
+</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.4/lib/msal-browser.min.js"></script>
+<script>/* Hell/Dunkel-Wahl vor dem Rendern anwenden (kein Aufblitzen) */
+(function(){try{var t=localStorage.getItem('kpc_theme');if(t==='light'||t==='dark')document.documentElement.setAttribute('data-theme',t);}catch(e){}})();</script>
+</head>
+<body>
+
+<div id="loginOv">
+  <img src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDI0LjAuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkViZW5lXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCAxNDkuOCAxODEiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDE0OS44IDE4MTsiIHhtbDpzcGFjZT0icHJlc2VydmUiPgo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPgoJLnN0MHtmaWxsOiNGRkZGRkY7fQoJLnN0MXtmaWxsOiM4OTU2MTM7fQoJLnN0MntmaWxsOiM2NzZDNkU7fQo8L3N0eWxlPgo8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMTAuOCw4MS41YzUtNy40LDE3LjctMjUuMywyNC42LTM1LjZoMTIuMWMtNi43LDkuNS0xMy45LDE5LjItMjAuOSwyOC44bDIzLDQ2LjdIMzcuM2wtMTguMS0zOAoJYy0yLDIuOC02LjEsOC40LTguNCwxMS4ydjI2LjdIMEMwLDgwLjksMCw0MC40LDAsMGMzLjYsMCw3LjIsMCwxMC44LDBDMTAuOCwyNy4yLDEwLjgsNTQuMywxMC44LDgxLjV6Ii8+CjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0xNDkuOCw5OC4zYy0wLjMsNC4xLTEuOSwyNC40LTI0LjIsMjQuNGMtMTkuNiwwLTI1LjEtMTcuNC0yNS4xLTM5LjNjMC0yMS4zLDYuOS0zOC44LDI2LjEtMzguOAoJYzIxLjksMCwyMi45LDIwLjIsMjMsMjMuOGgtMTEuMmMtMC4xLTIuOS0xLjItMTQuNC0xMi0xNC40cy0xNC45LDEyLTE0LjksMjkuM2MwLDE4LjcsNC4yLDMwLDE0LjMsMzBjMTAuOCwwLDEyLjItMTEuMSwxMi44LTE1CglIMTQ5LjhMMTQ5LjgsOTguM3oiLz4KPHBhdGggY2xhc3M9InN0MCIgZD0iTTQ5LjksMTgxVjY3LjhjMC0xMC4zLDAtMTcuMy0wLjEtMjJoMTAuNmMwLjEsMS40LDAuNSw2LjQsMC41LDEwLjJjMi41LTYuNSw3LjktMTEuMywxNy44LTExLjMKCWMxNC4zLDAsMjIsMTIuNiwyMiwzNy44YzAsMjcuMi05LjQsNDAuMi0yNC4yLDQwLjJjLTksMC0xMy41LTQuMy0xNS44LTlWMTgxSDQ5Ljl6IE03NS4zLDU0LjFjLTExLjcsMC0xNC45LDExLjItMTQuOSwyOQoJUzYyLjEsMTEzLDc0LjUsMTEzYzkuOSwwLDE1LTExLjYsMTUtMzBDODkuNiw2My45LDg1LjIsNTQuMSw3NS4zLDU0LjF6Ii8+CjxyZWN0IHk9IjEzMi4yIiBjbGFzcz0ic3QxIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+CjxyZWN0IHg9IjI0LjkiIHk9IjEzMi4yIiBjbGFzcz0ic3QyIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+Cjwvc3ZnPgo=" alt="kpc GmbH" style="width:200px;max-width:62vw;height:auto;">
+  <div style="color:#fff;font-size:13px;margin:8px 0 20px;letter-spacing:1px;">Einweisung · Geräte-Einweisungsprotokolle</div>
+  <button class="ms-btn" onclick="doLogin()">
+    <svg width="18" height="18" viewBox="0 0 21 21" aria-hidden="true"><rect x="1" y="1" width="9" height="9" fill="#2b2b2b"/><rect x="11" y="1" width="9" height="9" fill="#2b2b2b"/><rect x="1" y="11" width="9" height="9" fill="#2b2b2b"/><rect x="11" y="11" width="9" height="9" fill="#2b2b2b"/></svg>
+    Mit Microsoft anmelden
+  </button>
+  <div id="loginMsStatus"></div>
+</div>
+
+<header id="appHeader" style="display:none">
+  <div class="h-top">
+    <img class="logo-img" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDI0LjAuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkViZW5lXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCAxNDkuOCAxODEiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDE0OS44IDE4MTsiIHhtbDpzcGFjZT0icHJlc2VydmUiPgo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPgoJLnN0MHtmaWxsOiNGRkZGRkY7fQoJLnN0MXtmaWxsOiM4OTU2MTM7fQoJLnN0MntmaWxsOiM2NzZDNkU7fQo8L3N0eWxlPgo8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMTAuOCw4MS41YzUtNy40LDE3LjctMjUuMywyNC42LTM1LjZoMTIuMWMtNi43LDkuNS0xMy45LDE5LjItMjAuOSwyOC44bDIzLDQ2LjdIMzcuM2wtMTguMS0zOAoJYy0yLDIuOC02LjEsOC40LTguNCwxMS4ydjI2LjdIMEMwLDgwLjksMCw0MC40LDAsMGMzLjYsMCw3LjIsMCwxMC44LDBDMTAuOCwyNy4yLDEwLjgsNTQuMywxMC44LDgxLjV6Ii8+CjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0xNDkuOCw5OC4zYy0wLjMsNC4xLTEuOSwyNC40LTI0LjIsMjQuNGMtMTkuNiwwLTI1LjEtMTcuNC0yNS4xLTM5LjNjMC0yMS4zLDYuOS0zOC44LDI2LjEtMzguOAoJYzIxLjksMCwyMi45LDIwLjIsMjMsMjMuOGgtMTEuMmMtMC4xLTIuOS0xLjItMTQuNC0xMi0xNC40cy0xNC45LDEyLTE0LjksMjkuM2MwLDE4LjcsNC4yLDMwLDE0LjMsMzBjMTAuOCwwLDEyLjItMTEuMSwxMi44LTE1CglIMTQ5LjhMMTQ5LjgsOTguM3oiLz4KPHBhdGggY2xhc3M9InN0MCIgZD0iTTQ5LjksMTgxVjY3LjhjMC0xMC4zLDAtMTcuMy0wLjEtMjJoMTAuNmMwLjEsMS40LDAuNSw2LjQsMC41LDEwLjJjMi41LTYuNSw3LjktMTEuMywxNy44LTExLjMKCWMxNC4zLDAsMjIsMTIuNiwyMiwzNy44YzAsMjcuMi05LjQsNDAuMi0yNC4yLDQwLjJjLTksMC0xMy41LTQuMy0xNS44LTlWMTgxSDQ5Ljl6IE03NS4zLDU0LjFjLTExLjcsMC0xNC45LDExLjItMTQuOSwyOQoJUzYyLjEsMTEzLDc0LjUsMTEzYzkuOSwwLDE1LTExLjYsMTUtMzBDODkuNiw2My45LDg1LjIsNTQuMSw3NS4zLDU0LjF6Ii8+CjxyZWN0IHk9IjEzMi4yIiBjbGFzcz0ic3QxIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+CjxyZWN0IHg9IjI0LjkiIHk9IjEzMi4yIiBjbGFzcz0ic3QyIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+Cjwvc3ZnPgo=" alt="kpc GmbH">
+    <span class="ew-label">EINWEISUNG</span>
+    <div class="h-right">
+      <button class="theme-btn" onclick="cycleTheme()" title="Erscheinungsbild: Automatik / Hell / Dunkel"><span id="themeIcon">🌓</span><span id="themeLbl">Auto</span></button>
+      <div class="proj"><strong id="projName">–</strong><span id="projSub">Baustelle</span></div>
+      <span class="userbadge" id="userBadge">–</span>
+    </div>
+  </div>
+</header>
+
+<main id="main" style="display:none"></main>
+
+<div id="loader">Wird geladen …</div>
+<div id="toast"></div>
+
+<script>
+// ══════════════════ Generische Vorlagen (aus Einweisungs-App übernommen) ══════════════════
+const STD_FORMS = [{"id": "allgemein", "label": "Allgemein", "titel": "Pflege & Nutzung Edelstahlmöbel", "info": "Tische, Becken, Schränke, Regale, Wagen, Theken, Mischbatterien und Armaturen.", "checks": ["Reinigung nur mit für Edelstahl geeigneten Mitteln", "Keine Stahlwolle, Drahtbürsten oder Scheuermittel (Flugrost-/Kratzgefahr)", "Chlorid- und säurehaltige Reiniger vermeiden (Lochfraß/Korrosion)", "In Schliffrichtung reinigen und nachtrocknen", "Belastungsgrenzen von Auszügen, Borden und Ablagen beachten", "Fahrbare Möbel nach dem Verschieben feststellen (Bremsen)", "Stöße und scharfe Schläge auf Kanten vermeiden", "Herstellerangaben und Bedienungsanleitung beachten", "Revisionsunterlagen prüfen"]}, {"id": "klein", "label": "Kleingeräte", "titel": "Elektrische Kleingeräte", "info": "Einfache elektrische Handgeräte ohne eigene Geräteeinweisung.", "checks": ["Reinigung nur im stromlosen Zustand (Stecker ziehen)", "Kabel, Stecker und Gehäuse vor Gebrauch auf Schäden prüfen", "Kein Strahl-/Hochdruckwasser, nicht eintauchen (sofern nicht zugelassen)", "Standsicherheit auf trockener, ebener Fläche", "Herstellerangaben und Bedienungsanleitung beachten", "Revisionsunterlagen prüfen"]}, {"id": "gross", "label": "Großgeräte", "titel": "Großgeräte allgemein", "info": "Wärme- und Warmhaltegeräte, Thermoports, beheizte Spenderwagen.", "checks": ["Regelmäßige Reinigung und Pflege", "Lage von Hauptschalter und Not-Aus bekannt", "Beladungs- und Beschickungsgrenzen einhalten", "Keine Hochdruck-/Dampfstrahlreinigung (sofern nicht freigegeben)", "Herstellerangaben und Bedienungsanleitung beachten", "Revisionsunterlagen prüfen"]}];
+const SONDER_VORLAGEN = [{"name": "Kombidämpfer", "fabrikat": "MKN", "typ": "FlexiCombi", "checks": ["Betriebsarten und Garprogramme", "Automatisches Reinigungssystem", "Kerntemperaturfühler", "Entkalkung und Wasserqualität", "Herstellerangaben und Bedienungsanleitung beachten", "Revisionsunterlagen prüfen"]}, {"name": "Multifunktionsgerät", "fabrikat": "MKN / Rational", "typ": "FlexiChef / iVario", "checks": ["Kippmechanik und Druckgaren", "Heißes Fett/Öl", "Reinigung Tiegel", "Not-Aus", "Herstellerangaben und Bedienungsanleitung beachten", "Revisionsunterlagen prüfen"]}, {"name": "Kühlgerät", "fabrikat": "", "typ": "", "checks": ["Temperatur/HACCP", "Abtauung", "Kondensator", "Türdichtungen", "Herstellerangaben und Bedienungsanleitung beachten", "Revisionsunterlagen prüfen"]}, {"name": "Spülmaschine", "fabrikat": "", "typ": "", "checks": ["Programme", "Chemie-Dosierung", "Siebe/Tank", "Klarspüler", "Herstellerangaben und Bedienungsanleitung beachten", "Revisionsunterlagen prüfen"]}, {"name": "Pizzaofen", "fabrikat": "Cuppone", "typ": "", "checks": ["Aufheizen", "Steinplatten", "Abkühlphase", "Reinigung kalt", "Herstellerangaben und Bedienungsanleitung beachten", "Revisionsunterlagen prüfen"]}, {"name": "Fritteuse", "fabrikat": "MKN", "typ": "", "checks": ["Ölbefüllung/Temperatur", "Filtern abgekühlt", "Überhitzungsschutz", "Herstellerangaben und Bedienungsanleitung beachten", "Revisionsunterlagen prüfen"]}, {"name": "Induktionskochfeld", "fabrikat": "MKN", "typ": "", "checks": ["Leistungsstufen", "Topferkennung", "Glasfläche", "Restwärme", "Herstellerangaben und Bedienungsanleitung beachten", "Revisionsunterlagen prüfen"]}, {"name": "Aufschnittmaschine", "fabrikat": "ADE", "typ": "", "checks": ["Schnittgefahr", "Reinigung bei Stillstand", "Schutzhandschuh", "Herstellerangaben und Bedienungsanleitung beachten", "Revisionsunterlagen prüfen"]}, {"name": "Eiswürfelbereiter", "fabrikat": "Wessamat", "typ": "", "checks": ["Hygiene/Filter", "Entkalkung", "Abtauung", "Herstellerangaben und Bedienungsanleitung beachten", "Revisionsunterlagen prüfen"]}, {"name": "Wasserspender", "fabrikat": "Brita", "typ": "", "checks": ["Filter/CO2", "Hygiene", "Herstellerangaben und Bedienungsanleitung beachten", "Revisionsunterlagen prüfen"]}, {"name": "Kartonagenpresse", "fabrikat": "HSM", "typ": "", "checks": ["Einzugsgefahr", "Not-Aus", "Nur eingewiesenes Personal", "Herstellerangaben und Bedienungsanleitung beachten", "Revisionsunterlagen prüfen"]}];
+
+function checksFor(dev){
+  const hay=((dev.fab||'')+' '+(dev.typ||'')+' '+(dev.bez||'')).toLowerCase();
+  for(const v of SONDER_VORLAGEN){
+    const keys=[v.name, v.fabrikat, v.typ].filter(Boolean);
+    for(const k of keys){ for(const t of k.toLowerCase().split(/[\/\s]+/)){ if(t.length>3 && hay.indexOf(t)>-1) return v.checks.slice(); } }
+  }
+  return ['Bedienung und Funktion','Reinigung und Pflege','Sicherheitshinweise / Not-Aus','Herstellerangaben und Bedienungsanleitung beachten','Revisionsunterlagen prüfen'];
+}
+
+// ══════════════════ Backend (Microsoft 365 / Graph) – aus Hauptapp übernommen ══════════════════
+const MS_CONFIG = { tenantId:'cba1b1fc-4a80-4da1-a7f1-e3e4614056eb', clientId:'68f89557-eef9-4481-b45c-29919ed7b55d', spHost:'kpcfulda.sharepoint.com', sitePath:'/sites/Montagefortschritt', listName:'Positionen', libName:'Fotos' };
+const GRAPH='https://graph.microsoft.com/v1.0';
+const GRAPH_SCOPES=['User.Read','Sites.Selected'];
+const USE_REDIRECT=/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof window.matchMedia==='function' && window.matchMedia('(pointer: coarse)').matches);
+let msalApp=null, msalAccount=null;
+const SPIDS={ siteId:null, listId:null, driveId:null };
+let PID=null, PROJNAME='', USER='';
+let LV=[];                 // Etagen/Bereiche/Geräte aus LV_<pid>.json
+let EW={ v:1, devices:{}, std:{}, protokolle:[] };  // Einweisungs-Status (EINWEISUNG_<pid>.json)
+
+async function msalInit(){
+  msalApp=new msal.PublicClientApplication({
+    auth:{ clientId:MS_CONFIG.clientId, authority:'https://login.microsoftonline.com/'+MS_CONFIG.tenantId,
+      redirectUri:(window.location.origin+window.location.pathname) },
+    cache:{ cacheLocation:'localStorage' }
+  });
+  if(typeof msalApp.initialize==='function') await msalApp.initialize();
+  const resp=await msalApp.handleRedirectPromise();
+  if(resp&&resp.account) msalAccount=resp.account;
+  if(!msalAccount){ const a=msalApp.getAllAccounts(); if(a.length) msalAccount=a[0]; }
+  if(msalAccount) msalApp.setActiveAccount(msalAccount);
+  return msalAccount;
+}
+async function msalLogin(){
+  if(!msalApp){ if(typeof msal==='undefined') throw new Error('MSAL nicht geladen (Internet prüfen)'); await msalInit(); }
+  if(USE_REDIRECT){ await msalApp.loginRedirect({scopes:GRAPH_SCOPES}); return null; }
+  const res=await msalApp.loginPopup({scopes:GRAPH_SCOPES, prompt:'select_account'});
+  msalAccount=res.account; msalApp.setActiveAccount(msalAccount); return msalAccount;
+}
+async function getToken(){
+  try{ return (await msalApp.acquireTokenSilent({scopes:GRAPH_SCOPES, account:msalAccount})).accessToken; }
+  catch(e){ if(USE_REDIRECT){ await msalApp.acquireTokenRedirect({scopes:GRAPH_SCOPES}); throw e; }
+    const res=await msalApp.acquireTokenPopup({scopes:GRAPH_SCOPES}); msalAccount=res.account; return res.accessToken; }
+}
+async function graph(path, opts){
+  opts=opts||{}; const token=await getToken();
+  const headers=Object.assign({'Authorization':'Bearer '+token}, opts.headers||{});
+  const res=await fetch(GRAPH+path, Object.assign({}, opts, {headers}));
+  if(!res.ok){ const t=await res.text(); throw new Error('Graph '+res.status+': '+t.substring(0,300)); }
+  return res;
+}
+async function resolveIds(){
+  const site=await (await graph('/sites/'+MS_CONFIG.spHost+':'+MS_CONFIG.sitePath)).json();
+  SPIDS.siteId=site.id;
+  const lists=await (await graph('/sites/'+SPIDS.siteId+'/lists?$filter='+encodeURIComponent("displayName eq '"+MS_CONFIG.listName+"'"))).json();
+  if(!lists.value||!lists.value.length) throw new Error('Liste "'+MS_CONFIG.listName+'" nicht gefunden');
+  SPIDS.listId=lists.value[0].id;
+  const drives=await (await graph('/sites/'+SPIDS.siteId+'/drives')).json();
+  const drive=(drives.value||[]).find(d=>d.name===MS_CONFIG.libName)||(drives.value||[])[0];
+  if(!drive) throw new Error('Bibliothek "'+MS_CONFIG.libName+'" nicht gefunden');
+  SPIDS.driveId=drive.id;
+}
+function encPath(p){ return String(p).split('/').map(encodeURIComponent).join('/'); }
+function safeName(s){ return String(s==null?'':s).replace(/[\\/:*?"<>|#%]/g,'-').replace(/\s+/g,' ').trim().replace(/[. ]+$/,'').slice(0,80)||'_'; }
+async function ensureFolder(path){
+  const segs=String(path).split('/').filter(Boolean); let parent='';
+  for(const seg of segs){
+    const base='/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId;
+    const ep=parent? base+'/root:/'+encPath(parent)+':/children' : base+'/root/children';
+    try{ await graph(ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({name:seg,folder:{},'@microsoft.graph.conflictBehavior':'fail'})}); }
+    catch(e){ if(!/409|nameAlreadyExists|already exists/i.test((e&&e.message)||'')) console.warn('Ordner:',seg,e&&e.message); }
+    parent=parent? parent+'/'+seg : seg;
+  }
+}
+async function spUpload(fname, body, contentType){
+  const i=fname.lastIndexOf('/'); if(i>0) await ensureFolder(fname.slice(0,i));
+  await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encPath(fname)+':/content',{method:'PUT',headers:{'Content-Type':contentType||'application/octet-stream'},body:body});
+  return fname;
+}
+async function spDownloadBlob(fname){
+  const meta=await (await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encPath(fname))).json();
+  const dl=meta['@microsoft.graph.downloadUrl']; if(!dl) throw new Error('downloadUrl fehlt');
+  const res=await fetch(dl); if(!res.ok) throw new Error('Download '+res.status); return await res.blob();
+}
+async function spTryDownloadText(fname){
+  try{ return await (await spDownloadBlob(fname)).text(); }
+  catch(e){ const m=((e&&e.message)||'')+''; if(/ 404|404:|itemnotfound/i.test(m)) return null; throw e; }
+}
+async function spUploadText(fname, text){ return spUpload(fname, new Blob([text],{type:'application/json'}), 'application/json'); }
+
+// ══════════════════ Projekt / LV / Einweisungs-Status laden ══════════════════
+async function loadProjectsList(){
+  const txt=await spTryDownloadText('__projects.json');
+  try{ return txt? (JSON.parse(txt)||[]) : []; }catch(e){ return []; }
+}
+async function loadLV(pid){
+  const txt=await spTryDownloadText('LV_'+pid+'.json');
+  if(!txt) throw new Error('Stückliste (LV) für dieses Projekt nicht gefunden.');
+  return JSON.parse(txt);
+}
+async function loadEW(pid){
+  const txt=await spTryDownloadText('EINWEISUNG_'+pid+'.json');
+  let ew={ v:1, devices:{}, std:{}, protokolle:[] };
+  if(txt){ try{ ew=JSON.parse(txt); }catch(e){} }
+  ew.devices=ew.devices||{}; ew.std=ew.std||{}; ew.protokolle=ew.protokolle||[];
+  return ew;
+}
+async function saveEW(){ await spUploadText('EINWEISUNG_'+PID+'.json', JSON.stringify(EW)); }
+
+// Baut aus der LV die Geräte-Baumstruktur (Etage -> Bereich -> Gerät)
+function buildTreeFromLV(lv){
+  const tree=[];
+  (lv||[]).forEach(sec=>{
+    const et={ label:sec.label||sec.pos||'', bez:sec.bez||'', bereiche:[] };
+    (sec.subsections||[]).forEach(sub=>{
+      const ber={ pos:sub.pos||'', bez:sub.bez||'', geraete:[] };
+      (sub.items||[]).forEach(it=>{
+        ber.geraete.push({ pos:it.pos, bez:(it.bez||'').trim(), fab:(it.fabrikat||'').trim(), typ:(it.typ||'').trim() });
+      });
+      if(ber.geraete.length) et.bereiche.push(ber);
+    });
+    if(et.bereiche.length) tree.push(et);
+  });
+  return tree;
+}
+function devState(pos){ return EW.devices[pos]||null; }
+function allDevices(){ const a=[]; LV.forEach(et=>et.bereiche.forEach(b=>b.geraete.forEach(g=>a.push({et,b,g})))); return a; }
+
+// ══════════════════ ew-Rückschreibung in die Positionen-Liste ══════════════════
+// Lädt die Listen-Items des Projekts (roh) -> Map pos -> {id, data(obj)}
+async function loadPositionItems(){
+  const map={};
+  let url='/sites/'+SPIDS.siteId+'/lists/'+SPIDS.listId+'/items?$expand=fields&$top=2000';
+  while(url){
+    const data=await (await graph(url)).json();
+    (data.value||[]).forEach(it=>{ const f=it.fields||{}; if(!f.pos) return; if((f.projekt||'')!==PID) return;
+      let d={}; try{ d=f.data? JSON.parse(f.data):{}; }catch(e){ d={}; }
+      map[f.pos]={ id:it.id, data:d };
+    });
+    url=data['@odata.nextLink']? data['@odata.nextLink'].replace(GRAPH,'') : null;
+  }
+  return map;
+}
+// Schreibt "Einweisung erledigt" (ew) für die angegebenen Positionen zurück, ohne andere Felder zu verlieren.
+async function writeBackEingewiesen(positions, iso){
+  if(!positions.length) return;
+  const items=await loadPositionItems();
+  for(const pos of positions){
+    const ex=items[pos];
+    let d=ex? ex.data : {};
+    d.ew=true;
+    let ts={}; try{ ts=d.ts? JSON.parse(d.ts):{}; }catch(e){ ts={}; } ts.ew=iso; d.ts=JSON.stringify(ts);
+    let usr={}; try{ usr=d.usr? JSON.parse(d.usr):{}; }catch(e){ usr={}; } usr.ew=USER||''; d.usr=JSON.stringify(usr);
+    const fields={ pos:pos, projekt:PID, data:JSON.stringify(d) };
+    if(ex&&ex.id){ await graph('/sites/'+SPIDS.siteId+'/lists/'+SPIDS.listId+'/items/'+ex.id+'/fields',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(fields)}); }
+    else { await graph('/sites/'+SPIDS.siteId+'/lists/'+SPIDS.listId+'/items',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields})}); }
+  }
+}
+
+// ══════════════════ Helpers UI ══════════════════
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function lid(s){ return String(s).replace(/[^A-Za-z0-9]/g,'_'); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
+function fmtDE(iso){ if(!iso) return ''; const d=new Date(iso); return isNaN(d)? '' : d.toLocaleDateString('de-DE'); }
+function showLoader(m){ const el=document.getElementById('loader'); el.textContent=m||'Wird geladen …'; el.style.display='flex'; }
+function hideLoader(){ document.getElementById('loader').style.display='none'; }
+function toast(m){ const t=document.getElementById('toast'); t.textContent=m; t.style.display='block'; clearTimeout(toast._t); toast._t=setTimeout(()=>t.style.display='none',3000); }
+
+// ── Hell/Dunkel-Umschalter (wie Hauptapp) ──
+const THEME_MODES=['auto','light','dark'];
+const THEME_META={auto:{icon:'🌓',lbl:'Auto'},light:{icon:'☀️',lbl:'Hell'},dark:{icon:'🌙',lbl:'Dunkel'}};
+function getTheme(){ try{ const t=localStorage.getItem('kpc_theme'); return (t==='light'||t==='dark')?t:'auto'; }catch(e){ return 'auto'; } }
+function applyTheme(mode){ if(mode==='light'||mode==='dark'){ document.documentElement.setAttribute('data-theme',mode); localStorage.setItem('kpc_theme',mode); } else { document.documentElement.removeAttribute('data-theme'); localStorage.setItem('kpc_theme','auto'); } updateThemeBtn(); }
+function updateThemeBtn(){ const m=THEME_META[getTheme()]||THEME_META.auto; const ic=document.getElementById('themeIcon'), lb=document.getElementById('themeLbl'); if(ic)ic.textContent=m.icon; if(lb)lb.textContent=m.lbl; }
+function cycleTheme(){ const cur=getTheme(); applyTheme(THEME_MODES[(THEME_MODES.indexOf(cur)+1)%THEME_MODES.length]); }
+
+// KPC-Logo (dunkel) für PDF – einmalig zu PNG rastern (jsPDF kann kein SVG)
+const LOGO_DARK='data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDI0LjAuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkViZW5lXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCAyNTEuNyAxODEiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDI1MS43IDE4MTsiIHhtbDpzcGFjZT0icHJlc2VydmUiPgo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPgoJLnN0MHtmaWxsOiMyYjJiMmI7ZW5hYmxlLWJhY2tncm91bmQ6bmV3ICAgIDt9Cgkuc3Qxe2ZpbGw6IzJiMmIyYjt9Cgkuc3Qye2ZpbGw6Izg5NTYxMzt9Cgkuc3Qze2ZpbGw6IzY3NkM2RTt9Cjwvc3R5bGU+CjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0xMC44LDgxLjVjNS03LjQsMTcuNy0yNS4zLDI0LjYtMzUuNmgxMi4xYy02LjcsOS41LTEzLjksMTkuMi0yMC45LDI4LjhsMjMsNDYuN0gzNy4zbC0xOC4xLTM4CgljLTIsMi44LTYuMSw4LjQtOC40LDExLjJ2MjYuN0gwQzAsODAuOSwwLDQwLjQsMCwwYzMuNiwwLDcuMiwwLDEwLjgsMEMxMC44LDI3LjIsMTAuOCw1NC4zLDEwLjgsODEuNXoiLz4KPHBhdGggY2xhc3M9InN0MCIgZD0iTTE0OS44LDk4LjNjLTAuMyw0LjEtMS45LDI0LjQtMjQuMiwyNC40Yy0xOS42LDAtMjUuMS0xNy40LTI1LjEtMzkuM2MwLTIxLjMsNi45LTM4LjgsMjYuMS0zOC44CgljMjEuOSwwLDIyLjksMjAuMiwyMywyMy44aC0xMS4yYy0wLjEtMi45LTEuMi0xNC40LTEyLTE0LjRjLTEwLjgsMC0xNC45LDEyLTE0LjksMjkuM2MwLDE4LjcsNC4yLDMwLDE0LjMsMzAKCWMxMC44LDAsMTIuMi0xMS4xLDEyLjgtMTVMMTQ5LjgsOTguM0wxNDkuOCw5OC4zeiIvPgo8cGF0aCBjbGFzcz0ic3QwIiBkPSJNNDkuOSwxODFWNjcuOGMwLTEwLjMsMC0xNy4zLTAuMS0yMmgxMC42YzAuMSwxLjQsMC41LDYuNCwwLjUsMTAuMmMyLjUtNi41LDcuOS0xMS4zLDE3LjgtMTEuMwoJYzE0LjMsMCwyMiwxMi42LDIyLDM3LjhjMCwyNy4yLTkuNCw0MC4yLTI0LjIsNDAuMmMtOSwwLTEzLjUtNC4zLTE1LjgtOVYxODFINDkuOXogTTc1LjMsNTQuMWMtMTEuNywwLTE0LjksMTEuMi0xNC45LDI5CglTNjIuMSwxMTMsNzQuNSwxMTNjOS45LDAsMTUtMTEuNiwxNS0zMEM4OS42LDYzLjksODUuMiw1NC4xLDc1LjMsNTQuMXoiLz4KPGc+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNNzkuNCwxNTIuNWwwLjEsMC42bDAuMS0wLjdsMi40LTkuMUg4M2wyLjQsOWwwLjIsMC45bDAuMi0wLjhsMi4xLTkuMWgxLjNsLTIuOSwxMS44aC0xbC0yLjYtOS40bC0wLjEtMC4zCgkJdjAuM2wtMi41LDkuNGgtMWwtMi45LTExLjhoMS4zTDc5LjQsMTUyLjV6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNOTUuOCwxNTUuNGMtMS40LDAtMi41LTAuNC0zLjMtMS4zYy0wLjgtMC45LTEuMi0yLjItMS4yLTMuOXYtMS40YzAtMS43LDAuNC0zLjEsMS4yLTQuMQoJCWMwLjctMSwxLjgtMS41LDMuMS0xLjVjMS4zLDAsMi4yLDAuNCwzLDEuM3MxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFzMS40LDEuMSwyLjQsMS4xCgkJYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44Qzk4LjYsMTU0LjgsOTcuNCwxNTUuNCw5NS44LDE1NS40eiBNOTUuNiwxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEM5OC4zLDE0NS40LDk3LjQsMTQ0LjMsOTUuNiwxNDQuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMDkuOCwxNDAuM3YzaDIuMXYxLjFoLTIuMXY3LjljMCwwLjYsMC4xLDEuMiwwLjMsMS40YzAuMiwwLjQsMC41LDAuNCwxLDAuNGMwLjIsMCwwLjQsMCwwLjktMC4xdjEuMQoJCWMtMC4zLDAuMS0wLjcsMC4yLTEuMiwwLjJjLTEuNCwwLTIuMS0xLTIuMS0zdi04LjFoLTEuOHYtMS4xaDEuOHYtM0wxMDkuOCwxNDAuM0wxMDkuOCwxNDAuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMTYuMSwxNDUuMmMwLjQtMC42LDAuOC0xLjIsMS4zLTEuNWMwLjUtMC40LDEuMi0wLjUsMS45LTAuNWMyLjEsMCwzLjEsMS4zLDMuMSw0LjF2OGgtMS4ydi03LjgKCQljMC0xLjEtMC4yLTEuOS0wLjUtMi4zYy0wLjQtMC40LTAuOS0wLjctMS43LTAuN2MtMC42LDAtMS4yLDAuMy0xLjcsMC43Yy0wLjUsMC40LTAuOSwxLjItMS4yLDJ2OC4yaC0xLjN2LTE1LjFoMS4zTDExNi4xLDE0NS4yCgkJTDExNi4xLDE0NS4yeiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTEyNiwxMzkuOWMwLTAuMywwLjEtMC40LDAuMi0wLjZjMC4yLTAuMiwwLjQtMC4zLDAuNi0wLjNzMC40LDAuMSwwLjYsMC4zYzAuMiwwLjIsMC4yLDAuNCwwLjIsMC42CgkJYzAsMC4zLTAuMSwwLjQtMC4yLDAuNmMtMC4yLDAuMi0wLjQsMC4zLTAuNiwwLjNjLTAuMywwLTAuNC0wLjEtMC42LTAuM1MxMjYsMTQwLjIsMTI2LDEzOS45eiBNMTI3LjQsMTU1LjJoLTEuM3YtMTEuOGgxLjNWMTU1LjJ6CgkJIi8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTMyLjMsMTQzLjN2MS45YzAuNC0wLjYsMC44LTEuMiwxLjMtMS41YzAuNS0wLjQsMS4yLTAuNSwxLjktMC41YzIuMSwwLDMuMSwxLjMsMy4xLDQuMXY4aC0xLjJ2LTcuOAoJCWMwLTEuMS0wLjItMS45LTAuNS0yLjNjLTAuNC0wLjQtMC45LTAuNy0xLjctMC43Yy0wLjYsMC0xLjIsMC4zLTEuNywwLjdjLTAuNSwwLjQtMC45LDEuMi0xLjIsMnY4LjJoLTEuM3YtMTEuOGgxLjJWMTQzLjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTQ0LjgsMTQ5LjNsLTEuMywxLjN2NC42aC0xLjN2LTE1aDEuM3Y4LjlsMS0xLjNsMy43LTQuNWgxLjVsLTQuMSw1bDQuNiw2LjhoLTEuNEwxNDQuOCwxNDkuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xNTIuMywxNTguMmwtMC44LTAuNWMwLjYtMC45LDEtMS44LDEtMi44di0xLjdoMS4zdjEuM0MxNTMuOCwxNTYsMTUzLjIsMTU3LjMsMTUyLjMsMTU4LjJ6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTY1LjEsMTUyLjVsMC4xLDAuNmwwLjEtMC43bDIuNC05LjFoMWwyLjQsOWwwLjIsMC45bDAuMi0wLjhsMi4xLTkuMWgxLjNsLTIuOSwxMS44aC0xLjFsLTIuNi05LjRsLTAuMS0wLjMKCQl2MC4zbC0yLjUsOS40aC0xLjFsLTIuOS0xMS44aDEuM0wxNjUuMSwxNTIuNXoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xODEuNCwxNTUuNGMtMS40LDAtMi41LTAuNC0zLjMtMS4zYy0wLjgtMC45LTEuMi0yLjItMS4yLTMuOXYtMS40YzAtMS43LDAuNC0zLjEsMS4yLTQuMQoJCWMwLjctMSwxLjgtMS41LDMuMS0xLjVjMS4zLDAsMi4yLDAuNCwzLDEuM3MxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFjMC42LDAuNywxLjQsMS4xLDIuNCwxLjEKCQljMS4yLDAsMi4xLTAuNCwyLjktMS4zbDAuNiwwLjhDMTg0LjIsMTU0LjgsMTgzLjEsMTU1LjQsMTgxLjQsMTU1LjR6IE0xODEuMywxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMxODMuOSwxNDUuNCwxODMuMSwxNDQuMywxODEuMywxNDQuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xOTcuNCwxNTQuM2MwLjgsMCwxLjUtMC4zLDItMC43YzAuNC0wLjQsMC43LTEuMiwwLjctMi4xaDEuMmMtMC4xLDEuMy0wLjQsMi4xLTEuMiwyLjlzLTEuNiwxLjEtMi43LDEuMQoJCWMtMS40LDAtMi41LTAuNC0zLjItMS4zcy0xLjEtMi4yLTEuMS00di0xLjRjMC0xLjgsMC40LTMuMSwxLjEtNC4xczEuOC0xLjMsMy4yLTEuM2MxLjIsMCwyLjEsMC40LDIuOCwxLjFzMS4xLDEuOCwxLjEsMy4xaC0xLjIKCQljMC0xLTAuMy0xLjctMC43LTIuMmMtMC40LTAuNS0xLjEtMC44LTItMC44Yy0xLjEsMC0xLjgsMC40LTIuMywxLjFzLTAuNywxLjgtMC43LDMuMnYxLjNjMCwxLjUsMC4zLDIuNiwwLjcsMy4zCgkJQzE5NS41LDE1My45LDE5Ni4zLDE1NC4zLDE5Ny40LDE1NC4zeiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIwOC44LDE0NC41Yy0wLjMtMC4xLTAuNS0wLjEtMC44LTAuMWMtMC43LDAtMS4zLDAuMy0xLjcsMC43Yy0wLjQsMC40LTAuOCwxLjEtMSwxLjl2OC4xSDIwNHYtMTEuOGgxLjJ2MS44CgkJYzAuNS0xLjMsMS41LTIsMi43LTJjMC40LDAsMC41LDAuMSwwLjcsMC4yTDIwOC44LDE0NC41eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIxNS4yLDE1NS40Yy0xLjQsMC0yLjUtMC40LTMuMy0xLjNjLTAuOC0wLjktMS4yLTIuMi0xLjItMy45di0xLjRjMC0xLjcsMC40LTMuMSwxLjItNC4xCgkJYzAuNy0xLDEuOC0xLjUsMy4xLTEuNWMxLjMsMCwyLjIsMC40LDMsMS4zczEsMi4xLDEuMSwzLjl2MS4ySDIxMnYwLjZjMCwxLjMsMC4zLDIuNCwwLjksMy4xYzAuNSwwLjcsMS40LDEuMSwyLjQsMS4xCgkJYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44QzIxOCwxNTQuOCwyMTYuOCwxNTUuNCwyMTUuMiwxNTUuNHogTTIxNSwxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMyMTcuNywxNDUuNCwyMTYuOCwxNDQuMywyMTUsMTQ0LjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMjI4LjIsMTU1LjJjLTAuMS0wLjQtMC4yLTAuOS0wLjItMS42Yy0wLjQsMC42LTAuOCwxLjEtMS40LDEuM2MtMC41LDAuNC0xLjIsMC40LTEuOSwwLjQKCQljLTEsMC0xLjgtMC4zLTIuNC0wLjljLTAuNS0wLjUtMC45LTEuNC0wLjktMi41YzAtMS4yLDAuNC0yLjEsMS4yLTIuOHMxLjktMSwzLjMtMWgyLjF2LTEuNmMwLTAuOC0wLjItMS40LTAuNi0xLjgKCQljLTAuNC0wLjQtMS4xLTAuNS0xLjktMC41Yy0wLjcsMC0xLjMsMC4yLTEuOSwwLjZjLTAuNCwwLjQtMC43LDEtMC43LDEuN2gtMS4zYzAtMSwwLjQtMS44LDEuMS0yLjVzMS42LTEsMi44LTFzMi4xLDAuMywyLjcsMC45CgkJYzAuNiwwLjYsMC45LDEuNCwwLjksMi42djUuOGMwLDEuMiwwLjEsMi4xLDAuNCwyLjZ2MC4xTDIyOC4yLDE1NS4yTDIyOC4yLDE1NS4yeiBNMjI0LjksMTU0LjJjMC43LDAsMS4zLTAuMiwxLjktMC41CgkJYzAuNS0wLjQsMS0wLjksMS4zLTEuNXYtMi45aC0yYy0xLjEsMC0yLDAuMy0yLjUsMC43Yy0wLjUsMC40LTAuOCwxLjItMC44LDJDMjIyLjcsMTUzLjUsMjIzLjQsMTU0LjIsMjI0LjksMTU0LjJ6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMjM0LjcsMTQwLjN2M2gyLjF2MS4xaC0yLjF2Ny45YzAsMC42LDAuMSwxLjIsMC4zLDEuNGMwLjIsMC40LDAuNSwwLjQsMSwwLjRjMC4yLDAsMC40LDAsMC45LTAuMXYxLjEKCQljLTAuMywwLjEtMC43LDAuMi0xLjIsMC4yYy0xLjQsMC0yLjEtMS0yLjEtM3YtOC4xaC0xLjh2LTEuMWgxLjh2LTNMMjM0LjcsMTQwLjNMMjM0LjcsMTQwLjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMjQzLjcsMTU1LjRjLTEuNCwwLTIuNS0wLjQtMy4zLTEuM2MtMC44LTAuOS0xLjItMi4yLTEuMi0zLjl2LTEuNGMwLTEuNywwLjQtMy4xLDEuMi00LjEKCQljMC43LTEsMS44LTEuNSwzLjEtMS41YzEuMywwLDIuMiwwLjQsMywxLjNjMC43LDAuOCwxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFjMC42LDAuNywxLjQsMS4xLDIuNCwxLjEKCQljMS4yLDAsMi4xLTAuNCwyLjktMS4zbDAuNiwwLjhDMjQ2LjQsMTU0LjgsMjQ1LjMsMTU1LjQsMjQzLjcsMTU1LjR6IE0yNDMuNSwxNDQuM2MtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMyNDYuMiwxNDUuNCwyNDUuMywxNDQuMywyNDMuNSwxNDQuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0yNTAuMiwxNTguMmwtMC44LTAuNWMwLjYtMC45LDEtMS44LDEtMi44di0xLjdoMS4zdjEuM0MyNTEuNywxNTYsMjUxLjMsMTU3LjMsMjUwLjIsMTU4LjJ6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNNzkuNCwxNzhsMC4xLDAuNmwwLjEtMC43bDIuNC05LjFIODNsMi40LDlsMC4yLDAuOWwwLjItMC44bDIuMS05LjFoMS4zbC0yLjksMTEuOGgtMWwtMi42LTkuNGwtMC4xLTAuM3YwLjMKCQlsLTIuNSw5LjRoLTFsLTIuOS0xMS44aDEuM0w3OS40LDE3OHoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik05NS44LDE4MWMtMS40LDAtMi41LTAuNC0zLjMtMS4zcy0xLjItMi4yLTEuMi0zLjl2LTEuNGMwLTEuNywwLjQtMy4xLDEuMi00LjFjMC43LTEsMS44LTEuNSwzLjEtMS41CgkJYzEuMywwLDIuMiwwLjQsMywxLjNjMC43LDAuOCwxLDIuMSwxLjEsMy45djEuMmgtNy4xdjAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFzMS40LDEuMSwyLjQsMS4xYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44CgkJQzk4LjYsMTgwLjQsOTcuNCwxODEsOTUuOCwxODF6IE05NS42LDE2OS44Yy0xLDAtMS43LDAuNC0yLjIsMWMtMC41LDAuNy0wLjgsMS43LTAuOCwzaDUuOHYtMC40Qzk4LjMsMTcxLDk3LjQsMTY5LjgsOTUuNiwxNjkuOHoiCgkJLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMDkuNCwxODAuN2gtMS4zdi0xNi44aDEuM1YxODAuN3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMTIuNiwxNzQuM2MwLTEuNywwLjQtMywxLjItNGMwLjgtMSwxLjgtMS41LDMuMS0xLjVjMS4zLDAsMi40LDAuNCwzLjEsMS40czEuMiwyLjMsMS4yLDR2MS4zCgkJYzAsMS43LTAuNCwzLjEtMS4yLDRjLTAuOCwxLTEuOCwxLjQtMy4xLDEuNGMtMS4zLDAtMi4zLTAuNC0zLjEtMS40Yy0wLjgtMS0xLjItMi4yLTEuMi0zLjlWMTc0LjN6IE0xMTMuOCwxNzUuNAoJCWMwLDEuMywwLjMsMi40LDAuOCwzLjJjMC41LDAuOCwxLjMsMS4yLDIuMywxLjJzMS44LTAuNCwyLjMtMS4yYzAuNS0wLjgsMC44LTEuOCwwLjgtMy4ydi0xLjNjMC0xLjMtMC4zLTIuNC0wLjgtMy4yCgkJYy0wLjUtMC44LTEuMy0xLjItMi4zLTEuMnMtMS43LDAuNC0yLjIsMS4yYy0wLjUsMC44LTAuOCwxLjgtMC45LDMuMVYxNzUuNHoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xMjcuNiwxNzguOGwzLTkuOWgxLjNsLTMuNywxMS44aC0xbC0zLjctMTEuOGgxLjNMMTI3LjYsMTc4Ljh6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTM4LjMsMTgxYy0xLjQsMC0yLjUtMC40LTMuMy0xLjNjLTAuOC0wLjktMS4yLTIuMi0xLjItMy45di0xLjRjMC0xLjcsMC40LTMuMSwxLjItNC4xCgkJYzAuNy0xLDEuOC0xLjUsMy4xLTEuNWMxLjMsMCwyLjIsMC40LDMsMS4zYzAuNywwLjgsMSwyLjEsMS4xLDMuOXYxLjJIMTM1djAuNmMwLDEuMywwLjMsMi40LDAuOSwzLjFzMS40LDEuMSwyLjQsMS4xCgkJYzEuMiwwLDIuMS0wLjQsMi45LTEuM2wwLjYsMC44QzE0MS4xLDE4MC40LDEzOS45LDE4MSwxMzguMywxODF6IE0xMzguMSwxNjkuOGMtMSwwLTEuNywwLjQtMi4yLDFjLTAuNSwwLjctMC44LDEuNy0wLjgsM2g1LjgKCQl2LTAuNEMxNDAuOCwxNzEsMTM5LjgsMTY5LjgsMTM4LjEsMTY5Ljh6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTUzLjIsMTc1LjNsLTEsMS4ydjQuMmgtMnYtMTYuOGgydjEwbDMuNy01LjFoMi4zbC0zLjgsNC45bDQuMyw2LjloLTIuM0wxNTMuMiwxNzUuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xNjQuMiwxNjUuOGMwLDAuNC0wLjEsMC42LTAuMywwLjhjLTAuMiwwLjItMC40LDAuNC0wLjgsMC40Yy0wLjQsMC0wLjYtMC4xLTAuOC0wLjQKCQljLTAuMi0wLjItMC4zLTAuNC0wLjMtMC44YzAtMC40LDAuMS0wLjYsMC4zLTAuOGMwLjItMC4zLDAuNC0wLjQsMC44LTAuNGMwLjQsMCwwLjYsMC4xLDAuOCwwLjRTMTY0LjIsMTY1LjQsMTY0LjIsMTY1Ljh6CgkJIE0xNjQsMTgwLjdoLTJ2LTExLjhoMlYxODAuN3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0xNzEuMSwxNjZ2Mi45aDEuOHYxLjVoLTEuOHY3LjNjMCwwLjQsMC4xLDAuOCwwLjMsMS4xczAuNCwwLjQsMC44LDAuNGMwLjMsMCwwLjUsMCwwLjgtMC4xdjEuNgoJCWMtMC40LDAuMi0wLjksMC4yLTEuMywwLjJjLTAuOCwwLTEuMy0wLjMtMS44LTAuOGMtMC40LTAuNS0wLjYtMS4zLTAuNi0yLjN2LTcuM2gtMS44di0xLjVoMS44VjE2NkwxNzEuMSwxNjZMMTcxLjEsMTY2eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTE4MSwxNzkuM2MwLjYsMCwxLjItMC4yLDEuNS0wLjZjMC40LTAuNCwwLjYtMSwwLjYtMS43aDEuOGMwLDEuMi0wLjQsMi4xLTEuMywyLjljLTAuOCwwLjgtMS43LDEuMi0yLjgsMS4yCgkJYy0xLjQsMC0yLjYtMC40LTMuMy0xLjNjLTAuOC0wLjktMS4yLTIuMy0xLjItNC4xdi0xLjNjMC0xLjgsMC40LTMuMSwxLjItNC4xYzAuOC0wLjksMS45LTEuNCwzLjMtMS40YzEuMywwLDIuMSwwLjQsMi45LDEuMgoJCWMwLjcsMC44LDEuMSwxLjgsMS4yLDMuMWgtMS44YzAtMC45LTAuMy0xLjUtMC42LTJjLTAuNC0wLjQtMC45LTAuNi0xLjUtMC42Yy0wLjksMC0xLjUsMC4zLTEuOSwwLjhjLTAuNCwwLjUtMC42LDEuNS0wLjYsMi44djEuNQoJCWMwLDEuNCwwLjIsMi40LDAuNiwzQzE3OS40LDE3OSwxODAuMSwxNzkuMywxODEsMTc5LjN6Ii8+Cgk8cGF0aCBjbGFzcz0ic3QxIiBkPSJNMTkwLjcsMTcwLjFjMC43LTEsMS43LTEuNCwyLjktMS40YzIuMSwwLDMuMSwxLjQsMy4yLDQuMnY3LjloLTJWMTczYzAtMC45LTAuMi0xLjYtMC40LTIKCQljLTAuMy0wLjQtMC44LTAuNi0xLjQtMC42Yy0wLjQsMC0wLjksMC4yLTEuMywwLjRjLTAuNCwwLjQtMC43LDAuNy0wLjksMS4zdjguNmgtMlYxNjZoMkwxOTAuNywxNzAuMUwxOTAuNywxNzAuMXoiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0yMDUuNCwxODFjLTEuNCwwLTIuNi0wLjQtMy40LTEuM2MtMC44LTAuOS0xLjItMi4xLTEuMi0zLjl2LTEuNGMwLTEuOCwwLjQtMy4xLDEuMi00LjFzMS45LTEuNSwzLjItMS41CgkJYzEuMywwLDIuNCwwLjQsMy4xLDEuM3MxLjEsMi4yLDEuMSw0LjF2MS4zaC02LjZ2MC4zYzAsMS4zLDAuMywyLjIsMC43LDIuOHMxLjIsMC45LDIuMSwwLjljMC41LDAsMS4xLTAuMSwxLjUtMC40CgkJYzAuNC0wLjIsMC44LTAuNSwxLjMtMWwxLDEuM0MyMDguNCwxODAuMywyMDcuMSwxODEsMjA1LjQsMTgxeiBNMjA1LjIsMTcwLjNjLTAuOCwwLTEuNCwwLjMtMS44LDAuOGMtMC40LDAuNS0wLjYsMS40LTAuNiwyLjZoNC43CgkJdi0wLjNjLTAuMS0xLjItMC4zLTItMC42LTIuNEMyMDYuNCwxNzAuNiwyMDUuOSwxNzAuMywyMDUuMiwxNzAuM3oiLz4KCTxwYXRoIGNsYXNzPSJzdDEiIGQ9Ik0yMTUuMSwxNjguOWwwLjEsMS4zYzAuNy0xLDEuNy0xLjUsMi45LTEuNWMyLjEsMCwzLjEsMS40LDMuMiw0LjJ2Ny45aC0ydi03LjhjMC0wLjktMC4yLTEuNi0wLjQtMgoJCWMtMC4zLTAuNC0wLjgtMC42LTEuNC0wLjZjLTAuNCwwLTAuOSwwLjItMS4zLDAuNGMtMC40LDAuNC0wLjcsMC43LTAuOSwxLjN2OC42aC0ydi0xMS44TDIxNS4xLDE2OC45TDIxNS4xLDE2OC45eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIzMS40LDE3Ny43YzAtMC40LTAuMi0wLjgtMC40LTEuMWMtMC40LTAuMy0wLjktMC42LTEuOC0xLjFjLTEuMS0wLjQtMS44LTAuOC0yLjItMS4xcy0wLjctMC42LTEtMS4xCgkJYy0wLjItMC40LTAuNC0wLjktMC40LTEuNGMwLTEsMC40LTEuOCwxLjEtMi40YzAuNy0wLjYsMS42LTEsMi43LTFjMS4yLDAsMi4xLDAuNCwyLjgsMWMwLjcsMC43LDEuMSwxLjUsMS4xLDIuNmgtMgoJCWMwLTAuNS0wLjItMS0wLjUtMS4zYy0wLjQtMC40LTAuOC0wLjUtMS4zLTAuNWMtMC41LDAtMSwwLjItMS4zLDAuNGMtMC40LDAuMy0wLjQsMC43LTAuNCwxLjJjMCwwLjQsMC4xLDAuNywwLjQsMQoJCWMwLjMsMC4zLDAuOCwwLjUsMS43LDFjMS40LDAuNSwyLjQsMS4xLDMsMS42YzAuNSwwLjUsMC44LDEuMywwLjgsMi4xYzAsMS4xLTAuNCwxLjktMS4xLDIuNXMtMS43LDAuOS0yLjksMC45CgkJYy0xLjMsMC0yLjItMC40LTMtMS4xcy0xLjItMS42LTEuMi0yLjdoMmMwLDAuNiwwLjIsMS4yLDAuNiwxLjVjMC40LDAuNCwwLjksMC41LDEuNiwwLjVjMC42LDAsMS4yLTAuMiwxLjQtMC40CgkJQzIzMS4yLDE3OC42LDIzMS40LDE3OC4yLDIzMS40LDE3Ny43eiIvPgoJPHBhdGggY2xhc3M9InN0MSIgZD0iTTIzNi42LDE4MGMwLTAuMywwLjEtMC40LDAuMy0wLjZjMC4yLTAuMiwwLjQtMC4zLDAuNi0wLjNjMC4zLDAsMC40LDAuMSwwLjYsMC4zYzAuMiwwLjIsMC4zLDAuNCwwLjMsMC43CgkJcy0wLjEsMC40LTAuMywwLjZjLTAuMiwwLjItMC40LDAuMy0wLjYsMC4zYy0wLjMsMC0wLjUtMC4xLTAuNi0wLjNDMjM2LjYsMTgwLjMsMjM2LjUsMTgwLjIsMjM2LjYsMTgweiIvPgo8L2c+CjxyZWN0IHk9IjEzMi4yIiBjbGFzcz0ic3QyIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+CjxyZWN0IHg9IjI0LjkiIHk9IjEzMi4yIiBjbGFzcz0ic3QzIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+Cjwvc3ZnPgo=';
+let LOGO_PNG='';
+function svgToPng(dataUri,w,h){ return new Promise(res=>{ const img=new Image(); img.onload=()=>{ try{ const c=document.createElement('canvas'); c.width=w; c.height=h; c.getContext('2d').drawImage(img,0,0,w,h); res(c.toDataURL('image/png')); }catch(e){ res(''); } }; img.onerror=()=>res(''); img.src=dataUri; }); }
+try{ svgToPng(LOGO_DARK,420,302).then(p=>{ LOGO_PNG=p; }); }catch(e){}
+
+// ══════════════════ Login-Flow ══════════════════
+async function doLogin(){
+  const st=document.getElementById('loginMsStatus');
+  try{ st.textContent='Anmeldung läuft …'; await msalLogin(); if(msalAccount) await onLoggedIn(); }
+  catch(e){ st.textContent='Fehler: '+((e&&e.message)||e); console.error(e); }
+}
+async function onLoggedIn(){
+  USER=(msalAccount&&(msalAccount.name||msalAccount.username))||'';
+  document.getElementById('loginOv').style.display='none';
+  document.getElementById('appHeader').style.display='block';
+  document.getElementById('main').style.display='block';
+  document.getElementById('userBadge').textContent='👤 '+(USER? USER.split(' ')[0] : '–');
+  updateThemeBtn();
+  showLoader('Verbindung zu SharePoint …');
+  try{ await resolveIds(); }catch(e){ hideLoader(); document.getElementById('main').innerHTML='<div class="empty">SharePoint-Verbindung fehlgeschlagen:<br>'+esc((e&&e.message)||e)+'</div>'; return; }
+  // Projektkontext aus URL-Hash (#pid=...&projekt=...) – wie IBN-Aufruf aus der Hauptapp
+  const h=new URLSearchParams((location.hash||'').replace(/^#/,''));
+  const pid=h.get('pid'); const pname=h.get('projekt');
+  if(pid){ await openProject(pid, pname||''); }
+  else { await showProjectPicker(); }
+  hideLoader();
+}
+
+// ══════════════════ Projektauswahl ══════════════════
+async function showProjectPicker(){
+  showLoader('Baustellen werden geladen …');
+  let projects=[]; try{ projects=await loadProjectsList(); }catch(e){}
+  hideLoader();
+  const main=document.getElementById('main');
+  projects.sort((a,b)=>((b.lastEdit||b.created)||'').localeCompare((a.lastEdit||a.created)||''));
+  main.innerHTML='<h2 style="font-size:16px;color:var(--braun);margin:6px 2px 14px">Baustelle wählen</h2>'+
+    (projects.length? projects.map(p=>'<button class="opt" onclick="openProject('+JSON.stringify(p.pid)+','+JSON.stringify(p.name||'')+')">'+esc(p.name||p.pid)+'<small>'+(p.lastEdit||p.created? 'Geändert: '+fmtDE(p.lastEdit||p.created):'')+'</small></button>').join('')
+      : '<div class="empty">Keine Baustellen gefunden.</div>');
+}
+async function openProject(pid, pname){
+  PID=pid; PROJNAME=pname||pid;
+  showLoader('Stückliste & Einweisungsstatus …');
+  try{
+    const lv=await loadLV(pid); LV=buildTreeFromLV(lv);
+    EW=await loadEW(pid);
+    if(!PROJNAME||PROJNAME===pid){ const projs=await loadProjectsList(); const p=projs.find(x=>x.pid===pid); if(p) PROJNAME=p.name||pid; }
+  }catch(e){ hideLoader(); document.getElementById('main').innerHTML='<div class="empty">'+esc((e&&e.message)||e)+'</div>'; return; }
+  document.getElementById('projName').textContent=PROJNAME;
+  document.getElementById('projSub').textContent='Baustelle';
+  hideLoader();
+  renderOverview();
+}
+
+// ══════════════════ Übersicht ══════════════════
+function counts(){ let tot=0,ein=0; allDevices().forEach(d=>{ tot++; if(devState(d.g.pos)&&devState(d.g.pos).eingewiesen) ein++; }); return {tot,ein}; }
+function renderOverview(){
+  const main=document.getElementById('main');
+  const c=counts();
+  let html='<div class="toolbar"><button class="btn-primary" onclick="startSession()">+ Neue Einweisung</button>'+
+    '<span class="summary">'+c.ein+' von '+c.tot+' Geräten eingewiesen</span></div>';
+
+  // Allgemein-Karte
+  const allgProt=EW.protokolle.filter(p=>p.typ==='allgemein');
+  html+='<div class="card"><div class="card-h">Allgemein-Grundlagen</div><div class="card-b">'+
+    '<div class="hint">Generische Pflege-, Nutzungs- und Sicherheitsgrundlagen (Edelstahlmöbel, Klein-/Großgeräte). Als eigenes Protokoll je Übergabe.</div>'+
+    (allgProt.length? allgProt.map(protLine).join('') : '<div style="font-size:12px;color:var(--accent2)">Noch kein Allgemein-Protokoll erstellt.</div>')+
+    '</div></div>';
+
+  // Etagen
+  if(!LV.length){ html+='<div class="empty">Keine Geräte in der Stückliste dieser Baustelle.</div>'; }
+  LV.forEach((et,ei)=>{
+    let tot=0,ein=0; et.bereiche.forEach(b=>b.geraete.forEach(g=>{ tot++; if(devState(g.pos)&&devState(g.pos).eingewiesen) ein++; }));
+    const L=lid(et.label)+'_'+ei;
+    html+='<div class="etblock"><div class="ethd" onclick="toggleEt('+ei+')">'+
+      '<h3>'+esc(et.label)+(et.bez? ' · '+esc(et.bez):'')+'</h3>'+
+      '<span class="cnt">'+ein+'/'+tot+'</span><span class="tog" id="TOG_'+L+'">&#9660;</span></div>'+
+      '<div class="etbody" id="ETB_'+L+'">';
+    et.bereiche.forEach(b=>{
+      html+='<div class="berhd">'+esc(b.pos)+' '+esc(b.bez)+'</div>';
+      b.geraete.forEach(g=>{
+        const s=devState(g.pos); const ein=s&&s.eingewiesen;
+        html+='<div class="grow'+(ein?' ein':'')+'">'+
+          '<div class="gmark">'+(ein?'&#10003;':'')+'</div>'+
+          '<div class="gi"><div class="gbez">'+esc(g.bez)+'</div><div class="gmeta">'+esc(g.pos)+(g.fab? ' · '+esc(g.fab):'')+(g.typ? ' · '+esc(g.typ):'')+'</div></div>'+
+          '<div class="gstat">'+(ein? '<span class="ok">✓ '+fmtDE(s.datum)+'</span>' : '<span class="off">offen</span>')+'</div>'+
+        '</div>';
+      });
+    });
+    html+='</div></div>';
+  });
+
+  // Protokoll-Historie
+  const geraeteProt=EW.protokolle.filter(p=>p.typ!=='allgemein');
+  html+='<div class="card"><div class="card-h">Protokoll-Historie</div><div class="card-b">'+
+    (EW.protokolle.length? EW.protokolle.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).map(protLine).join('') : '<div style="font-size:12px;color:var(--accent2)">Noch keine Protokolle.</div>')+
+    '</div></div>';
+
+  main.innerHTML=html;
+}
+function protLine(p){
+  return '<div class="prow"><div class="pmain"><div class="pt">'+esc(p.titel||'Einweisung')+'</div>'+
+    '<div class="pm">'+fmtDE(p.datum)+(p.teilnehmer? ' · '+esc(p.teilnehmer):'')+(p.positions&&p.positions.length? ' · '+p.positions.length+' Gerät(e)':'')+' · Einweiser: '+esc(p.einweiser||'')+'</div></div>'+
+    (p.pdf? '<button class="plink" onclick="openPdf('+JSON.stringify(p.pdf)+')">PDF</button>':'')+'</div>';
+}
+function toggleEt(ei){ const L=lid(LV[ei].label)+'_'+ei; const b=document.getElementById('ETB_'+L); const t=document.getElementById('TOG_'+L); if(!b)return; const hid=b.classList.toggle('hid'); if(t)t.classList.toggle('cl',hid); }
+async function openPdf(fname){
+  showLoader('PDF wird geladen …');
+  try{ const blob=await spDownloadBlob(fname); const url=URL.createObjectURL(blob); window.open(url,'_blank'); }
+  catch(e){ alert('PDF konnte nicht geladen werden: '+((e&&e.message)||e)); }
+  finally{ hideLoader(); }
+}
+
+// ══════════════════ Sitzung (Neue Einweisung) ══════════════════
+let SESSION=null;
+function startSession(){
+  SESSION=null;
+  const ov=mkOverlay('Neue Einweisung');
+  ov.body.innerHTML='<div class="step-title">Art der Einweisung wählen</div>'+
+    '<button class="opt" onclick="sessionType(\'geraete\')">🔧 Geräte-Einweisung<small>Fertiggestellte(n) Bereich(e) oder einzelne Geräte einweisen und protokollieren.</small></button>'+
+    '<button class="opt" onclick="sessionType(\'allgemein\')">📋 Allgemein-Grundlagen<small>Pflege, Nutzung & Sicherheit (Edelstahlmöbel, Klein-/Großgeräte).</small></button>';
+}
+function sessionType(typ){
+  SESSION={ typ, selected:{}, sonder:{}, std:{}, teilnehmer:'', betreiber:'', datum:todayISO(), einweiser:USER||'', sig:'' };
+  if(typ==='geraete') renderSessionGeraete(); else renderSessionAllgemein();
+}
+
+function mkOverlay(title){
+  let ov=document.getElementById('ewOv'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='ewOv'; ov.className='ov';
+  ov.innerHTML='<div class="sheet"><div class="sheet-h"><button class="sheet-close" onclick="closeOverlay()">&#10005;</button><span class="ttl">'+esc(title)+'</span></div><div class="sheet-b" id="ewBody"></div></div>';
+  document.body.appendChild(ov);
+  return { ov, body:ov.querySelector('#ewBody') };
+}
+function closeOverlay(){ const ov=document.getElementById('ewOv'); if(ov) ov.remove(); SESSION=null; }
+
+function renderSessionGeraete(){
+  const body=document.getElementById('ewBody');
+  let html='<div class="step-title">1. Geräte auswählen</div>'+
+    '<div class="hint">Bereits eingewiesene Geräte sind ausgegraut. Ganzen Bereich per Kopfzeile wählen oder einzeln antippen.</div>';
+  LV.forEach((et,ei)=>{
+    const open=et.bereiche.some(b=>b.geraete.some(g=>!(devState(g.pos)&&devState(g.pos).eingewiesen)));
+    html+='<div style="margin:12px 0 4px;font-weight:700;color:var(--braun);font-size:13px">'+esc(et.label)+(et.bez?' · '+esc(et.bez):'')+'</div>';
+    et.bereiche.forEach((b,bi)=>{
+      html+='<div class="selbar"><div class="sub-bereich" style="padding:2px 6px">'+esc(b.pos)+' '+esc(b.bez)+'</div>'+
+        '<button class="chip" onclick="selBereich('+ei+','+bi+')">Bereich wählen</button></div>';
+      b.geraete.forEach(g=>{
+        const done=devState(g.pos)&&devState(g.pos).eingewiesen;
+        const sel=!!SESSION.selected[g.pos];
+        html+='<div class="selrow'+(sel?' on':'')+(done?' done':'')+'" onclick="selDev('+JSON.stringify(g.pos)+')">'+
+          '<div class="selbox">'+(sel?'&#10003;':'')+'</div>'+
+          '<div class="gi"><div class="gbez">'+esc(g.bez)+'</div><div class="gmeta">'+esc(g.pos)+(g.fab?' · '+esc(g.fab):'')+(g.typ?' · '+esc(g.typ):'')+(done?' · bereits eingewiesen':'')+'</div></div>'+
+        '</div>';
+        if(sel){
+          const checks=SESSION.sonder[g.pos]||(SESSION.sonder[g.pos]=checksFor(g).map(t=>({txt:t,done:false})));
+          checks.forEach((c,ci)=>{ html+='<div class="sck'+(c.done?' on':'')+'" onclick="toggleSck('+JSON.stringify(g.pos)+','+ci+')"><div class="sckb">'+(c.done?'&#10003;':'')+'</div><div>'+esc(c.txt)+'</div></div>'; });
+        }
+      });
+    });
+  });
+  html+=footerFields();
+  body.innerHTML=html;
+  initSig();
+}
+function renderSessionAllgemein(){
+  const body=document.getElementById('ewBody');
+  let html='<div class="step-title">1. Grundlagen bestätigen</div>';
+  STD_FORMS.forEach(f=>{
+    const arr=SESSION.std[f.id]||(SESSION.std[f.id]=f.checks.map(t=>({txt:t,done:false})));
+    html+='<div class="card"><div class="card-h" style="font-size:13px">'+esc(f.titel)+'</div><div class="card-b" style="padding:6px 10px">';
+    arr.forEach((c,ci)=>{ html+='<div class="sck'+(c.done?' on':'')+'" style="padding-left:0" onclick="toggleStd('+JSON.stringify(f.id)+','+ci+')"><div class="sckb">'+(c.done?'&#10003;':'')+'</div><div>'+esc(c.txt)+'</div></div>'; });
+    html+='</div></div>';
+  });
+  html+=footerFields();
+  body.innerHTML=html;
+  initSig();
+}
+function footerFields(){
+  return '<div class="step-title" style="margin-top:16px">2. Teilnehmer & Unterschrift</div>'+
+    '<div class="fld"><label>Eingewiesene Person (Teilnehmer) *</label><input id="f_teil" value="'+esc(SESSION.teilnehmer)+'" oninput="SESSION.teilnehmer=this.value" placeholder="Name"></div>'+
+    '<div class="fld"><label>Betreiber / Firma</label><input id="f_betr" value="'+esc(SESSION.betreiber)+'" oninput="SESSION.betreiber=this.value" placeholder="optional"></div>'+
+    '<div class="fld"><label>Datum</label><input id="f_datum" type="date" value="'+esc(SESSION.datum)+'" oninput="SESSION.datum=this.value"></div>'+
+    '<div class="fld"><label>Einweiser (KPC)</label><input id="f_einw" value="'+esc(SESSION.einweiser)+'" oninput="SESSION.einweiser=this.value"></div>'+
+    '<div class="fld"><label>Unterschrift der eingewiesenen Person *</label><div class="sigwrap"><canvas id="sigCanvas"></canvas><div class="sigtools"><span style="font-size:11px;color:var(--accent2)">Mit dem Finger unterschreiben</span><button onclick="clearSig()">Löschen</button></div></div></div>'+
+    '<button class="finish" onclick="finishSession()">Protokoll abschließen &amp; speichern</button>';
+}
+function selDev(pos){ if(SESSION.selected[pos]) delete SESSION.selected[pos]; else SESSION.selected[pos]=true; renderSessionGeraete(); }
+function selBereich(ei,bi){ const b=LV[ei].bereiche[bi]; const anyOff=b.geraete.some(g=>!SESSION.selected[g.pos]); b.geraete.forEach(g=>{ if(anyOff) SESSION.selected[g.pos]=true; else delete SESSION.selected[g.pos]; }); renderSessionGeraete(); }
+function toggleSck(pos,ci){ SESSION.sonder[pos][ci].done=!SESSION.sonder[pos][ci].done; renderSessionGeraete(); }
+function toggleStd(fid,ci){ SESSION.std[fid][ci].done=!SESSION.std[fid][ci].done; renderSessionAllgemein(); }
+
+// ── Unterschrift-Pad ──
+function initSig(){
+  const cv=document.getElementById('sigCanvas'); if(!cv) return;
+  const ratio=window.devicePixelRatio||1;
+  const rect=cv.getBoundingClientRect();
+  cv.width=Math.max(300,rect.width)*ratio; cv.height=160*ratio;
+  const ctx=cv.getContext('2d'); ctx.scale(ratio,ratio); ctx.lineWidth=2.2; ctx.lineCap='round'; ctx.strokeStyle='#1a1a1a';
+  let drawing=false, last=null, dirty=false;
+  function pt(e){ const r=cv.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return {x:t.clientX-r.left, y:t.clientY-r.top}; }
+  function down(e){ e.preventDefault(); drawing=true; last=pt(e); }
+  function move(e){ if(!drawing)return; e.preventDefault(); const p=pt(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; dirty=true; }
+  function up(){ if(drawing&&dirty){ SESSION.sig=cv.toDataURL('image/png'); } drawing=false; }
+  cv.addEventListener('mousedown',down); cv.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
+  cv.addEventListener('touchstart',down,{passive:false}); cv.addEventListener('touchmove',move,{passive:false}); cv.addEventListener('touchend',up);
+  // vorhandene Unterschrift wiederherstellen
+  if(SESSION.sig){ const img=new Image(); img.onload=()=>ctx.drawImage(img,0,0,cv.width/ratio,cv.height/ratio); img.src=SESSION.sig; }
+}
+function clearSig(){ SESSION.sig=''; const cv=document.getElementById('sigCanvas'); if(cv){ cv.getContext('2d').clearRect(0,0,cv.width,cv.height); } }
+
+// ══════════════════ Abschluss: PDF + SharePoint + Rückschreibung ══════════════════
+async function finishSession(){
+  if(!SESSION.teilnehmer.trim()){ alert('Bitte den Namen der eingewiesenen Person eingeben.'); return; }
+  if(!SESSION.sig){ alert('Bitte die Unterschrift der eingewiesenen Person erfassen.'); return; }
+  let positions=[];
+  if(SESSION.typ==='geraete'){
+    positions=Object.keys(SESSION.selected);
+    if(!positions.length){ alert('Bitte mindestens ein Gerät auswählen.'); return; }
+  }
+  showLoader('Protokoll wird erstellt …');
+  try{
+    const id='P'+Date.now();
+    const iso=new Date(SESSION.datum+'T12:00:00').toISOString();
+    const titel = SESSION.typ==='allgemein' ? 'Grundlagen-Einweisung' : 'Geräte-Einweisung';
+    // PDF bauen
+    const pdfBlob=buildPdf(titel, positions);
+    // Ablage in SharePoint
+    const folder=safeName(PROJNAME)+'/_Einweisung';
+    const fname=folder+'/Einweisung_'+(SESSION.typ)+'_'+SESSION.datum.replace(/-/g,'')+'_'+id.slice(-6)+'.pdf';
+    await spUpload(fname, pdfBlob, 'application/pdf');
+    // Status aktualisieren
+    if(SESSION.typ==='geraete'){
+      positions.forEach(pos=>{ EW.devices[pos]={ eingewiesen:true, datum:iso, by:USER||'', protokollId:id, sonderChecks:(SESSION.sonder[pos]||[]).map(c=>({txt:c.txt,done:c.done})) }; });
+      showLoader('Status wird in die Positionen zurückgeschrieben …');
+      await writeBackEingewiesen(positions, iso);
+    } else {
+      Object.keys(SESSION.std).forEach(fid=>{ EW.std[fid]={ checks:SESSION.std[fid].map(c=>({txt:c.txt,done:c.done})) }; });
+    }
+    EW.protokolle.push({ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), betreiber:SESSION.betreiber.trim(), einweiser:SESSION.einweiser.trim(), positions, titel, pdf:fname, ts:Date.now() });
+    showLoader('Wird in SharePoint gespeichert …');
+    await saveEW();
+    hideLoader();
+    closeOverlay();
+    renderOverview();
+    toast('✓ Einweisungsprotokoll gespeichert');
+    // PDF gleich anzeigen
+    try{ window.open(URL.createObjectURL(pdfBlob),'_blank'); }catch(e){}
+  }catch(e){ hideLoader(); console.error(e); alert('Speichern fehlgeschlagen: '+((e&&e.message)||e)); }
+}
+
+// ── PDF-Layout (jsPDF, manuell) ──
+function buildPdf(titel, positions){
+  const { jsPDF }=window.jspdf;
+  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const W=210, M=15; let y=16;
+  const brown=[137,85,0], grey=[150,150,150], dark=[43,43,43];
+  // Kopf – echtes KPC-Logo (falls gerastert), sonst Text-Fallback
+  if(LOGO_PNG){ try{ doc.addImage(LOGO_PNG,'PNG',M,y-6,26,26*181/251.7); }catch(e){ doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor.apply(doc,dark); doc.text('KPC',M,y); } }
+  else { doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor.apply(doc,dark); doc.text('KPC',M,y); doc.setFontSize(8); doc.setTextColor.apply(doc,grey); doc.text('GMBH',M+16,y); }
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor.apply(doc,dark);
+  doc.text('Einweisungsprotokoll',W-M,y-4,{align:'right'});
+  doc.setFont('helvetica','normal'); doc.setTextColor.apply(doc,grey); doc.setFontSize(8);
+  doc.text('Projekt: '+PROJNAME, W-M, y, {align:'right'});
+  doc.text('Datum: '+fmtDE(SESSION.datum), W-M, y+4, {align:'right'});
+  y+=6; doc.setDrawColor.apply(doc,brown); doc.setLineWidth(0.8); doc.line(M,y,W-M,y); y+=8;
+  // Titel + Meta
+  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor.apply(doc,brown); doc.text(titel,M,y); y+=7;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor.apply(doc,dark);
+  doc.text('Einweiser (KPC): '+(SESSION.einweiser||'–'),M,y); y+=5;
+  if(SESSION.betreiber) { doc.text('Betreiber: '+SESSION.betreiber,M,y); y+=5; }
+  y+=2;
+  function pageCheck(extra){ if(y+(extra||0)>270){ doc.addPage(); y=18; } }
+  // Inhalt
+  if(SESSION.typ==='allgemein'){
+    STD_FORMS.forEach(f=>{
+      pageCheck(10);
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor.apply(doc,brown); doc.text(f.titel,M,y); y+=5;
+      doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor.apply(doc,dark);
+      (SESSION.std[f.id]||[]).forEach(c=>{ pageCheck(6); const mark=c.done?'[x] ':'[ ] '; const lines=doc.splitTextToSize(mark+c.txt, W-2*M-2); doc.text(lines,M+2,y); y+=lines.length*4.6; });
+      y+=3;
+    });
+  } else {
+    // nach Etage/Bereich gruppieren
+    const byGroup={};
+    positions.forEach(pos=>{ const d=allDevices().find(x=>x.g.pos===pos); if(!d) return; const key=d.et.label+'||'+d.b.pos+' '+d.b.bez; (byGroup[key]=byGroup[key]||[]).push(d); });
+    Object.keys(byGroup).forEach(key=>{
+      pageCheck(10);
+      const parts=key.split('||');
+      doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor.apply(doc,brown);
+      doc.text(parts[0]+'  ·  '+parts[1],M,y); y+=5.5;
+      byGroup[key].forEach(d=>{
+        pageCheck(7);
+        doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor.apply(doc,dark);
+        const head='[x] '+d.g.pos+'  '+d.g.bez+(d.g.fab? '  ('+d.g.fab+(d.g.typ? ' '+d.g.typ:'')+')':'');
+        const hl=doc.splitTextToSize(head, W-2*M-2); doc.text(hl,M+2,y); y+=hl.length*4.6;
+        doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc,grey);
+        (SESSION.sonder[d.g.pos]||[]).forEach(c=>{ pageCheck(5); doc.text((c.done?'· ':'· ')+c.txt,M+8,y); y+=4; });
+        y+=1.5;
+      });
+      y+=2;
+    });
+  }
+  // Unterschriften
+  pageCheck(45); y=Math.max(y,255);
+  const colW=(W-2*M-20)/2;
+  if(SESSION.sig){ try{ doc.addImage(SESSION.sig,'PNG',M,y-2,colW*0.9,20); }catch(e){} }
+  doc.setDrawColor.apply(doc,dark); doc.setLineWidth(0.3);
+  doc.line(M,y+22,M+colW,y+22); doc.line(M+colW+20,y+22,M+2*colW+20,y+22);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc,grey);
+  doc.text((SESSION.teilnehmer||'')+(SESSION.betreiber? ' · '+SESSION.betreiber:''),M,y+26);
+  doc.text('Name & Unterschrift der eingewiesenen Person',M,y+30);
+  doc.text(SESSION.einweiser||'',M+colW+20,y+26);
+  doc.text('Unterschrift Einweiser (KPC GmbH)',M+colW+20,y+30);
+  return doc.output('blob');
+}
+
+// ══════════════════ INIT ══════════════════
+(async function init(){
+  const st=document.getElementById('loginMsStatus');
+  try{ await msalInit(); if(msalAccount) await onLoggedIn(); }
+  catch(e){ if(st) st.textContent='Init-Fehler: '+((e&&e.message)||e); console.error(e); }
+})();
+</script>
+</body>
+</html>
