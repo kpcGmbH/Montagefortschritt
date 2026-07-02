@@ -280,6 +280,7 @@ async function loadEW(pid){
   let ew={ v:1, devices:{}, std:{}, protokolle:[] };
   if(txt){ try{ ew=JSON.parse(txt); }catch(e){} }
   ew.devices=ew.devices||{}; ew.std=ew.std||{}; ew.protokolle=ew.protokolle||[];
+  if(ew.auftraggeber==null) ew.auftraggeber=''; if(ew.ort==null) ew.ort='';
   return ew;
 }
 async function saveEW(){ await spUploadText('EINWEISUNG_'+PID+'.json', JSON.stringify(EW)); }
@@ -292,7 +293,7 @@ function buildTreeFromLV(lv){
     (sec.subsections||[]).forEach(sub=>{
       const ber={ pos:sub.pos||'', bez:sub.bez||'', geraete:[] };
       (sub.items||[]).forEach(it=>{
-        ber.geraete.push({ pos:it.pos, bez:(it.bez||'').trim(), fab:(it.fabrikat||'').trim(), typ:(it.typ||'').trim(), gew:(it.gew||[]) });
+        ber.geraete.push({ pos:it.pos, bez:(it.bez||'').trim(), fab:(it.fabrikat||'').trim(), typ:(it.typ||'').trim(), gew:(it.gew||[]), menge:(it.menge!=null?it.menge:''), einh:(it.einh||'').trim() });
       });
       if(ber.geraete.length) et.bereiche.push(ber);
     });
@@ -485,8 +486,10 @@ function startSession(){
     '<button class="opt" onclick="sessionType(\'geraete\')">🔧 Geräte-Einweisung<small>Fertiggestellte(n) Bereich(e) oder einzelne Geräte einweisen und protokollieren.</small></button>'+
     '<button class="opt" onclick="sessionType(\'allgemein\')">📋 Allgemein-Grundlagen<small>Pflege, Nutzung & Sicherheit (Edelstahlmöbel, Klein-/Großgeräte).</small></button>';
 }
+// Ort aus dem Projektnamen ableiten (Schema "Nummer Ort Objekt")
+function deriveOrt(){ const p=(PROJNAME||'').trim().split(/\s+/); return p.length>=2? p[1] : ''; }
 function sessionType(typ){
-  SESSION={ typ, selected:{}, sonder:{}, std:{}, collapsed:{}, teilnehmer:'', betreiber:'', datum:todayISO(), einweiser:USER||'', sig:'' };
+  SESSION={ typ, selected:{}, sonder:{}, std:{}, collapsed:{}, teilnehmer:'', auftraggeber:(EW.auftraggeber||''), ort:(EW.ort||deriveOrt()), datum:todayISO(), einweiser:USER||'', sig:'' };
   if(typ==='geraete') renderSessionGeraete(); else renderSessionAllgemein();
 }
 
@@ -560,10 +563,11 @@ function renderSessionAllgemein(){
 }
 function footerFields(){
   return '<div class="step-title" style="margin-top:16px">2. Teilnehmer & Unterschrift</div>'+
-    '<div class="fld"><label>Eingewiesene Person (Teilnehmer) *</label><input id="f_teil" value="'+esc(SESSION.teilnehmer)+'" oninput="SESSION.teilnehmer=this.value" placeholder="Name"></div>'+
-    '<div class="fld"><label>Betreiber / Firma</label><input id="f_betr" value="'+esc(SESSION.betreiber)+'" oninput="SESSION.betreiber=this.value" placeholder="optional"></div>'+
-    '<div class="fld"><label>Datum</label><input id="f_datum" type="date" value="'+esc(SESSION.datum)+'" oninput="SESSION.datum=this.value"></div>'+
+    '<div class="fld"><label>Auftraggeber</label><input id="f_ag" value="'+esc(SESSION.auftraggeber)+'" oninput="SESSION.auftraggeber=this.value" placeholder="z.B. Goetze KG Armaturen"></div>'+
+    '<div class="fld"><label>Bedienungsperson / eingewiesene Person *</label><input id="f_teil" value="'+esc(SESSION.teilnehmer)+'" oninput="SESSION.teilnehmer=this.value" placeholder="Name (Techniker, Hausmeister, Küchenpersonal …)"></div>'+
     '<div class="fld"><label>Einweiser (KPC)</label><input id="f_einw" value="'+esc(SESSION.einweiser)+'" oninput="SESSION.einweiser=this.value"></div>'+
+    '<div class="fld"><label>Ort (für „Anerkannt")</label><input id="f_ort" value="'+esc(SESSION.ort)+'" oninput="SESSION.ort=this.value" placeholder="Ort"></div>'+
+    '<div class="fld"><label>Datum</label><input id="f_datum" type="date" value="'+esc(SESSION.datum)+'" oninput="SESSION.datum=this.value"></div>'+
     '<div class="fld"><label>Unterschrift der eingewiesenen Person *</label><div class="sigwrap"><canvas id="sigCanvas"></canvas><div class="sigtools"><span style="font-size:11px;color:var(--accent2)">Mit dem Finger unterschreiben</span><button onclick="clearSig()">Löschen</button></div></div></div>'+
     '<button class="finish" onclick="finishSession()">Protokoll abschließen &amp; speichern</button>';
 }
@@ -623,7 +627,9 @@ async function finishSession(){
     } else {
       Object.keys(SESSION.std).forEach(fid=>{ EW.std[fid]={ checks:SESSION.std[fid].map(c=>({txt:c.txt,done:c.done})) }; });
     }
-    EW.protokolle.push({ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), betreiber:SESSION.betreiber.trim(), einweiser:SESSION.einweiser.trim(), positions, titel, pdf:fname, ts:Date.now() });
+    // Auftraggeber + Ort projektweit merken (nachträglich editierbar)
+    EW.auftraggeber=SESSION.auftraggeber.trim(); EW.ort=SESSION.ort.trim();
+    EW.protokolle.push({ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), einweiser:SESSION.einweiser.trim(), positions, titel, pdf:fname, ts:Date.now() });
     showLoader('Wird in SharePoint gespeichert …');
     await saveEW();
     hideLoader();
@@ -639,66 +645,115 @@ async function finishSession(){
 function buildPdf(titel, positions){
   const { jsPDF }=window.jspdf;
   const doc=new jsPDF({unit:'mm',format:'a4'});
-  const W=210, M=15;
-  const brown=[137,85,0], grey=[150,150,150], dark=[43,43,43];
-  // Kopf – KPC-Wortmarke (dunkel) links, Meta rechts, Trennlinie darunter
+  const W=210, M=18;
+  const brown=[137,85,0], grey=[110,110,110], dark=[43,43,43];
   const logoH=15, logoW=logoH*149.8/181;
-  if(LOGO_PNG){ try{ doc.addImage(LOGO_PNG,'PNG',M,11,logoW,logoH); }catch(e){ doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor.apply(doc,dark); doc.text('kpc',M,22); } }
-  else { doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.setTextColor.apply(doc,dark); doc.text('kpc',M,22); }
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor.apply(doc,dark);
-  doc.text('Einweisungsprotokoll',W-M,14,{align:'right'});
-  doc.setFont('helvetica','normal'); doc.setTextColor.apply(doc,grey); doc.setFontSize(9);
-  doc.text('Projekt: '+PROJNAME, W-M, 20, {align:'right'});
-  doc.text('Datum: '+fmtDE(SESSION.datum), W-M, 25, {align:'right'});
-  let y=32; doc.setDrawColor.apply(doc,brown); doc.setLineWidth(0.8); doc.line(M,y,W-M,y); y+=8;
-  // Titel + Meta
-  doc.setFont('helvetica','bold'); doc.setFontSize(13); doc.setTextColor.apply(doc,brown); doc.text(titel,M,y); y+=7;
-  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor.apply(doc,dark);
-  doc.text('Einweiser (KPC): '+(SESSION.einweiser||'–'),M,y); y+=5;
-  if(SESSION.betreiber) { doc.text('Betreiber: '+SESSION.betreiber,M,y); y+=5; }
-  y+=2;
-  function pageCheck(extra){ if(y+(extra||0)>270){ doc.addPage(); y=18; } }
-  // Inhalt
-  if(SESSION.typ==='allgemein'){
+  const datumDE=fmtDE(SESSION.datum);
+  const isAllg = SESSION.typ==='allgemein';
+  // Bereich aus den gewählten Geräten ableiten
+  const berSet=[]; positions.forEach(pos=>{ const d=allDevices().find(x=>x.g.pos===pos); if(d){ const b=(d.b.bez||'').trim(); if(b && berSet.indexOf(b)<0) berSet.push(b); } });
+  const bereichStr = berSet.length>3 ? 'siehe beigefügte Aufstellung' : berSet.join(', ');
+  function logo(){ if(LOGO_PNG){ try{ doc.addImage(LOGO_PNG,'PNG',M,12,logoW,logoH); return; }catch(e){} } doc.setFont('helvetica','bold'); doc.setFontSize(18); doc.setTextColor.apply(doc,dark); doc.text('kpc',M,23); }
+  function lab(t,x,yy){ doc.setFont('helvetica','normal'); doc.setTextColor.apply(doc,grey); doc.text(t,x,yy); }
+  function val(t,x,yy){ doc.setFont('helvetica','bold'); doc.setTextColor.apply(doc,dark); doc.text(t||'',x,yy); }
+
+  // ═══════════ SEITE 1 – Deckblatt ═══════════
+  logo();
+  doc.setFont('helvetica','bold'); doc.setFontSize(13.5); doc.setTextColor.apply(doc,dark);
+  doc.text('Inbetriebnahme- und', W-M, 16, {align:'right'});
+  doc.text('Einweisungsprotokoll', W-M, 22.5, {align:'right'});
+  let y=34; doc.setDrawColor.apply(doc,brown); doc.setLineWidth(0.8); doc.line(M,y,W-M,y); y+=9;
+
+  doc.setFontSize(10.5);
+  lab('Bauvorhaben:',M,y); val(PROJNAME,M+30,y); lab('Datum:',W-M-42,y); val(datumDE,W-M-30,y); y+=7;
+  lab('Gewerk:',M,y); val('Küchentechnik',M+30,y); y+=7;
+  lab('Bereich:',M,y); val(bereichStr,M+30,y); y+=7;
+  lab('Gerät:',M,y); val('gemäß beigefügter Aufstellung',M+30,y); y+=9;
+  lab('Auftragnehmer (ausführende Firma):',M,y); val('KPC GmbH',M+62,y); y+=10;
+
+  // Teilnehmer
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor.apply(doc,brown); doc.text('Teilnehmer',M,y); y+=6;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  const tLabs=['Auftraggeber:','Auftragnehmer (Einweisende Person):','Bedienungsperson:'];
+  let tvx=0; tLabs.forEach(l=>{ tvx=Math.max(tvx,doc.getTextWidth(l)); }); tvx=M+tvx+5;
+  lab(tLabs[0],M,y); val(SESSION.auftraggeber||'—',tvx,y); y+=6;
+  lab(tLabs[1],M,y); val((SESSION.einweiser?SESSION.einweiser+', ':'')+'KPC GmbH',tvx,y); y+=6;
+  lab(tLabs[2],M,y); val(SESSION.teilnehmer||'—',tvx,y); y+=4;
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor.apply(doc,grey); doc.text('(Techniker, Hausmeister, Küchenpersonal etc.)',M,y); y+=8;
+
+  // Einweisung durchgeführt
+  doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor.apply(doc,dark);
+  doc.text('Einweisung durchgeführt:',M,y); doc.setFont('helvetica','bold'); doc.text('[X] ja',M+55,y); doc.setFont('helvetica','normal'); doc.text('[  ] nein',M+75,y); y+=9;
+
+  // Bestätigungstext
+  doc.setFontSize(9.5); doc.setTextColor.apply(doc,dark);
+  const conf='Ich bestätige hiermit, dass ich von obiger Firma ausreichend eingewiesen wurde und in der Lage bin, obige Geräte zu bedienen. Ich wurde über die Funktionen, Produktionsabfolgen, Programmierschritte, Einsatzgebiete sowie Reinigung und Pflege der Geräte eingewiesen.';
+  const cl=doc.splitTextToSize(conf, W-2*M); doc.text(cl,M,y); y+=cl.length*5+7;
+
+  // Anerkannt
+  lab('Anerkannt:',M,y); val((SESSION.ort||'')+(SESSION.ort?', ':'')+datumDE,M+24,y); y+=16;
+
+  // Unterschriften (unten)
+  const colW=(W-2*M-16)/2; const sy=Math.max(y,248);
+  if(SESSION.sig){ try{ doc.addImage(SESSION.sig,'PNG',M+colW+16,sy-1,colW*0.8,17); }catch(e){} }
+  doc.setDrawColor.apply(doc,dark); doc.setLineWidth(0.3);
+  doc.line(M,sy+19,M+colW,sy+19); doc.line(M+colW+16,sy+19,M+2*colW+16,sy+19);
+  doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor.apply(doc,dark);
+  doc.text(SESSION.einweiser||'',M,sy+24); doc.text(SESSION.teilnehmer||'',M+colW+16,sy+24);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor.apply(doc,grey);
+  doc.text('Unterschrift Auftragnehmer (KPC GmbH)',M,sy+28);
+  doc.text('Auftraggeber – Eingewiesene Person',M+colW+16,sy+28);
+  doc.setFontSize(7); doc.text('Für diese Unterlage behalten wir uns alle Rechte vor.',M,289);
+
+  // ═══════════ SEITE 2 – Anlage ═══════════
+  if(isAllg){
+    doc.addPage(); logo();
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor.apply(doc,dark);
+    doc.text('Anlage – Grundlagen-Einweisung',W-M,18,{align:'right'});
+    let ya=34; doc.setDrawColor.apply(doc,brown); doc.setLineWidth(0.8); doc.line(M,ya,W-M,ya); ya+=9;
+    function ac(extra){ if(ya+(extra||0)>282){ doc.addPage(); ya=20; } }
     STD_FORMS.forEach(f=>{
-      pageCheck(10);
-      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor.apply(doc,brown); doc.text(f.titel,M,y); y+=5;
+      ac(12);
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor.apply(doc,brown); doc.text(f.titel,M,ya); ya+=6;
       doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor.apply(doc,dark);
-      (SESSION.std[f.id]||[]).forEach(c=>{ pageCheck(6); const mark=c.done?'[x] ':'[ ] '; const lines=doc.splitTextToSize(mark+c.txt, W-2*M-2); doc.text(lines,M+2,y); y+=lines.length*4.6; });
-      y+=3;
+      (SESSION.std[f.id]||[]).forEach(c=>{ ac(6); const mark=c.done?'[X]  ':'[  ]  '; const lines=doc.splitTextToSize(mark+c.txt, W-2*M-4); doc.text(lines,M+2,ya); ya+=lines.length*4.8; });
+      ya+=4;
     });
-  } else {
-    // nach Etage/Bereich gruppieren
-    const byGroup={};
-    positions.forEach(pos=>{ const d=allDevices().find(x=>x.g.pos===pos); if(!d) return; const key=d.et.label+'||'+d.b.pos+' '+d.b.bez; (byGroup[key]=byGroup[key]||[]).push(d); });
-    Object.keys(byGroup).forEach(key=>{
-      pageCheck(10);
-      const parts=key.split('||');
-      doc.setFont('helvetica','bold'); doc.setFontSize(10.5); doc.setTextColor.apply(doc,brown);
-      doc.text(parts[0]+'  ·  '+parts[1],M,y); y+=5.5;
-      byGroup[key].forEach(d=>{
-        pageCheck(7);
-        doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor.apply(doc,dark);
-        const head='[x] '+d.g.pos+'  '+d.g.bez+(d.g.fab? '  ('+d.g.fab+(d.g.typ? ' '+d.g.typ:'')+')':'');
-        const hl=doc.splitTextToSize(head, W-2*M-2); doc.text(hl,M+2,y); y+=hl.length*4.6;
-        doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc,grey);
-        (SESSION.sonder[d.g.pos]||[]).forEach(c=>{ pageCheck(5); doc.text((c.done?'· ':'· ')+c.txt,M+8,y); y+=4; });
-        y+=1.5;
+  } else if(positions.length){
+    doc.addPage(); logo();
+    doc.setFont('helvetica','bold'); doc.setFontSize(12); doc.setTextColor.apply(doc,dark);
+    doc.text('Anlage zum Inbetriebnahme- und',W-M,15,{align:'right'});
+    doc.text('Einweisungsprotokoll',W-M,20.5,{align:'right'});
+    let ya=32; doc.setDrawColor.apply(doc,brown); doc.setLineWidth(0.8); doc.line(M,ya,W-M,ya); ya+=6;
+    doc.setFont('helvetica','normal'); doc.setFontSize(9); doc.setTextColor.apply(doc,grey);
+    doc.text('Bauvorhaben: '+PROJNAME,M,ya); doc.text('Stand: '+datumDE,W-M,ya,{align:'right'}); ya+=8;
+    // Spalten: Pos | Stück | Einh | Bezeichnung | Fabrikat | Typ
+    const cx={pos:M, stk:M+24, einh:M+34, bez:M+46, fab:M+118, typ:M+150};
+    const wBez=cx.fab-cx.bez-2, wFab=cx.typ-cx.fab-2, wTyp=W-M-cx.typ;
+    function head(){
+      doc.setFont('helvetica','bold'); doc.setFontSize(8.5); doc.setTextColor.apply(doc,dark);
+      doc.text('Pos.',cx.pos,ya); doc.text('Stück',cx.stk,ya); doc.text('Einh.',cx.einh,ya); doc.text('Bezeichnung',cx.bez,ya); doc.text('Fabrikat',cx.fab,ya); doc.text('Typ',cx.typ,ya);
+      ya+=2; doc.setDrawColor.apply(doc,grey); doc.setLineWidth(0.2); doc.line(M,ya,W-M,ya); ya+=4;
+    }
+    function ac(extra){ if(ya+(extra||0)>285){ doc.addPage(); ya=20; head(); } }
+    head();
+    // nach Warengruppe (Section/Etage) gruppieren, Reihenfolge wie in der LV
+    const groups=[];
+    LV.forEach(et=>{ const items=[]; et.bereiche.forEach(b=>b.geraete.forEach(g=>{ if(positions.indexOf(g.pos)>=0) items.push(g); })); if(items.length) groups.push({label:et.label, items}); });
+    groups.forEach(gr=>{
+      ac(9);
+      doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor.apply(doc,brown); doc.text(gr.label,M,ya); ya+=5;
+      gr.items.forEach(g=>{
+        const bezL=doc.splitTextToSize(g.bez||'', wBez), fabL=doc.splitTextToSize(g.fab||'', wFab), typL=doc.splitTextToSize(g.typ||'', wTyp);
+        const rows=Math.max(bezL.length,fabL.length,typL.length,1); ac(rows*4.4+2);
+        doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc,dark);
+        doc.text(String(g.pos||''),cx.pos,ya); doc.text(String(g.menge||''),cx.stk,ya); doc.text(String(g.einh||''),cx.einh,ya);
+        doc.text(bezL,cx.bez,ya); doc.text(fabL,cx.fab,ya); doc.text(typL,cx.typ,ya);
+        ya+=rows*4.4+1.5;
       });
-      y+=2;
+      ya+=2;
     });
   }
-  // Unterschriften
-  pageCheck(45); y=Math.max(y,255);
-  const colW=(W-2*M-20)/2;
-  if(SESSION.sig){ try{ doc.addImage(SESSION.sig,'PNG',M,y-2,colW*0.9,20); }catch(e){} }
-  doc.setDrawColor.apply(doc,dark); doc.setLineWidth(0.3);
-  doc.line(M,y+22,M+colW,y+22); doc.line(M+colW+20,y+22,M+2*colW+20,y+22);
-  doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc,grey);
-  doc.text((SESSION.teilnehmer||'')+(SESSION.betreiber? ' · '+SESSION.betreiber:''),M,y+26);
-  doc.text('Name & Unterschrift der eingewiesenen Person',M,y+30);
-  doc.text(SESSION.einweiser||'',M+colW+20,y+26);
-  doc.text('Unterschrift Einweiser (KPC GmbH)',M+colW+20,y+30);
   return doc.output('blob');
 }
 
