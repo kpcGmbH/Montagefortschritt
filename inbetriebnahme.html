@@ -455,6 +455,32 @@ Winterhalter:{label:'Winterhalter',desc:'Spülmaschinen · Inbetriebnahmekarte &
        single('Inbetriebnahme-Prüfungen',[chk('Elektroanschlüsse geprüft'),chk('MTR+MTF: Abluft ohne Festanschluss ausgeführt'),chk('Reiniger eingestellt (ml/l oder g/l)'),chk('Wasseranschlüsse auf Dichtheit geprüft'),chk('Gerät erklärt und Personal eingewiesen'),chk('Klarspüler eingestellt (ml/l oder g/l)'),chk('Kapazität Wasseraufbereitung geprüft und eingestellt'),chk('Betriebsanleitung übergeben'),mea('Rohwasser-Zulauftemperatur','°C')]),
        sec('Altmaschine',[chk('Wurde eine Altmaschine ausgebaut?'),chk('Wurde die Altmaschine entsorgt?'),txt('Fabrikat der Altmaschine'),txt('Modell der Altmaschine'),txt('Serialnummer der Altmaschine')])
      ],sign:{mode:'unterschrift',roles:['Kunde']}}
+  }},
+
+'DGUV V3':{label:'DGUV V3',desc:'Prüfprotokoll für elektrische Geräte nach Instandsetzung, Änderung – Wiederholungsprüfung (BetrSichV / DGUV Vorschrift 3, Prüfgrundlage DIN VDE 0701-0702)',icon:'⚡',
+  devices:{
+   'Prüfprotokoll elektrische Geräte':{tags:['Elektro','Wiederholungsprüfung'],
+     pdfTitle:'PRÜFPROTOKOLL',pdfSub:'BetrSichV / DGUV Vorschrift 3 · DIN VDE 0701-0702',
+     kopf:[txt('Kunde'),txt('Gerät / Bezeichnung'),txt('Fabrikat'),txt('Typ / Modell'),txt('Seriennummer (S-Nr.)'),txt('Standort / Position'),txt('Baustelle'),txt('Datum')],
+     sections:[
+       sec('01 · Sichtprüfung',[
+         chk('Typenschild vorhanden und leserlich'),
+         chk('Gehäuse weist keine Beschädigung auf'),
+         chk('Allgemeiner Zustand ist zufriedenstellend')
+       ]),
+       sec('02 · Messung',[
+         mea('Schutzleiterwiderstand – Anschlussleitung bis 5 m Länge (SOLL max. 0,3 Ohm)','Ohm'),
+         mea('Schutzleiterwiderstand – bei festem Netzanschluss, zwischen Körper und Schutzleiter-Anschlussklemme (SOLL max. 1 Ohm)','Ohm'),
+         mea('Isolationswiderstand – Schutzklasse 1, Gerät mit Schutzleiteranschluss (SOLL min. 0,5 MOhm)','MOhm')
+       ],{comment:false}),
+       sec('03 · Funktionsprüfung',[
+         opt('Ergebnis der Funktionsprüfung',['Keine Mängel festgestellt','Mängel lt. gesondertem Bericht festgestellt']),
+         chk('Gerät geprüft – unter Beachtung der gültigen Vorschriften ist eine gefahrlose Benutzung des Gerätes möglich'),
+         chk('Prüfplakette erhalten'),
+         chk('Gerätesicherheit nicht gegeben – ein gefahrloser Betrieb ist nicht möglich; auf die Gefahr des Betreibens wurde hingewiesen')
+       ]),
+       sec('04 · Daten des benutzten Messgerätes',[txt('Typ / Bezeichnung')],{comment:false})
+     ],sign:{mode:'unterschrift',roles:['Servicetechniker']}}
   }}
 };
 
@@ -559,7 +585,7 @@ function continueDraft(){CUR.fresh=false;DRAFTAVAIL=false;loadState();openForm(C
 function openForm(dev,keepScroll){
   CUR.dev=dev;if(!(CUR.fresh&&!CUR.pos))loadState();applyPrefills();setCrumbs();
   const o=DB[CUR.mfr].devices[dev];
-  let h='<div class="formhead"><h2>'+CUR.mfr+' · '+dev+'</h2><div class="sub">Inbetriebnahmeprotokoll · Leistungsfeststellung</div>'+
+  let h='<div class="formhead"><h2>'+CUR.mfr+' · '+dev+'</h2><div class="sub">'+(o.pdfSub?(o.pdfTitle?o.pdfTitle.charAt(0)+o.pdfTitle.slice(1).toLowerCase()+' · ':'')+o.pdfSub:'Inbetriebnahmeprotokoll · Leistungsfeststellung')+'</div>'+
         '<div class="progress"><i id="prog"></i></div></div>'+((CUR.fresh&&!CUR.pos&&DRAFTAVAIL)?'<div class="draftbar">📝 Für dieses Gerät existiert ein früherer Entwurf. <button class="btn ghost small" onclick="continueDraft()">Letzten Entwurf fortsetzen</button></div>':'');
   // Kopfdaten
   h+='<div class="section"><div class="sh"><span class="bar"></span><h3>Allgemeine Angaben</h3></div><div class="body"><div class="grid2">';
@@ -680,9 +706,9 @@ function exportPDF(){
   let y=0,page=0;
   function header(){
     try{doc.addImage("data:image/png;base64,"+LOGO_B64,'PNG',mL,11,24,17.3);}catch(e){}
-    doc.setFont('RC');doc.setFontSize(15);doc.setTextColor(20,20,20);doc.text('INBETRIEBNAHMEPROTOKOLL',W-mR,16,{align:'right'});
+    doc.setFont('RC');doc.setFontSize(15);doc.setTextColor(20,20,20);doc.text(o.pdfTitle||'INBETRIEBNAHMEPROTOKOLL',W-mR,16,{align:'right'});
     doc.setFontSize(9.5);doc.setTextColor(...gray);doc.text(CUR.mfr+'  ·  '+CUR.dev,W-mR,21.5,{align:'right'});
-    doc.setFontSize(8);doc.text('Leistungsfeststellung',W-mR,25.5,{align:'right'});
+    doc.setFontSize(8);doc.text(o.pdfSub||'Leistungsfeststellung',W-mR,25.5,{align:'right'});
     doc.setDrawColor(...copper);doc.setLineWidth(0.5);doc.line(mL,32,W-mR,32);
     y=40;
   }
