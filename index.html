@@ -461,8 +461,11 @@ select.fs option{background:var(--surface);color:var(--text);}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
     <span class="fab-label">+ Fotos</span>
   </button>
-  <button class="fab-mini fab-icon" style="background:#5b4c8a;color:#fff" onclick="expRest()" title="Restarbeitenliste als PDF">
+  <button class="fab-mini fab-icon" style="background:#5b4c8a;color:#fff" onclick="expRest()" title="Restarbeitenliste als PDF (mit Fotos)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 0 2-2h11"/></svg>
+  </button>
+  <button class="fab-mini fab-icon" style="background:#1d6f42;color:#fff" onclick="expRestXlsx()" title="Restarbeitenliste als Excel">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 8l8 8M16 8l-8 8"/></svg>
   </button>
   <button class="fab-mini fab-icon" style="background:#b8860b;color:#fff" onclick="openTagesberichtDialog()" title="Tagesbericht (Datum wählen)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/></svg>
@@ -3037,10 +3040,9 @@ function raOlb(pos,idx,fi){
   loadImageAsBlob(fname).then(b=>{ document.getElementById('lbi').src=b||''; });
   document.getElementById('lb').classList.add('on');
 }
-function expRest(){
-  const now=new Date();
-  const d=now.toLocaleDateString('de-DE');
-  let rows=[];
+// Alle erfassten Restarbeiten einsammeln (für PDF-Bericht + Excel-Export)
+function collectRestRows(){
+  const rows=[];
   DATA.forEach(sec=>{
     sec.subsections.forEach(sub=>{
       sub.items.forEach(item=>{
@@ -3052,13 +3054,49 @@ function expRest(){
           rows.push({
             geschoss:sec.label, bereich:sub.bez, pos:item.pos, bez:item.bez.trim(),
             txt:r.txt, done:r.done, ersteller:r.ersteller, erstelltAm:r.erstelltAm,
-            erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm
+            erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
+            fotos:(r.fotos||[]).slice()
           });
         });
       });
     });
   });
+  return rows;
+}
+// Restarbeitenliste als Excel (.xlsx) – nutzt bereits geladenes SheetJS
+function expRestXlsx(){
+  if(typeof XLSX==='undefined'){ alert('Excel-Bibliothek ist nicht geladen (Internet nötig).'); return; }
+  const rows=collectRestRows();
+  if(rows.length===0){ alert('Keine Restarbeiten erfasst.'); return; }
+  const aoa=[['Geschoss','Bereich','Pos.','Gerät','Restarbeit','Status','Erstellt von','Erstellt am','Erledigt von','Erledigt am','Fotos']];
+  rows.forEach(r=>aoa.push([
+    r.geschoss||'', r.bereich||'', r.pos||'', r.bez||'', r.txt||'',
+    r.done?'Erledigt':'Offen',
+    r.ersteller||'', raFmtTs(r.erstelltAm)||'',
+    r.erledigtVon||'', raFmtTs(r.erledigtAm)||'',
+    (r.fotos&&r.fotos.length)?r.fotos.length:0
+  ]));
+  const ws=XLSX.utils.aoa_to_sheet(aoa);
+  ws['!cols']=[{wch:14},{wch:20},{wch:8},{wch:26},{wch:44},{wch:9},{wch:16},{wch:15},{wch:16},{wch:15},{wch:6}];
+  ws['!autofilter']={ref:'A1:K1'};
+  const wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Restarbeiten');
+  const slug=curProjName().replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'Projekt';
+  XLSX.writeFile(wb, 'Restarbeiten_'+slug+'_'+new Date().toISOString().slice(0,10)+'.xlsx');
+}
+async function expRest(){
+  const now=new Date();
+  const d=now.toLocaleDateString('de-DE');
+  let rows=collectRestRows();
   if(rows.length===0){alert('Keine Restarbeiten erfasst.');return;}
+  // Fotos vorab als Daten-URLs laden (das Berichts-Popup hat keinen Graph-Token)
+  const fotoData={};
+  const anyFoto=rows.some(r=>r.fotos&&r.fotos.length);
+  if(anyFoto){
+    showLoader('Bericht wird vorbereitet...');
+    for(const r of rows){ for(const src of (r.fotos||[])){ if(fotoData[src]!==undefined) continue; try{ fotoData[src]=await blobToDataURL(await getFileBlob(src)); }catch(e){ fotoData[src]=''; } } }
+    hideLoader();
+  }
   let lastG='',lastB='',tableRows='';
   rows.forEach((r,i)=>{
     if(r.geschoss!==lastG){
@@ -3079,6 +3117,11 @@ function expRest(){
       <td style="padding:5px 8px;font-size:10px;color:#895500">${r.ersteller||''}${r.erstelltAm?' · '+raFmtTs(r.erstelltAm):''}</td>
       <td style="padding:5px 8px;font-size:10px;color:#3a7a3a">${r.erledigtVon||''}${r.erledigtAm?' · '+raFmtTs(r.erledigtAm):''}</td>
     </tr>`;
+    if(r.fotos && r.fotos.length){
+      let imgs='';
+      r.fotos.forEach(src=>{ const durl=fotoData[src]||''; if(!durl) return; imgs+=`<img src="${durl}" style="width:110px;height:82px;object-fit:cover;border-radius:4px;border:1px solid #eee;margin:0 6px 6px 0">`; });
+      if(imgs) tableRows+=`<tr class="rafoto" data-done="${r.done?1:0}" style="background:${i%2===0?'#fff':'#faf9f7'}"><td colspan="6" style="padding:0 8px 8px 28px">${imgs}</td></tr>`;
+    }
   });
   const offen=rows.filter(r=>!r.done).length;
   const html=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
@@ -3108,6 +3151,7 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
   <button class="flt on" data-m="all" onclick="raFilter('all')">Alle</button>
   <button class="flt" data-m="offen" onclick="raFilter('offen')">Nur offene</button>
   <button class="flt" data-m="erledigt" onclick="raFilter('erledigt')">Nur erledigte</button>
+  ${anyFoto?'<span style="width:1px;height:20px;background:#d4cdc6;margin:0 2px"></span><button class="flt on" id="fotoTgl" onclick="toggleFotos()">📷 Fotos an</button>':''}
   <span id="fltInfo" style="font-size:12px;color:#a8a8a8;margin-left:4px"></span>
 </div>
 <table><thead><tr>
@@ -3121,14 +3165,24 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
   <button onclick="window.print()" style="padding:10px 24px;background:#5b4c8a;color:#fff;border:none;border-radius:4px;font-size:13px;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">Drucken / Als PDF speichern</button>
 </div>
 <script>
+var curMode='all', fotosOn=true;
+function toggleFotos(){ fotosOn=!fotosOn; var b=document.getElementById('fotoTgl'); if(b){ b.classList.toggle('on',fotosOn); b.textContent=fotosOn?'📷 Fotos an':'📷 Fotos aus'; } raFilter(curMode); }
 function raFilter(mode){
+  curMode=mode;
   var rows=[].slice.call(document.querySelectorAll('tbody tr'));
-  rows.forEach(function(tr){ if(tr.classList.contains('ra')){ var d=tr.getAttribute('data-done')==='1'; tr.style.display=(mode==='all'||(mode==='offen'&&!d)||(mode==='erledigt'&&d))?'':'none'; } });
+  rows.forEach(function(tr){
+    var isRa=tr.classList.contains('ra'), isFoto=tr.classList.contains('rafoto');
+    if(isRa||isFoto){ var d=tr.getAttribute('data-done')==='1';
+      var ok=(mode==='all'||(mode==='offen'&&!d)||(mode==='erledigt'&&d));
+      if(isFoto) ok=ok&&fotosOn;
+      tr.style.display=ok?'':'none';
+    }
+  });
   for(var i=0;i<rows.length;i++){ var tr=rows[i]; if(!tr.classList.contains('grp'))continue; var isG=tr.classList.contains('geschoss'); var vis=false;
     for(var j=i+1;j<rows.length;j++){ var t=rows[j]; if(t.classList.contains('grp')){ if(!isG)break; if(t.classList.contains('geschoss'))break; } if(t.classList.contains('ra')&&t.style.display!=='none'){vis=true;break;} }
     tr.style.display=vis?'':'none'; }
   rows.forEach(function(tr,i){ if(tr.classList.contains('spacer')){ var n=rows[i+1]; tr.style.display=(n&&n.style.display==='none')?'none':''; } });
-  [].forEach.call(document.querySelectorAll('.flt'),function(b){ b.classList.toggle('on', b.getAttribute('data-m')===mode); });
+  [].forEach.call(document.querySelectorAll('.flt[data-m]'),function(b){ b.classList.toggle('on', b.getAttribute('data-m')===mode); });
   var c=[].filter.call(document.querySelectorAll('tbody tr.ra'),function(t){return t.style.display!=='none';}).length;
   document.getElementById('fltInfo').textContent='('+c+' angezeigt)';
 }
