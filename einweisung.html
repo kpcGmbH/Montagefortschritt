@@ -684,59 +684,59 @@ function buildPdf(titel, positions){
   let y=34; doc.setDrawColor.apply(doc,brown); doc.setLineWidth(0.8); doc.line(M,y,W-M,y); y+=9;
 
   doc.setFontSize(10.5);
-  lab('Bauvorhaben:',M,y); val(PROJNAME,M+30,y); lab('Datum:',W-M-42,y); val(datumDE,W-M-30,y); y+=7;
-  lab('Gewerk:',M,y); val('Küchentechnik',M+30,y); y+=7;
-  lab('Bereich:',M,y); val(isAllg? 'bereichsübergreifend' : bereichStr,M+30,y); y+=7;
+  // Allgemein: kompaktere Zeilenabstände, damit alles möglichst auf eine Seite passt
+  const lh=isAllg?6:7;
+  lab('Bauvorhaben:',M,y); val(PROJNAME,M+30,y); lab('Datum:',W-M-42,y); val(datumDE,W-M-30,y); y+=lh;
+  lab('Gewerk:',M,y); val('Küchentechnik',M+30,y); y+=lh;
+  lab('Bereich:',M,y); val(isAllg? 'bereichsübergreifend' : bereichStr,M+30,y); y+=lh;
   if(!isAllg){ lab('Gerät:',M,y); val('gemäß beigefügter Aufstellung',M+30,y); y+=7; }
-  y+=2; lab('Auftragnehmer (ausführende Firma):',M,y); val('KPC GmbH',M+62,y); y+=10;
+  y+=(isAllg?1:2); lab('Auftragnehmer (ausführende Firma):',M,y); val('KPC GmbH',M+62,y); y+=(isAllg?8:10);
 
   // Teilnehmer
-  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor.apply(doc,brown); doc.text('Teilnehmer',M,y); y+=6;
+  doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor.apply(doc,brown); doc.text('Teilnehmer',M,y); y+=(isAllg?5:6);
   doc.setFont('helvetica','normal'); doc.setFontSize(10);
   const tLabs=['Auftraggeber:','Auftragnehmer (Einweisende Person):','Bedienungsperson:'];
   let tvx=0; tLabs.forEach(l=>{ tvx=Math.max(tvx,doc.getTextWidth(l)); }); tvx=M+tvx+5;
-  lab(tLabs[0],M,y); val(SESSION.auftraggeber||'—',tvx,y); y+=6;
-  lab(tLabs[1],M,y); val((SESSION.einweiser?SESSION.einweiser+', ':'')+'KPC GmbH',tvx,y); y+=6;
-  lab(tLabs[2],M,y); val(SESSION.teilnehmer||'—',tvx,y); y+=4;
-  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor.apply(doc,grey); doc.text('(Techniker, Hausmeister, Küchenpersonal etc.)',M,y); y+=8;
+  lab(tLabs[0],M,y); val(SESSION.auftraggeber||'—',tvx,y); y+=(isAllg?5.5:6);
+  lab(tLabs[1],M,y); val((SESSION.einweiser?SESSION.einweiser+', ':'')+'KPC GmbH',tvx,y); y+=(isAllg?5.5:6);
+  lab(tLabs[2],M,y); val(SESSION.teilnehmer||'—',tvx,y); y+=(isAllg?3:4);
+  doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor.apply(doc,grey); doc.text('(Techniker, Hausmeister, Küchenpersonal etc.)',M,y); y+=(isAllg?6.5:8);
 
   // Einweisung durchgeführt
   doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor.apply(doc,dark);
-  doc.text('Einweisung durchgeführt:',M,y); doc.setFont('helvetica','bold'); doc.text('[X] ja',M+55,y); doc.setFont('helvetica','normal'); doc.text('[  ] nein',M+75,y); y+=9;
+  doc.text('Einweisung durchgeführt:',M,y); doc.setFont('helvetica','bold'); doc.text('[X] ja',M+55,y); doc.setFont('helvetica','normal'); doc.text('[  ] nein',M+75,y); y+=(isAllg?7:9);
 
   // Bemerkung (optional)
   const komm=(SESSION.kommentar||'').trim();
   if(komm){
     doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor.apply(doc,grey); doc.text('Bemerkung:',M,y);
-    doc.setTextColor.apply(doc,dark); const kl=doc.splitTextToSize(komm, W-2*M-24); doc.text(kl,M+24,y); y+=Math.max(kl.length*5,5)+4;
+    doc.setTextColor.apply(doc,dark); const kl=doc.splitTextToSize(komm, W-2*M-24); doc.text(kl,M+24,y); y+=Math.max(kl.length*5,5)+(isAllg?2:4);
   }
 
   // ── Allgemein: die Grundlagen-Punkte stehen VOR dem Bestätigungstext auf dem Protokoll selbst ──
   if(isAllg){
-    doc.setFontSize(9.5); const blockH0=doc.splitTextToSize(confText(), W-2*M).length*5+9+14+32;
-    y+=2;
-    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor.apply(doc,brown); doc.text('Inhalte der Einweisung',M,y); y+=6.5;
-    STD_FORMS.forEach((f,fi)=>{
+    y+=1;
+    doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.setTextColor.apply(doc,brown); doc.text('Inhalte der Einweisung',M,y); y+=5.5;
+    STD_FORMS.forEach(f=>{
       const arr=SESSION.std[f.id]||[];
-      // Abschnitt möglichst nicht teilen; der letzte Abschnitt nimmt den Unterschriftenblock mit
-      const fh=5.5+arr.length*4.8+3;
-      const need=fh+(fi===STD_FORMS.length-1? 8+blockH0 : 0);
-      if(y+need>287 && fh<260){ doc.addPage(); y=20; }
-      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor.apply(doc,dark); doc.text(f.titel,M,y); y+=5.5;
+      const fh=4.8+arr.length*4.2+1.5;              // Abschnitt möglichst nicht teilen
+      if(y+fh>287 && fh<260){ doc.addPage(); y=20; }
+      doc.setFont('helvetica','bold'); doc.setFontSize(10); doc.setTextColor.apply(doc,dark); doc.text(f.titel,M,y); y+=4.8;
       doc.setFont('helvetica','normal'); doc.setFontSize(9.5); doc.setTextColor.apply(doc,dark);
-      arr.forEach(c=>{ if(y>282){ doc.addPage(); y=20; } const mark=c.done?'[X]  ':'[  ]  '; const lines=doc.splitTextToSize(mark+c.txt, W-2*M-4); doc.text(lines,M+2,y); y+=lines.length*4.8; });
-      y+=3;
+      arr.forEach(c=>{ if(y>283){ doc.addPage(); y=20; } const mark=c.done?'[X]  ':'[  ]  '; const lines=doc.splitTextToSize(mark+c.txt, W-2*M-4); doc.text(lines,M+2,y); y+=lines.length*4.2; });
+      y+=1.5;
     });
   }
 
   // ── Unterer Block: Bestätigungstext steht DIREKT über den Unterschriften (Text = das, was unterschrieben wird) ──
+  // Allgemein: folgt direkt auf den Inhalt (kompakt); Geräte: am unteren Seitenrand verankert (wie Vorlage)
   doc.setFontSize(9.5); const cl=doc.splitTextToSize(confText(), W-2*M); const confH=cl.length*5;
-  const blockH=confH+9+14+32;                       // Bestätigung + Anerkannt + Unterschriften
-  let by=Math.max(y+8, 287-blockH);                 // an den unteren Rand, aber nicht über den oberen Inhalt
-  if(by+blockH>289){ doc.addPage(); by=287-blockH; }// passt nicht mehr auf die Seite -> neue Seite, unten verankert
-  doc.setTextColor.apply(doc,dark); doc.text(cl,M,by); by+=confH+9;
+  const blockH=confH+(isAllg?5:9)+(isAllg?10:14)+(isAllg?30:32);  // Bestätigung + Anerkannt + Unterschriften
+  let by=isAllg? y+4 : Math.max(y+8, 287-blockH);
+  if(by+blockH>289){ doc.addPage(); by=isAllg? 20 : 287-blockH; }
+  doc.setTextColor.apply(doc,dark); doc.text(cl,M,by); by+=confH+(isAllg?5:9);
   // Anerkannt
-  lab('Anerkannt:',M,by); val((SESSION.ort||'')+(SESSION.ort?', ':'')+datumDE,M+24,by); by+=14;
+  lab('Anerkannt:',M,by); val((SESSION.ort||'')+(SESSION.ort?', ':'')+datumDE,M+24,by); by+=(isAllg?10:14);
   // Unterschriften direkt darunter
   const colW=(W-2*M-16)/2; const sy=by;
   if(SESSION.sig){ try{ doc.addImage(SESSION.sig,'PNG',M+colW+16,sy-1,colW*0.8,17); }catch(e){} }
