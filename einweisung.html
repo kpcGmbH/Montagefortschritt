@@ -24,7 +24,10 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;font-weight:300;-webkit-tap-highlight-color:transparent;}
+/* Durchgängig Roboto Condensed Light – wie in der Hauptapp (überschreibt Inline-Stile) */
+*{font-weight:300 !important;font-family:var(--font) !important;}
 button{font-family:inherit;}
+.noein{cursor:default !important;}
 
 /* LOGIN */
 #loginOv{position:fixed;inset:0;background:var(--anthrazit);z-index:9000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;color:#fff;}
@@ -97,6 +100,15 @@ main{padding:14px 12px 40px;max-width:900px;margin:0 auto;}
 .step-title{font-size:13px;font-weight:700;color:var(--braun);margin:4px 0 10px;letter-spacing:.3px;}
 .opt{display:block;width:100%;text-align:left;background:var(--white);border:2px solid var(--border);border-radius:10px;padding:14px;font-size:15px;font-weight:700;color:var(--text);cursor:pointer;margin-bottom:10px;}
 .opt small{display:block;font-weight:400;font-size:12px;color:var(--accent2);margin-top:3px;}
+.sel-et{background:var(--white);border:1px solid var(--border);border-radius:10px;margin-bottom:10px;overflow:hidden;}
+.sel-ethd{display:flex;align-items:center;gap:9px;padding:11px 13px;cursor:pointer;background:var(--bg2);border-left:4px solid var(--accent);}
+.sel-tog{font-size:11px;color:var(--braun);transition:transform .18s;}
+.sel-tog.cl{transform:rotate(-90deg);}
+.sel-etlbl{flex:1;font-size:14px;font-weight:700;color:var(--braun);}
+.sel-etcnt{font-size:11px;font-weight:700;color:var(--green);white-space:nowrap;}
+.sel-et .selbar{padding:0 12px;}
+.sel-et .selrow{padding-left:12px;padding-right:12px;}
+.sel-et .sck{padding-left:46px;padding-right:12px;}
 .selbar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px;}
 .chip{background:var(--bg2);border:1px solid var(--line);border-radius:16px;padding:6px 12px;font-size:12px;font-weight:700;cursor:pointer;color:var(--text);}
 .selrow{display:flex;align-items:flex-start;gap:10px;padding:8px 6px;border-bottom:1px solid var(--bg2);cursor:pointer;}
@@ -279,7 +291,7 @@ function buildTreeFromLV(lv){
     (sec.subsections||[]).forEach(sub=>{
       const ber={ pos:sub.pos||'', bez:sub.bez||'', geraete:[] };
       (sub.items||[]).forEach(it=>{
-        ber.geraete.push({ pos:it.pos, bez:(it.bez||'').trim(), fab:(it.fabrikat||'').trim(), typ:(it.typ||'').trim() });
+        ber.geraete.push({ pos:it.pos, bez:(it.bez||'').trim(), fab:(it.fabrikat||'').trim(), typ:(it.typ||'').trim(), gew:(it.gew||[]) });
       });
       if(ber.geraete.length) et.bereiche.push(ber);
     });
@@ -289,6 +301,13 @@ function buildTreeFromLV(lv){
 }
 function devState(pos){ return EW.devices[pos]||null; }
 function allDevices(){ const a=[]; LV.forEach(et=>et.bereiche.forEach(b=>b.geraete.forEach(g=>a.push({et,b,g})))); return a; }
+
+// Einweisungs-Relevanz je Position – EXAKT wie Hauptapp: das Feld "Einweisung" (ew)
+// gehört zum Gewerk Elektro. Positionen ohne Gewerk werden wie Montage behandelt
+// (keine Einweisung). Nur einweisungspflichtige Geräte bekommen Checkliste + Auswahl.
+const GEW_FIELDS={M:['g','m'],S:['sa','dp'],E:['ea','ib','ew']};
+function relFieldsG(gew){ const set=new Set(); (gew||[]).forEach(g=>(GEW_FIELDS[g]||[]).forEach(f=>set.add(f))); if(!set.size){ set.add('g'); set.add('m'); } return set; }
+function needsEinw(gew){ return relFieldsG(gew).has('ew'); }
 
 // ══════════════════ ew-Rückschreibung in die Positionen-Liste ══════════════════
 // Lädt die Listen-Items des Projekts (roh) -> Map pos -> {id, data(obj)}
@@ -393,7 +412,7 @@ async function openProject(pid, pname){
 }
 
 // ══════════════════ Übersicht ══════════════════
-function counts(){ let tot=0,ein=0; allDevices().forEach(d=>{ tot++; if(devState(d.g.pos)&&devState(d.g.pos).eingewiesen) ein++; }); return {tot,ein}; }
+function counts(){ let tot=0,ein=0; allDevices().forEach(d=>{ if(!needsEinw(d.g.gew)) return; tot++; if(devState(d.g.pos)&&devState(d.g.pos).eingewiesen) ein++; }); return {tot,ein}; }
 function renderOverview(){
   const main=document.getElementById('main');
   const c=counts();
@@ -410,7 +429,7 @@ function renderOverview(){
   // Etagen
   if(!LV.length){ html+='<div class="empty">Keine Geräte in der Stückliste dieser Baustelle.</div>'; }
   LV.forEach((et,ei)=>{
-    let tot=0,ein=0; et.bereiche.forEach(b=>b.geraete.forEach(g=>{ tot++; if(devState(g.pos)&&devState(g.pos).eingewiesen) ein++; }));
+    let tot=0,ein=0; et.bereiche.forEach(b=>b.geraete.forEach(g=>{ if(!needsEinw(g.gew)) return; tot++; if(devState(g.pos)&&devState(g.pos).eingewiesen) ein++; }));
     const L=lid(et.label)+'_'+ei;
     html+='<div class="etblock"><div class="ethd" onclick="toggleEt('+ei+')">'+
       '<h3>'+esc(et.label)+(et.bez? ' · '+esc(et.bez):'')+'</h3>'+
@@ -419,11 +438,12 @@ function renderOverview(){
     et.bereiche.forEach(b=>{
       html+='<div class="berhd">'+esc(b.pos)+' '+esc(b.bez)+'</div>';
       b.geraete.forEach(g=>{
+        const einwP=needsEinw(g.gew);
         const s=devState(g.pos); const ein=s&&s.eingewiesen;
         html+='<div class="grow'+(ein?' ein':'')+'">'+
-          '<div class="gmark">'+(ein?'&#10003;':'')+'</div>'+
+          '<div class="gmark"'+(einwP?'':' style="visibility:hidden"')+'>'+(ein?'&#10003;':'')+'</div>'+
           '<div class="gi"><div class="gbez">'+esc(g.bez)+'</div><div class="gmeta">'+esc(g.pos)+(g.fab? ' · '+esc(g.fab):'')+(g.typ? ' · '+esc(g.typ):'')+'</div></div>'+
-          '<div class="gstat">'+(ein? '<span class="ok">✓ '+fmtDE(s.datum)+'</span>' : '<span class="off">offen</span>')+'</div>'+
+          '<div class="gstat">'+(einwP? (ein? '<span class="ok">✓ '+fmtDE(s.datum)+'</span>' : '<span class="off">offen</span>') : '')+'</div>'+
         '</div>';
       });
     });
@@ -461,7 +481,7 @@ function startSession(){
     '<button class="opt" onclick="sessionType(\'allgemein\')">📋 Allgemein-Grundlagen<small>Pflege, Nutzung & Sicherheit (Edelstahlmöbel, Klein-/Großgeräte).</small></button>';
 }
 function sessionType(typ){
-  SESSION={ typ, selected:{}, sonder:{}, std:{}, teilnehmer:'', betreiber:'', datum:todayISO(), einweiser:USER||'', sig:'' };
+  SESSION={ typ, selected:{}, sonder:{}, std:{}, collapsed:{}, teilnehmer:'', betreiber:'', datum:todayISO(), einweiser:USER||'', sig:'' };
   if(typ==='geraete') renderSessionGeraete(); else renderSessionAllgemein();
 }
 
@@ -477,26 +497,44 @@ function closeOverlay(){ const ov=document.getElementById('ewOv'); if(ov) ov.rem
 function renderSessionGeraete(){
   const body=document.getElementById('ewBody');
   let html='<div class="step-title">1. Geräte auswählen</div>'+
-    '<div class="hint">Bereits eingewiesene Geräte sind ausgegraut. Ganzen Bereich per Kopfzeile wählen oder einzeln antippen.</div>';
+    '<div class="hint">Ganze Etage/Bereich per Button wählen oder Etage aufklappen und einzelne Geräte antippen. Bei einweisungspflichtigen Geräten (Gewerk Elektro) erscheint die Checkliste.</div>';
   LV.forEach((et,ei)=>{
-    const open=et.bereiche.some(b=>b.geraete.some(g=>!(devState(g.pos)&&devState(g.pos).eingewiesen)));
-    html+='<div style="margin:12px 0 4px;font-weight:700;color:var(--braun);font-size:13px">'+esc(et.label)+(et.bez?' · '+esc(et.bez):'')+'</div>';
-    et.bereiche.forEach((b,bi)=>{
-      html+='<div class="selbar"><div class="sub-bereich" style="padding:2px 6px">'+esc(b.pos)+' '+esc(b.bez)+'</div>'+
-        '<button class="chip" onclick="selBereich('+ei+','+bi+')">Bereich wählen</button></div>';
-      b.geraete.forEach(g=>{
-        const done=devState(g.pos)&&devState(g.pos).eingewiesen;
-        const sel=!!SESSION.selected[g.pos];
-        html+='<div class="selrow'+(sel?' on':'')+(done?' done':'')+'" onclick="selDev('+JSON.stringify(g.pos)+')">'+
-          '<div class="selbox">'+(sel?'&#10003;':'')+'</div>'+
-          '<div class="gi"><div class="gbez">'+esc(g.bez)+'</div><div class="gmeta">'+esc(g.pos)+(g.fab?' · '+esc(g.fab):'')+(g.typ?' · '+esc(g.typ):'')+(done?' · bereits eingewiesen':'')+'</div></div>'+
-        '</div>';
-        if(sel){
-          const checks=SESSION.sonder[g.pos]||(SESSION.sonder[g.pos]=checksFor(g).map(t=>({txt:t,done:false})));
-          checks.forEach((c,ci)=>{ html+='<div class="sck'+(c.done?' on':'')+'" onclick="toggleSck('+JSON.stringify(g.pos)+','+ci+')"><div class="sckb">'+(c.done?'&#10003;':'')+'</div><div>'+esc(c.txt)+'</div></div>'; });
-        }
+    const collapsed = SESSION.collapsed[ei]!==false;   // Standard: zugeklappt
+    let etTot=0, etSel=0;
+    et.bereiche.forEach(b=>b.geraete.forEach(g=>{ if(!needsEinw(g.gew)) return; etTot++; if(SESSION.selected[g.pos]) etSel++; }));
+    html+='<div class="sel-et">'+
+      '<div class="sel-ethd" onclick="toggleEtColl('+ei+')">'+
+        '<span class="sel-tog'+(collapsed?' cl':'')+'">&#9660;</span>'+
+        '<span class="sel-etlbl">'+esc(et.label)+(et.bez?' · '+esc(et.bez):'')+'</span>'+
+        '<span class="sel-etcnt">'+etSel+'/'+etTot+'</span>'+
+        (etTot? '<button class="chip" onclick="event.stopPropagation();selEtage('+ei+')">Ganze Etage</button>':'')+
+      '</div>';
+    if(!collapsed){
+      et.bereiche.forEach((b,bi)=>{
+        const bTot=b.geraete.filter(g=>needsEinw(g.gew)).length;
+        html+='<div class="selbar"><div class="sub-bereich" style="padding:2px 6px">'+esc(b.pos)+' '+esc(b.bez)+'</div>'+
+          (bTot? '<button class="chip" onclick="selBereich('+ei+','+bi+')">Bereich wählen</button>':'')+'</div>';
+        b.geraete.forEach(g=>{
+          const einwP=needsEinw(g.gew);
+          const done=devState(g.pos)&&devState(g.pos).eingewiesen;
+          const sel=!!SESSION.selected[g.pos];
+          if(!einwP){
+            html+='<div class="selrow noein"><div class="selbox" style="visibility:hidden"></div>'+
+              '<div class="gi"><div class="gbez">'+esc(g.bez)+'</div><div class="gmeta">'+esc(g.pos)+(g.fab?' · '+esc(g.fab):'')+(g.typ?' · '+esc(g.typ):'')+'</div></div></div>';
+            return;
+          }
+          html+='<div class="selrow'+(sel?' on':'')+(done?' done':'')+'" onclick="selDev('+JSON.stringify(g.pos)+')">'+
+            '<div class="selbox">'+(sel?'&#10003;':'')+'</div>'+
+            '<div class="gi"><div class="gbez">'+esc(g.bez)+'</div><div class="gmeta">'+esc(g.pos)+(g.fab?' · '+esc(g.fab):'')+(g.typ?' · '+esc(g.typ):'')+(done?' · bereits eingewiesen':'')+'</div></div>'+
+          '</div>';
+          if(sel){
+            const checks=SESSION.sonder[g.pos]||(SESSION.sonder[g.pos]=checksFor(g).map(t=>({txt:t,done:false})));
+            checks.forEach((c,ci)=>{ html+='<div class="sck'+(c.done?' on':'')+'" onclick="toggleSck('+JSON.stringify(g.pos)+','+ci+')"><div class="sckb">'+(c.done?'&#10003;':'')+'</div><div>'+esc(c.txt)+'</div></div>'; });
+          }
+        });
       });
-    });
+    }
+    html+='</div>';
   });
   html+=footerFields();
   body.innerHTML=html;
@@ -524,8 +562,12 @@ function footerFields(){
     '<div class="fld"><label>Unterschrift der eingewiesenen Person *</label><div class="sigwrap"><canvas id="sigCanvas"></canvas><div class="sigtools"><span style="font-size:11px;color:var(--accent2)">Mit dem Finger unterschreiben</span><button onclick="clearSig()">Löschen</button></div></div></div>'+
     '<button class="finish" onclick="finishSession()">Protokoll abschließen &amp; speichern</button>';
 }
-function selDev(pos){ if(SESSION.selected[pos]) delete SESSION.selected[pos]; else SESSION.selected[pos]=true; renderSessionGeraete(); }
-function selBereich(ei,bi){ const b=LV[ei].bereiche[bi]; const anyOff=b.geraete.some(g=>!SESSION.selected[g.pos]); b.geraete.forEach(g=>{ if(anyOff) SESSION.selected[g.pos]=true; else delete SESSION.selected[g.pos]; }); renderSessionGeraete(); }
+function devByPos(pos){ const d=allDevices().find(x=>x.g.pos===pos); return d?d.g:null; }
+function ensureSonder(pos){ if(!SESSION.sonder[pos]){ const g=devByPos(pos); if(g) SESSION.sonder[pos]=checksFor(g).map(t=>({txt:t,done:false})); } }
+function selDev(pos){ if(SESSION.selected[pos]) delete SESSION.selected[pos]; else { SESSION.selected[pos]=true; ensureSonder(pos); } renderSessionGeraete(); }
+function selBereich(ei,bi){ const gs=LV[ei].bereiche[bi].geraete.filter(g=>needsEinw(g.gew)); const anyOff=gs.some(g=>!SESSION.selected[g.pos]); gs.forEach(g=>{ if(anyOff){ SESSION.selected[g.pos]=true; ensureSonder(g.pos); } else delete SESSION.selected[g.pos]; }); renderSessionGeraete(); }
+function selEtage(ei){ const gs=[]; LV[ei].bereiche.forEach(b=>b.geraete.forEach(g=>{ if(needsEinw(g.gew)) gs.push(g); })); const anyOff=gs.some(g=>!SESSION.selected[g.pos]); gs.forEach(g=>{ if(anyOff){ SESSION.selected[g.pos]=true; ensureSonder(g.pos); } else delete SESSION.selected[g.pos]; }); renderSessionGeraete(); }
+function toggleEtColl(ei){ SESSION.collapsed[ei]=!(SESSION.collapsed[ei]!==false); renderSessionGeraete(); }
 function toggleSck(pos,ci){ SESSION.sonder[pos][ci].done=!SESSION.sonder[pos][ci].done; renderSessionGeraete(); }
 function toggleStd(fid,ci){ SESSION.std[fid][ci].done=!SESSION.std[fid][ci].done; renderSessionAllgemein(); }
 
