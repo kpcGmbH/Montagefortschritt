@@ -401,7 +401,7 @@ async function showProjectPicker(){
   const main=document.getElementById('main');
   projects.sort((a,b)=>((b.lastEdit||b.created)||'').localeCompare((a.lastEdit||a.created)||''));
   main.innerHTML='<h2 style="font-size:16px;color:var(--braun);margin:6px 2px 14px">Baustelle wählen</h2>'+
-    (projects.length? projects.map(p=>'<button class="opt" onclick="openProject('+JSON.stringify(p.pid)+','+JSON.stringify(p.name||'')+')">'+esc(p.name||p.pid)+'<small>'+(p.lastEdit||p.created? 'Geändert: '+fmtDE(p.lastEdit||p.created):'')+'</small></button>').join('')
+    (projects.length? projects.map(p=>'<button class="opt" onclick="openProject('+esc(JSON.stringify(p.pid))+','+esc(JSON.stringify(p.name||''))+')">'+esc(p.name||p.pid)+'<small>'+(p.lastEdit||p.created? 'Geändert: '+fmtDE(p.lastEdit||p.created):'')+'</small></button>').join('')
       : '<div class="empty">Keine Baustellen gefunden.</div>');
 }
 async function openProject(pid, pname){
@@ -533,13 +533,13 @@ function renderSessionGeraete(){
           const einwP=needsEinw(g.gew);
           const done=devState(g.pos)&&devState(g.pos).eingewiesen;
           const sel=!!SESSION.selected[g.pos];
-          html+='<div class="selrow'+(sel?' on':'')+(done?' done':'')+'" onclick="selDev('+JSON.stringify(g.pos)+')">'+
+          html+='<div class="selrow'+(sel?' on':'')+(done?' done':'')+'" onclick="selDev('+esc(JSON.stringify(g.pos))+')">'+
             '<div class="selbox">'+(sel?'&#10003;':'')+'</div>'+
             '<div class="gi"><div class="gbez">'+esc(g.bez)+'</div><div class="gmeta">'+esc(g.pos)+(g.fab?' · '+esc(g.fab):'')+(g.typ?' · '+esc(g.typ):'')+(done?' · bereits eingewiesen':'')+'</div></div>'+
           '</div>';
           if(sel && einwP){
             const checks=SESSION.sonder[g.pos]||(SESSION.sonder[g.pos]=checksFor(g).map(t=>({txt:t,done:false})));
-            checks.forEach((c,ci)=>{ html+='<div class="sck'+(c.done?' on':'')+'" onclick="toggleSck('+JSON.stringify(g.pos)+','+ci+')"><div class="sckb">'+(c.done?'&#10003;':'')+'</div><div>'+esc(c.txt)+'</div></div>'; });
+            checks.forEach((c,ci)=>{ html+='<div class="sck'+(c.done?' on':'')+'" onclick="toggleSck('+esc(JSON.stringify(g.pos))+','+ci+')"><div class="sckb">'+(c.done?'&#10003;':'')+'</div><div>'+esc(c.txt)+'</div></div>'; });
           }
         });
       });
@@ -556,7 +556,7 @@ function renderSessionAllgemein(){
   STD_FORMS.forEach(f=>{
     const arr=SESSION.std[f.id]||(SESSION.std[f.id]=f.checks.map(t=>({txt:t,done:false})));
     html+='<div class="card"><div class="card-h" style="font-size:13px">'+esc(f.titel)+'</div><div class="card-b" style="padding:6px 10px">';
-    arr.forEach((c,ci)=>{ html+='<div class="sck'+(c.done?' on':'')+'" style="padding-left:0" onclick="toggleStd('+JSON.stringify(f.id)+','+ci+')"><div class="sckb">'+(c.done?'&#10003;':'')+'</div><div>'+esc(c.txt)+'</div></div>'; });
+    arr.forEach((c,ci)=>{ html+='<div class="sck'+(c.done?' on':'')+'" style="padding-left:0" onclick="toggleStd('+esc(JSON.stringify(f.id))+','+ci+')"><div class="sckb">'+(c.done?'&#10003;':'')+'</div><div>'+esc(c.txt)+'</div></div>'; });
     html+='</div></div>';
   });
   html+=footerFields();
