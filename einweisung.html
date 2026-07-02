@@ -122,6 +122,7 @@ main{padding:14px 12px 40px;max-width:900px;margin:0 auto;}
 .fld{margin-bottom:12px;}
 .fld label{display:block;font-size:12px;color:var(--accent2);margin-bottom:4px;font-weight:700;}
 .fld input{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-family:inherit;background:var(--white);color:var(--text);}
+.confbox{border:1px solid var(--border);border-left:4px solid var(--braun);border-radius:8px;background:var(--bg2);padding:11px 13px;font-size:13px;line-height:1.55;color:var(--text);}
 .sigwrap{border:1px dashed var(--border);border-radius:8px;background:var(--white);}
 #sigCanvas{width:100%;height:160px;display:block;touch-action:none;border-radius:8px;}
 .sigtools{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-top:1px solid var(--bg2);}
@@ -568,6 +569,7 @@ function renderSessionAllgemein(){
   body.innerHTML=html;
   initSig();
 }
+const CONF_TEXT='Ich bestätige hiermit, dass ich von obiger Firma ausreichend eingewiesen wurde und in der Lage bin, obige Geräte zu bedienen. Ich wurde über die Funktionen, Produktionsabfolgen, Programmierschritte, Einsatzgebiete sowie Reinigung und Pflege der Geräte eingewiesen.';
 function footerFields(){
   return '<div class="step-title" style="margin-top:16px">2. Teilnehmer & Unterschrift</div>'+
     '<div class="fld"><label>Auftraggeber</label><input id="f_ag" value="'+esc(SESSION.auftraggeber)+'" oninput="SESSION.auftraggeber=this.value" placeholder="z.B. Goetze KG Armaturen"></div>'+
@@ -575,7 +577,8 @@ function footerFields(){
     '<div class="fld"><label>Einweiser (KPC)</label><input id="f_einw" value="'+esc(SESSION.einweiser)+'" oninput="SESSION.einweiser=this.value"></div>'+
     '<div class="fld"><label>Ort (für „Anerkannt")</label><input id="f_ort" value="'+esc(SESSION.ort)+'" oninput="SESSION.ort=this.value" placeholder="Ort"></div>'+
     '<div class="fld"><label>Datum</label><input id="f_datum" type="date" value="'+esc(SESSION.datum)+'" oninput="SESSION.datum=this.value"></div>'+
-    '<div class="fld"><label>Unterschrift der eingewiesenen Person *</label><div class="sigwrap"><canvas id="sigCanvas"></canvas><div class="sigtools"><span style="font-size:11px;color:var(--accent2)">Mit dem Finger unterschreiben</span><button onclick="clearSig()">Löschen</button></div></div></div>'+
+    '<div class="fld"><label>Bestätigung der eingewiesenen Person</label><div class="confbox">'+esc(CONF_TEXT)+'</div></div>'+
+    '<div class="fld"><label>Unterschrift der eingewiesenen Person *</label><div class="sigwrap"><canvas id="sigCanvas"></canvas><div class="sigtools"><span style="font-size:11px;color:var(--accent2)">Mit der Unterschrift wird die obige Bestätigung anerkannt</span><button onclick="clearSig()">Löschen</button></div></div></div>'+
     '<button class="finish" onclick="finishSession()">Protokoll abschließen &amp; speichern</button>';
 }
 function devByPos(pos){ const d=allDevices().find(x=>x.g.pos===pos); return d?d.g:null; }
@@ -699,8 +702,7 @@ function buildPdf(titel, positions){
   doc.text('Einweisung durchgeführt:',M,y); doc.setFont('helvetica','bold'); doc.text('[X] ja',M+55,y); doc.setFont('helvetica','normal'); doc.text('[  ] nein',M+75,y); y+=9;
 
   // ── Unterer Block: Bestätigungstext steht DIREKT über den Unterschriften (Text = das, was unterschrieben wird) ──
-  const conf='Ich bestätige hiermit, dass ich von obiger Firma ausreichend eingewiesen wurde und in der Lage bin, obige Geräte zu bedienen. Ich wurde über die Funktionen, Produktionsabfolgen, Programmierschritte, Einsatzgebiete sowie Reinigung und Pflege der Geräte eingewiesen.';
-  doc.setFontSize(9.5); const cl=doc.splitTextToSize(conf, W-2*M); const confH=cl.length*5;
+  doc.setFontSize(9.5); const cl=doc.splitTextToSize(CONF_TEXT, W-2*M); const confH=cl.length*5;
   const blockH=confH+9+14+32;                       // Bestätigung + Anerkannt + Unterschriften
   let by=Math.max(y+8, 287-blockH);                 // an den unteren Rand, aber nicht über den oberen Inhalt
   doc.setTextColor.apply(doc,dark); doc.text(cl,M,by); by+=confH+9;
