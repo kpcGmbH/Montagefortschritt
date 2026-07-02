@@ -979,8 +979,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 31;
+const APP_VERSION = 32;
 const CHANGELOG = [
+  { v:32, titel:'Auftraggeber in den Stammdaten', punkte:[
+    'Beim Anlegen einer Baustelle wird jetzt der Auftraggeber abgefragt (Pflichtfeld) und in den Projektdaten gespeichert.',
+    'Bestehende Baustellen: Auftraggeber über 🏢 in der Baustellen-Auswahl nachtragen. Die Einweisungs-App übernimmt ihn dann automatisch.' ]},
   { v:31, titel:'Neu: Einweisung', punkte:[
     'Neuer Button „📋 Einweisung": Geräte-Einweisungen je Bereich/Termin protokollieren – mit Unterschrift, PDF-Ablage in SharePoint und automatischer Rückmeldung „Einweisung erledigt" an die Positionen.' ]},
   { v:30, titel:'Restarbeitenliste: Fotos & Excel', punkte:[
@@ -3356,11 +3359,11 @@ async function loadProjectLV(pid){
   if(pid===LEGACY_PID) return SEED_DATA;
   throw new Error('Stückliste für Projekt nicht gefunden');
 }
-async function createProject(name, lv){
+async function createProject(name, lv, auftraggeber){
   const pid = slugify(name)+'-'+Date.now();
   await spUploadText('LV_'+pid+'.json', JSON.stringify(lv));
   const _now=new Date().toISOString();
-  PROJECTS.push({pid, name, created:_now, lastEdit:_now, by:USER||''});
+  PROJECTS.push({pid, name, auftraggeber:(auftraggeber||'').trim(), created:_now, lastEdit:_now, by:USER||''});
   await saveProjects();
   return pid;
 }
@@ -3398,7 +3401,9 @@ function renderProjectPicker(){
         '<div class="projRow" data-name="'+escapeHtml(String(p.name||'').toLowerCase())+'" onclick="selectProject(\''+p.pid+'\')" style="text-align:left;background:#3a3530;border:1px solid #895500;border-radius:10px;padding:14px 16px;cursor:pointer;color:#fff;font-family:inherit;display:flex;align-items:center;gap:12px;">'+
           '<span style="font-size:20px">🏗️</span>'+
           '<span style="flex:1"><span style="display:block;font-size:15px;font-weight:700;color:#fff">'+escapeHtml(p.name)+'</span>'+
-          '<span style="display:block;font-size:11px;color:#a8a8a8;margin-top:2px">'+((p.lastEdit||p.created)?('Geändert: '+new Date(p.lastEdit||p.created).toLocaleDateString('de-DE')):'')+'</span></span>'+
+          '<span style="display:block;font-size:11px;color:'+(p.auftraggeber?'#c0a780':'#e0a060')+';margin-top:2px">'+(p.auftraggeber?('👤 '+escapeHtml(p.auftraggeber)):'⚠ Auftraggeber fehlt')+'</span>'+
+          '<span style="display:block;font-size:11px;color:#a8a8a8;margin-top:1px">'+((p.lastEdit||p.created)?('Geändert: '+new Date(p.lastEdit||p.created).toLocaleDateString('de-DE')):'')+'</span></span>'+
+          '<button onclick="editAuftraggeber(\''+p.pid+'\',event)" title="Auftraggeber bearbeiten" style="background:none;border:none;color:#d7c1ae;font-size:15px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">🏢</button>'+
           '<button onclick="renameProject(\''+p.pid+'\',event)" title="Baustelle umbenennen" style="background:none;border:none;color:#d7c1ae;font-size:16px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">✏️</button>'+
           '<span style="color:#d7c1ae;font-size:18px">›</span>'+
         '</div>'
@@ -3421,6 +3426,22 @@ function filterProjects(q){
   const none=document.getElementById('projNone'); if(none) none.style.display=shown?'none':'block';
 }
 function switchProject(){ openProjectFlow(); }
+
+// Auftraggeber (Stammdaten) je Baustelle setzen/ändern – wird in die Einweisungsprotokolle übernommen.
+async function editAuftraggeber(pid, ev){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  const p = PROJECTS.find(x=>x.pid===pid);
+  if(!p){ return; }
+  const eingabe = prompt('Auftraggeber für „'+p.name+'":', p.auftraggeber||'');
+  if(eingabe==null) return;
+  const ag = eingabe.trim();
+  if(ag===(p.auftraggeber||'')) return;
+  const alt = p.auftraggeber||'';
+  p.auftraggeber = ag;
+  try{ await saveProjects(); }
+  catch(e){ p.auftraggeber = alt; alert('Speichern fehlgeschlagen: '+(e.message||e)); return; }
+  renderProjectPicker();
+}
 
 // Baustelle umbenennen (nur der Anzeigename; pid + LV-Datei bleiben unverändert,
 // damit Fortschritt und Fotos in SharePoint erhalten bleiben).
@@ -3476,6 +3497,9 @@ function openImportWizard(){
     '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Projektname – Schema: <b>Nummer Ort Objekt</b></label>'+
     '<input id="impName" type="text" placeholder="z.B. 0908.20 Berlin Upbeat" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:5px">'+
     '<div style="font-size:11px;color:#a8a8a8;margin-bottom:16px">Pflichtformat: Projektnummer (z.B. 0908.20), dann Ort, dann Objekt – mit Leerzeichen, ohne Unterstriche.</div>'+
+    '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Auftraggeber <span style="color:#e0a060">*</span></label>'+
+    '<input id="impAuftraggeber" type="text" placeholder="z.B. Goetze KG Armaturen" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:5px">'+
+    '<div style="font-size:11px;color:#a8a8a8;margin-bottom:16px">Wird automatisch in die Einweisungsprotokolle übernommen.</div>'+
     '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Stückliste (Excel .xlsx/.csv oder PDF)</label>'+
     '<input id="impFile" type="file" accept=".xlsx,.xls,.csv,.pdf" onchange="handleImportFile(this.files[0])" style="width:100%;color:#fff;font-size:13px;margin-bottom:8px">'+
     '<div style="font-size:11px;color:#a8a8a8;margin-bottom:14px">Empfohlen: Excel-Vorlage (saubere Spalten). PDF wird grob ausgelesen – bitte Vorschau prüfen.</div>'+
@@ -3528,12 +3552,14 @@ const PROJNAME_HINT='Bitte das Schema einhalten: "Nummer Ort Objekt"\nz.B. 0908.
 
 async function confirmCreateProject(){
   const name=(document.getElementById('impName').value||'').trim();
+  const auftraggeber=(document.getElementById('impAuftraggeber').value||'').trim();
   if(!name){ alert('Bitte einen Projektnamen eingeben.'); return; }
   if(!isValidProjName(name)){ alert(PROJNAME_HINT); return; }
+  if(!auftraggeber){ alert('Bitte den Auftraggeber eingeben (Pflichtfeld).'); document.getElementById('impAuftraggeber').focus(); return; }
   if(!PENDING_LV){ alert('Bitte zuerst eine gültige Stückliste hochladen.'); return; }
   const act=document.getElementById('impActions');
   act.innerHTML='<div style="color:#d7c1ae">Baustelle wird angelegt …</div>';
-  try{ const pid=await createProject(name, PENDING_LV); await selectProject(pid); }
+  try{ const pid=await createProject(name, PENDING_LV, auftraggeber); await selectProject(pid); }
   catch(e){ alert('Anlegen fehlgeschlagen: '+(e.message||e)); openImportWizard(); }
 }
 

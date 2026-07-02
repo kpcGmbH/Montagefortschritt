@@ -192,7 +192,7 @@ const GRAPH_SCOPES=['User.Read','Sites.Selected'];
 const USE_REDIRECT=/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof window.matchMedia==='function' && window.matchMedia('(pointer: coarse)').matches);
 let msalApp=null, msalAccount=null;
 const SPIDS={ siteId:null, listId:null, driveId:null };
-let PID=null, PROJNAME='', USER='';
+let PID=null, PROJNAME='', USER='', PROJ_AG='';   // PROJ_AG = Auftraggeber aus Projekt-Stammdaten
 let LV=[];                 // Etagen/Bereiche/Geräte aus LV_<pid>.json
 let EW={ v:1, devices:{}, std:{}, protokolle:[] };  // Einweisungs-Status (EINWEISUNG_<pid>.json)
 
@@ -410,7 +410,8 @@ async function openProject(pid, pname){
   try{
     const lv=await loadLV(pid); LV=buildTreeFromLV(lv);
     EW=await loadEW(pid);
-    if(!PROJNAME||PROJNAME===pid){ const projs=await loadProjectsList(); const p=projs.find(x=>x.pid===pid); if(p) PROJNAME=p.name||pid; }
+    // Stammdaten (Name + Auftraggeber) aus __projects.json
+    try{ const projs=await loadProjectsList(); const p=projs.find(x=>x.pid===pid); if(p){ if(!PROJNAME||PROJNAME===pid) PROJNAME=p.name||pid; PROJ_AG=(p.auftraggeber||''); } }catch(e){}
   }catch(e){ hideLoader(); document.getElementById('main').innerHTML='<div class="empty">'+esc((e&&e.message)||e)+'</div>'; return; }
   document.getElementById('projName').textContent=PROJNAME;
   document.getElementById('projSub').textContent='Baustelle';
@@ -496,7 +497,7 @@ function startSession(){
 // Ort aus dem Projektnamen ableiten (Schema "Nummer Ort Objekt")
 function deriveOrt(){ const p=(PROJNAME||'').trim().split(/\s+/); return p.length>=2? p[1] : ''; }
 function sessionType(typ){
-  SESSION={ typ, selected:{}, sonder:{}, std:{}, collapsed:{}, teilnehmer:'', auftraggeber:(EW.auftraggeber||''), ort:(EW.ort||deriveOrt()), datum:todayISO(), einweiser:USER||'', kommentar:'', sig:'' };
+  SESSION={ typ, selected:{}, sonder:{}, std:{}, collapsed:{}, teilnehmer:'', auftraggeber:(PROJ_AG||EW.auftraggeber||''), ort:(EW.ort||deriveOrt()), datum:todayISO(), einweiser:USER||'', kommentar:'', sig:'' };
   if(typ==='geraete') renderSessionGeraete(); else renderSessionAllgemein();
 }
 
