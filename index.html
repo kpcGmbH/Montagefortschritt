@@ -981,9 +981,9 @@ function startData(){
 // die zuletzt vom Nutzer gesehene Version.
 const APP_VERSION = 32;
 const CHANGELOG = [
-  { v:32, titel:'Auftraggeber in den Stammdaten', punkte:[
-    'Beim Anlegen einer Baustelle wird jetzt der Auftraggeber abgefragt (Pflichtfeld) und in den Projektdaten gespeichert.',
-    'Bestehende Baustellen: Auftraggeber über 🏢 in der Baustellen-Auswahl nachtragen. Die Einweisungs-App übernimmt ihn dann automatisch.' ]},
+  { v:32, titel:'Baustellen-Anlage mit Stammdaten', punkte:[
+    'Neue Baustelle: Projektnummer, Ort, Projektname (Objekt) und Kunde/Auftraggeber sind jetzt einzelne Pflichtfelder; der Anzeigename wird daraus gebildet.',
+    'Bestehende Baustellen: Auftraggeber über 🏢 in der Baustellen-Auswahl nachtragen. Die Einweisungs-App übernimmt Kunde und Ort dann automatisch.' ]},
   { v:31, titel:'Neu: Einweisung', punkte:[
     'Neuer Button „📋 Einweisung": Geräte-Einweisungen je Bereich/Termin protokollieren – mit Unterschrift, PDF-Ablage in SharePoint und automatischer Rückmeldung „Einweisung erledigt" an die Positionen.' ]},
   { v:30, titel:'Restarbeitenliste: Fotos & Excel', punkte:[
@@ -3359,11 +3359,12 @@ async function loadProjectLV(pid){
   if(pid===LEGACY_PID) return SEED_DATA;
   throw new Error('Stückliste für Projekt nicht gefunden');
 }
-async function createProject(name, lv, auftraggeber){
+async function createProject(name, lv, auftraggeber, meta){
+  meta=meta||{};
   const pid = slugify(name)+'-'+Date.now();
   await spUploadText('LV_'+pid+'.json', JSON.stringify(lv));
   const _now=new Date().toISOString();
-  PROJECTS.push({pid, name, auftraggeber:(auftraggeber||'').trim(), created:_now, lastEdit:_now, by:USER||''});
+  PROJECTS.push({pid, name, nummer:(meta.nummer||'').trim(), ort:(meta.ort||'').trim(), objekt:(meta.objekt||'').trim(), auftraggeber:(auftraggeber||'').trim(), created:_now, lastEdit:_now, by:USER||''});
   await saveProjects();
   return pid;
 }
@@ -3494,12 +3495,17 @@ function openImportWizard(){
   ov.innerHTML =
     '<div style="width:100%;max-width:560px;color:#fff;">'+
     '<div style="display:flex;align-items:center;gap:10px;margin:6px 0 16px"><button onclick="renderProjectPicker()" style="background:none;border:none;color:#d7c1ae;font-size:22px;cursor:pointer">‹</button><span style="font-size:17px;font-weight:700">Neue Baustelle</span></div>'+
-    '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Projektname – Schema: <b>Nummer Ort Objekt</b></label>'+
-    '<input id="impName" type="text" placeholder="z.B. 0908.20 Berlin Upbeat" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:5px">'+
-    '<div style="font-size:11px;color:#a8a8a8;margin-bottom:16px">Pflichtformat: Projektnummer (z.B. 0908.20), dann Ort, dann Objekt – mit Leerzeichen, ohne Unterstriche.</div>'+
-    '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Auftraggeber <span style="color:#e0a060">*</span></label>'+
+    '<div style="display:flex;gap:10px;margin-bottom:10px">'+
+      '<div style="flex:0 0 38%"><label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Projektnummer <span style="color:#e0a060">*</span></label>'+
+        '<input id="impNummer" type="text" placeholder="z.B. 0908.20" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;box-sizing:border-box"></div>'+
+      '<div style="flex:1"><label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Ort <span style="color:#e0a060">*</span></label>'+
+        '<input id="impOrt" type="text" placeholder="z.B. Berlin" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;box-sizing:border-box"></div>'+
+    '</div>'+
+    '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Projektname / Objekt <span style="color:#e0a060">*</span></label>'+
+    '<input id="impObjekt" type="text" placeholder="z.B. Upbeat" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:10px">'+
+    '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Kunde / Auftraggeber <span style="color:#e0a060">*</span></label>'+
     '<input id="impAuftraggeber" type="text" placeholder="z.B. Goetze KG Armaturen" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:5px">'+
-    '<div style="font-size:11px;color:#a8a8a8;margin-bottom:16px">Wird automatisch in die Einweisungsprotokolle übernommen.</div>'+
+    '<div style="font-size:11px;color:#a8a8a8;margin-bottom:16px">Anzeigename wird als „Nummer Ort Objekt" gebildet. Kunde wird in die Einweisungsprotokolle übernommen.</div>'+
     '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Stückliste (Excel .xlsx/.csv oder PDF)</label>'+
     '<input id="impFile" type="file" accept=".xlsx,.xls,.csv,.pdf" onchange="handleImportFile(this.files[0])" style="width:100%;color:#fff;font-size:13px;margin-bottom:8px">'+
     '<div style="font-size:11px;color:#a8a8a8;margin-bottom:14px">Empfohlen: Excel-Vorlage (saubere Spalten). PDF wird grob ausgelesen – bitte Vorschau prüfen.</div>'+
@@ -3551,15 +3557,19 @@ function isValidProjName(name){
 const PROJNAME_HINT='Bitte das Schema einhalten: "Nummer Ort Objekt"\nz.B. 0908.20 Berlin Upbeat\n(Projektnummer wie 0908.20, dann Ort, dann Objekt – mit Leerzeichen, keine Unterstriche.)';
 
 async function confirmCreateProject(){
-  const name=(document.getElementById('impName').value||'').trim();
+  const nummer=(document.getElementById('impNummer').value||'').trim();
+  const ort=(document.getElementById('impOrt').value||'').trim();
+  const objekt=(document.getElementById('impObjekt').value||'').trim();
   const auftraggeber=(document.getElementById('impAuftraggeber').value||'').trim();
-  if(!name){ alert('Bitte einen Projektnamen eingeben.'); return; }
-  if(!isValidProjName(name)){ alert(PROJNAME_HINT); return; }
-  if(!auftraggeber){ alert('Bitte den Auftraggeber eingeben (Pflichtfeld).'); document.getElementById('impAuftraggeber').focus(); return; }
+  if(!nummer){ alert('Bitte die Projektnummer eingeben (Pflichtfeld).'); document.getElementById('impNummer').focus(); return; }
+  if(!ort){ alert('Bitte den Ort eingeben (Pflichtfeld).'); document.getElementById('impOrt').focus(); return; }
+  if(!objekt){ alert('Bitte den Projektnamen / das Objekt eingeben (Pflichtfeld).'); document.getElementById('impObjekt').focus(); return; }
+  if(!auftraggeber){ alert('Bitte den Kunden / Auftraggeber eingeben (Pflichtfeld).'); document.getElementById('impAuftraggeber').focus(); return; }
   if(!PENDING_LV){ alert('Bitte zuerst eine gültige Stückliste hochladen.'); return; }
+  const name=(nummer+' '+ort+' '+objekt).replace(/\s+/g,' ').trim();
   const act=document.getElementById('impActions');
   act.innerHTML='<div style="color:#d7c1ae">Baustelle wird angelegt …</div>';
-  try{ const pid=await createProject(name, PENDING_LV, auftraggeber); await selectProject(pid); }
+  try{ const pid=await createProject(name, PENDING_LV, auftraggeber, {nummer,ort,objekt}); await selectProject(pid); }
   catch(e){ alert('Anlegen fehlgeschlagen: '+(e.message||e)); openImportWizard(); }
 }
 
