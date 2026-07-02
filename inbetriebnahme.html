@@ -160,6 +160,7 @@ textarea{border:1.4px solid var(--line);border-radius:8px;min-height:64px;resize
 <body>
 <div class="topbar"><div class="topbar-in">
   <img id="logo" alt="kpc">
+  <button class="loginbtn" onclick="backToApp()" title="Zurück zur Montagefortschritt-App">‹ Hauptapp</button>
   <button id="loginBtn" class="loginbtn" onclick="msLogin()">Mit Microsoft anmelden</button>
   <button id="sigBtn" class="loginbtn" onclick="openMySig()">✍ Meine Signatur</button>
   <span style="flex:1"></span>
@@ -936,6 +937,9 @@ function msLogout(){try{const a=msalApp&&msalApp.getAllAccounts()[0];if(a)msalAp
 function renderLoginState(){const b=$('loginBtn');if(!b)return;
   if(TECH.name){b.classList.add('on');b.innerHTML='\u{1F464} '+esc(TECH.name)+' \u00A0\u2715';b.title='Abmelden';}
   else{b.classList.remove('on');b.textContent='Mit Microsoft anmelden';b.title='Anmelden, um den Techniker-Namen automatisch zu übernehmen';}}
+// Zurück zur Hauptapp: eigenen Tab schließen (falls per window.open geöffnet), sonst navigieren
+function backToApp(){ try{ window.close(); }catch(e){} setTimeout(function(){ window.location.href='index.html'; }, 150); }
+window.backToApp=backToApp;
 window.msLogin=msLogin;window.msLogout=msLogout;
 window.goHome=goHome;window.goDevices=goDevices;window.openForm=openForm;window.pickDevice=pickDevice;window.continueDraft=continueDraft;
 window.setVal=setVal;window.setCheck=setCheck;window.setCmt=setCmt;window.toggleOpt=toggleOpt;window.setSig=setSig;
