@@ -979,8 +979,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 33;
+const APP_VERSION = 34;
 const CHANGELOG = [
+  { v:34, titel:'Protokolle zentral je Baustelle', punkte:[
+    'Alle Protokolle werden jetzt zentral je Baustelle gesammelt: Inbetriebnahme in „_Inbetriebnahme", DGUV in „_DGUV", Einweisung in „_Einweisung" – zusätzlich bleiben sie wie gewohnt an der Position sichtbar.' ]},
   { v:33, titel:'DGUV-V3-Prüfprotokoll digital', punkte:[
     'Protokoll-Menü je Position: „⚡ DGUV digital ausfüllen" öffnet das kpc-Prüfprotokoll für elektrische Geräte (DIN VDE 0701-0702) vorausgefüllt in der Protokoll-App.',
     'DGUV-Protokolle werden je Baustelle zentral im Ordner „_DGUV" gesammelt (analog Einweisung) und bleiben zusätzlich an der Position sichtbar.' ]},
@@ -2361,6 +2363,10 @@ setInterval(async () => {
 // ── PROTOKOLL UPLOAD + PDF EDITOR ──
 let PPOS=null, PTYPE=null;
 const PROTO_TYPES=['IBN Protokoll','Einweisungsprotokoll','DGUV Protokoll'];
+// Zentrale Sammel-Ordner je Baustelle für Protokolle (analog Einweisungs-App);
+// Typen ohne Eintrag landen wie bisher im Positions-Ordner.
+const PROTO_DIRS={'IBN Protokoll':'_Inbetriebnahme','DGUV Protokoll':'_DGUV','Einweisungsprotokoll':'_Einweisung'};
+function protoDir(type,pos){ const d=PROTO_DIRS[type]; return d? safeName(curProjName())+'/'+d : folderFor(pos); }
 
 // ── Einweisung: projektweite Einweisungs-App öffnen (gleiche Origin, Kontext per Hash) ──
 const EINWEISUNG_URL='einweisung.html';
@@ -2401,9 +2407,7 @@ async function ibnReceive(p){
   if(!PID){ alert('IBN-Protokoll empfangen, aber es ist keine Baustelle geöffnet. Bitte Baustelle öffnen – das Protokoll wird dann automatisch übernommen.'); _ibnSeen.delete(p.id); return; }
   try{
     const pos=p.pos, type=p.ptype||'IBN Protokoll', ts=Date.now();
-    // DGUV-Protokolle zentral je Baustelle sammeln (analog _Einweisung), Rest bei der Position
-    const dir=(type==='DGUV Protokoll')? safeName(curProjName())+'/_DGUV' : folderFor(pos);
-    const base=dir+'/'+pos.replace(/\./g,'_')+'_'+type.replace(/ /g,'_')+'_'+ts;
+    const base=protoDir(type,pos)+'/'+pos.replace(/\./g,'_')+'_'+type.replace(/ /g,'_')+'_'+ts;
     const fname=base+'.pdf';
     await queueUpload(fname, _dataURLtoBlob(p.pdf), 'application/pdf', pos);
     let dataFname='';
@@ -2457,8 +2461,7 @@ document.getElementById('pi').addEventListener('change',async function(e){
   showLoader(PTYPE+' wird gespeichert...');
   try {
     const ext=file.name.split('.').pop();
-    const pdir=(PTYPE==='DGUV Protokoll')? safeName(curProjName())+'/_DGUV' : folderFor(PPOS);
-    const fname=pdir+'/'+PPOS.replace(/\./g,'_')+'_'+PTYPE.replace(/ /g,'_')+'_'+Date.now()+'.'+ext;
+    const fname=protoDir(PTYPE,PPOS)+'/'+PPOS.replace(/\./g,'_')+'_'+PTYPE.replace(/ /g,'_')+'_'+Date.now()+'.'+ext;
     await queueUpload(fname, file, file.type||'application/pdf', PPOS);   // lokal + Warteschlange (offline-fähig)
     if(!gs(PPOS).pdfs) gs(PPOS).pdfs=[];
     gs(PPOS).pdfs.push({type:PTYPE,name:file.name,fname:fname});
