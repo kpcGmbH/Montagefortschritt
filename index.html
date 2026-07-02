@@ -3343,6 +3343,21 @@ async function loadProjects(){
   try{ await idbSet('projects','__list', PROJECTS); }catch(e){}   // Write-through für Offline
 }
 async function saveProjects(){
+  // Vor dem Hochladen mit dem Server-Stand mergen: ein Gerät mit älterer
+  // PROJECTS-Kopie darf Felder anderer Geräte (z.B. Auftraggeber) nicht
+  // überschreiben (last writer wins über das gedrosselte touchProject).
+  try{
+    const txt=await spTryDownloadTextStrict('__projects.json');
+    const remote=txt? (JSON.parse(txt)||[]) : [];
+    const byPid={}; remote.forEach(r=>{ if(r&&r.pid) byPid[r.pid]=r; });
+    PROJECTS.forEach(p=>{ const r=byPid[p.pid]; if(!r) return;
+      // lokal unbekannte Felder vom Server übernehmen ('' bleibt bewusstes Leeren)
+      for(const k in r){ if(p[k]===undefined||p[k]===null) p[k]=r[k]; }
+      if(r.lastEdit && (!p.lastEdit || r.lastEdit>p.lastEdit)) p.lastEdit=r.lastEdit;
+    });
+    // nur remote vorhandene Baustellen nicht verlieren
+    remote.forEach(r=>{ if(r&&r.pid&&!PROJECTS.some(x=>x.pid===r.pid)) PROJECTS.push(r); });
+  }catch(e){}   // offline/Fehler -> lokalen Stand schreiben (wie bisher)
   try{ await idbSet('projects','__list', PROJECTS); }catch(e){}
   await spUploadText('__projects.json', JSON.stringify(PROJECTS));
 }
