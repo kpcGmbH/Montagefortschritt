@@ -698,16 +698,16 @@ function buildPdf(titel, positions){
   doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor.apply(doc,dark);
   doc.text('Einweisung durchgeführt:',M,y); doc.setFont('helvetica','bold'); doc.text('[X] ja',M+55,y); doc.setFont('helvetica','normal'); doc.text('[  ] nein',M+75,y); y+=9;
 
-  // Bestätigungstext
-  doc.setFontSize(9.5); doc.setTextColor.apply(doc,dark);
+  // ── Unterer Block: Bestätigungstext steht DIREKT über den Unterschriften (Text = das, was unterschrieben wird) ──
   const conf='Ich bestätige hiermit, dass ich von obiger Firma ausreichend eingewiesen wurde und in der Lage bin, obige Geräte zu bedienen. Ich wurde über die Funktionen, Produktionsabfolgen, Programmierschritte, Einsatzgebiete sowie Reinigung und Pflege der Geräte eingewiesen.';
-  const cl=doc.splitTextToSize(conf, W-2*M); doc.text(cl,M,y); y+=cl.length*5+7;
-
+  doc.setFontSize(9.5); const cl=doc.splitTextToSize(conf, W-2*M); const confH=cl.length*5;
+  const blockH=confH+9+14+32;                       // Bestätigung + Anerkannt + Unterschriften
+  let by=Math.max(y+8, 287-blockH);                 // an den unteren Rand, aber nicht über den oberen Inhalt
+  doc.setTextColor.apply(doc,dark); doc.text(cl,M,by); by+=confH+9;
   // Anerkannt
-  lab('Anerkannt:',M,y); val((SESSION.ort||'')+(SESSION.ort?', ':'')+datumDE,M+24,y); y+=16;
-
-  // Unterschriften (unten)
-  const colW=(W-2*M-16)/2; const sy=Math.max(y,248);
+  lab('Anerkannt:',M,by); val((SESSION.ort||'')+(SESSION.ort?', ':'')+datumDE,M+24,by); by+=14;
+  // Unterschriften direkt darunter
+  const colW=(W-2*M-16)/2; const sy=by;
   if(SESSION.sig){ try{ doc.addImage(SESSION.sig,'PNG',M+colW+16,sy-1,colW*0.8,17); }catch(e){} }
   doc.setDrawColor.apply(doc,dark); doc.setLineWidth(0.3);
   doc.line(M,sy+19,M+colW,sy+19); doc.line(M+colW+16,sy+19,M+2*colW+16,sy+19);
@@ -716,7 +716,7 @@ function buildPdf(titel, positions){
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor.apply(doc,grey);
   doc.text('Unterschrift Auftragnehmer (KPC GmbH)',M,sy+28);
   doc.text('Auftraggeber – Eingewiesene Person',M+colW+16,sy+28);
-  doc.setFontSize(7); doc.text('Für diese Unterlage behalten wir uns alle Rechte vor.',M,289);
+  doc.setFontSize(7); doc.text('Für diese Unterlage behalten wir uns alle Rechte vor.',M,293);
 
   // ═══════════ SEITE 2 – Anlage ═══════════
   if(isAllg){
