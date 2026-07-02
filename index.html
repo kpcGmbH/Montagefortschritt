@@ -979,8 +979,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 32;
+const APP_VERSION = 33;
 const CHANGELOG = [
+  { v:33, titel:'DGUV-V3-Prüfprotokoll digital', punkte:[
+    'Protokoll-Menü je Position: „⚡ DGUV digital ausfüllen" öffnet das kpc-Prüfprotokoll für elektrische Geräte (DIN VDE 0701-0702) vorausgefüllt in der Protokoll-App.',
+    'DGUV-Protokolle werden je Baustelle zentral im Ordner „_DGUV" gesammelt (analog Einweisung) und bleiben zusätzlich an der Position sichtbar.' ]},
   { v:32, titel:'Baustellen-Anlage mit Stammdaten', punkte:[
     'Neue Baustelle: Projektnummer, Ort, Projektname (Objekt) und Kunde/Auftraggeber sind jetzt einzelne Pflichtfelder; der Anzeigename wird daraus gebildet.',
     'Bestehende Baustellen: Auftraggeber über 🏢 in der Baustellen-Auswahl nachtragen. Die Einweisungs-App übernimmt Kunde und Ort dann automatisch.' ]},
@@ -2373,6 +2376,11 @@ function itemByPos(pos){for(const s of DATA)for(const su of s.subsections)for(co
 function openIbnDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.classList.remove('open');const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
   const url=IBN_URL+'#projekt='+q(curProjName())+'&ort='+q('')+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez);
   window.open(url,'_blank','noopener');}
+// ── DGUV digital: öffnet die IBN-App direkt beim DGUV-V3-Prüfprotokoll (Kontext + Kunde per Hash) ──
+function openDguvDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.classList.remove('open');const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
+  const proj=(typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS.find(x=>x.pid===PID):null;
+  const url=IBN_URL+'#proto=dguv&projekt='+q(curProjName())+'&ort='+q(proj&&proj.ort)+'&kunde='+q(proj&&proj.auftraggeber)+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez);
+  window.open(url,'_blank','noopener');}
 // ── Empfang des fertigen IBN-PDFs aus der IBN-App und Ablage bei der Position ──
 const _ibnSeen=new Set();
 function _dataURLtoBlob(d){const a=d.split(',');const mime=((a[0].match(/:(.*?);/))||[])[1]||'application/pdf';const bin=atob(a[1]);const n=bin.length;const u=new Uint8Array(n);for(let i=0;i<n;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime});}
@@ -2393,7 +2401,9 @@ async function ibnReceive(p){
   if(!PID){ alert('IBN-Protokoll empfangen, aber es ist keine Baustelle geöffnet. Bitte Baustelle öffnen – das Protokoll wird dann automatisch übernommen.'); _ibnSeen.delete(p.id); return; }
   try{
     const pos=p.pos, type=p.ptype||'IBN Protokoll', ts=Date.now();
-    const base=folderFor(pos)+'/'+pos.replace(/\./g,'_')+'_'+type.replace(/ /g,'_')+'_'+ts;
+    // DGUV-Protokolle zentral je Baustelle sammeln (analog _Einweisung), Rest bei der Position
+    const dir=(type==='DGUV Protokoll')? safeName(curProjName())+'/_DGUV' : folderFor(pos);
+    const base=dir+'/'+pos.replace(/\./g,'_')+'_'+type.replace(/ /g,'_')+'_'+ts;
     const fname=base+'.pdf';
     await queueUpload(fname, _dataURLtoBlob(p.pdf), 'application/pdf', pos);
     let dataFname='';
@@ -2410,7 +2420,7 @@ async function ibnReceive(p){
         if(old.dataFname){removeQueuedFile(old.dataFname);spDelete(old.dataFname);} } }
     if(!replaced) gs(pos).pdfs.push(entry);
     saveFotos(pos); updPG(pos);
-    showToast('✓ IBN-Protokoll bei Position '+pos+(replaced?' aktualisiert':' abgelegt'));
+    showToast('✓ '+type+' bei Position '+pos+(replaced?' aktualisiert':' abgelegt'));
   }catch(e){ alert('IBN-Protokoll konnte nicht abgelegt werden: '+((e&&e.message)||e)); }
 }
 function ibnCheckPending(){ try{var v=localStorage.getItem('ibn:return'); if(v){ localStorage.removeItem('ibn:return'); ibnReceive(JSON.parse(v)); } }catch(e){} }
@@ -2424,7 +2434,7 @@ function trpdf(pos,btn){
     menu=document.createElement('div');
     menu.id='ptypeMenu';
     menu.className='ptype-menu';
-    menu.innerHTML=PROTO_TYPES.map(t=>`<div class="ptype-item" onclick="selectPtype('${t}')">${t}</div>`).join('')+'<div class="ptype-item" style="border-top:1px solid var(--braun);color:#bfe3b4" onclick="openIbnDigital()">📝 IBN digital ausfüllen</div>';
+    menu.innerHTML=PROTO_TYPES.map(t=>`<div class="ptype-item" onclick="selectPtype('${t}')">${t}</div>`).join('')+'<div class="ptype-item" style="border-top:1px solid var(--braun);color:#bfe3b4" onclick="openIbnDigital()">📝 IBN digital ausfüllen</div>'+'<div class="ptype-item" style="color:#bfe3b4" onclick="openDguvDigital()">⚡ DGUV digital ausfüllen</div>';
     document.body.appendChild(menu);
     document.addEventListener('click',e=>{if(!e.target.closest('#ptypeMenu')&&!e.target.closest('.fbtn'))menu.classList.remove('open');});
   }
@@ -2447,7 +2457,8 @@ document.getElementById('pi').addEventListener('change',async function(e){
   showLoader(PTYPE+' wird gespeichert...');
   try {
     const ext=file.name.split('.').pop();
-    const fname=folderFor(PPOS)+'/'+PPOS.replace(/\./g,'_')+'_'+PTYPE.replace(/ /g,'_')+'_'+Date.now()+'.'+ext;
+    const pdir=(PTYPE==='DGUV Protokoll')? safeName(curProjName())+'/_DGUV' : folderFor(PPOS);
+    const fname=pdir+'/'+PPOS.replace(/\./g,'_')+'_'+PTYPE.replace(/ /g,'_')+'_'+Date.now()+'.'+ext;
     await queueUpload(fname, file, file.type||'application/pdf', PPOS);   // lokal + Warteschlange (offline-fähig)
     if(!gs(PPOS).pdfs) gs(PPOS).pdfs=[];
     gs(PPOS).pdfs.push({type:PTYPE,name:file.name,fname:fname});

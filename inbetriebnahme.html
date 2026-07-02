@@ -460,7 +460,7 @@ Winterhalter:{label:'Winterhalter',desc:'Spülmaschinen · Inbetriebnahmekarte &
 'DGUV V3':{label:'DGUV V3',desc:'Prüfprotokoll für elektrische Geräte nach Instandsetzung, Änderung – Wiederholungsprüfung (BetrSichV / DGUV Vorschrift 3, Prüfgrundlage DIN VDE 0701-0702)',icon:'⚡',
   devices:{
    'Prüfprotokoll elektrische Geräte':{tags:['Elektro','Wiederholungsprüfung'],
-     pdfTitle:'PRÜFPROTOKOLL',pdfSub:'BetrSichV / DGUV Vorschrift 3 · DIN VDE 0701-0702',
+     pdfTitle:'PRÜFPROTOKOLL',pdfSub:'BetrSichV / DGUV Vorschrift 3 · DIN VDE 0701-0702',ptype:'DGUV Protokoll',
      kopf:[txt('Kunde'),txt('Gerät / Bezeichnung'),txt('Fabrikat'),txt('Typ / Modell'),txt('Seriennummer (S-Nr.)'),txt('Standort / Position'),txt('Baustelle'),txt('Datum')],
      sections:[
        sec('01 · Sichtprüfung',[
@@ -988,20 +988,26 @@ function ctxPrefill(p){if(!CUR.dev)return;var o=DB[CUR.mfr].devices[CUR.dev];var
   o.kopf.forEach(function(f,i){var key='k'+i;
     if(p.typ&&!STATE[key]&&/Typ|Modell/i.test(f.l)){STATE[key]=p.typ;ch=true;}
     else if(p.pos&&!STATE[key]&&/Position|Standort/i.test(f.l)){STATE[key]=p.pos;ch=true;}
-    else if(p.sn&&!STATE[key]&&/Seriennummer|Serien-?Nr/i.test(f.l)){STATE[key]=p.sn;ch=true;}});
+    else if(p.sn&&!STATE[key]&&/Seriennummer|Serien-?Nr/i.test(f.l)){STATE[key]=p.sn;ch=true;}
+    else if(p.bez&&!STATE[key]&&/Gerät|Bezeichnung/i.test(f.l)){STATE[key]=p.bez;ch=true;}
+    else if(p.hersteller&&!STATE[key]&&/Fabrikat|^Hersteller$/i.test(f.l)){STATE[key]=p.hersteller;ch=true;}
+    else if(p.kunde&&!STATE[key]&&/^Kunde$/i.test(f.l)){STATE[key]=p.kunde;ch=true;}});
   if(ch){saveState();openForm(CUR.dev,true);}}
 let IBNCTX=null;
 function ibnSendBack(durl,name){if(!IBNCTX||!IBNCTX.pos)return false;
-  var payload={id:String(Date.now())+'_'+IBNCTX.pos,pos:IBNCTX.pos,pdf:durl,name:name,ptype:'IBN Protokoll',projekt:IBNCTX.projekt||'',mfr:CUR.mfr,dev:CUR.dev,state:STATE,replaceFname:(IBNCTX.replaceFname||'')};
+  var __o=(DB[CUR.mfr]&&DB[CUR.mfr].devices[CUR.dev])||{};
+  var payload={id:String(Date.now())+'_'+IBNCTX.pos,pos:IBNCTX.pos,pdf:durl,name:name,ptype:(__o.ptype||'IBN Protokoll'),projekt:IBNCTX.projekt||'',mfr:CUR.mfr,dev:CUR.dev,state:STATE,replaceFname:(IBNCTX.replaceFname||'')};
   try{localStorage.setItem('ibn:return',JSON.stringify(payload));}catch(e){}
   try{if(window.opener&&!window.opener.closed)window.opener.postMessage({__ibnReturn:true,payload:payload},location.origin);}catch(e){}
   return true;}
 function applyUrlContext(){var hash=(location.hash||'').replace(/^#/,'');if(!hash)return false;
   var p={};hash.split('&').forEach(function(kv){var i=kv.indexOf('=');if(i>0)try{p[decodeURIComponent(kv.slice(0,i))]=decodeURIComponent(kv.slice(i+1));}catch(e){}});
-  if(!p.projekt&&!p.ort&&!p.hersteller&&!p.typ)return false;
-  if(p.projekt!==undefined)PROJECT.name=p.projekt;if(p.ort!==undefined)PROJECT.ort=p.ort;saveProject();
+  if(!p.projekt&&!p.ort&&!p.hersteller&&!p.typ&&!p.proto)return false;
+  if(p.projekt!==undefined)PROJECT.name=p.projekt;if(p.ort!==undefined&&p.ort!=='')PROJECT.ort=p.ort;saveProject();
   if(p.pos){IBNCTX={pos:p.pos,projekt:p.projekt||''};CUR.pos=p.pos;}
   try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
+  // Direkter Einsprung ins DGUV-V3-Prüfprotokoll (aus der Hauptapp: „DGUV digital ausfüllen")
+  if(p.proto==='dguv'&&DB['DGUV V3']){CUR.mfr='DGUV V3';openForm('Prüfprotokoll elektrische Geräte');ctxPrefill(p);return true;}
   if(p.hersteller||p.typ){var mfr=ctxMatchMfr(p.hersteller);var dev=mfr?ctxMatchDev(mfr,p.typ):null;
     if(mfr&&dev){CUR.mfr=mfr;openForm(dev);ctxPrefill(p);return true;}}
   goHome();return true;}  // kein passendes Protokoll -> Startseite (Baustelle ist gesetzt)
