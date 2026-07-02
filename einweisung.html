@@ -419,7 +419,7 @@ async function openProject(pid, pname){
 }
 
 // ══════════════════ Übersicht ══════════════════
-function counts(){ let tot=0,ein=0; allDevices().forEach(d=>{ if(!needsEinw(d.g.gew)) return; tot++; if(devState(d.g.pos)&&devState(d.g.pos).eingewiesen) ein++; }); return {tot,ein}; }
+function counts(){ let tot=0,ein=0; allDevices().forEach(d=>{ tot++; if(devState(d.g.pos)&&devState(d.g.pos).eingewiesen) ein++; }); return {tot,ein}; }
 function renderOverview(){
   const main=document.getElementById('main');
   const c=counts();
@@ -436,7 +436,7 @@ function renderOverview(){
   // Etagen
   if(!LV.length){ html+='<div class="empty">Keine Geräte in der Stückliste dieser Baustelle.</div>'; }
   LV.forEach((et,ei)=>{
-    let tot=0,ein=0; et.bereiche.forEach(b=>b.geraete.forEach(g=>{ if(!needsEinw(g.gew)) return; tot++; if(devState(g.pos)&&devState(g.pos).eingewiesen) ein++; }));
+    let tot=0,ein=0; et.bereiche.forEach(b=>b.geraete.forEach(g=>{ tot++; if(devState(g.pos)&&devState(g.pos).eingewiesen) ein++; }));
     const L=lid(et.label)+'_'+ei;
     html+='<div class="etblock"><div class="ethd" onclick="toggleEt('+ei+')">'+
       '<h3>'+esc(et.label)+(et.bez? ' · '+esc(et.bez):'')+'</h3>'+
@@ -445,12 +445,11 @@ function renderOverview(){
     et.bereiche.forEach(b=>{
       html+='<div class="berhd">'+esc(b.pos)+' '+esc(b.bez)+'</div>';
       b.geraete.forEach(g=>{
-        const einwP=needsEinw(g.gew);
         const s=devState(g.pos); const ein=s&&s.eingewiesen;
         html+='<div class="grow'+(ein?' ein':'')+'">'+
-          '<div class="gmark"'+(einwP?'':' style="visibility:hidden"')+'>'+(ein?'&#10003;':'')+'</div>'+
+          '<div class="gmark">'+(ein?'&#10003;':'')+'</div>'+
           '<div class="gi"><div class="gbez">'+esc(g.bez)+'</div><div class="gmeta">'+esc(g.pos)+(g.fab? ' · '+esc(g.fab):'')+(g.typ? ' · '+esc(g.typ):'')+'</div></div>'+
-          '<div class="gstat">'+(einwP? (ein? '<span class="ok">✓ '+fmtDE(s.datum)+'</span>' : '<span class="off">offen</span>') : '')+'</div>'+
+          '<div class="gstat">'+(ein? '<span class="ok">✓ '+fmtDE(s.datum)+'</span>' : '<span class="off">offen</span>')+'</div>'+
         '</div>';
       });
     });
@@ -497,7 +496,7 @@ function startSession(){
 // Ort aus dem Projektnamen ableiten (Schema "Nummer Ort Objekt")
 function deriveOrt(){ const p=(PROJNAME||'').trim().split(/\s+/); return p.length>=2? p[1] : ''; }
 function sessionType(typ){
-  SESSION={ typ, selected:{}, sonder:{}, std:{}, collapsed:{}, teilnehmer:'', auftraggeber:(EW.auftraggeber||''), ort:(EW.ort||deriveOrt()), datum:todayISO(), einweiser:USER||'', sig:'' };
+  SESSION={ typ, selected:{}, sonder:{}, std:{}, collapsed:{}, teilnehmer:'', auftraggeber:(EW.auftraggeber||''), ort:(EW.ort||deriveOrt()), datum:todayISO(), einweiser:USER||'', kommentar:'', sig:'' };
   if(typ==='geraete') renderSessionGeraete(); else renderSessionAllgemein();
 }
 
@@ -513,11 +512,11 @@ function closeOverlay(){ const ov=document.getElementById('ewOv'); if(ov) ov.rem
 function renderSessionGeraete(){
   const body=document.getElementById('ewBody');
   let html='<div class="step-title">1. Geräte auswählen</div>'+
-    '<div class="hint">Ganze Etage/Bereich per Button wählen oder Etage aufklappen und einzelne Geräte antippen. Bei einweisungspflichtigen Geräten (Gewerk Elektro) erscheint die Checkliste.</div>';
+    '<div class="hint">Jeder Artikel ist ankreuzbar. Ganze Etage/Bereich per Button wählen oder Etage aufklappen und einzeln antippen. Bei einweisungspflichtigen Geräten (Gewerk Elektro) erscheint zusätzlich die Checkliste.</div>';
   LV.forEach((et,ei)=>{
     const collapsed = SESSION.collapsed[ei]!==false;   // Standard: zugeklappt
     let etTot=0, etSel=0;
-    et.bereiche.forEach(b=>b.geraete.forEach(g=>{ if(!needsEinw(g.gew)) return; etTot++; if(SESSION.selected[g.pos]) etSel++; }));
+    et.bereiche.forEach(b=>b.geraete.forEach(g=>{ etTot++; if(SESSION.selected[g.pos]) etSel++; }));
     html+='<div class="sel-et">'+
       '<div class="sel-ethd" onclick="toggleEtColl('+ei+')">'+
         '<span class="sel-tog'+(collapsed?' cl':'')+'">&#9660;</span>'+
@@ -527,23 +526,17 @@ function renderSessionGeraete(){
       '</div>';
     if(!collapsed){
       et.bereiche.forEach((b,bi)=>{
-        const bTot=b.geraete.filter(g=>needsEinw(g.gew)).length;
         html+='<div class="selbar"><div class="sub-bereich" style="padding:2px 6px">'+esc(b.pos)+' '+esc(b.bez)+'</div>'+
-          (bTot? '<button class="chip" onclick="selBereich('+ei+','+bi+')">Bereich wählen</button>':'')+'</div>';
+          (b.geraete.length? '<button class="chip" onclick="selBereich('+ei+','+bi+')">Bereich wählen</button>':'')+'</div>';
         b.geraete.forEach(g=>{
           const einwP=needsEinw(g.gew);
           const done=devState(g.pos)&&devState(g.pos).eingewiesen;
           const sel=!!SESSION.selected[g.pos];
-          if(!einwP){
-            html+='<div class="selrow noein"><div class="selbox" style="visibility:hidden"></div>'+
-              '<div class="gi"><div class="gbez">'+esc(g.bez)+'</div><div class="gmeta">'+esc(g.pos)+(g.fab?' · '+esc(g.fab):'')+(g.typ?' · '+esc(g.typ):'')+'</div></div></div>';
-            return;
-          }
           html+='<div class="selrow'+(sel?' on':'')+(done?' done':'')+'" onclick="selDev('+JSON.stringify(g.pos)+')">'+
             '<div class="selbox">'+(sel?'&#10003;':'')+'</div>'+
             '<div class="gi"><div class="gbez">'+esc(g.bez)+'</div><div class="gmeta">'+esc(g.pos)+(g.fab?' · '+esc(g.fab):'')+(g.typ?' · '+esc(g.typ):'')+(done?' · bereits eingewiesen':'')+'</div></div>'+
           '</div>';
-          if(sel){
+          if(sel && einwP){
             const checks=SESSION.sonder[g.pos]||(SESSION.sonder[g.pos]=checksFor(g).map(t=>({txt:t,done:false})));
             checks.forEach((c,ci)=>{ html+='<div class="sck'+(c.done?' on':'')+'" onclick="toggleSck('+JSON.stringify(g.pos)+','+ci+')"><div class="sckb">'+(c.done?'&#10003;':'')+'</div><div>'+esc(c.txt)+'</div></div>'; });
           }
@@ -577,15 +570,17 @@ function footerFields(){
     '<div class="fld"><label>Einweiser (KPC)</label><input id="f_einw" value="'+esc(SESSION.einweiser)+'" oninput="SESSION.einweiser=this.value"></div>'+
     '<div class="fld"><label>Ort (für „Anerkannt")</label><input id="f_ort" value="'+esc(SESSION.ort)+'" oninput="SESSION.ort=this.value" placeholder="Ort"></div>'+
     '<div class="fld"><label>Datum</label><input id="f_datum" type="date" value="'+esc(SESSION.datum)+'" oninput="SESSION.datum=this.value"></div>'+
+    '<div class="fld"><label>Kommentar (optional)</label><textarea id="f_komm" rows="2" oninput="SESSION.kommentar=this.value" placeholder="Bemerkungen, Auffälligkeiten, Ausnahmen …" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-family:inherit;background:var(--white);color:var(--text);resize:vertical">'+esc(SESSION.kommentar||'')+'</textarea></div>'+
     '<div class="fld"><label>Bestätigung der eingewiesenen Person</label><div class="confbox">'+esc(CONF_TEXT)+'</div></div>'+
     '<div class="fld"><label>Unterschrift der eingewiesenen Person *</label><div class="sigwrap"><canvas id="sigCanvas"></canvas><div class="sigtools"><span style="font-size:11px;color:var(--accent2)">Mit der Unterschrift wird die obige Bestätigung anerkannt</span><button onclick="clearSig()">Löschen</button></div></div></div>'+
     '<button class="finish" onclick="finishSession()">Protokoll abschließen &amp; speichern</button>';
 }
 function devByPos(pos){ const d=allDevices().find(x=>x.g.pos===pos); return d?d.g:null; }
-function ensureSonder(pos){ if(!SESSION.sonder[pos]){ const g=devByPos(pos); if(g) SESSION.sonder[pos]=checksFor(g).map(t=>({txt:t,done:false})); } }
+// Checkliste nur für einweisungspflichtige (Elektro) Geräte anlegen
+function ensureSonder(pos){ if(!SESSION.sonder[pos]){ const g=devByPos(pos); if(g && needsEinw(g.gew)) SESSION.sonder[pos]=checksFor(g).map(t=>({txt:t,done:false})); } }
 function selDev(pos){ if(SESSION.selected[pos]) delete SESSION.selected[pos]; else { SESSION.selected[pos]=true; ensureSonder(pos); } renderSessionGeraete(); }
-function selBereich(ei,bi){ const gs=LV[ei].bereiche[bi].geraete.filter(g=>needsEinw(g.gew)); const anyOff=gs.some(g=>!SESSION.selected[g.pos]); gs.forEach(g=>{ if(anyOff){ SESSION.selected[g.pos]=true; ensureSonder(g.pos); } else delete SESSION.selected[g.pos]; }); renderSessionGeraete(); }
-function selEtage(ei){ const gs=[]; LV[ei].bereiche.forEach(b=>b.geraete.forEach(g=>{ if(needsEinw(g.gew)) gs.push(g); })); const anyOff=gs.some(g=>!SESSION.selected[g.pos]); gs.forEach(g=>{ if(anyOff){ SESSION.selected[g.pos]=true; ensureSonder(g.pos); } else delete SESSION.selected[g.pos]; }); renderSessionGeraete(); }
+function selBereich(ei,bi){ const gs=LV[ei].bereiche[bi].geraete; const anyOff=gs.some(g=>!SESSION.selected[g.pos]); gs.forEach(g=>{ if(anyOff){ SESSION.selected[g.pos]=true; ensureSonder(g.pos); } else delete SESSION.selected[g.pos]; }); renderSessionGeraete(); }
+function selEtage(ei){ const gs=[]; LV[ei].bereiche.forEach(b=>b.geraete.forEach(g=>gs.push(g))); const anyOff=gs.some(g=>!SESSION.selected[g.pos]); gs.forEach(g=>{ if(anyOff){ SESSION.selected[g.pos]=true; ensureSonder(g.pos); } else delete SESSION.selected[g.pos]; }); renderSessionGeraete(); }
 function toggleEtColl(ei){ SESSION.collapsed[ei]=!(SESSION.collapsed[ei]!==false); renderSessionGeraete(); }
 function toggleSck(pos,ci){ SESSION.sonder[pos][ci].done=!SESSION.sonder[pos][ci].done; renderSessionGeraete(); }
 function toggleStd(fid,ci){ SESSION.std[fid][ci].done=!SESSION.std[fid][ci].done; renderSessionAllgemein(); }
@@ -645,7 +640,7 @@ async function finishSession(){
     EW.auftraggeber=SESSION.auftraggeber.trim(); EW.ort=SESSION.ort.trim();
     // "vollständig" = alle einweisungspflichtigen Geräte des Projekts jetzt eingewiesen
     let complete=false; if(SESSION.typ==='geraete'){ const c=counts(); complete = c.tot>0 && c.ein>=c.tot; }
-    EW.protokolle.push({ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), einweiser:SESSION.einweiser.trim(), positions, bereiche, titel, complete, pdf:fname, ts:Date.now() });
+    EW.protokolle.push({ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), einweiser:SESSION.einweiser.trim(), kommentar:(SESSION.kommentar||'').trim(), positions, bereiche, titel, complete, pdf:fname, ts:Date.now() });
     showLoader('Wird in SharePoint gespeichert …');
     await saveEW();
     hideLoader();
@@ -700,6 +695,13 @@ function buildPdf(titel, positions){
   // Einweisung durchgeführt
   doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor.apply(doc,dark);
   doc.text('Einweisung durchgeführt:',M,y); doc.setFont('helvetica','bold'); doc.text('[X] ja',M+55,y); doc.setFont('helvetica','normal'); doc.text('[  ] nein',M+75,y); y+=9;
+
+  // Bemerkung (optional)
+  const komm=(SESSION.kommentar||'').trim();
+  if(komm){
+    doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor.apply(doc,grey); doc.text('Bemerkung:',M,y);
+    doc.setTextColor.apply(doc,dark); const kl=doc.splitTextToSize(komm, W-2*M-24); doc.text(kl,M+24,y); y+=Math.max(kl.length*5,5)+4;
+  }
 
   // ── Unterer Block: Bestätigungstext steht DIREKT über den Unterschriften (Text = das, was unterschrieben wird) ──
   doc.setFontSize(9.5); const cl=doc.splitTextToSize(CONF_TEXT, W-2*M); const confH=cl.length*5;
