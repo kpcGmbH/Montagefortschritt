@@ -465,16 +465,23 @@ function renderOverview(){
   main.innerHTML=html;
 }
 function protLine(p){
-  return '<div class="prow"><div class="pmain"><div class="pt">'+esc(p.titel||'Einweisung')+'</div>'+
+  const badge = p.complete? ' <span style="color:var(--green)">✓ vollständig</span>' : '';
+  return '<div class="prow"><div class="pmain"><div class="pt">'+esc(p.titel||'Einweisung')+badge+'</div>'+
     '<div class="pm">'+fmtDE(p.datum)+(p.teilnehmer? ' · '+esc(p.teilnehmer):'')+(p.positions&&p.positions.length? ' · '+p.positions.length+' Gerät(e)':'')+' · Einweiser: '+esc(p.einweiser||'')+'</div></div>'+
-    (p.pdf? '<button class="plink" onclick="openPdf('+JSON.stringify(p.pdf)+')">PDF</button>':'')+'</div>';
+    (p.pdf? '<button class="plink" onclick="openPdfById(\''+esc(p.id)+'\')">PDF</button>':'')+'</div>';
 }
 function toggleEt(ei){ const L=lid(LV[ei].label)+'_'+ei; const b=document.getElementById('ETB_'+L); const t=document.getElementById('TOG_'+L); if(!b)return; const hid=b.classList.toggle('hid'); if(t)t.classList.toggle('cl',hid); }
-async function openPdf(fname){
+function openPdfById(id){ const p=EW.protokolle.find(x=>x.id===id); if(p&&p.pdf) openPdf(p.pdf); }
+function openPdf(fname){
+  // Fenster SYNCHRON im Klick öffnen (sonst Popup-Blocker), Inhalt nach Download setzen
+  const w=window.open('','_blank');
   showLoader('PDF wird geladen …');
-  try{ const blob=await spDownloadBlob(fname); const url=URL.createObjectURL(blob); window.open(url,'_blank'); }
-  catch(e){ alert('PDF konnte nicht geladen werden: '+((e&&e.message)||e)); }
-  finally{ hideLoader(); }
+  spDownloadBlob(fname).then(blob=>{
+    const url=URL.createObjectURL(blob);
+    if(w && !w.closed){ w.location=url; }
+    else { const a=document.createElement('a'); a.href=url; a.download=fname.split('/').pop(); document.body.appendChild(a); a.click(); a.remove(); }
+  }).catch(e=>{ if(w) try{w.close();}catch(_){} alert('PDF konnte nicht geladen werden: '+((e&&e.message)||e)); })
+    .finally(()=>hideLoader());
 }
 
 // ══════════════════ Sitzung (Neue Einweisung) ══════════════════
@@ -612,7 +619,11 @@ async function finishSession(){
   try{
     const id='P'+Date.now();
     const iso=new Date(SESSION.datum+'T12:00:00').toISOString();
-    const titel = SESSION.typ==='allgemein' ? 'Grundlagen-Einweisung' : 'Geräte-Einweisung';
+    // Bereich(e) dieser Sitzung für die Benennung
+    let bereiche=[];
+    positions.forEach(pos=>{ const d=allDevices().find(x=>x.g.pos===pos); if(d){ const b=(d.b.bez||'').trim(); if(b&&bereiche.indexOf(b)<0) bereiche.push(b); } });
+    const titel = SESSION.typ==='allgemein' ? 'Grundlagen-Einweisung'
+      : (bereiche.length? ('Einweisung – '+(bereiche.length<=2? bereiche.join(', ') : bereiche.slice(0,2).join(', ')+' …')) : 'Geräte-Einweisung');
     // PDF bauen
     const pdfBlob=buildPdf(titel, positions);
     // Ablage in SharePoint
@@ -629,7 +640,9 @@ async function finishSession(){
     }
     // Auftraggeber + Ort projektweit merken (nachträglich editierbar)
     EW.auftraggeber=SESSION.auftraggeber.trim(); EW.ort=SESSION.ort.trim();
-    EW.protokolle.push({ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), einweiser:SESSION.einweiser.trim(), positions, titel, pdf:fname, ts:Date.now() });
+    // "vollständig" = alle einweisungspflichtigen Geräte des Projekts jetzt eingewiesen
+    let complete=false; if(SESSION.typ==='geraete'){ const c=counts(); complete = c.tot>0 && c.ein>=c.tot; }
+    EW.protokolle.push({ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), einweiser:SESSION.einweiser.trim(), positions, bereiche, titel, complete, pdf:fname, ts:Date.now() });
     showLoader('Wird in SharePoint gespeichert …');
     await saveEW();
     hideLoader();
