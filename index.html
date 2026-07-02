@@ -369,6 +369,19 @@ select.fs option{background:var(--surface);color:var(--text);}
 .etkat-src{display:flex;gap:10px;margin-bottom:10px;}
 .etsrc{flex:1;padding:13px;background:#3a3530;border:1px solid #895500;color:#fff;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;}
 .etkat-cancel{width:100%;padding:11px;background:none;border:1px solid var(--line);color:var(--accent2);border-radius:10px;font-size:14px;cursor:pointer;font-family:inherit;}
+
+/* ── „Was ist neu?" Update-Hinweis ── */
+#clogOv{position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;}
+.clog-card{width:100%;max-width:440px;max-height:80vh;display:flex;flex-direction:column;background:var(--chrome-bg);border-radius:16px;box-shadow:0 12px 40px rgba(0,0,0,.4);overflow:hidden;}
+.clog-hd{display:flex;align-items:center;gap:8px;padding:16px 18px;font-size:17px;font-weight:700;color:#fff;background:var(--braun);}
+.clog-spark{font-size:19px;}
+.clog-body{padding:16px 18px;overflow-y:auto;}
+.clog-sec{margin-bottom:16px;}
+.clog-sec:last-child{margin-bottom:0;}
+.clog-t{font-size:14px;font-weight:700;color:var(--braun);margin-bottom:6px;}
+.clog-ul{margin:0;padding-left:20px;}
+.clog-ul li{font-size:13.5px;color:var(--text);line-height:1.5;margin-bottom:5px;}
+.clog-ok{margin:4px 18px 18px;padding:13px;background:var(--braun);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;}
 </style>
 <script>
 /* Gespeicherte Hell/Dunkel-Wahl vor dem Rendern anwenden (verhindert Aufblitzen) */
@@ -958,7 +971,55 @@ async function onLoggedIn(){
 }
 
 function startData(){
-  loadState().then(()=>{ restoreUI(); upStats(); maybeOfferKonsolidieren(); });
+  loadState().then(()=>{ restoreUI(); upStats(); maybeOfferKonsolidieren(); setTimeout(maybeShowChangelog, 600); });
+}
+
+// ── „Was ist neu?" – Update-Hinweis beim ersten Start nach einem Update ──
+// APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
+// CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
+// die zuletzt vom Nutzer gesehene Version.
+const APP_VERSION = 30;
+const CHANGELOG = [
+  { v:30, titel:'Restarbeitenliste: Fotos & Excel', punkte:[
+    'Restarbeiten-Bericht zeigt jetzt die Fotos direkt mit an – umschaltbar („Fotos an/aus"), auch beim Drucken.',
+    'Neuer Excel-Export der Restarbeitenliste.' ]},
+  { v:29, titel:'Anlagenfotos verbessert', punkte:[
+    'Kategorie-Auswahl korrigiert.',
+    'Mehrere Fotos gleichzeitig aus der Galerie hochladen.' ]},
+  { v:28, titel:'Neu: Anlagenfotos pro Etage', punkte:[
+    'Übersichtsfotos je Etage mit Kategorie (z. B. Montagestand, Fertigstellung) und zeitlichem Verlauf – Button „📸 Anlagenfotos" oben in jeder Etage.' ]},
+];
+let _clogShown=false;
+function maybeShowChangelog(){
+  if(_clogShown) return;
+  let seen=0;
+  try{ seen=parseInt(localStorage.getItem('kpc_seen_version')||'0')||0; }catch(e){}
+  if(seen>=APP_VERSION) return;                 // aktuelle Version schon gesehen
+  const neu=CHANGELOG.filter(c=>c.v>seen);      // seen=0 (Erststart des Features) -> alle jüngsten
+  if(!neu.length){ try{ localStorage.setItem('kpc_seen_version', String(APP_VERSION)); }catch(e){} return; }
+  showChangelogModal(neu);
+}
+function closeChangelog(){
+  const ov=document.getElementById('clogOv'); if(ov) ov.remove();
+  try{ localStorage.setItem('kpc_seen_version', String(APP_VERSION)); }catch(e){}
+}
+function showChangelogModal(list){
+  _clogShown=true;
+  let ov=document.getElementById('clogOv');
+  if(ov) ov.remove();
+  ov=document.createElement('div');
+  ov.id='clogOv';
+  ov.addEventListener('click', e=>{ if(e.target===ov) closeChangelog(); });
+  ov.innerHTML=
+    '<div class="clog-card">'+
+      '<div class="clog-hd"><span class="clog-spark">✨</span> Was ist neu</div>'+
+      '<div class="clog-body">'+
+        list.map(c=>'<div class="clog-sec"><div class="clog-t">'+escapeHtml(c.titel)+'</div><ul class="clog-ul">'+
+          c.punkte.map(p=>'<li>'+escapeHtml(p)+'</li>').join('')+'</ul></div>').join('')+
+      '</div>'+
+      '<button class="clog-ok" onclick="closeChangelog()">Verstanden</button>'+
+    '</div>';
+  document.body.appendChild(ov);
 }
 
 function setAusfuehrer(typ,name){
