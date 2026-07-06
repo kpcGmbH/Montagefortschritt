@@ -52,7 +52,7 @@ button{font-family:inherit;}
 
 /* HEADER */
 header{background:var(--chrome-bg);position:sticky;top:0;z-index:100;box-shadow:0 2px 10px rgba(0,0,0,.18);}
-.h-top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 14px 7px;border-bottom:2px solid var(--braun);background:var(--anthrazit);}
+.h-top{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:calc(9px + env(safe-area-inset-top)) 14px 7px;border-bottom:2px solid var(--braun);background:var(--anthrazit);}
 .logo-img{height:36px;width:auto;display:block;flex-shrink:0;}
 .ew-label{color:var(--accent);font-size:12px;font-weight:700;letter-spacing:2px;margin-left:2px;}
 .h-right{display:flex;align-items:center;gap:10px;}
@@ -105,7 +105,7 @@ main{padding:14px 12px 40px;max-width:900px;margin:0 auto;}
 /* OVERLAY (Sitzung) */
 .ov{position:fixed;inset:0;z-index:1500;background:rgba(0,0,0,.55);display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:0;}
 .sheet{width:100%;max-width:640px;min-height:100%;background:var(--bg);display:flex;flex-direction:column;}
-.sheet-h{position:sticky;top:0;background:var(--anthrazit);color:#fff;display:flex;align-items:center;gap:10px;padding:13px 14px;z-index:2;}
+.sheet-h{position:sticky;top:0;background:var(--anthrazit);color:#fff;display:flex;align-items:center;gap:10px;padding:calc(13px + env(safe-area-inset-top)) 14px 13px;z-index:2;}
 .sheet-h .ttl{flex:1;font-size:15px;font-weight:700;}
 .sheet-close{background:none;border:none;color:#fff;font-size:26px;line-height:1;cursor:pointer;padding:0 6px;}
 .sheet-b{padding:14px 12px 30px;}
@@ -146,7 +146,7 @@ main{padding:14px 12px 40px;max-width:900px;margin:0 auto;}
 
 /* LOADER / TOAST */
 #loader{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9500;display:none;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:700;}
-#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:12px 22px;border-radius:24px;font-size:14px;font-weight:700;z-index:9600;display:none;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:90vw;text-align:center;}
+#toast{position:fixed;bottom:calc(24px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);background:var(--green);color:#fff;padding:12px 22px;border-radius:24px;font-size:14px;font-weight:700;z-index:9600;display:none;box-shadow:0 6px 20px rgba(0,0,0,.3);max-width:90vw;text-align:center;}
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/@azure/msal-browser@2.38.4/lib/msal-browser.min.js"></script>
