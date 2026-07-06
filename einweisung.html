@@ -3,18 +3,6 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<script>/* Smartphones: Oberfläche ~15% größer über kleinere Viewport-Breite (nativ skaliert –
-   KEIN CSS-zoom: das verschob Koordinaten von Menüs/Signatur-Pad und iOS-Touch-Ziele) */
-(function(){try{
-  var pw=Math.min(screen.width,screen.height); if(pw>480) return;
-  var mv=document.querySelector('meta[name="viewport"]'); if(!mv) return;
-  function apply(){
-    var ls=window.matchMedia&&window.matchMedia('(orientation: landscape)').matches;
-    var w=ls? Math.max(screen.width,screen.height) : Math.min(screen.width,screen.height);
-    mv.setAttribute('content','width='+Math.round(w/1.15)+', user-scalable=no, viewport-fit=cover');
-  }
-  apply(); window.addEventListener('orientationchange',function(){setTimeout(apply,250);});
-}catch(e){}})();</script>
 <title>Einweisung – KPC GmbH</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&display=swap');
