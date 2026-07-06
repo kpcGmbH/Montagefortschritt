@@ -991,8 +991,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 36;
+const APP_VERSION = 37;
 const CHANGELOG = [
+  { v:37, titel:'Berichte öffnen wieder auf dem Smartphone', punkte:[
+    'Restarbeitenliste und Kundenbericht mit Fotos wurden auf dem Handy vom Popup-Blocker verhindert – das Berichtsfenster öffnet jetzt sofort beim Antippen und füllt sich, sobald die Fotos geladen sind.' ]},
   { v:36, titel:'Fehlerbehebung mobile Darstellung', punkte:[
     'Fotoupload und Restarbeiten funktionieren auf dem Smartphone wieder – die größere Darstellung wird jetzt technisch anders umgesetzt (native Skalierung statt CSS-Zoom).' ]},
   { v:35, titel:'Größere Darstellung auf dem Smartphone', punkte:[
@@ -1868,6 +1870,11 @@ async function expKunde(withFotos=false){
 
   if(rows.length===0){alert('Keine Positionen mit Status Geliefert vorhanden.');return;}
 
+  // Fenster SYNCHRON im Klick öffnen – nach den awaits blockt der mobile Popup-Blocker window.open
+  const w=window.open('','_blank');
+  if(!w){alert('Das Berichtsfenster wurde vom Browser blockiert. Bitte Popups für diese Seite erlauben.');return;}
+  try{ w.document.write('<title>Kundenbericht</title><body style="font-family:Arial,sans-serif;padding:24px;color:#666">Bericht wird erstellt …</body>'); }catch(e){}
+
   // Fotos vorab als Daten-URLs laden (das Berichts-Popup hat keinen Graph-Token)
   const fotoData={};
   if(withFotos){
@@ -1977,7 +1984,8 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 </div>
 </body></html>`;
 
-  const w=window.open('','_blank');
+  if(w.closed){return;}
+  w.document.open();
   w.document.write(html);
   w.document.close();
 }
@@ -3194,6 +3202,10 @@ async function expRest(){
   const d=now.toLocaleDateString('de-DE');
   let rows=collectRestRows();
   if(rows.length===0){alert('Keine Restarbeiten erfasst.');return;}
+  // Fenster SYNCHRON im Klick öffnen – nach den awaits blockt der mobile Popup-Blocker window.open
+  const w=window.open('','_blank');
+  if(!w){alert('Das Berichtsfenster wurde vom Browser blockiert. Bitte Popups für diese Seite erlauben.');return;}
+  try{ w.document.write('<title>Restarbeitenliste</title><body style="font-family:Arial,sans-serif;padding:24px;color:#666">Bericht wird erstellt …</body>'); }catch(e){}
   // Fotos vorab als Daten-URLs laden (das Berichts-Popup hat keinen Graph-Token)
   const fotoData={};
   const anyFoto=rows.some(r=>r.fotos&&r.fotos.length);
@@ -3294,7 +3306,8 @@ function raFilter(mode){
 raFilter('all');
 <\/script>
 </body></html>`;
-  const w=window.open('','_blank');
+  if(w.closed){return;}
+  w.document.open();
   w.document.write(html);
   w.document.close();
 }
