@@ -24,6 +24,8 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:var(--font);background:var(--bg);color:var(--text);font-size:14px;font-weight:300;-webkit-tap-highlight-color:transparent;}
+/* Smartphones: gesamte Oberfläche gleichmäßig etwas größer darstellen */
+@media (max-width:480px){ body{zoom:1.15;} }
 /* Durchgängig Roboto Condensed Light – wie in der Hauptapp (überschreibt Inline-Stile) */
 *{font-weight:300 !important;font-family:var(--font) !important;}
 button{font-family:inherit;}

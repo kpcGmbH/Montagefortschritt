@@ -18,6 +18,11 @@ body{
   font-weight:300; color:var(--black); background:var(--bg);
   -webkit-font-smoothing:antialiased; font-size:16px; line-height:1.45;
 }
+/* Smartphones: gesamte Oberfläche gleichmäßig etwas größer darstellen */
+@media (max-width:480px){
+  body{zoom:1.15;}
+  .topbar-in{flex-wrap:wrap;gap:8px;row-gap:6px;}
+}
 .wrap{max-width:980px;margin:0 auto;padding:0 16px 120px}
 /* Topbar */
 .topbar{position:sticky;top:0;z-index:30;background:#fff;border-bottom:1.4px solid var(--copper);box-shadow:var(--shadow)}

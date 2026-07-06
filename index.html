@@ -58,6 +58,8 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:var(--font);background:var(--page);color:var(--text);font-size:14px;font-weight:300;}
+/* Smartphones: gesamte Oberfläche gleichmäßig etwas größer darstellen */
+@media (max-width:480px){ body{zoom:1.15;} }
 /* Durchgängig Roboto Condensed Light – überschreibt auch fettere/abweichende Inline-Stile */
 *{font-weight:300 !important;font-family:var(--font) !important;}
 
@@ -979,8 +981,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 34;
+const APP_VERSION = 35;
 const CHANGELOG = [
+  { v:35, titel:'Größere Darstellung auf dem Smartphone', punkte:[
+    'Auf Smartphones wird die gesamte Oberfläche jetzt ca. 15 % größer dargestellt – in der Hauptapp, den Berichten, der Protokoll-App (IBN/DGUV) und der Einweisungs-App.' ]},
   { v:34, titel:'Protokolle zentral je Baustelle', punkte:[
     'Alle Protokolle werden jetzt zentral je Baustelle gesammelt: Inbetriebnahme in „_Inbetriebnahme", DGUV in „_DGUV", Einweisung in „_Einweisung" – zusätzlich bleiben sie wie gewohnt an der Position sichtbar.' ]},
   { v:33, titel:'DGUV-V3-Prüfprotokoll digital', punkte:[
@@ -1800,6 +1804,7 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 .sig-box{flex:1;}
 .sig-line{border-top:1px solid #2b2b2b;padding-top:6px;font-size:11px;color:#a8a8a8;margin-top:40px;}
 @media print{body{padding:10px;}button{display:none!important;}}
+@media screen and (max-width:600px){body{zoom:1.15;}}
 </style></head><body>
 <button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
 <div class="kpc"><img class="logo-img" src="${repLogo()}" alt="KPC GmbH">
@@ -1933,6 +1938,7 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 .sig-box{flex:1;}
 .sig-line{border-top:1px solid #2b2b2b;padding-top:6px;font-size:11px;color:#a8a8a8;margin-top:40px;}
 @media print{body{padding:10px;}button{display:none!important;}}
+@media screen and (max-width:600px){body{zoom:1.15;}}
 </style></head><body>
 <button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
 <div class="kpc">
@@ -3228,7 +3234,8 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 .sig-line{border-top:1px solid #2b2b2b;padding-top:6px;font-size:11px;color:#a8a8a8;margin-top:40px;}
 .flt{font-family:inherit;font-size:12px;font-weight:700;padding:6px 13px;border-radius:16px;border:1px solid #d4cdc6;background:#fff;color:#2b2b2b;cursor:pointer;}
 .flt.on{background:#895500;color:#fff;border-color:#895500;}
-@media print{body{padding:10px;}button,.flt-bar{display:none!important;}}</style></head><body>
+@media print{body{padding:10px;}button,.flt-bar{display:none!important;}}
+@media screen and (max-width:600px){body{zoom:1.15;}}</style></head><body>
 <button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
 <div class="kpc">
   <img class="logo-img" src="${repLogo()}" alt="KPC GmbH">
