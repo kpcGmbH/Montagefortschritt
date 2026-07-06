@@ -1028,8 +1028,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 42;
+const APP_VERSION = 43;
 const CHANGELOG = [
+  { v:43, titel:'„Offen" heißt jetzt überall dasselbe', punkte:[
+    'Der Filter „Offen" und die Zahl in der Zusammenfassung zählen jetzt alles, was noch nicht vollständig ist (auch teilweise erledigte Positionen) – genau wie die neuen Etagen-Zahlen. Vorher zeigte der Filter nur Positionen ganz ohne Haken.' ]},
   { v:42, titel:'Offene Arbeiten je Etage', punkte:[
     'Die Etagen-Tabs zeigen jetzt, wie viele Positionen dort noch offen sind (bzw. ✓ wenn alles fertig ist) – passend zum gewählten Gewerk-Filter.',
     'Tipp: Ein Klick auf „Offen" in der Zusammenfassungszeile blendet alle fertigen Positionen aus – so sieht man über alle Etagen nur das, was noch zu tun ist.' ]},
@@ -1623,7 +1625,7 @@ function upStats(){
   document.getElementById('cD').textContent=dn;
   document.getElementById('cP').textContent=pt;
   document.getElementById('cC').textContent=ang;
-  document.getElementById('cO').textContent=op;
+  document.getElementById('cO').textContent=pt+op;   // offen = alles außer vollständig (wie Etagen-Badges/Filter)
   document.getElementById('cT').textContent=tot;
   updTabBadges();
 }
@@ -1681,7 +1683,7 @@ function applyF(){
     if(SF==='done') stOk=done;
     else if(SF==='part') stOk=part;
     else if(SF==='angeschl') stOk=angeschl(pos);
-    else if(SF==='open') stOk=!done&&!part;
+    else if(SF==='open') stOk=!done;              // offen = noch nicht vollständig (inkl. teilweise) – wie die Etagen-Badges
     const gwOk = TF==='all' || (c.dataset.gew||'').includes(TF);
     const show=txtOk && stOk && gwOk;
     c.style.display=show?'':'none';
