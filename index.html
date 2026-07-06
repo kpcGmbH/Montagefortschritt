@@ -382,6 +382,31 @@ select.fs option{background:var(--surface);color:var(--text);}
 .clog-ul{margin:0;padding-left:20px;}
 .clog-ul li{font-size:13.5px;color:var(--text);line-height:1.5;margin-bottom:5px;}
 .clog-ok{margin:4px 18px 18px;padding:13px;background:var(--braun);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;}
+
+/* ── Smartphones: gezielt größere Schrift & Touch-Ziele (KEINE globale Skalierung, siehe Übergabe §8) ── */
+@media (max-width:480px){
+  .ibez{font-size:16px;}                    /* Positions-Bezeichnung */
+  .imet{font-size:12.5px;}                  /* Pos-Nr · Fabrikat · Typ */
+  .img{font-size:13px;}                     /* Menge */
+  .cki{font-size:15px;}                     /* Status-Buttons (Geliefert, Montiert, …) */
+  .ck-ts{font-size:9.5px;}
+  .tab{font-size:14px;padding:11px 12px;}   /* Etagen-Tabs */
+  .tab .n{font-size:11px;}
+  .gw{font-size:13.5px;padding:6px 14px;}   /* Gewerk-Filter-Chips */
+  .sbar{font-size:12px;}                    /* Zusammenfassungszeile */
+  .bhdr h3{font-size:15px;}                 /* Bereichs-Überschriften */
+  .bpos,.bcnt,.bprog{font-size:11px;}
+  .sw input{font-size:16px;}                /* Suche (16px verhindert iOS-Auto-Zoom) */
+  .fbtn{font-size:13px;padding:8px 15px;}   /* Foto/Protokoll-Buttons */
+  .pb{font-size:10px;}
+  .pdoc{font-size:12px;}
+  .ratxt{font-size:14px;}                   /* Restarbeiten */
+  .rahd{font-size:12px;}
+  .rakuerz{font-size:11px;}
+  .rats,.fth-date{font-size:10px;}
+  .theme-btn{font-size:12px;}
+  .proj strong{font-size:14px;}
+}
 </style>
 <script>
 /* Gespeicherte Hell/Dunkel-Wahl vor dem Rendern anwenden (verhindert Aufblitzen) */
@@ -979,8 +1004,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 39;
+const APP_VERSION = 40;
 const CHANGELOG = [
+  { v:40, titel:'Größere Schrift auf dem Smartphone', punkte:[
+    'Positionsliste, Status-Buttons, Tabs, Suche und Restarbeiten sind auf Smartphones jetzt gezielt größer – ohne die globale Skalierung, die zuvor Darstellungsfehler verursachte. Auch die Einweisungs-App wurde angepasst.' ]},
   { v:39, titel:'Mobile Vergrößerung zurückgenommen', punkte:[
     'Die ~15 % größere Darstellung auf Smartphones verursachte je nach Gerät Darstellungsfehler (abgeschnittene Ansichten) und wurde in allen Apps wieder entfernt – die Darstellung entspricht jetzt wieder dem bewährten Stand.' ]},
   { v:38, titel:'Abstand zu Kamera & Statusleiste', punkte:[
