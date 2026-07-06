@@ -385,6 +385,12 @@ select.fs option{background:var(--surface);color:var(--text);}
 
 /* ── Smartphones: gezielt größere Schrift & Touch-Ziele (KEINE globale Skalierung, siehe Übergabe §8) ── */
 @media (max-width:480px){
+  body{overflow-x:hidden;}                  /* Kopfzeile darf die Seite nie seitlich scrollbar machen */
+  .h-top{flex-wrap:wrap;row-gap:6px;}
+  .h-right{min-width:0;flex-wrap:wrap;justify-content:flex-end;row-gap:6px;}
+  .proj{min-width:0;}
+  .proj strong{max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  #userBadge{display:inline-block;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .ibez{font-size:16px;}                    /* Positions-Bezeichnung */
   .imet{font-size:12.5px;}                  /* Pos-Nr · Fabrikat · Typ */
   .img{font-size:13px;}                     /* Menge */
@@ -1004,8 +1010,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 40;
+const APP_VERSION = 41;
 const CHANGELOG = [
+  { v:41, titel:'Kopfzeile passt aufs Smartphone', punkte:[
+    'Baustellen-Name und Nutzer werden in der Kopfzeile jetzt gekürzt bzw. umbrochen – die Seite kann nicht mehr seitlich verrutschen (Hauptapp und Einweisungs-App).' ]},
   { v:40, titel:'Größere Schrift auf dem Smartphone', punkte:[
     'Positionsliste, Status-Buttons, Tabs, Suche und Restarbeiten sind auf Smartphones jetzt gezielt größer – ohne die globale Skalierung, die zuvor Darstellungsfehler verursachte. Auch die Einweisungs-App wurde angepasst.' ]},
   { v:39, titel:'Mobile Vergrößerung zurückgenommen', punkte:[

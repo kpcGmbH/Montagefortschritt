@@ -137,6 +137,13 @@ main{padding:14px 12px 40px;max-width:900px;margin:0 auto;}
 #loader{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9500;display:none;align-items:center;justify-content:center;color:#fff;font-size:15px;font-weight:700;}
 /* ── Smartphones: gezielt größere Schrift & Touch-Ziele (KEINE globale Skalierung, siehe Übergabe §8) ── */
 @media (max-width:480px){
+  body{overflow-x:hidden;}                  /* Kopfzeile darf die Seite nie seitlich scrollbar machen */
+  .h-top{flex-wrap:wrap;row-gap:6px;}
+  .h-right{min-width:0;flex:1 1 auto;justify-content:flex-end;flex-wrap:wrap;row-gap:6px;}
+  .proj{min-width:0;}
+  .proj strong{max-width:140px;}
+  .userbadge{max-width:110px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .ew-label{font-size:10px;letter-spacing:1px;}
   .gbez{font-size:15px;}                    /* Geräte-Bezeichnung */
   .gmeta,.gstat{font-size:11.5px;}
   .ethd h3,.sel-etlbl{font-size:15px;}      /* Etagen-Überschriften */
