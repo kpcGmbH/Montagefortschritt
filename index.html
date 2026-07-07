@@ -341,6 +341,12 @@ select.fs option{background:var(--surface);color:var(--text);}
 
 /* ── ANLAGENFOTOS PRO ETAGE ── */
 .etbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 14px;background:var(--bhdr-bg);border-bottom:1px solid var(--line);}
+.egwbar{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 14px;background:var(--bhdr-bg);border-bottom:1px solid var(--line);}
+.egwbar:empty{display:none;}
+.egwt{color:var(--accent2);font-size:11px;font-weight:700;}
+.egw{background:var(--chrome-bg2);border:1px solid var(--line);border-radius:16px;padding:5px 12px;font-size:12px;font-weight:700;color:#c9803a;cursor:pointer;font-family:inherit;white-space:nowrap;-webkit-tap-highlight-color:transparent;}
+.egw.done{color:var(--green);}
+.egw.on{background:var(--braun);color:#fff;border-color:var(--braun);}
 .etbtn{display:inline-flex;align-items:center;gap:7px;padding:8px 15px;background:var(--braun);color:#fff;border:none;border-radius:20px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
 .etbtn:active{opacity:.85;}
 .etcnt{background:var(--accent);color:var(--anthrazit);font-size:11px;min-width:18px;text-align:center;padding:0 6px;border-radius:10px;font-weight:700;}
@@ -401,6 +407,7 @@ select.fs option{background:var(--surface);color:var(--text);}
   .tab{font-size:14px;padding:11px 12px;}   /* Etagen-Tabs */
   .tab .n{font-size:11px;}
   .gw{font-size:13.5px;padding:6px 14px;}   /* Gewerk-Filter-Chips */
+  .egw{font-size:13px;padding:6px 13px;}    /* Etagen-Gewerk-Chips */
   .sbar{font-size:12px;}                    /* Zusammenfassungszeile */
   .bhdr h3{font-size:15px;}                 /* Bereichs-Überschriften */
   .bpos,.bcnt,.bprog{font-size:11px;}
@@ -821,6 +828,29 @@ function updTabBadges(){
     else { el.textContent=off+' offen'; el.className='tno'; }
   });
 }
+// Gewerk-Zeile je Etage: offene Arbeiten je Gewerk auf DIESER Etage (Chips = Direktfilter)
+const EGW_META={M:{ic:'&#128295;',lbl:'Montage'},E:{ic:'&#9889;',lbl:'Elektro'},S:{ic:'&#128703;',lbl:'Sanit&#228;r'}};
+function updEtGw(){
+  DATA.forEach(sec=>{
+    const el=document.getElementById('EGW_'+sp(sec.pos)); if(!el) return;
+    let html='<span class="egwt">Diese Etage:</span>';
+    ['M','E','S'].forEach(g=>{
+      let tot=0,dn=0;
+      sec.subsections.forEach(sub=>sub.items.forEach(it=>{ const gw=it.gew||[]; if(!gw.includes(g)) return; tot++; if(ist(it.pos,g)==='done') dn++; }));
+      if(!tot) return;
+      const off=tot-dn; const m=EGW_META[g];
+      html+='<button class="egw'+(off?'':' done')+((TF===g&&SF==='open')?' on':'')+'" onclick="etGw(\''+g+'\')" title="'+m.lbl+': offene Arbeiten dieser Etage anzeigen">'+m.ic+' '+m.lbl+': '+(off? off+' offen':'&#10003;')+'</button>';
+    });
+    el.innerHTML=html;
+  });
+}
+// Chip-Klick: Gewerk-Filter + „Offen" gemeinsam setzen (nochmal antippen = Filter aus)
+function etGw(g){
+  const aus=(TF===g && SF==='open');
+  const zielSF=aus?'all':'open';
+  if(SF!==zielSF) setSF(zielSF);
+  setTF(aus?'all':g);
+}
 
 function swTab(p){
   ACT=p;
@@ -849,6 +879,10 @@ function buildPanels(){
     etbar.innerHTML='<button class="etbtn" onclick="openEtageFotos('+secIdx+')">&#128248; Anlagenfotos <span class="etcnt" id="ETC'+secIdx+'"></span></button>'+
       '<span class="ethint">Fotos der ganzen Anlage je Kategorie – Montageverlauf</span>';
     panel.appendChild(etbar);
+    // Gewerk-Übersicht dieser Etage: was ist hier je Gewerk noch zu tun (antippbar = Direktfilter)
+    const egw=document.createElement('div');
+    egw.className='egwbar'; egw.id='EGW_'+sp(sec.pos);
+    panel.appendChild(egw);
     sec.subsections.forEach(sub=>{
       const div=document.createElement('div');
       div.className='bblock';
@@ -1028,8 +1062,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 43;
+const APP_VERSION = 44;
 const CHANGELOG = [
+  { v:44, titel:'Gewerk-Überblick je Etage', punkte:[
+    'Jede Etage zeigt oben, was dort je Gewerk noch zu tun ist: „🔧 Montage: 5 offen · ⚡ Elektro: 3 offen · 🚿 Sanitär: ✓". Ein Tipp auf ein Gewerk blendet sofort nur dessen offene Arbeiten ein (nochmal tippen = Filter aus).',
+    'Status- und Gewerk-Filter bleiben jetzt in der gewählten Etage – nur die Suche zeigt weiterhin Treffer aus allen Etagen.' ]},
   { v:43, titel:'„Offen" heißt jetzt überall dasselbe', punkte:[
     'Der Filter „Offen" und die Zahl in der Zusammenfassung zählen jetzt alles, was noch nicht vollständig ist (auch teilweise erledigte Positionen) – genau wie die neuen Etagen-Zahlen. Vorher zeigte der Filter nur Positionen ganz ohne Haken.' ]},
   { v:42, titel:'Offene Arbeiten je Etage', punkte:[
@@ -1628,6 +1665,7 @@ function upStats(){
   document.getElementById('cO').textContent=pt+op;   // offen = alles außer vollständig (wie Etagen-Badges/Filter)
   document.getElementById('cT').textContent=tot;
   updTabBadges();
+  updEtGw();
 }
 
 // SEARCH/FILTER
@@ -1664,12 +1702,15 @@ function applyF(){
   const q=document.getElementById('srch').value.toLowerCase().trim();
   const active = q || SF!=='all' || TF!=='all';
 
-  // Bei Suche oder aktivem Statusfilter alle Bereiche aufklappen, sonst aktiven Tab
-  if(active){
+  // NUR die Suche zeigt alle Etagen; Status-/Gewerk-Filter bleiben in der Etagen-Ansicht
+  // (Bauleiter-Workflow: Etage wählen -> Gewerk/Offen filtern -> nur diese Etage sehen)
+  if(q){
     document.querySelectorAll('.panel').forEach(pn=>pn.classList.add('on'));
-    document.querySelectorAll('.ilist.hid').forEach(l=>l.classList.remove('hid'));
   } else {
     document.querySelectorAll('.panel').forEach(pn=>pn.classList.toggle('on',pn.dataset.p===ACT));
+  }
+  if(active){
+    document.querySelectorAll('.ilist.hid').forEach(l=>l.classList.remove('hid'));
   }
 
   document.querySelectorAll('.card').forEach(c=>{
