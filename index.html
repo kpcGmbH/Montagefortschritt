@@ -807,7 +807,7 @@ function buildTabs(){
     const b=document.createElement('button');
     b.className='tab'+(sec.pos===ACT?' on':'');
     b.dataset.p=sec.pos;
-    b.innerHTML=sec.label+'<span class="n">('+tot+')</span><span class="tno" id="TNO_'+sp(sec.pos)+'"></span>';
+    b.innerHTML=sec.label+'<span class="n">('+tot+')</span>';
     b.onclick=()=>swTab(sec.pos);
     w.appendChild(b);
   });
@@ -824,18 +824,6 @@ function updTabBadges(){
     else if(o===0){ ea.innerHTML='&#10003;'; ea.className='tno done'; }
     else { ea.textContent=o+' offen'; ea.className='tno'; }
   }
-  DATA.forEach(sec=>{
-    const el=document.getElementById('TNO_'+sp(sec.pos)); if(!el) return;
-    let tot=0,dn=0;
-    sec.subsections.forEach(sub=>sub.items.forEach(item=>{
-      if(TF!=='all'){ const g=item.gew||[]; if(!g.includes(TF)) return; }
-      tot++; if(ist(item.pos,TF)==='done') dn++;
-    }));
-    const off=tot-dn;
-    if(!tot){ el.textContent=''; el.className='tno'; }
-    else if(off===0){ el.innerHTML='&#10003;'; el.className='tno done'; }
-    else { el.textContent=off+' offen'; el.className='tno'; }
-  });
 }
 
 function swTab(p){
@@ -1044,8 +1032,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 45;
+const APP_VERSION = 46;
 const CHANGELOG = [
+  { v:46, titel:'Aufgeräumte Etagen-Tabs', punkte:[
+    'Die „n offen"-Anzeige unter den einzelnen Etagen entfällt wieder – der Überblick ergibt sich direkt aus „Alle" + Filtern; nur der „Alle"-Tab zeigt weiterhin die Gesamtzahl offener Arbeiten.' ]},
   { v:45, titel:'Neue Anordnung: Suche → Gewerk → Etagen → Status', punkte:[
     'Die Kopfleiste ist neu sortiert: oben die Suche, darunter die Gewerk-Auswahl, dann die Etagen, zuletzt die Status-Zeile.',
     'Neuer Tab „Alle": ohne Etagen-Auswahl wirken Filter aufs ganze Projekt (z.B. Gewerk „Elektro" + „Offen" = alle offenen Elektro-Arbeiten, nach Etagen gruppiert). Mit gewählter Etage wird zusätzlich auf diese Etage gefiltert.',
