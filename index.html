@@ -830,6 +830,7 @@ function swTab(p){
   ACT=p;
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
   document.querySelectorAll('.panel').forEach(pn=>pn.classList.toggle('on',p==='__all'||pn.dataset.p===p));
+  upStats();   // Status-Zeile zählt im Kontext der gewählten Etage
   // Kein restoreUI - UI ist beim Initial-Load schon gesetzt, Lazy Observer kümmert sich um neue Bilder
   const at=document.querySelector('.tab.on');
   if(at)at.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
@@ -1035,7 +1036,8 @@ function startData(){
 const APP_VERSION = 46;
 const CHANGELOG = [
   { v:46, titel:'Aufgeräumte Etagen-Tabs', punkte:[
-    'Die „n offen"-Anzeige unter den einzelnen Etagen entfällt wieder – der Überblick ergibt sich direkt aus „Alle" + Filtern; nur der „Alle"-Tab zeigt weiterhin die Gesamtzahl offener Arbeiten.' ]},
+    'Die „n offen"-Anzeige unter den einzelnen Etagen entfällt wieder – der Überblick ergibt sich direkt aus „Alle" + Filtern; nur der „Alle"-Tab zeigt weiterhin die Gesamtzahl offener Arbeiten.',
+    'Die Status-Zeile (Vollständig/Teilweise/Angeschlossen/Offen/Gesamt) zählt jetzt passend zur Auswahl: bei gewählter Etage nur diese Etage, bei „Alle" das ganze Projekt.' ]},
   { v:45, titel:'Neue Anordnung: Suche → Gewerk → Etagen → Status', punkte:[
     'Die Kopfleiste ist neu sortiert: oben die Suche, darunter die Gewerk-Auswahl, dann die Etagen, zuletzt die Status-Zeile.',
     'Neuer Tab „Alle": ohne Etagen-Auswahl wirken Filter aufs ganze Projekt (z.B. Gewerk „Elektro" + „Offen" = alle offenen Elektro-Arbeiten, nach Etagen gruppiert). Mit gewählter Etage wird zusätzlich auf diese Etage gefiltert.',
@@ -1629,12 +1631,13 @@ function olbEt(idx, oi){
 // STATS
 function upStats(){
   let tot=0,dn=0,pt=0,op=0,ang=0;
-  DATA.forEach(s=>s.subsections.forEach(sub=>sub.items.forEach(item=>{
+  // Zählt im Kontext der Auswahl: gewählte Etage -> nur diese, „Alle" -> ganzes Projekt
+  DATA.forEach(s=>{ if(ACT!=='__all' && s.pos!==ACT) return; s.subsections.forEach(sub=>sub.items.forEach(item=>{
     if(TF!=='all'){ const g=item.gew||[]; if(!g.includes(TF)) return; }   // nur Positionen des gewählten Gewerks
     tot++; const st=ist(item.pos, TF);
     if(st==='done')dn++; else if(st==='part')pt++; else op++;
     if(angeschl(item.pos)) ang++;
-  })));
+  })); });
   document.getElementById('cD').textContent=dn;
   document.getElementById('cP').textContent=pt;
   document.getElementById('cC').textContent=ang;
