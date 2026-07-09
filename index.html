@@ -290,6 +290,8 @@ select.fs option{background:var(--surface);color:var(--text);}
   outline:none;padding:1px 5px;border-radius:3px;}
 .rakuerz::placeholder{color:#c0c0c0;font-weight:400;}
 .rakuerz:focus{border-color:var(--braun);}
+.ragw{font-family:inherit;font-size:10px;color:var(--accent2);background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:2px 4px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.ragw.set{color:var(--braun);font-weight:700;border-color:var(--braun);}
 .rats{font-size:9px;color:var(--accent2);white-space:nowrap;font-family:Arial Narrow,Arial,sans-serif;}
 .rafg{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;padding-left:24px;}
 .rafth{position:relative;width:54px;height:54px;border-radius:4px;overflow:hidden;
@@ -1054,8 +1056,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 50;
+const APP_VERSION = 51;
 const CHANGELOG = [
+  { v:51, titel:'Restarbeiten nach Zuständigkeit', punkte:[
+    'Jede Restarbeit kann jetzt einem Gewerk zugeordnet werden: 🔧 Montage, ⚡ Elektro, 🚿 Sanitär oder 🏢 Büro (für Innendienst-Aufgaben). Bei Positions-Restarbeiten wird das Gewerk der Position automatisch vorgeschlagen.',
+    'Die Restarbeitenliste hat eine neue Spalte „Zuständigkeit" und lässt sich danach filtern (kombinierbar mit Offen/Erledigt); der Excel-Export enthält die Spalte ebenfalls.' ]},
   { v:50, titel:'Tagesbericht nach Mitarbeiter filtern', punkte:[
     'Im Tagesbericht gibt es jetzt eine Mitarbeiter-Leiste: ein Klick auf ein Kürzel zeigt nur die Arbeiten dieser Person (Statusschritte und Restarbeiten), nochmal klicken zeigt wieder alle.',
     'Der Filter berücksichtigt sowohl die Status-Kürzel als auch die Ersteller/Erlediger der Restarbeiten. Beim Drucken/PDF wird die aktuelle Auswahl übernommen.' ]},
@@ -3184,11 +3189,17 @@ function raFmtTs(iso){
   return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'})
     +' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
 }
+// Zuständigkeit/Gewerk je Restarbeit – inkl. Büro (B) für Innendienst-Aufgaben
+const RA_GW=[['M','🔧 Montage'],['E','⚡ Elektro'],['S','🚿 Sanitär'],['B','🏢 Büro']];
+const RA_GW_LBL={M:'Montage',E:'Elektro',S:'Sanitär',B:'Büro'};
+// Vorbelegung der Zuständigkeit: bei Positions-Restarbeit das eindeutige Gewerk der Position, sonst offen
+function raDefaultGw(pos){ if(isEKey(pos)||pos===PRAKEY) return ''; const g=POSGEW[pos]||[]; return g.length===1?g[0]:''; }
 function raEnsure(r){
   if(typeof r.ersteller==='undefined') r.ersteller=r.kuerzel||'';
   if(typeof r.erstelltAm==='undefined') r.erstelltAm=null;
   if(typeof r.erledigtVon==='undefined') r.erledigtVon='';
   if(typeof r.erledigtAm==='undefined') r.erledigtAm=r.doneAt||null;
+  if(typeof r.gw==='undefined') r.gw='';
   if(!Array.isArray(r.fotos)) r.fotos=[];
   return r;
 }
@@ -3198,7 +3209,7 @@ function updRA(pos){
   const g=document.getElementById('RA'+id);
   if(!g)return;
   // Etagen-Listen starten leer (nur „+ Restarbeit"-Button); Positionslisten mit leerer Eingabezeile
-  if(!s.restarbeiten.length && !isEKey(pos)) s.restarbeiten.push({txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,fotos:[]});
+  if(!s.restarbeiten.length && !isEKey(pos)) s.restarbeiten.push({txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[]});
   s.restarbeiten.forEach(raEnsure);
   g.innerHTML=s.restarbeiten.map((r,i)=>{
     const tsErst=r.erstelltAm?raFmtTs(r.erstelltAm):'';
@@ -3213,6 +3224,13 @@ function updRA(pos){
         <button class="radel" onclick="raDel('${pos}',${i})" title="Zeile löschen">&#10005;</button>
       </div>
       <div class="rameta">
+        <div class="rametacol">
+          <span class="rametalbl">Zust.:</span>
+          <select class="ragw${r.gw?' set':''}" onchange="raSetGw('${pos}',${i},this.value)">
+            <option value="">– offen –</option>
+            ${RA_GW.map(([v,l])=>`<option value="${v}"${r.gw===v?' selected':''}>${l}</option>`).join('')}
+          </select>
+        </div>
         <div class="rametacol">
           <span class="rametalbl">Erst.:</span>
           <input type="text" class="rakuerz" value="${(r.ersteller||'').replace(/"/g,'&quot;')}" placeholder="Name" maxlength="30"
@@ -3269,6 +3287,15 @@ function raStampErstellt(pos,i){
     raDebouncedSave(pos);
   }
 }
+function raSetGw(pos,i,val){
+  const s=gs(pos);
+  if(!s.restarbeiten[i])return;
+  raEnsure(s.restarbeiten[i]);
+  s.restarbeiten[i].gw=val;
+  const sel=document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+i+'"] .ragw');
+  if(sel) sel.classList.toggle('set',!!val);
+  raDebouncedSave(pos);
+}
 function raSetErledigtVon(pos,i,val){
   const s=gs(pos);
   if(!s.restarbeiten[i])return;
@@ -3300,7 +3327,7 @@ function raKey(ev,pos,i){
   if(ev.key!=='Enter')return;
   ev.preventDefault();
   const s=gs(pos);
-  s.restarbeiten.splice(i+1,0,{txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,fotos:[]});
+  s.restarbeiten.splice(i+1,0,{txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[]});
   updRA(pos);
   saveFotos(pos);
   setTimeout(()=>{
@@ -3315,7 +3342,7 @@ function raAddNew(pos){
   const s=gs(pos);
   s.restarbeiten.forEach(raEnsure);
   let idx=s.restarbeiten.findIndex(r=>!(r.txt&&r.txt.trim())&&!(r.fotos&&r.fotos.length));
-  if(idx<0){ s.restarbeiten.push({txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,fotos:[]}); idx=s.restarbeiten.length-1; }
+  if(idx<0){ s.restarbeiten.push({txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[]}); idx=s.restarbeiten.length-1; }
   updRA(pos);
   setTimeout(()=>{
     const el=document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+idx+'"] .ratxt');
@@ -3423,7 +3450,7 @@ function collectRestRows(){
       if(!r.txt)return;
       rows.push({
         geschoss:'Baustelle allgemein', bereich:'Etagenübergreifend', pos:'–', bez:'Baustellenweit',
-        txt:r.txt, done:r.done, ersteller:r.ersteller, erstelltAm:r.erstelltAm,
+        txt:r.txt, done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
         erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
         fotos:(r.fotos||[]).slice()
       });
@@ -3438,7 +3465,7 @@ function collectRestRows(){
         if(!r.txt)return;
         rows.push({
           geschoss:sec.label, bereich:'Etage allgemein', pos:'–', bez:'Etagenweit',
-          txt:r.txt, done:r.done, ersteller:r.ersteller, erstelltAm:r.erstelltAm,
+          txt:r.txt, done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
           erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
           fotos:(r.fotos||[]).slice()
         });
@@ -3453,7 +3480,7 @@ function collectRestRows(){
           if(!r.txt)return;
           rows.push({
             geschoss:sec.label, bereich:sub.bez, pos:item.pos, bez:item.bez.trim(),
-            txt:r.txt, done:r.done, ersteller:r.ersteller, erstelltAm:r.erstelltAm,
+            txt:r.txt, done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
             erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
             fotos:(r.fotos||[]).slice()
           });
@@ -3468,17 +3495,18 @@ function expRestXlsx(){
   if(typeof XLSX==='undefined'){ alert('Excel-Bibliothek ist nicht geladen (Internet nötig).'); return; }
   const rows=collectRestRows();
   if(rows.length===0){ alert('Keine Restarbeiten erfasst.'); return; }
-  const aoa=[['Geschoss','Bereich','Pos.','Gerät','Restarbeit','Status','Erstellt von','Erstellt am','Erledigt von','Erledigt am','Fotos']];
+  const aoa=[['Geschoss','Bereich','Pos.','Gerät','Restarbeit','Zuständigkeit','Status','Erstellt von','Erstellt am','Erledigt von','Erledigt am','Fotos']];
   rows.forEach(r=>aoa.push([
     r.geschoss||'', r.bereich||'', r.pos||'', r.bez||'', r.txt||'',
+    RA_GW_LBL[r.gw]||'',
     r.done?'Erledigt':'Offen',
     r.ersteller||'', raFmtTs(r.erstelltAm)||'',
     r.erledigtVon||'', raFmtTs(r.erledigtAm)||'',
     (r.fotos&&r.fotos.length)?r.fotos.length:0
   ]));
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:14},{wch:20},{wch:8},{wch:26},{wch:44},{wch:9},{wch:16},{wch:15},{wch:16},{wch:15},{wch:6}];
-  ws['!autofilter']={ref:'A1:K1'};
+  ws['!cols']=[{wch:14},{wch:20},{wch:8},{wch:26},{wch:44},{wch:13},{wch:9},{wch:16},{wch:15},{wch:16},{wch:15},{wch:6}];
+  ws['!autofilter']={ref:'A1:L1'};
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Restarbeiten');
   const slug=curProjName().replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'Projekt';
@@ -3501,22 +3529,24 @@ async function expRest(){
     for(const r of rows){ for(const src of (r.fotos||[])){ if(fotoData[src]!==undefined) continue; try{ fotoData[src]=await blobToDataURL(await getFileBlob(src)); }catch(e){ fotoData[src]=''; } } }
     hideLoader();
   }
+  const gwBadge=g=>g?`<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px;background:#f0ece8;color:#895500;white-space:nowrap">${escapeHtml(RA_GW_LBL[g]||g)}</span>`:'<span style="color:#c8c8c8;font-size:10px">–</span>';
   let lastG='',lastB='',tableRows='';
   rows.forEach((r,i)=>{
     if(r.geschoss!==lastG){
-      if(lastG!=='')tableRows+='<tr class="spacer"><td colspan="6" style="height:10px;background:#f5f3f0;border:none"></td></tr>';
-      tableRows+=`<tr class="grp geschoss"><td colspan="6" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:7px 10px;letter-spacing:1px">${r.geschoss}</td></tr>`;
+      if(lastG!=='')tableRows+='<tr class="spacer"><td colspan="7" style="height:10px;background:#f5f3f0;border:none"></td></tr>';
+      tableRows+=`<tr class="grp geschoss"><td colspan="7" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:7px 10px;letter-spacing:1px">${r.geschoss}</td></tr>`;
       lastG=r.geschoss; lastB='';
     }
     if(r.bereich!==lastB){
-      tableRows+=`<tr class="grp bereich"><td colspan="6" style="background:#eeecea;color:#895500;font-weight:700;font-size:12px;padding:4px 10px;border-left:3px solid #d7c1ae">${r.bereich}</td></tr>`;
+      tableRows+=`<tr class="grp bereich"><td colspan="7" style="background:#eeecea;color:#895500;font-weight:700;font-size:12px;padding:4px 10px;border-left:3px solid #d7c1ae">${r.bereich}</td></tr>`;
       lastB=r.bereich;
     }
     const status=r.done?'<span style="color:#3a7a3a;font-weight:700">✓ Erledigt</span>':'<span style="color:#c0392b;font-weight:700">● Offen</span>';
-    tableRows+=`<tr class="ra" data-done="${r.done?1:0}" style="background:${i%2===0?'#fff':'#faf9f7'}">
+    tableRows+=`<tr class="ra" data-done="${r.done?1:0}" data-gw="${r.gw||'-'}" style="background:${i%2===0?'#fff':'#faf9f7'}">
       <td style="padding:5px 8px;font-size:10px;color:#a8a8a8;white-space:nowrap">${r.pos}</td>
       <td style="padding:5px 8px;font-size:12px;font-weight:700">${r.bez}</td>
       <td style="padding:5px 8px;font-size:12px">${r.txt}</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:center">${gwBadge(r.gw)}</td>
       <td style="padding:5px 8px;font-size:11px;text-align:center">${status}</td>
       <td style="padding:5px 8px;font-size:10px;color:#895500">${r.ersteller||''}${r.erstelltAm?' · '+raFmtTs(r.erstelltAm):''}</td>
       <td style="padding:5px 8px;font-size:10px;color:#3a7a3a">${r.erledigtVon||''}${r.erledigtAm?' · '+raFmtTs(r.erledigtAm):''}</td>
@@ -3524,9 +3554,11 @@ async function expRest(){
     if(r.fotos && r.fotos.length){
       let imgs='';
       r.fotos.forEach(src=>{ const durl=fotoData[src]||''; if(!durl) return; imgs+=`<img src="${durl}" style="width:110px;height:82px;object-fit:cover;border-radius:4px;border:1px solid #eee;margin:0 6px 6px 0">`; });
-      if(imgs) tableRows+=`<tr class="rafoto" data-done="${r.done?1:0}" style="background:${i%2===0?'#fff':'#faf9f7'}"><td colspan="6" style="padding:0 8px 8px 28px">${imgs}</td></tr>`;
+      if(imgs) tableRows+=`<tr class="rafoto" data-done="${r.done?1:0}" data-gw="${r.gw||'-'}" style="background:${i%2===0?'#fff':'#faf9f7'}"><td colspan="7" style="padding:0 8px 8px 28px">${imgs}</td></tr>`;
     }
   });
+  // vorkommende Zuständigkeiten für die Filterleiste
+  const gwCounts={}; rows.forEach(r=>{ const k=r.gw||'-'; gwCounts[k]=(gwCounts[k]||0)+1; });
   const offen=rows.filter(r=>!r.done).length;
   const html=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
 <title>Restarbeitenliste ${escapeHtml(curProjName())} – ${d}</title>
@@ -3541,8 +3573,9 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 .sig{margin-top:40px;display:flex;gap:60px;}
 .sig-box{flex:1;}
 .sig-line{border-top:1px solid #2b2b2b;padding-top:6px;font-size:11px;color:#a8a8a8;margin-top:40px;}
-.flt{font-family:inherit;font-size:12px;font-weight:700;padding:6px 13px;border-radius:16px;border:1px solid #d4cdc6;background:#fff;color:#2b2b2b;cursor:pointer;}
+.flt,.gwf{font-family:inherit;font-size:12px;font-weight:700;padding:6px 13px;border-radius:16px;border:1px solid #d4cdc6;background:#fff;color:#2b2b2b;cursor:pointer;}
 .flt.on{background:#895500;color:#fff;border-color:#895500;}
+.gwf.on{background:#5b4c8a;color:#fff;border-color:#5b4c8a;}
 @media print{body{padding:10px;}button,.flt-bar{display:none!important;}}</style></head><body>
 <button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
 <div class="kpc">
@@ -3550,7 +3583,7 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
   <div class="meta"><strong>Restarbeitenliste</strong>Projekt: ${escapeHtml(curProjName())}<br>Datum: ${d}<br>Dok.-Nr.: RA-${curProjCode()}-${now.toISOString().slice(0,10).replace(/-/g,'')}</div>
 </div>
 <p style="margin-bottom:10px;font-size:13px">Gesamt: <strong>${rows.length}</strong> Restarbeiten &nbsp;|&nbsp; Offen: <strong style="color:#c0392b">${offen}</strong> &nbsp;|&nbsp; Erledigt: <strong style="color:#3a7a3a">${rows.length-offen}</strong></p>
-<div class="flt-bar" style="margin:0 0 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+<div class="flt-bar" style="margin:0 0 8px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
   <span style="font-size:12px;color:#a8a8a8">Anzeigen:</span>
   <button class="flt on" data-m="all" onclick="raFilter('all')">Alle</button>
   <button class="flt" data-m="offen" onclick="raFilter('offen')">Nur offene</button>
@@ -3558,8 +3591,14 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
   ${anyFoto?'<span style="width:1px;height:20px;background:#d4cdc6;margin:0 2px"></span><button class="flt on" id="fotoTgl" onclick="toggleFotos()">📷 Fotos an</button>':''}
   <span id="fltInfo" style="font-size:12px;color:#a8a8a8;margin-left:4px"></span>
 </div>
+<div class="flt-bar" style="margin:0 0 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <span style="font-size:12px;color:#a8a8a8">Zuständigkeit:</span>
+  <button class="gwf on" data-g="all" onclick="raGw('all')">Alle</button>
+  ${[['M','🔧 Montage'],['E','⚡ Elektro'],['S','🚿 Sanitär'],['B','🏢 Büro']].filter(([k])=>gwCounts[k]).map(([k,l])=>`<button class="gwf" data-g="${k}" onclick="raGw('${k}')">${l} (${gwCounts[k]})</button>`).join('')}
+  ${gwCounts['-']?`<button class="gwf" data-g="-" onclick="raGw('-')">– ohne (${gwCounts['-']})</button>`:''}
+</div>
 <table><thead><tr>
-  <th>Pos.</th><th>Gerät</th><th>Restarbeit</th><th>Status</th><th>Erstellt</th><th>Erledigt</th>
+  <th>Pos.</th><th>Gerät</th><th>Restarbeit</th><th>Zust.</th><th>Status</th><th>Erstellt</th><th>Erledigt</th>
 </tr></thead><tbody>${tableRows}</tbody></table>
 <div class="sig">
   <div class="sig-box"><div class="sig-line">Datum / Unterschrift KPC GmbH</div></div>
@@ -3569,15 +3608,17 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
   <button onclick="window.print()" style="padding:10px 24px;background:#5b4c8a;color:#fff;border:none;border-radius:4px;font-size:13px;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">Drucken / Als PDF speichern</button>
 </div>
 <script>
-var curMode='all', fotosOn=true;
+var curMode='all', curGw='all', fotosOn=true;
 function toggleFotos(){ fotosOn=!fotosOn; var b=document.getElementById('fotoTgl'); if(b){ b.classList.toggle('on',fotosOn); b.textContent=fotosOn?'📷 Fotos an':'📷 Fotos aus'; } raFilter(curMode); }
+function raGw(g){ curGw=g; [].forEach.call(document.querySelectorAll('.gwf[data-g]'),function(b){ b.classList.toggle('on', b.getAttribute('data-g')===g); }); raFilter(curMode); }
 function raFilter(mode){
   curMode=mode;
   var rows=[].slice.call(document.querySelectorAll('tbody tr'));
   rows.forEach(function(tr){
     var isRa=tr.classList.contains('ra'), isFoto=tr.classList.contains('rafoto');
-    if(isRa||isFoto){ var d=tr.getAttribute('data-done')==='1';
+    if(isRa||isFoto){ var d=tr.getAttribute('data-done')==='1'; var g=tr.getAttribute('data-gw')||'-';
       var ok=(mode==='all'||(mode==='offen'&&!d)||(mode==='erledigt'&&d));
+      ok=ok&&(curGw==='all'||g===curGw);
       if(isFoto) ok=ok&&fotosOn;
       tr.style.display=ok?'':'none';
     }
