@@ -1054,8 +1054,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 49;
+const APP_VERSION = 50;
 const CHANGELOG = [
+  { v:50, titel:'Tagesbericht nach Mitarbeiter filtern', punkte:[
+    'Im Tagesbericht gibt es jetzt eine Mitarbeiter-Leiste: ein Klick auf ein Kürzel zeigt nur die Arbeiten dieser Person (Statusschritte und Restarbeiten), nochmal klicken zeigt wieder alle.',
+    'Der Filter berücksichtigt sowohl die Status-Kürzel als auch die Ersteller/Erlediger der Restarbeiten. Beim Drucken/PDF wird die aktuelle Auswahl übernommen.' ]},
   { v:49, titel:'Restarbeiten für Etage & Baustelle', punkte:[
     'Oben in jeder Etage gibt es jetzt „Restarbeiten – Etage allgemein" für positionsübergreifende Arbeiten (Silikonfugen, Reinigung, Bauschutt …) – mit denselben Feldern wie bei Positionen.',
     'Ganz oben zusätzlich „Restarbeiten – Baustelle allgemein" für alles, was über alle Etagen greift (immer sichtbar, unabhängig von der Etagen-Auswahl).',
@@ -1922,23 +1925,26 @@ function expTagebericht(dateStr){
 
   if(rows.length===0 && raRows.length===0){alert('Am '+dObj.toLocaleDateString('de-DE')+' wurden keine Statusänderungen vorgenommen und keine Restarbeiten erfasst/erledigt.');return;}
 
-  // nach Kürzel gruppieren (erster Eintrag des ersten Felds als Kürzel des Monteurs)
-  const monteure=[...new Set(rows.flatMap(r=>r.felder.map(f=>f.kuerzel)))].filter(k=>k!=='–');
+  // Alle beteiligten Mitarbeiter des Tages (Status-Kürzel + Restarbeiten-Ersteller/Erlediger) für Filter + Kopfzeile
+  const statusK=rows.flatMap(r=>r.felder.map(f=>f.kuerzel));
+  const raK=raRows.flatMap(r=>[r.neu?r.ersteller:'', r.erl?r.erledigtVon:'']);
+  const monteure=[...new Set([...statusK,...raK])].filter(k=>k&&k!=='–').sort((a,b)=>a.localeCompare(b));
 
   let tableRows='';
   let lastG='',lastB='';
   rows.forEach((r,i)=>{
     if(r.geschoss!==lastG){
-      if(lastG!=='') tableRows+='<tr><td colspan="5" style="height:10px;background:#f5f3f0;border:none"></td></tr>';
-      tableRows+=`<tr><td colspan="5" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:7px 10px;letter-spacing:1px">${r.geschoss}: ${DATA.find(s=>s.label===r.geschoss)?.bez||''}</td></tr>`;
+      if(lastG!=='') tableRows+='<tr class="gspace"><td colspan="5" style="height:10px;background:#f5f3f0;border:none"></td></tr>';
+      tableRows+=`<tr class="grpg"><td colspan="5" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:7px 10px;letter-spacing:1px">${r.geschoss}: ${DATA.find(s=>s.label===r.geschoss)?.bez||''}</td></tr>`;
       lastG=r.geschoss; lastB='';
     }
     if(r.bereich!==lastB){
-      tableRows+=`<tr><td colspan="5" style="background:#eeecea;color:#895500;font-weight:700;font-size:12px;padding:4px 10px;border-left:3px solid #d7c1ae">${r.bereich}</td></tr>`;
+      tableRows+=`<tr class="grpb"><td colspan="5" style="background:#eeecea;color:#895500;font-weight:700;font-size:12px;padding:4px 10px;border-left:3px solid #d7c1ae">${r.bereich}</td></tr>`;
       lastB=r.bereich;
     }
-    const felderHtml=r.felder.map(f=>`<span style="display:inline-flex;align-items:center;gap:3px;background:#f0ece8;border-radius:4px;padding:2px 7px;margin:2px;font-size:11px;font-weight:700;color:#2b2b2b">${f.lbl}<span style="color:#a8a8a8;font-weight:400"> ${f.zeit}</span><span style="color:#d7c1ae;font-weight:700"> ${f.kuerzel}</span></span>`).join('');
-    tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">
+    const rowMit=[...new Set(r.felder.map(f=>f.kuerzel).filter(k=>k&&k!=='–'))].join('|');
+    const felderHtml=r.felder.map(f=>`<span class="kchip" data-k="${escapeHtml(f.kuerzel)}" style="display:inline-flex;align-items:center;gap:3px;background:#f0ece8;border-radius:4px;padding:2px 7px;margin:2px;font-size:11px;font-weight:700;color:#2b2b2b">${f.lbl}<span style="color:#a8a8a8;font-weight:400"> ${f.zeit}</span><span style="color:#d7c1ae;font-weight:700"> ${escapeHtml(f.kuerzel)}</span></span>`).join('');
+    tableRows+=`<tr class="drow" data-mit="${escapeHtml(rowMit)}" style="background:${i%2===0?'#fff':'#faf9f7'}">
       <td style="padding:5px 8px;font-size:11px;color:#a8a8a8;white-space:nowrap">${r.pos}</td>
       <td style="padding:5px 8px;font-size:12px;font-weight:700">${r.bez}</td>
       <td style="padding:5px 8px;font-size:11px;color:#895500">${r.fabrikat}</td>
@@ -1947,18 +1953,23 @@ function expTagebericht(dateStr){
     </tr>`;
   });
 
-  const monteureHtml=monteure.length?`<div style="margin-bottom:8px;font-size:12px;color:#895500">Monteure an diesem Tag: <strong>${monteure.join(', ')}</strong></div>`:'';
+  const monteureHtml=monteure.length?`<div style="margin-bottom:8px;font-size:12px;color:#895500">Mitarbeiter an diesem Tag: <strong>${monteure.map(escapeHtml).join(', ')}</strong></div>`:'';
+  // Mitarbeiter-Filter (nur bei ≥2 Beteiligten sinnvoll) – wirkt im geöffneten Bericht
+  const filterBar=monteure.length>=2?`<div class="mflt-bar" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin:0 0 16px">`+
+    `<span style="font-size:12px;color:#a8a8a8">Mitarbeiter:</span>`+
+    `<button class="mflt on" data-m="all" onclick="tbFilter(this.getAttribute('data-m'))">Alle</button>`+
+    monteure.map(k=>`<button class="mflt" data-m="${escapeHtml(k)}" onclick="tbFilter(this.getAttribute('data-m'))">${escapeHtml(k)}</button>`).join('')+
+    `<span id="mfltInfo" style="font-size:12px;color:#a8a8a8;margin-left:4px"></span></div>`:'';
 
   // Haupt-Tabelle nur, wenn es Statusänderungen gab
-  const hauptHtml=rows.length?`<h2>Durchgeführte Arbeiten – Statusänderungen am ${dObj.toLocaleDateString('de-DE')}</h2>
-${monteureHtml}
+  const hauptHtml=rows.length?`<div class="sect"><h2>Durchgeführte Arbeiten – Statusänderungen am ${dObj.toLocaleDateString('de-DE')}</h2>
 <table>
 <thead><tr>
   <th>Pos.</th><th>Bezeichnung</th><th>Fabrikat</th><th>Typ</th>
   <th>Heute erledigt (Uhrzeit · Kürzel)</th>
 </tr></thead>
 <tbody>${tableRows}</tbody>
-</table>`:`<p style="font-size:13px;color:#a8a8a8">Keine Statusänderungen an diesem Tag.</p>`;
+</table></div>`:`<p style="font-size:13px;color:#a8a8a8">Keine Statusänderungen an diesem Tag.</p>`;
 
   // Restarbeiten-Abschnitt (neu erfasste + erledigte des Tages)
   let raHtml='';
@@ -1966,29 +1977,30 @@ ${monteureHtml}
     let raTr='',lg='',lb='';
     raRows.forEach((r,i)=>{
       if(r.geschoss!==lg){
-        if(lg!=='') raTr+='<tr><td colspan="4" style="height:10px;background:#f5f3f0;border:none"></td></tr>';
-        raTr+=`<tr><td colspan="4" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:7px 10px;letter-spacing:1px">${r.geschoss}</td></tr>`;
+        if(lg!=='') raTr+='<tr class="gspace"><td colspan="4" style="height:10px;background:#f5f3f0;border:none"></td></tr>';
+        raTr+=`<tr class="grpg"><td colspan="4" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:7px 10px;letter-spacing:1px">${r.geschoss}</td></tr>`;
         lg=r.geschoss; lb='';
       }
       if(r.bereich!==lb){
-        raTr+=`<tr><td colspan="4" style="background:#eeecea;color:#895500;font-weight:700;font-size:12px;padding:4px 10px;border-left:3px solid #d7c1ae">${r.bereich}</td></tr>`;
+        raTr+=`<tr class="grpb"><td colspan="4" style="background:#eeecea;color:#895500;font-weight:700;font-size:12px;padding:4px 10px;border-left:3px solid #d7c1ae">${r.bereich}</td></tr>`;
         lb=r.bereich;
       }
       const status=r.erl
         ?`<span style="color:#3a7a3a;font-weight:700">&#10003; erledigt${r.erledigtVon?' · '+escapeHtml(r.erledigtVon):''}</span>`
         :`<span style="color:#c0392b;font-weight:700">&#9679; neu erfasst${r.ersteller?' · '+escapeHtml(r.ersteller):''}</span>`;
-      raTr+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}">
+      const raMit=[...new Set([r.neu?r.ersteller:'', r.erl?r.erledigtVon:''].filter(k=>k&&k!=='–'))].join('|');
+      raTr+=`<tr class="drow" data-mit="${escapeHtml(raMit)}" style="background:${i%2===0?'#fff':'#faf9f7'}">
         <td style="padding:5px 8px;font-size:11px;color:#a8a8a8;white-space:nowrap">${r.pos}</td>
         <td style="padding:5px 8px;font-size:12px;font-weight:700">${escapeHtml(r.bez)}</td>
         <td style="padding:5px 8px;font-size:12px">${escapeHtml(r.txt)}</td>
         <td style="padding:5px 8px;font-size:11px;white-space:nowrap">${status}</td>
       </tr>`;
     });
-    raHtml=`<h2 style="margin-top:26px">Restarbeiten am ${dObj.toLocaleDateString('de-DE')} – neu erfasst / erledigt</h2>
+    raHtml=`<div class="sect"><h2 style="margin-top:26px">Restarbeiten am ${dObj.toLocaleDateString('de-DE')} – neu erfasst / erledigt</h2>
 <table>
 <thead><tr><th>Pos.</th><th>Gerät</th><th>Restarbeit</th><th>Status</th></tr></thead>
 <tbody>${raTr}</tbody>
-</table>`;
+</table></div>`;
   }
 
   const repHtml=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
@@ -2006,17 +2018,58 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 .sig{margin-top:40px;display:flex;gap:60px;}
 .sig-box{flex:1;}
 .sig-line{border-top:1px solid #2b2b2b;padding-top:6px;font-size:11px;color:#a8a8a8;margin-top:40px;}
-@media print{body{padding:10px;}button{display:none!important;}}
+.mflt{font-family:inherit;font-size:12px;font-weight:700;padding:6px 13px;border-radius:16px;border:1px solid #d4cdc6;background:#fff;color:#2b2b2b;cursor:pointer;}
+.mflt.on{background:#895500;color:#fff;border-color:#895500;}
+@media print{body{padding:10px;}button{display:none!important;}.mflt-bar{display:none!important;}}
 </style></head><body>
 <button onclick="window.close()" class="rep-close" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
 <div class="kpc"><img class="logo-img" src="${repLogo()}" alt="KPC GmbH">
 <div class="meta"><strong>${escapeHtml(curProjName())}</strong>Tagesbericht Leistungsfeststellung<br>${d}</div></div>
+${monteureHtml}
+${filterBar}
 ${hauptHtml}
 ${raHtml}
 <div class="sig">
   <div class="sig-box"><div class="sig-line">Datum / Unterschrift Monteur</div></div>
   <div class="sig-box"><div class="sig-line">Datum / Unterschrift Bauleitung KPC</div></div>
 </div>
+<script>
+(function(){
+  var cur='all';
+  function grpVisibility(){
+    var all=[].slice.call(document.querySelectorAll('table tr'));
+    for(var i=0;i<all.length;i++){
+      var tr=all[i]; var isG=tr.classList.contains('grpg'), isB=tr.classList.contains('grpb');
+      if(!isG&&!isB) continue;
+      var vis=false;
+      for(var j=i+1;j<all.length;j++){
+        var t=all[j];
+        if(t.classList.contains('grpg')) break;
+        if(!isG && t.classList.contains('grpb')) break;
+        if(t.classList.contains('drow') && t.style.display!=='none'){ vis=true; break; }
+      }
+      tr.style.display=vis?'':'none';
+    }
+    all.forEach(function(tr,i){ if(tr.classList.contains('gspace')){ var n=all[i+1]; tr.style.display=(n&&n.style.display==='none')?'none':''; } });
+  }
+  window.tbFilter=function(k){
+    cur=(cur===k && k!=='all')?'all':k;
+    document.querySelectorAll('.kchip').forEach(function(c){ c.style.display=(cur==='all'||c.getAttribute('data-k')===cur)?'':'none'; });
+    document.querySelectorAll('.drow').forEach(function(r){
+      var mit=(r.getAttribute('data-mit')||'').split('|');
+      r.style.display=(cur==='all'||mit.indexOf(cur)>=0)?'':'none';
+    });
+    grpVisibility();
+    document.querySelectorAll('.sect').forEach(function(s){
+      var any=[].slice.call(s.querySelectorAll('.drow')).some(function(r){return r.style.display!=='none';});
+      s.style.display=any?'':'none';
+    });
+    document.querySelectorAll('.mflt').forEach(function(b){ b.classList.toggle('on', b.getAttribute('data-m')===cur); });
+    var info=document.getElementById('mfltInfo');
+    if(info) info.textContent = cur==='all' ? '' : ('nur '+cur);
+  };
+})();
+<\/script>
 </body></html>`;
 
   const win=window.open('','_blank');
