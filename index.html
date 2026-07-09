@@ -1059,7 +1059,7 @@ function startData(){
 const APP_VERSION = 51;
 const CHANGELOG = [
   { v:51, titel:'Restarbeiten nach Zuständigkeit', punkte:[
-    'Jede Restarbeit kann jetzt einem Gewerk zugeordnet werden: 🔧 Montage, ⚡ Elektro, 🚿 Sanitär oder 🏢 Büro (für Innendienst-Aufgaben). Bei Positions-Restarbeiten wird das Gewerk der Position automatisch vorgeschlagen.',
+    'Jede Restarbeit kann jetzt einem Gewerk zugeordnet werden: 🔧 Montage, ⚡ Elektro, 🚿 Sanitär, 🏢 Büro (Innendienst) oder 👷 Bauleitung. Bei Positions-Restarbeiten wird das Gewerk der Position automatisch vorgeschlagen.',
     'Die Restarbeitenliste hat eine neue Spalte „Zuständigkeit" und lässt sich danach filtern (kombinierbar mit Offen/Erledigt); der Excel-Export enthält die Spalte ebenfalls.' ]},
   { v:50, titel:'Tagesbericht nach Mitarbeiter filtern', punkte:[
     'Im Tagesbericht gibt es jetzt eine Mitarbeiter-Leiste: ein Klick auf ein Kürzel zeigt nur die Arbeiten dieser Person (Statusschritte und Restarbeiten), nochmal klicken zeigt wieder alle.',
@@ -3190,8 +3190,8 @@ function raFmtTs(iso){
     +' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
 }
 // Zuständigkeit/Gewerk je Restarbeit – inkl. Büro (B) für Innendienst-Aufgaben
-const RA_GW=[['M','🔧 Montage'],['E','⚡ Elektro'],['S','🚿 Sanitär'],['B','🏢 Büro']];
-const RA_GW_LBL={M:'Montage',E:'Elektro',S:'Sanitär',B:'Büro'};
+const RA_GW=[['M','🔧 Montage'],['E','⚡ Elektro'],['S','🚿 Sanitär'],['B','🏢 Büro'],['BL','👷 Bauleitung']];
+const RA_GW_LBL={M:'Montage',E:'Elektro',S:'Sanitär',B:'Büro',BL:'Bauleitung'};
 // Vorbelegung der Zuständigkeit: bei Positions-Restarbeit das eindeutige Gewerk der Position, sonst offen
 function raDefaultGw(pos){ if(isEKey(pos)||pos===PRAKEY) return ''; const g=POSGEW[pos]||[]; return g.length===1?g[0]:''; }
 function raEnsure(r){
@@ -3594,7 +3594,7 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 <div class="flt-bar" style="margin:0 0 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
   <span style="font-size:12px;color:#a8a8a8">Zuständigkeit:</span>
   <button class="gwf on" data-g="all" onclick="raGw('all')">Alle</button>
-  ${[['M','🔧 Montage'],['E','⚡ Elektro'],['S','🚿 Sanitär'],['B','🏢 Büro']].filter(([k])=>gwCounts[k]).map(([k,l])=>`<button class="gwf" data-g="${k}" onclick="raGw('${k}')">${l} (${gwCounts[k]})</button>`).join('')}
+  ${RA_GW.filter(([k])=>gwCounts[k]).map(([k,l])=>`<button class="gwf" data-g="${k}" onclick="raGw('${k}')">${l} (${gwCounts[k]})</button>`).join('')}
   ${gwCounts['-']?`<button class="gwf" data-g="-" onclick="raGw('-')">– ohne (${gwCounts['-']})</button>`:''}
 </div>
 <table><thead><tr>
