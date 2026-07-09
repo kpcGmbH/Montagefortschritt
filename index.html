@@ -849,6 +849,13 @@ function buildPanels(){
   main.innerHTML='';
   Object.keys(POSGEW).forEach(k=>delete POSGEW[k]);   // Gewerk-Index neu aufbauen
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ POSGEW[it.pos]=it.gew||[]; })));
+  // Projektweite Restarbeiten (etagenübergreifend) – immer sichtbar über allen Etagen
+  const pra=document.createElement('div');
+  pra.className='rasec etrasec prasec';
+  pra.innerHTML='<div class="rahd">&#128203; Restarbeiten – Baustelle allgemein <span class="rai" id="RAI'+sp(PRAKEY)+'"></span></div>'+
+    '<div id="RA'+sp(PRAKEY)+'"></div>'+
+    '<button class="raadd" onclick="raAddNew(\''+PRAKEY+'\')">&#65291; Restarbeit</button>';
+  main.appendChild(pra);
   DATA.forEach((sec,secIdx)=>{
     const panel=document.createElement('div');
     panel.className='panel'+(sec.pos===ACT?' on':'');
@@ -1049,9 +1056,10 @@ function startData(){
 // die zuletzt vom Nutzer gesehene Version.
 const APP_VERSION = 49;
 const CHANGELOG = [
-  { v:49, titel:'Restarbeiten für die ganze Etage', punkte:[
+  { v:49, titel:'Restarbeiten für Etage & Baustelle', punkte:[
     'Oben in jeder Etage gibt es jetzt „Restarbeiten – Etage allgemein" für positionsübergreifende Arbeiten (Silikonfugen, Reinigung, Bauschutt …) – mit denselben Feldern wie bei Positionen.',
-    'Diese Etagen-Restarbeiten erscheinen auch in der Restarbeitenliste (PDF/Excel) und im Tagesbericht, gekennzeichnet als „Etage allgemein".' ]},
+    'Ganz oben zusätzlich „Restarbeiten – Baustelle allgemein" für alles, was über alle Etagen greift (immer sichtbar, unabhängig von der Etagen-Auswahl).',
+    'Beides erscheint in der Restarbeitenliste (PDF/Excel) und im Tagesbericht, gekennzeichnet als „Etage allgemein" bzw. „Baustelle allgemein".' ]},
   { v:48, titel:'Restarbeiten: Namen automatisch', punkte:[
     'Bei neuen Restarbeiten wird „Erst." automatisch mit deinem Login-Kürzel vorbelegt, und beim Abhaken trägt sich der Abhakende als „Erl." ein – beides bleibt änderbar.' ]},
   { v:47, titel:'Restarbeiten: Tagesbericht & neuer Button', punkte:[
@@ -1513,6 +1521,8 @@ function EKEY(sec){ return '§E§'+(sec&&typeof sec==='object'?sec.pos:sec); }
 function gsE(key){ if(!ST[key]) ST[key]={__etage:true, efotos:[], restarbeiten:[]}; if(!Array.isArray(ST[key].efotos)) ST[key].efotos=[]; if(!Array.isArray(ST[key].restarbeiten)) ST[key].restarbeiten=[]; return ST[key]; }
 // Etage zu einem §E§-Key (für Beschriftung/Ablagepfad der Etagen-Restarbeiten)
 function secByEKey(key){ return DATA.find(s=>EKEY(s)===key)||null; }
+// Projektweite (etagenübergreifende) Restarbeiten: eigene synthetische Zeile, gleiche §E§-Sync-Mechanik
+const PRAKEY=EKEY('__projekt');
 function etageFolder(sec){ return safeName(curProjName())+'/'+safeName(sec.label||sec.pos)+'/_Anlagenfotos'; }
 function saveEtage(key){ persistCurrentState(); touchProject(PID); enqueuePos(key).then(()=>flushOutbox()); }
 
@@ -1786,8 +1796,9 @@ function restoreUI() {
     // Restore progress
     updProg(pos);
   });
-  // Allgemeine Etagen-Restarbeiten rendern (isEKey wird oben übersprungen)
+  // Allgemeine Etagen- und Projekt-Restarbeiten rendern (isEKey wird oben übersprungen)
   DATA.forEach(sec=>updRA(EKEY(sec)));
+  updRA(PRAKEY);
   upStats();
   updAllEtageBars();
 }
@@ -1815,6 +1826,7 @@ function openTagesberichtDialog(){
     if(r.erstelltAm){ const day=localDay(r.erstelltAm); if(day) counts[day]=(counts[day]||0)+1; }
     if(r.done&&r.erledigtAm){ const day=localDay(r.erledigtAm); if(day) counts[day]=(counts[day]||0)+1; }
   });};
+  if(ST[PRAKEY]) zaehlRA(ST[PRAKEY].restarbeiten);
   DATA.forEach(sec=>{
     const e=ST[EKEY(sec)]; if(e) zaehlRA(e.restarbeiten);
     sec.subsections.forEach(sub=>sub.items.forEach(it=>{
@@ -1878,8 +1890,16 @@ function expTagebericht(dateStr){
     });
   });
 
-  // Restarbeiten des Tages: an diesem Tag neu erfasst oder erledigt (inkl. Etage allgemein)
+  // Restarbeiten des Tages: an diesem Tag neu erfasst oder erledigt (inkl. Etage/Baustelle allgemein)
   let raRows=[];
+  const prTag=ST[PRAKEY];
+  if(prTag&&Array.isArray(prTag.restarbeiten)) prTag.restarbeiten.forEach(r=>{
+    if(!r.txt) return;
+    const neu=r.erstelltAm&&localDay(r.erstelltAm)===tag;
+    const erl=r.done&&r.erledigtAm&&localDay(r.erledigtAm)===tag;
+    if(!neu&&!erl) return;
+    raRows.push({geschoss:'Baustelle allgemein',bereich:'Etagenübergreifend',pos:'–',bez:'Baustellenweit',txt:r.txt,neu,erl,ersteller:r.ersteller||'',erledigtVon:r.erledigtVon||''});
+  });
   DATA.forEach(sec=>{
     const e=ST[EKEY(sec)];
     if(e&&Array.isArray(e.restarbeiten)) e.restarbeiten.forEach(r=>{
@@ -3304,7 +3324,8 @@ async function raHandleFotoUpload(e){
   try{
     const uploadFile=await tryCompressImage(file);
     let fname;
-    if(isEKey(pos)){ const sec=secByEKey(pos); fname=safeName(curProjName())+'/'+safeName(sec?sec.label:'Etage')+'/_Restarbeiten/RA_Etage_'+idx+'_'+Date.now()+'.jpg'; }
+    if(pos===PRAKEY){ fname=safeName(curProjName())+'/_Restarbeiten/RA_Baustelle_'+idx+'_'+Date.now()+'.jpg'; }
+    else if(isEKey(pos)){ const sec=secByEKey(pos); fname=safeName(curProjName())+'/'+safeName(sec?sec.label:'Etage')+'/_Restarbeiten/RA_Etage_'+idx+'_'+Date.now()+'.jpg'; }
     else fname=folderFor(pos)+'/RA_'+pos.replace(/\./g,'_')+'_'+idx+'_'+Date.now()+'.jpg';
     await queueUpload(fname, uploadFile, 'image/jpeg', pos);   // lokal + Warteschlange (offline-fähig)
     const s=gs(pos);
@@ -3341,6 +3362,20 @@ function raOlb(pos,idx,fi){
 // Alle erfassten Restarbeiten einsammeln (für PDF-Bericht + Excel-Export)
 function collectRestRows(){
   const rows=[];
+  // Projektweite Restarbeiten zuerst (eigene Gruppe „Baustelle allgemein")
+  const pr=ST[PRAKEY];
+  if(pr&&Array.isArray(pr.restarbeiten)){
+    pr.restarbeiten.forEach(r=>{
+      raEnsure(r);
+      if(!r.txt)return;
+      rows.push({
+        geschoss:'Baustelle allgemein', bereich:'Etagenübergreifend', pos:'–', bez:'Baustellenweit',
+        txt:r.txt, done:r.done, ersteller:r.ersteller, erstelltAm:r.erstelltAm,
+        erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
+        fotos:(r.fotos||[]).slice()
+      });
+    });
+  }
   DATA.forEach(sec=>{
     // Allgemeine (positionsübergreifende) Restarbeiten der Etage zuerst
     const e=ST[EKEY(sec)];
