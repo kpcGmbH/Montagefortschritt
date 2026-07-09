@@ -1056,8 +1056,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 51;
+const APP_VERSION = 52;
 const CHANGELOG = [
+  { v:52, titel:'Restarbeiten: Nachunternehmer', punkte:[
+    'Zusätzliche Zuständigkeit „🏗️ Nachunternehmer" bei den Restarbeiten – auswählbar je Restarbeit und filterbar in der Restarbeitenliste.' ]},
   { v:51, titel:'Restarbeiten nach Zuständigkeit', punkte:[
     'Jede Restarbeit kann jetzt einem Gewerk zugeordnet werden: 🔧 Montage, ⚡ Elektro, 🚿 Sanitär, 🏢 Büro (Innendienst) oder 👷 Bauleitung. Bei Positions-Restarbeiten wird das Gewerk der Position automatisch vorgeschlagen.',
     'Die Restarbeitenliste hat eine neue Spalte „Zuständigkeit" und lässt sich danach filtern (kombinierbar mit Offen/Erledigt); der Excel-Export enthält die Spalte ebenfalls.' ]},
@@ -3190,8 +3192,8 @@ function raFmtTs(iso){
     +' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
 }
 // Zuständigkeit/Gewerk je Restarbeit – inkl. Büro (B) für Innendienst-Aufgaben
-const RA_GW=[['M','🔧 Montage'],['E','⚡ Elektro'],['S','🚿 Sanitär'],['B','🏢 Büro'],['BL','👷 Bauleitung']];
-const RA_GW_LBL={M:'Montage',E:'Elektro',S:'Sanitär',B:'Büro',BL:'Bauleitung'};
+const RA_GW=[['M','🔧 Montage'],['E','⚡ Elektro'],['S','🚿 Sanitär'],['B','🏢 Büro'],['BL','👷 Bauleitung'],['NU','🏗️ Nachunternehmer']];
+const RA_GW_LBL={M:'Montage',E:'Elektro',S:'Sanitär',B:'Büro',BL:'Bauleitung',NU:'Nachunternehmer'};
 // Vorbelegung der Zuständigkeit: bei Positions-Restarbeit das eindeutige Gewerk der Position, sonst offen
 function raDefaultGw(pos){ if(isEKey(pos)||pos===PRAKEY) return ''; const g=POSGEW[pos]||[]; return g.length===1?g[0]:''; }
 function raEnsure(r){
