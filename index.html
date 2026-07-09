@@ -1037,8 +1037,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 47;
+const APP_VERSION = 48;
 const CHANGELOG = [
+  { v:48, titel:'Restarbeiten: Namen automatisch', punkte:[
+    'Bei neuen Restarbeiten wird „Erst." automatisch mit deinem Login-Kürzel vorbelegt, und beim Abhaken trägt sich der Abhakende als „Erl." ein – beides bleibt änderbar.' ]},
   { v:47, titel:'Restarbeiten: Tagesbericht & neuer Button', punkte:[
     'Der Tagesbericht zeigt jetzt auch die Restarbeiten des Tages – neu erfasste und erledigte, mit Name. Die Tage-mit-Aktivität-Schnellauswahl berücksichtigt sie ebenfalls.',
     'Neuer Button „＋ Restarbeit" unter der Restarbeiten-Liste jeder Position – neue Einträge lassen sich damit immer anlegen (vorher nur per Enter-Taste in der letzten Zeile, was auf dem Handy leicht unauffindbar war).' ]},
@@ -3092,7 +3094,7 @@ function updRA(pos){
   const s=gs(pos);
   const g=document.getElementById('RA'+id);
   if(!g)return;
-  if(!s.restarbeiten.length) s.restarbeiten.push({txt:'',done:false,ersteller:'',erstelltAm:null,erledigtVon:'',erledigtAm:null,fotos:[]});
+  if(!s.restarbeiten.length) s.restarbeiten.push({txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,fotos:[]});
   s.restarbeiten.forEach(raEnsure);
   g.innerHTML=s.restarbeiten.map((r,i)=>{
     const tsErst=r.erstelltAm?raFmtTs(r.erstelltAm):'';
@@ -3139,6 +3141,12 @@ function raSetTxt(pos,i,val){
   raEnsure(s.restarbeiten[i]);
   s.restarbeiten[i].txt=val;
   if(val.trim() && !s.restarbeiten[i].erstelltAm) s.restarbeiten[i].erstelltAm=new Date().toISOString();
+  // Ersteller mit dem Login-Kürzel vorbelegen (bleibt änderbar)
+  if(val.trim() && !s.restarbeiten[i].ersteller && USER){
+    s.restarbeiten[i].ersteller=USER;
+    const inp=document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+i+'"] .rakuerz');
+    if(inp && !inp.value) inp.value=USER;
+  }
   raDebouncedSave(pos);
 }
 function raSetErsteller(pos,i,val){
@@ -3170,6 +3178,7 @@ function raToggle(pos,i,done){
   raEnsure(s.restarbeiten[i]);
   s.restarbeiten[i].done=done;
   s.restarbeiten[i].erledigtAm=done?new Date().toISOString():null;
+  if(done && !s.restarbeiten[i].erledigtVon) s.restarbeiten[i].erledigtVon=USER||'';   // wer abhakt, hat's erledigt
   if(!done) s.restarbeiten[i].erledigtVon='';
   updRA(pos);
   saveFotos(pos);
@@ -3187,7 +3196,7 @@ function raKey(ev,pos,i){
   if(ev.key!=='Enter')return;
   ev.preventDefault();
   const s=gs(pos);
-  s.restarbeiten.splice(i+1,0,{txt:'',done:false,ersteller:'',erstelltAm:null,erledigtVon:'',erledigtAm:null,fotos:[]});
+  s.restarbeiten.splice(i+1,0,{txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,fotos:[]});
   updRA(pos);
   saveFotos(pos);
   setTimeout(()=>{
@@ -3202,7 +3211,7 @@ function raAddNew(pos){
   const s=gs(pos);
   s.restarbeiten.forEach(raEnsure);
   let idx=s.restarbeiten.findIndex(r=>!(r.txt&&r.txt.trim())&&!(r.fotos&&r.fotos.length));
-  if(idx<0){ s.restarbeiten.push({txt:'',done:false,ersteller:'',erstelltAm:null,erledigtVon:'',erledigtAm:null,fotos:[]}); idx=s.restarbeiten.length-1; }
+  if(idx<0){ s.restarbeiten.push({txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,fotos:[]}); idx=s.restarbeiten.length-1; }
   updRA(pos);
   setTimeout(()=>{
     const el=document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+idx+'"] .ratxt');
