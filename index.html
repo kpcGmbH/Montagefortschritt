@@ -241,6 +241,8 @@ select.fs option{background:var(--surface);color:var(--text);}
 .fbtn:active{background:var(--braun);}
 .raadd{background:transparent;border:1px dashed var(--line);border-radius:8px;color:var(--braun);font-size:12px;font-weight:700;padding:6px 12px;margin:5px 0 2px;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;}
 .raadd:active{background:var(--chrome-bg2);}
+.rasec.etrasec{display:block;margin-top:0;border-top:none;background:var(--bhdr-bg);border-bottom:1px solid var(--line);padding:8px 14px 10px;}
+.rasec.etrasec .rahd{margin-bottom:2px;}
 .fcnt{background:var(--accent);color:var(--anthrazit);font-size:10px;padding:0 5px;border-radius:10px;font-weight:700;}
 .fgrid{display:flex;gap:9px;flex-wrap:wrap;margin-top:7px;}
 .fth-wrap{display:flex;flex-direction:column;align-items:center;gap:3px;}
@@ -857,6 +859,14 @@ function buildPanels(){
     etbar.innerHTML='<button class="etbtn" onclick="openEtageFotos('+secIdx+')">&#128248; Anlagenfotos <span class="etcnt" id="ETC'+secIdx+'"></span></button>'+
       '<span class="ethint">Fotos der ganzen Anlage je Kategorie – Montageverlauf</span>';
     panel.appendChild(etbar);
+    // Allgemeine (positionsübergreifende) Restarbeiten dieser Etage – gespeichert in der §E§-Etagenzeile
+    const ekey=EKEY(sec), eid=sp(ekey);
+    const era=document.createElement('div');
+    era.className='rasec etrasec';
+    era.innerHTML='<div class="rahd">&#128203; Restarbeiten – Etage allgemein <span class="rai" id="RAI'+eid+'"></span></div>'+
+      '<div id="RA'+eid+'"></div>'+
+      '<button class="raadd" onclick="raAddNew(\''+ekey+'\')">&#65291; Restarbeit</button>';
+    panel.appendChild(era);
     sec.subsections.forEach(sub=>{
       const div=document.createElement('div');
       div.className='bblock';
@@ -1037,8 +1047,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 48;
+const APP_VERSION = 49;
 const CHANGELOG = [
+  { v:49, titel:'Restarbeiten für die ganze Etage', punkte:[
+    'Oben in jeder Etage gibt es jetzt „Restarbeiten – Etage allgemein" für positionsübergreifende Arbeiten (Silikonfugen, Reinigung, Bauschutt …) – mit denselben Feldern wie bei Positionen.',
+    'Diese Etagen-Restarbeiten erscheinen auch in der Restarbeitenliste (PDF/Excel) und im Tagesbericht, gekennzeichnet als „Etage allgemein".' ]},
   { v:48, titel:'Restarbeiten: Namen automatisch', punkte:[
     'Bei neuen Restarbeiten wird „Erst." automatisch mit deinem Login-Kürzel vorbelegt, und beim Abhaken trägt sich der Abhakende als „Erl." ein – beides bleibt änderbar.' ]},
   { v:47, titel:'Restarbeiten: Tagesbericht & neuer Button', punkte:[
@@ -1497,7 +1510,9 @@ document.getElementById('lb').addEventListener('click',e=>{if(e.target===e.curre
 const EFOTO_KATS=['Montagebeginn','Aktueller Montagestand','Anlieferung','Sanitär fertig','Elektro fertig','Inbetriebnahme','Fertigstellung','Übergabe','Mängel'];
 function isEKey(k){ return typeof k==='string' && k.indexOf('§E§')===0; }
 function EKEY(sec){ return '§E§'+(sec&&typeof sec==='object'?sec.pos:sec); }
-function gsE(key){ if(!ST[key]) ST[key]={__etage:true, efotos:[]}; if(!Array.isArray(ST[key].efotos)) ST[key].efotos=[]; return ST[key]; }
+function gsE(key){ if(!ST[key]) ST[key]={__etage:true, efotos:[], restarbeiten:[]}; if(!Array.isArray(ST[key].efotos)) ST[key].efotos=[]; if(!Array.isArray(ST[key].restarbeiten)) ST[key].restarbeiten=[]; return ST[key]; }
+// Etage zu einem §E§-Key (für Beschriftung/Ablagepfad der Etagen-Restarbeiten)
+function secByEKey(key){ return DATA.find(s=>EKEY(s)===key)||null; }
 function etageFolder(sec){ return safeName(curProjName())+'/'+safeName(sec.label||sec.pos)+'/_Anlagenfotos'; }
 function saveEtage(key){ persistCurrentState(); touchProject(PID); enqueuePos(key).then(()=>flushOutbox()); }
 
@@ -1771,6 +1786,8 @@ function restoreUI() {
     // Restore progress
     updProg(pos);
   });
+  // Allgemeine Etagen-Restarbeiten rendern (isEKey wird oben übersprungen)
+  DATA.forEach(sec=>updRA(EKEY(sec)));
   upStats();
   updAllEtageBars();
 }
@@ -1793,16 +1810,19 @@ function runTagesbericht(){ const el=document.getElementById('tbDate'); const v=
 function openTagesberichtDialog(){
   const FELDER=['g','m','sa','dp','ea','ib','ew'];
   const counts={};
-  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
-    const s=gs(it.pos), t=s.ts||{};
-    FELDER.forEach(f=>{ if(t[f]){ const day=localDay(t[f]); if(day) counts[day]=(counts[day]||0)+1; } });
-    // Restarbeiten zählen als Aktivität (neu erfasst / erledigt)
-    (s.restarbeiten||[]).forEach(r=>{
-      if(!r.txt) return;
-      if(r.erstelltAm){ const day=localDay(r.erstelltAm); if(day) counts[day]=(counts[day]||0)+1; }
-      if(r.done&&r.erledigtAm){ const day=localDay(r.erledigtAm); if(day) counts[day]=(counts[day]||0)+1; }
-    });
-  })));
+  const zaehlRA=(list)=>{(list||[]).forEach(r=>{
+    if(!r.txt) return;
+    if(r.erstelltAm){ const day=localDay(r.erstelltAm); if(day) counts[day]=(counts[day]||0)+1; }
+    if(r.done&&r.erledigtAm){ const day=localDay(r.erledigtAm); if(day) counts[day]=(counts[day]||0)+1; }
+  });};
+  DATA.forEach(sec=>{
+    const e=ST[EKEY(sec)]; if(e) zaehlRA(e.restarbeiten);
+    sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+      const s=gs(it.pos), t=s.ts||{};
+      FELDER.forEach(f=>{ if(t[f]){ const day=localDay(t[f]); if(day) counts[day]=(counts[day]||0)+1; } });
+      zaehlRA(s.restarbeiten);
+    }));
+  });
   const days=Object.keys(counts).sort((a,b)=>b.localeCompare(a));   // neueste zuerst
   const today=localDay(new Date().toISOString());
   const def=counts[today]?today:(days[0]||today);
@@ -1858,17 +1878,27 @@ function expTagebericht(dateStr){
     });
   });
 
-  // Restarbeiten des Tages: an diesem Tag neu erfasst oder erledigt
+  // Restarbeiten des Tages: an diesem Tag neu erfasst oder erledigt (inkl. Etage allgemein)
   let raRows=[];
-  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
-    (gs(it.pos).restarbeiten||[]).forEach(r=>{
+  DATA.forEach(sec=>{
+    const e=ST[EKEY(sec)];
+    if(e&&Array.isArray(e.restarbeiten)) e.restarbeiten.forEach(r=>{
       if(!r.txt) return;
       const neu=r.erstelltAm&&localDay(r.erstelltAm)===tag;
       const erl=r.done&&r.erledigtAm&&localDay(r.erledigtAm)===tag;
       if(!neu&&!erl) return;
-      raRows.push({geschoss:sec.label,bereich:sub.bez,pos:it.pos,bez:it.bez.trim(),txt:r.txt,neu,erl,ersteller:r.ersteller||'',erledigtVon:r.erledigtVon||''});
+      raRows.push({geschoss:sec.label,bereich:'Etage allgemein',pos:'–',bez:'Etagenweit',txt:r.txt,neu,erl,ersteller:r.ersteller||'',erledigtVon:r.erledigtVon||''});
     });
-  })));
+    sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+      (gs(it.pos).restarbeiten||[]).forEach(r=>{
+        if(!r.txt) return;
+        const neu=r.erstelltAm&&localDay(r.erstelltAm)===tag;
+        const erl=r.done&&r.erledigtAm&&localDay(r.erledigtAm)===tag;
+        if(!neu&&!erl) return;
+        raRows.push({geschoss:sec.label,bereich:sub.bez,pos:it.pos,bez:it.bez.trim(),txt:r.txt,neu,erl,ersteller:r.ersteller||'',erledigtVon:r.erledigtVon||''});
+      });
+    }));
+  });
 
   if(rows.length===0 && raRows.length===0){alert('Am '+dObj.toLocaleDateString('de-DE')+' wurden keine Statusänderungen vorgenommen und keine Restarbeiten erfasst/erledigt.');return;}
 
@@ -2240,7 +2270,7 @@ async function spListLoadRows(){
 
 function buildPosData(pos){
   // Synthetische Etagen-Zeile (Anlagen-/Übersichtsfotos je Geschoss) – eigene Struktur
-  if(isEKey(pos)){ const e=gsE(pos); return JSON.stringify({__etage:true, efotos:e.efotos||[]}); }
+  if(isEKey(pos)){ const e=gsE(pos); return JSON.stringify({__etage:true, efotos:e.efotos||[], restarbeiten:e.restarbeiten||[]}); }
   const s = gs(pos);
   // gleiche Struktur wie früher die Supabase-Spalten (innere Felder als JSON-Strings)
   return JSON.stringify({
@@ -2354,7 +2384,7 @@ async function loadState() {
     if (data) {
       let newest = null;
       data.forEach(row => {
-        if(row.__etage || isEKey(row.pos)){ ST[row.pos] = {__etage:true, efotos: Array.isArray(row.efotos)?row.efotos:[]}; if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at; return; }
+        if(row.__etage || isEKey(row.pos)){ ST[row.pos] = {__etage:true, efotos: Array.isArray(row.efotos)?row.efotos:[], restarbeiten: Array.isArray(row.restarbeiten)?row.restarbeiten:[]}; if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at; return; }
         let fotos = [], pdfs = [];
         try { fotos = row.fotos ? JSON.parse(row.fotos) : []; } catch(e) {}
         try { pdfs = row.pdfs ? JSON.parse(row.pdfs) : []; } catch(e) {}
@@ -2468,7 +2498,7 @@ setInterval(async () => {
     let newest = null;
     data.forEach(row => {
       if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at;
-      if (row.__etage || isEKey(row.pos)){ if(!DIRTY.has(row.pos) && !ST[row.pos]){ ST[row.pos]={__etage:true, efotos:Array.isArray(row.efotos)?row.efotos:[]}; } return; }
+      if (row.__etage || isEKey(row.pos)){ if(!DIRTY.has(row.pos) && !ST[row.pos]){ ST[row.pos]={__etage:true, efotos:Array.isArray(row.efotos)?row.efotos:[], restarbeiten:Array.isArray(row.restarbeiten)?row.restarbeiten:[]}; if(document.getElementById('RA'+sp(row.pos))) updRA(row.pos); } return; }
       if (DIRTY.has(row.pos)) return;     // lokale, noch nicht synchronisierte Änderung nicht überschreiben
       const cur = ST[row.pos];
       let newRest = cur ? cur.restarbeiten : [];
@@ -3094,7 +3124,8 @@ function updRA(pos){
   const s=gs(pos);
   const g=document.getElementById('RA'+id);
   if(!g)return;
-  if(!s.restarbeiten.length) s.restarbeiten.push({txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,fotos:[]});
+  // Etagen-Listen starten leer (nur „+ Restarbeit"-Button); Positionslisten mit leerer Eingabezeile
+  if(!s.restarbeiten.length && !isEKey(pos)) s.restarbeiten.push({txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,fotos:[]});
   s.restarbeiten.forEach(raEnsure);
   g.innerHTML=s.restarbeiten.map((r,i)=>{
     const tsErst=r.erstelltAm?raFmtTs(r.erstelltAm):'';
@@ -3272,7 +3303,9 @@ async function raHandleFotoUpload(e){
   showLoader('Foto wird gespeichert...');
   try{
     const uploadFile=await tryCompressImage(file);
-    const fname=folderFor(pos)+'/RA_'+pos.replace(/\./g,'_')+'_'+idx+'_'+Date.now()+'.jpg';
+    let fname;
+    if(isEKey(pos)){ const sec=secByEKey(pos); fname=safeName(curProjName())+'/'+safeName(sec?sec.label:'Etage')+'/_Restarbeiten/RA_Etage_'+idx+'_'+Date.now()+'.jpg'; }
+    else fname=folderFor(pos)+'/RA_'+pos.replace(/\./g,'_')+'_'+idx+'_'+Date.now()+'.jpg';
     await queueUpload(fname, uploadFile, 'image/jpeg', pos);   // lokal + Warteschlange (offline-fähig)
     const s=gs(pos);
     if(s.restarbeiten[idx]){
@@ -3309,6 +3342,20 @@ function raOlb(pos,idx,fi){
 function collectRestRows(){
   const rows=[];
   DATA.forEach(sec=>{
+    // Allgemeine (positionsübergreifende) Restarbeiten der Etage zuerst
+    const e=ST[EKEY(sec)];
+    if(e&&Array.isArray(e.restarbeiten)){
+      e.restarbeiten.forEach(r=>{
+        raEnsure(r);
+        if(!r.txt)return;
+        rows.push({
+          geschoss:sec.label, bereich:'Etage allgemein', pos:'–', bez:'Etagenweit',
+          txt:r.txt, done:r.done, ersteller:r.ersteller, erstelltAm:r.erstelltAm,
+          erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
+          fotos:(r.fotos||[]).slice()
+        });
+      });
+    }
     sec.subsections.forEach(sub=>{
       sub.items.forEach(item=>{
         const s=gs(item.pos);
