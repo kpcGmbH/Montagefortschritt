@@ -1056,8 +1056,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 52;
+const APP_VERSION = 53;
 const CHANGELOG = [
+  { v:53, titel:'Restarbeiten: Namensvorschlag', punkte:[
+    'Beim Antippen der Felder „Erst." und „Erl." erscheint jetzt eine Vorschlagsliste – ganz oben der eingeloggte Benutzer, darunter die Monteure. Ein Tipp genügt statt Tippen.' ]},
   { v:52, titel:'Restarbeiten: Nachunternehmer', punkte:[
     'Zusätzliche Zuständigkeit „🏗️ Nachunternehmer" bei den Restarbeiten – auswählbar je Restarbeit und filterbar in der Restarbeitenliste.' ]},
   { v:51, titel:'Restarbeiten nach Zuständigkeit', punkte:[
@@ -3205,7 +3207,18 @@ function raEnsure(r){
   if(!Array.isArray(r.fotos)) r.fotos=[];
   return r;
 }
+// Vorschlagsliste für die Erst./Erl.-Namensfelder: eingeloggter Benutzer zuerst, dann Monteure
+function ensureRaNames(){
+  let dl=document.getElementById('raNames');
+  if(!dl){ dl=document.createElement('datalist'); dl.id='raNames'; document.body.appendChild(dl); }
+  const names=[];
+  if(USER) names.push(USER);
+  try{ const ln=deriveName(msalAccount); if(ln && names.indexOf(ln)<0) names.push(ln); }catch(e){}
+  MONTEURE.forEach(m=>{ if(names.indexOf(m)<0) names.push(m); });
+  dl.innerHTML=names.map(n=>'<option value="'+String(n).replace(/"/g,'&quot;')+'"></option>').join('');
+}
 function updRA(pos){
+  ensureRaNames();
   const id=sp(pos);
   const s=gs(pos);
   const g=document.getElementById('RA'+id);
@@ -3235,13 +3248,13 @@ function updRA(pos){
         </div>
         <div class="rametacol">
           <span class="rametalbl">Erst.:</span>
-          <input type="text" class="rakuerz" value="${(r.ersteller||'').replace(/"/g,'&quot;')}" placeholder="Name" maxlength="30"
+          <input type="text" class="rakuerz" list="raNames" value="${(r.ersteller||'').replace(/"/g,'&quot;')}" placeholder="Name" maxlength="30"
             oninput="raSetErsteller('${pos}',${i},this.value)" onblur="raStampErstellt('${pos}',${i})">
           <span class="rats">${tsErst}</span>
         </div>
         <div class="rametacol">
           <span class="rametalbl">Erl.:</span>
-          <input type="text" class="rakuerz" value="${(r.erledigtVon||'').replace(/"/g,'&quot;')}" placeholder="Name" maxlength="30"
+          <input type="text" class="rakuerz" list="raNames" value="${(r.erledigtVon||'').replace(/"/g,'&quot;')}" placeholder="Name" maxlength="30"
             oninput="raSetErledigtVon('${pos}',${i},this.value)">
           <span class="rats">${tsErl}</span>
         </div>
