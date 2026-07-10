@@ -281,16 +281,16 @@ select.fs option{background:var(--surface);color:var(--text);}
 .radel{background:transparent;border:none;color:#8b2222;cursor:pointer;font-size:13px;
   padding:0 4px;flex-shrink:0;-webkit-tap-highlight-color:transparent;}
 .radel:hover{color:#6b1818;}
-.rameta{display:flex;align-items:center;gap:8px;margin-top:3px;padding-left:24px;
+.rameta{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin-top:3px;padding-left:24px;
   font-size:9px;color:var(--accent2);font-family:Arial Narrow,Arial,sans-serif;}
-.rametacol{display:flex;align-items:center;gap:3px;flex-wrap:nowrap;}
+.rametacol{display:flex;align-items:center;gap:3px;flex-wrap:nowrap;min-width:0;}
 .rametalbl{font-weight:700;color:var(--braun);text-transform:uppercase;letter-spacing:0.3px;}
 .rakuerz{width:96px;border:1px solid var(--line);background:var(--surface);font-size:10px;color:var(--text);
   font-family:var(--font);font-weight:700;text-align:left;
   outline:none;padding:1px 5px;border-radius:3px;}
 .rakuerz::placeholder{color:#c0c0c0;font-weight:400;}
 .rakuerz:focus{border-color:var(--braun);}
-.ragw{font-family:inherit;font-size:10px;color:var(--accent2);background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:2px 4px;cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.ragw{font-family:inherit;font-size:10px;color:var(--accent2);background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:2px 4px;cursor:pointer;-webkit-tap-highlight-color:transparent;max-width:150px;}
 .ragw.set{color:var(--braun);font-weight:700;border-color:var(--braun);}
 .rats{font-size:9px;color:var(--accent2);white-space:nowrap;font-family:Arial Narrow,Arial,sans-serif;}
 .rafg{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;padding-left:24px;}
@@ -1056,8 +1056,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 53;
+const APP_VERSION = 54;
 const CHANGELOG = [
+  { v:54, titel:'Restarbeiten sauber auf dem Smartphone', punkte:[
+    'Die Zeile mit Zuständigkeit, Ersteller und Erlediger bricht jetzt sauber um, statt seitlich aus dem Bild zu laufen.' ]},
   { v:53, titel:'Restarbeiten: Namensvorschlag', punkte:[
     'Beim Antippen des Feldes „Erl." (erledigt von) erscheint jetzt eine Vorschlagsliste – ganz oben der eingeloggte Benutzer, darunter die Monteure. Ein Tipp genügt statt Tippen. („Erst." wird wie bisher automatisch mit dem Login vorbelegt.)' ]},
   { v:52, titel:'Restarbeiten: Nachunternehmer', punkte:[
