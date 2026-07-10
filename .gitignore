@@ -13,6 +13,7 @@ cloudflared
 _seed-*.json
 supabase-setup.sql
 Montagefortschritt1/
+Baustellen/
 
 # Lokale Tool-/Claude-Daten
 .claude/
