@@ -1059,7 +1059,7 @@ function startData(){
 const APP_VERSION = 53;
 const CHANGELOG = [
   { v:53, titel:'Restarbeiten: Namensvorschlag', punkte:[
-    'Beim Antippen der Felder „Erst." und „Erl." erscheint jetzt eine Vorschlagsliste – ganz oben der eingeloggte Benutzer, darunter die Monteure. Ein Tipp genügt statt Tippen.' ]},
+    'Beim Antippen des Feldes „Erl." (erledigt von) erscheint jetzt eine Vorschlagsliste – ganz oben der eingeloggte Benutzer, darunter die Monteure. Ein Tipp genügt statt Tippen. („Erst." wird wie bisher automatisch mit dem Login vorbelegt.)' ]},
   { v:52, titel:'Restarbeiten: Nachunternehmer', punkte:[
     'Zusätzliche Zuständigkeit „🏗️ Nachunternehmer" bei den Restarbeiten – auswählbar je Restarbeit und filterbar in der Restarbeitenliste.' ]},
   { v:51, titel:'Restarbeiten nach Zuständigkeit', punkte:[
@@ -3248,7 +3248,7 @@ function updRA(pos){
         </div>
         <div class="rametacol">
           <span class="rametalbl">Erst.:</span>
-          <input type="text" class="rakuerz" list="raNames" value="${(r.ersteller||'').replace(/"/g,'&quot;')}" placeholder="Name" maxlength="30"
+          <input type="text" class="rakuerz" value="${(r.ersteller||'').replace(/"/g,'&quot;')}" placeholder="Name" maxlength="30"
             oninput="raSetErsteller('${pos}',${i},this.value)" onblur="raStampErstellt('${pos}',${i})">
           <span class="rats">${tsErst}</span>
         </div>
