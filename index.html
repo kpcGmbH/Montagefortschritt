@@ -290,6 +290,10 @@ select.fs option{background:var(--surface);color:var(--text);}
   outline:none;padding:1px 5px;border-radius:3px;}
 .rakuerz::placeholder{color:#c0c0c0;font-weight:400;}
 .rakuerz:focus{border-color:var(--braun);}
+.raerlwrap{display:inline-flex;align-items:stretch;}
+.raerlwrap .raerl{border-radius:3px 0 0 3px;border-right:none;}
+.raerlbtn{background:var(--surface);border:1px solid var(--line);border-radius:0 3px 3px 0;color:var(--braun);font-size:10px;padding:0 6px;cursor:pointer;-webkit-tap-highlight-color:transparent;line-height:1;}
+.raerlbtn:active{background:var(--chrome-bg2);}
 .ragw{font-family:inherit;font-size:10px;color:var(--accent2);background:var(--surface);border:1px solid var(--line);border-radius:5px;padding:2px 4px;cursor:pointer;-webkit-tap-highlight-color:transparent;max-width:150px;}
 .ragw.set{color:var(--braun);font-weight:700;border-color:var(--braun);}
 .rats{font-size:9px;color:var(--accent2);white-space:nowrap;font-family:Arial Narrow,Arial,sans-serif;}
@@ -1056,8 +1060,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 54;
+const APP_VERSION = 55;
 const CHANGELOG = [
+  { v:55, titel:'Restarbeiten: zuverlässige Erlediger-Auswahl', punkte:[
+    'Das Erledigt-Feld hat jetzt einen ▾-Knopf, der ein Auswahlmenü öffnet (eingeloggter Benutzer oben, darunter die Monteure) – funktioniert jetzt auch zuverlässig auf dem iPhone. Freies Eintippen bleibt möglich.' ]},
   { v:54, titel:'Restarbeiten sauber auf dem Smartphone', punkte:[
     'Die Zeile mit Zuständigkeit, Ersteller und Erlediger bricht jetzt sauber um, statt seitlich aus dem Bild zu laufen.' ]},
   { v:53, titel:'Restarbeiten: Namensvorschlag', punkte:[
@@ -3209,18 +3215,35 @@ function raEnsure(r){
   if(!Array.isArray(r.fotos)) r.fotos=[];
   return r;
 }
-// Vorschlagsliste für die Erst./Erl.-Namensfelder: eingeloggter Benutzer zuerst, dann Monteure
-function ensureRaNames(){
-  let dl=document.getElementById('raNames');
-  if(!dl){ dl=document.createElement('datalist'); dl.id='raNames'; document.body.appendChild(dl); }
+// Namensliste für die Erlediger-Auswahl: eingeloggter Benutzer zuerst, dann Login-Name + Monteure
+function raNameList(){
   const names=[];
   if(USER) names.push(USER);
   try{ const ln=deriveName(msalAccount); if(ln && names.indexOf(ln)<0) names.push(ln); }catch(e){}
   MONTEURE.forEach(m=>{ if(names.indexOf(m)<0) names.push(m); });
-  dl.innerHTML=names.map(n=>'<option value="'+String(n).replace(/"/g,'&quot;')+'"></option>').join('');
+  return names;
+}
+// Eigenes Dropdown fürs Erl.-Feld (zuverlässiger als <datalist> auf iOS)
+let RA_ERL_TARGET=null, RA_ERL_NAMES=[];
+function raErlPick(pos,i,anchor){
+  RA_ERL_TARGET={pos,i}; RA_ERL_NAMES=raNameList();
+  let menu=document.getElementById('raErlMenu');
+  if(!menu){ menu=document.createElement('div'); menu.id='raErlMenu'; menu.className='ptype-menu'; document.body.appendChild(menu);
+    document.addEventListener('click',function(e){ if(!e.target.closest('#raErlMenu')&&!e.target.closest('.raerlbtn')&&!e.target.closest('.raerl')) menu.classList.remove('open'); }); }
+  menu.innerHTML=RA_ERL_NAMES.length? RA_ERL_NAMES.map((n,idx)=>'<div class="ptype-item" onclick="raPickName('+idx+')">'+(idx===0?'👤 ':'')+escapeHtml(n)+(idx===0?' · mein Login':'')+'</div>').join('') : '<div class="ptype-item" style="opacity:.6">Kein Benutzer hinterlegt</div>';
+  const r=anchor.getBoundingClientRect();
+  menu.style.top=(r.bottom+window.scrollY+4)+'px';
+  menu.style.left=Math.max(8,Math.min(r.left+window.scrollX, window.innerWidth-232))+'px';
+  menu.classList.add('open');
+}
+function raPickName(idx){
+  if(!RA_ERL_TARGET) return; const {pos,i}=RA_ERL_TARGET; const name=RA_ERL_NAMES[idx]||'';
+  const s=gs(pos); if(s.restarbeiten[i]){ raEnsure(s.restarbeiten[i]); s.restarbeiten[i].erledigtVon=name; }
+  const inp=document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+i+'"] .raerl'); if(inp) inp.value=name;
+  const menu=document.getElementById('raErlMenu'); if(menu) menu.classList.remove('open');
+  raDebouncedSave(pos);
 }
 function updRA(pos){
-  ensureRaNames();
   const id=sp(pos);
   const s=gs(pos);
   const g=document.getElementById('RA'+id);
@@ -3256,8 +3279,11 @@ function updRA(pos){
         </div>
         <div class="rametacol">
           <span class="rametalbl">Erl.:</span>
-          <input type="text" class="rakuerz" list="raNames" value="${(r.erledigtVon||'').replace(/"/g,'&quot;')}" placeholder="Name" maxlength="30"
-            oninput="raSetErledigtVon('${pos}',${i},this.value)">
+          <span class="raerlwrap">
+            <input type="text" class="rakuerz raerl" value="${(r.erledigtVon||'').replace(/"/g,'&quot;')}" placeholder="Name" maxlength="30"
+              oninput="raSetErledigtVon('${pos}',${i},this.value)" onfocus="raErlPick('${pos}',${i},this)">
+            <button type="button" class="raerlbtn" onclick="raErlPick('${pos}',${i},this.previousElementSibling)" title="Benutzer wählen">&#9662;</button>
+          </span>
           <span class="rats">${tsErl}</span>
         </div>
       </div>
