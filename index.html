@@ -306,7 +306,7 @@ select.fs option{background:var(--surface);color:var(--text);}
   display:flex;align-items:center;justify-content:center;cursor:pointer;line-height:1;}
 
 /* LIGHTBOX */
-.lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:999;
+.lb{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:2200;
   align-items:center;justify-content:center;}
 .lb.on{display:flex;}
 .lb img{max-width:94vw;max-height:85vh;border-radius:8px;object-fit:contain;}
@@ -1060,8 +1060,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 55;
+const APP_VERSION = 56;
 const CHANGELOG = [
+  { v:56, titel:'Anlagenfotos in groß', punkte:[
+    'Ein Anlagenfoto (📸 Anlagenfotos je Etage) lässt sich jetzt wieder antippen und öffnet sich in der großen Vollbild-Ansicht.' ]},
   { v:55, titel:'Restarbeiten: zuverlässige Erlediger-Auswahl', punkte:[
     'Das Erledigt-Feld hat jetzt einen ▾-Knopf, der ein Auswahlmenü öffnet (eingeloggter Benutzer oben, darunter die Monteure) – funktioniert jetzt auch zuverlässig auf dem iPhone. Freies Eintippen bleibt möglich.' ]},
   { v:54, titel:'Restarbeiten sauber auf dem Smartphone', punkte:[
