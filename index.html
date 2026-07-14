@@ -311,8 +311,16 @@ select.fs option{background:var(--surface);color:var(--text);}
 .lb.on{display:flex;}
 .lb img{max-width:94vw;max-height:85vh;border-radius:8px;object-fit:contain;}
 .lbx{position:fixed;top:calc(14px + env(safe-area-inset-top));right:14px;background:rgba(255,255,255,.15);color:#fff;
-  border:none;border-radius:50%;width:38px;height:38px;font-size:20px;cursor:pointer;
+  border:none;border-radius:50%;width:38px;height:38px;font-size:20px;cursor:pointer;z-index:3;
   display:flex;align-items:center;justify-content:center;}
+.lbnav{position:fixed;top:50%;transform:translateY(-50%);background:rgba(255,255,255,.14);color:#fff;border:none;
+  width:52px;height:74px;font-size:40px;line-height:1;cursor:pointer;border-radius:10px;z-index:3;
+  display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent;}
+.lbnav:active{background:rgba(255,255,255,.28);}
+.lbprev{left:max(10px,env(safe-area-inset-left));}
+.lbnext{right:max(10px,env(safe-area-inset-right));}
+.lbcount{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:50%;transform:translateX(-50%);
+  color:#fff;background:rgba(0,0,0,.5);padding:5px 13px;border-radius:14px;font-size:13px;z-index:3;}
 
 /* FAB */
 /* FAB (alt) - bleibt für Kompatibilität */
@@ -493,7 +501,10 @@ select.fs option{background:var(--surface);color:var(--text);}
 <main id="main"></main>
 <div class="lb" id="lb">
   <button class="lbx" onclick="clb()">&#10005;</button>
+  <button class="lbnav lbprev" id="lbPrev" onclick="event.stopPropagation();lbPrev()" aria-label="Vorheriges Bild">&#8249;</button>
   <img id="lbi" src="" alt="">
+  <button class="lbnav lbnext" id="lbNext" onclick="event.stopPropagation();lbNext()" aria-label="Nächstes Bild">&#8250;</button>
+  <div class="lbcount" id="lbCount"></div>
 </div>
 
 <div class="pdfed" id="pdfed">
@@ -1063,8 +1074,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 57;
+const APP_VERSION = 58;
 const CHANGELOG = [
+  { v:58, titel:'Fotos durchblättern', punkte:[
+    'In der großen Bildansicht kann man jetzt vor- und zurückblättern – per Pfeil, Wischen (Handy) oder Pfeiltasten – statt jedes Bild einzeln zu öffnen. Gilt für Positionsfotos, Anlagenfotos je Etage und Restarbeiten-Fotos; ein Zähler zeigt „Bild x / y".' ]},
   { v:57, titel:'Bautagebuch', punkte:[
     'Neuer Button „📓 Bautagebuch": pro Tag ein fortlaufend nummeriertes, gespeichertes Bautagebuch. Es wird mit den Statusänderungen, Restarbeiten und beteiligten Monteuren des Tages vorbelegt – alles bleibt frei änderbar, Personen (Name/Rolle/Stunden) lassen sich ergänzen. Ausgabe als PDF im kpc-Design, abgelegt in „_Bautagebuch". Bestehende Tage lassen sich wieder öffnen und fortschreiben.',
     'Das Wetter (Witterung + Temperatur) wird automatisch für den Tag und den Baustellen-Ort geholt – per Knopf auch aktualisierbar.',
@@ -1530,16 +1543,50 @@ function df(pos,i){
   if(fname){ removeQueuedFile(fname); spDelete(fname); }
 }
 
-// LIGHTBOX
-function olb(pos,i){
-  const url=gs(pos).fotos[i];
-  loadImageAsBlob(url).then(blobUrl=>{
-    document.getElementById('lbi').src=blobUrl||url;
-  });
+// LIGHTBOX – mit Blättern (Vor/Zurück) über eine Bilderliste
+let LB={items:[], idx:0, src:x=>x}, LB_TOKEN=0;
+function lbOpen(items, idx, srcOf){
+  if(!items||!items.length) return;
+  LB={items:items.slice(), idx:idx||0, src:srcOf||(x=>x)};
   document.getElementById('lb').classList.add('on');
+  lbShow(LB.idx);
 }
-function clb(){document.getElementById('lb').classList.remove('on');}
-document.getElementById('lb').addEventListener('click',e=>{if(e.target===e.currentTarget)clb();});
+function lbShow(i){
+  const n=LB.items.length; if(!n) return;
+  LB.idx=((i%n)+n)%n;                                  // umlaufend
+  const fname=LB.src(LB.items[LB.idx]);
+  const img=document.getElementById('lbi'); img.src='';
+  const tok=++LB_TOKEN;
+  loadImageAsBlob(fname).then(u=>{ if(tok===LB_TOKEN) img.src=u||fname||''; });
+  const multi=n>1;
+  const c=document.getElementById('lbCount'); if(c){ c.textContent=(LB.idx+1)+' / '+n; c.style.display=multi?'':'none'; }
+  const p=document.getElementById('lbPrev'), nx=document.getElementById('lbNext');
+  if(p) p.style.display=multi?'':'none'; if(nx) nx.style.display=multi?'':'none';
+}
+function lbNext(){ lbShow(LB.idx+1); }
+function lbPrev(){ lbShow(LB.idx-1); }
+function olb(pos,i){ lbOpen(gs(pos).fotos, i, x=>x); }
+function clb(){document.getElementById('lb').classList.remove('on'); LB.items=[];}
+(function(){
+  const lb=document.getElementById('lb');
+  lb.addEventListener('click',e=>{ if(e.target===e.currentTarget) clb(); });
+  // Tastatur: ← → blättern, Esc schließen
+  document.addEventListener('keydown',e=>{
+    if(!lb.classList.contains('on')) return;
+    if(e.key==='ArrowRight') lbNext();
+    else if(e.key==='ArrowLeft') lbPrev();
+    else if(e.key==='Escape') clb();
+  });
+  // Wischen (Touch) auf dem Bild
+  let sx=0, sy=0, moved=false;
+  const img=document.getElementById('lbi');
+  img.addEventListener('touchstart',e=>{ const t=e.touches[0]; sx=t.clientX; sy=t.clientY; moved=false; },{passive:true});
+  img.addEventListener('touchmove',e=>{ moved=true; },{passive:true});
+  img.addEventListener('touchend',e=>{
+    if(!moved) return; const t=e.changedTouches[0]; const dx=t.clientX-sx, dy=t.clientY-sy;
+    if(Math.abs(dx)>40 && Math.abs(dx)>Math.abs(dy)){ if(dx<0) lbNext(); else lbPrev(); }
+  },{passive:true});
+})();
 
 // ============================================================================
 // ── ANLAGENFOTOS PRO ETAGE (Übersichtsfotos je Geschoss, mit Kategorie + Verlauf) ──
@@ -1688,9 +1735,12 @@ function etDel(idx, oi){
 }
 function olbEt(idx, oi){
   const sec=DATA[idx]; if(!sec) return;
-  const rec=gsE(EKEY(sec)).efotos[oi]; if(!rec) return;
-  loadImageAsBlob(rec.fname).then(u=>{ document.getElementById('lbi').src=u||rec.fname; });
-  document.getElementById('lb').classList.add('on');
+  // In der Reihenfolge/Filterung blättern, wie sie im Overlay angezeigt wird
+  const e=gsE(EKEY(sec));
+  const shown=e.efotos.map((r,i)=>({r,i})).sort((a,b)=>(a.r.ts||0)-(b.r.ts||0))
+                       .filter(x=>!ETF_FILTER || x.r.kat===ETF_FILTER);
+  let start=shown.findIndex(x=>x.i===oi); if(start<0) start=0;
+  lbOpen(shown.map(x=>x.r), start, r=>r.fname);
 }
 
 // STATS
@@ -4015,10 +4065,9 @@ function raFotoDel(pos,idx,fi){
   if(fname){ removeQueuedFile(fname); spDelete(fname); }
 }
 function raOlb(pos,idx,fi){
-  const fname=gs(pos).restarbeiten[idx]?.fotos[fi];
-  if(!fname)return;
-  loadImageAsBlob(fname).then(b=>{ document.getElementById('lbi').src=b||''; });
-  document.getElementById('lb').classList.add('on');
+  const list=gs(pos).restarbeiten[idx]?.fotos;
+  if(!list||!list.length)return;
+  lbOpen(list, fi, x=>x);
 }
 // Alle erfassten Restarbeiten einsammeln (für PDF-Bericht + Excel-Export)
 function collectRestRows(){
