@@ -1074,8 +1074,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 58;
+const APP_VERSION = 59;
 const CHANGELOG = [
+  { v:59, titel:'Bautagebuch: PDF öffnen & Mobil-Feinschliff', punkte:[
+    'In der Bautagebuch-Auswahl gibt es jetzt je Eintrag einen „📄 PDF"-Knopf – das fertige Protokoll lässt sich direkt aus der App öffnen.',
+    'Die Beschäftigten-Zeilen sind auf dem Smartphone neu aufgebaut: Name in voller Breite, darunter Rolle und Stunden – nichts wird mehr zusammengequetscht.' ]},
   { v:58, titel:'Fotos durchblättern', punkte:[
     'In der großen Bildansicht kann man jetzt vor- und zurückblättern – per Pfeil, Wischen (Handy) oder Pfeiltasten – statt jedes Bild einzeln zu öffnen. Gilt für Positionsfotos, Anlagenfotos je Etage und Restarbeiten-Fotos; ein Zähler zeigt „Bild x / y".' ]},
   { v:57, titel:'Bautagebuch', punkte:[
@@ -2237,8 +2240,11 @@ function openBautagebuchDialog(){
     ? '<div style="font-size:12px;color:#a8a8a8;margin:16px 0 6px">Bereits erfasste Bautagebücher:</div>'+
       '<div style="max-height:150px;overflow:auto;display:flex;flex-direction:column;gap:5px">'+
       BTB.slice().sort((a,b)=>(b.datum||'').localeCompare(a.datum||'')).map(en=>
-        '<button type="button" onclick="btbPickDay(\''+en.datum+'\')" style="display:flex;justify-content:space-between;align-items:center;gap:10px;background:#332f2b;border:1px solid #4a423a;color:#fff;border-radius:8px;padding:8px 11px;font-size:13px;cursor:pointer;font-family:inherit;text-align:left">'+
-        '<span>Nr. '+en.nr+' · '+btbDeShort(en.datum)+'</span><span style="color:#8a8f92;font-size:11px">'+((en.arbeiter||[]).length)+' Pers.</span></button>').join('')+'</div>'
+        '<div style="display:flex;gap:6px;align-items:stretch">'+
+          '<button type="button" onclick="btbPickDay(\''+en.datum+'\')" title="Bearbeiten" style="flex:1;display:flex;justify-content:space-between;align-items:center;gap:10px;background:#332f2b;border:1px solid #4a423a;color:#fff;border-radius:8px;padding:8px 11px;font-size:13px;cursor:pointer;font-family:inherit;text-align:left">'+
+            '<span>Nr. '+en.nr+' · '+btbDeShort(en.datum)+'</span><span style="color:#8a8f92;font-size:11px">'+((en.arbeiter||[]).length)+' Pers.</span></button>'+
+          '<button type="button" onclick="btbOpenPdf(\''+en.datum+'\')" title="PDF öffnen" style="flex:0 0 auto;background:#3a3530;border:1px solid #895500;color:#d7c1ae;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap">📄 PDF</button>'+
+        '</div>').join('')+'</div>'
     : '';
   ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:22px;max-width:460px;width:100%;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
     '<div style="font-size:17px;font-weight:700;margin-bottom:4px">📓 Bautagebuch</div>'+
@@ -2254,6 +2260,18 @@ function openBautagebuchDialog(){
 function btbCloseDlg(){ const o=document.getElementById('btbDlg'); if(o) o.remove(); }
 function btbFromDate(){ const el=document.getElementById('btbDate'); const v=el?el.value:''; if(!v){ alert('Bitte ein Datum wählen.'); return; } btbPickDay(v); }
 function btbPickDay(day){ btbCloseDlg(); openBtbForm(day); }
+// PDF eines bestehenden Bautagebuchs öffnen (neu erzeugt aus den gespeicherten Daten).
+// Fenster SYNCHRON im Klick öffnen, sonst blockt der mobile Popup-Blocker (§8).
+function btbOpenPdf(datum){
+  const entry=BTB.find(e=>e.datum===datum);
+  if(!entry){ alert('Eintrag nicht gefunden.'); return; }
+  const win=window.open('','_blank');
+  if(win){ try{ win.document.write('<title>Bautagebuch Nr. '+entry.nr+'</title><body style="font-family:Arial,sans-serif;padding:24px;color:#666">PDF wird erstellt …</body>'); }catch(e){} }
+  btbBuildPdf(entry).then(blob=>{
+    const url=URL.createObjectURL(blob);
+    if(win) win.location=url; else window.open(url,'_blank');
+  }).catch(e=>{ if(win){ try{ win.close(); }catch(_){} } alert('PDF konnte nicht erstellt werden: '+(e.message||e)); });
+}
 
 // ---- Formular ----
 function openBtbForm(datum){
@@ -2481,14 +2499,16 @@ function btbRenderArbeiter(){
   const cont=document.getElementById('btbArb'); if(!cont||!BTB_FORM) return;
   const fld='box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid #6a5433;background:#3a3530;color:#fff;font-size:16px;font-family:inherit';
   cont.innerHTML=BTB_FORM.arbeiter.map((a,i)=>
-    '<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">'+
-      '<div style="position:relative;flex:1;min-width:0;display:flex">'+
+    '<div style="border:1px solid #4a423a;border-radius:9px;padding:8px;margin-bottom:8px;background:#332f2b">'+
+      '<div style="display:flex">'+
         '<input class="btbA-name btbMenuAnchor" data-i="'+i+'" value="'+escapeHtml(a.name||'')+'" placeholder="Name" onfocus="btbNameOpen(this,'+i+')" autocomplete="off" style="'+fld+';flex:1;min-width:0;border-radius:8px 0 0 8px">'+
-        '<button type="button" class="btbMenuAnchor" onclick="btbNameOpen(this.previousElementSibling,'+i+')" title="Monteur wählen" style="flex:0 0 32px;border:1px solid #6a5433;border-left:none;border-radius:0 8px 8px 0;background:#332f2b;color:#d7c1ae;font-size:13px;cursor:pointer">▾</button>'+
+        '<button type="button" class="btbMenuAnchor" onclick="btbNameOpen(this.previousElementSibling,'+i+')" title="Monteur wählen" style="flex:0 0 42px;border:1px solid #6a5433;border-left:none;border-radius:0 8px 8px 0;background:#3a3530;color:#d7c1ae;font-size:14px;cursor:pointer">▾</button>'+
       '</div>'+
-      '<select class="btbA-rolle" style="'+fld+';flex:0 0 33%">'+BTB_ROLLEN.map(r=>'<option'+(r===a.rolle?' selected':'')+'>'+r+'</option>').join('')+'</select>'+
-      '<input class="btbA-std" type="text" inputmode="decimal" value="'+escapeHtml((a.stunden||'')+'')+'" placeholder="Std" style="'+fld+';flex:0 0 54px;text-align:center">'+
-      '<button type="button" onclick="btbDelArbeiter('+i+')" style="flex:0 0 auto;background:none;border:none;color:#c26;font-size:20px;cursor:pointer;padding:0 2px">✕</button>'+
+      '<div style="display:flex;gap:8px;margin-top:6px;align-items:center">'+
+        '<select class="btbA-rolle" style="'+fld+';flex:1;min-width:0">'+BTB_ROLLEN.map(r=>'<option'+(r===a.rolle?' selected':'')+'>'+r+'</option>').join('')+'</select>'+
+        '<input class="btbA-std" type="text" inputmode="decimal" value="'+escapeHtml((a.stunden||'')+'')+'" placeholder="Std" style="'+fld+';flex:0 0 76px;text-align:center">'+
+        '<button type="button" onclick="btbDelArbeiter('+i+')" title="Person entfernen" style="flex:0 0 auto;background:none;border:none;color:#c26;font-size:22px;cursor:pointer;padding:0 4px">✕</button>'+
+      '</div>'+
     '</div>').join('');
 }
 // Generisches Dropdown (über dem Overlay; zuverlässiger als <datalist> auf iOS). Freie Eingabe bleibt möglich.
