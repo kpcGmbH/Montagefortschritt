@@ -1853,7 +1853,9 @@ function applyF(){
     document.querySelectorAll('.ilist.hid').forEach(l=>l.classList.remove('hid'));
   }
 
-  document.querySelectorAll('.card').forEach(c=>{
+  // :not(.dtcard) – die Prüfprotokoll-Karte ist keine LV-Position und darf vom
+  // Such-/Status-/Gewerk-Filter nicht ausgeblendet werden (sie hat kein data-gew).
+  document.querySelectorAll('.card:not(.dtcard)').forEach(c=>{
     const pos=c.id.slice(1).replace(/_/g,'.');
     const bez=c.querySelector('.ibez')?.textContent.toLowerCase()||'';
     const met=c.querySelector('.imet')?.textContent.toLowerCase()||'';
