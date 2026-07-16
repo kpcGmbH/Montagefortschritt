@@ -1091,8 +1091,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 63;
+const APP_VERSION = 64;
 const CHANGELOG = [
+  { v:64, titel:'Gewerk-Filter wirkt jetzt überall', punkte:[
+    'Wählt man oben ein Gewerk (z. B. Sanitär), zeigen auch die Restarbeiten nur noch die dieses Gewerks – inklusive „x/y erledigt"-Zähler. Neue Restarbeiten bekommen die gefilterte Zuständigkeit automatisch vorbelegt.',
+    'Die Restarbeitenliste (PDF) öffnet passend dazu direkt mit der Zuständigkeit des gewählten Gewerks – im Bericht weiterhin umschaltbar.',
+    'Die Leiste „📸 Anlagenfotos / 🏗 Bauphase" wird bei aktivem Gewerk-Filter ausgeblendet – sie ist gewerkeübergreifend und stand nur im Weg.' ]},
   { v:63, titel:'Dichtigkeitsprotokoll als eigene Sanitär-Position', punkte:[
     'Bei Gewerk-Filter „Sanitär" gibt es jetzt einen eigenen Abschnitt „💧 Prüfprotokoll – Sanitär" – einmal für die ganze Baustelle und einmal je Etage. Er zeigt als eigene Position, ob das Protokoll abgelegt ist („✓ Nr. 1 · 16.07.2026 · dicht") oder noch offen ist, samt Fortschritt „X von Y Positionen geprüft". Ein Tipp öffnet das Protokoll.',
     'Der Haken lässt sich nicht von Hand setzen: Er wird automatisch gesetzt, sobald das Protokoll abgelegt ist – so kann Haken und Nachweis nicht auseinanderlaufen. Etagen ohne Sanitärpositionen zeigen den Abschnitt nicht.' ]},
@@ -1836,6 +1840,9 @@ function setTF(t){
   applyF();
   upStats();
   updDichtTasks();   // Prüfprotokoll-Position: nur bei Gewerk „Sanitär"
+  updRaGwVis();      // Restarbeiten des gewählten Gewerks
+  updRaCounts();     // „x/y erledigt“ passend zum Filter
+  updEtbarVis();     // Fotoleiste ist gewerkeübergreifend -> bei Filter ausblenden
 }
 
 function applyF(){
@@ -4266,7 +4273,39 @@ function raFmtTs(iso){
 const RA_GW=[['M','🔧 Montage'],['E','⚡ Elektro'],['S','🚿 Sanitär'],['B','🏢 Büro'],['BL','👷 Bauleitung'],['NU','🏗️ Nachunternehmer']];
 const RA_GW_LBL={M:'Montage',E:'Elektro',S:'Sanitär',B:'Büro',BL:'Bauleitung',NU:'Nachunternehmer'};
 // Vorbelegung der Zuständigkeit: bei Positions-Restarbeit das eindeutige Gewerk der Position, sonst offen
-function raDefaultGw(pos){ if(isEKey(pos)||pos===PRAKEY) return ''; const g=POSGEW[pos]||[]; return g.length===1?g[0]:''; }
+// Vorbelegung der Zuständigkeit: eindeutiges Positions-Gewerk, sonst – wenn oben
+// ein Gewerk gefiltert ist – dieses (sonst wäre die neue Zeile sofort ausgeblendet).
+// Restarbeiten nach dem Gewerk-Filter aus-/einblenden. Leere Eingabezeilen bleiben
+// immer sichtbar, sonst könnte man bei aktivem Filter nichts mehr erfassen.
+function updRaGwVis(scope){
+  (scope||document).querySelectorAll('.rarow[data-gw]').forEach(r=>{
+    const g=r.getAttribute('data-gw')||'-';
+    const leer=r.getAttribute('data-leer')==='1';
+    r.style.display=(TF==='all'||g===TF||leer)?'':'none';
+  });
+}
+// „x/y erledigt“-Zähler je Restarbeiten-Liste – zählt nur, was der Gewerk-Filter zeigt
+function updRaCounts(){
+  const keys=[PRAKEY].concat(DATA.map(s=>EKEY(s)));
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>keys.push(it.pos))));
+  keys.forEach(k=>{
+    const info=document.getElementById('RAI'+sp(k)); if(!info) return;
+    const s=ST[k];
+    const rel=(s&&s.restarbeiten||[]).filter(r=>r.txt && (TF==='all'||(r.gw||'-')===TF));
+    const done=rel.filter(r=>r.done).length;
+    info.textContent=rel.length?(done+'/'+rel.length+' erledigt'):'';
+  });
+}
+// Gewerkeübergreifende Fotoleiste bei aktivem Gewerk-Filter ausblenden
+function updEtbarVis(){ document.querySelectorAll('.etbar').forEach(b=>{ b.style.display=(TF==='all')?'':'none'; }); }
+function raDefaultGw(pos){
+  const tf=(TF==='M'||TF==='E'||TF==='S')?TF:'';
+  if(isEKey(pos)||pos===PRAKEY) return tf;
+  const g=POSGEW[pos]||[];
+  if(g.length===1) return g[0];
+  if(tf && g.indexOf(tf)>=0) return tf;
+  return '';
+}
 function raEnsure(r){
   if(typeof r.ersteller==='undefined') r.ersteller=r.kuerzel||'';
   if(typeof r.erstelltAm==='undefined') r.erstelltAm=null;
@@ -4316,7 +4355,7 @@ function updRA(pos){
     const tsErst=r.erstelltAm?raFmtTs(r.erstelltAm):'';
     const tsErl=r.done&&r.erledigtAm?raFmtTs(r.erledigtAm):'';
     const fotosHtml=r.fotos.length?`<div class="rafg" id="RAFG_${id}_${i}">${r.fotos.map((src,fi)=>`<div class="rafth" onclick="raOlb('${pos}',${i},${fi})"><img class="raimg" data-fref="${src}"><button class="rafdel" onclick="event.stopPropagation();raFotoDel('${pos}',${i},${fi})">&#10005;</button></div>`).join('')}</div>`:'';
-    return `<div class="rarow${r.done?' done':''}" data-i="${i}">
+    return `<div class="rarow${r.done?' done':''}" data-i="${i}" data-gw="${r.gw||'-'}" data-leer="${(r.txt||'').trim()||(r.fotos&&r.fotos.length)?'0':'1'}">
       <div class="ramain">
         <input type="checkbox" class="rachk" ${r.done?'checked':''} onchange="raToggle('${pos}',${i},this.checked)">
         <input type="text" class="ratxt" value="${(r.txt||'').replace(/"/g,'&quot;')}" placeholder="Restarbeit ${i+1}…"
@@ -4354,12 +4393,8 @@ function updRA(pos){
   g.querySelectorAll('img.raimg[data-fref]').forEach(im=>{
     loadImageAsBlob(im.dataset.fref).then(b=>{ if(b) im.src=b; });
   });
-  const info=document.getElementById('RAI'+id);
-  if(info){
-    const off=s.restarbeiten.filter(r=>r.txt&&!r.done).length;
-    const all=s.restarbeiten.filter(r=>r.txt).length;
-    info.textContent=all?`${all-off}/${all} erledigt`:'';
-  }
+  updRaGwVis(g);
+  updRaCounts();
 }
 function raSetTxt(pos,i,val){
   const s=gs(pos);
@@ -4459,12 +4494,7 @@ function raDebouncedSave(pos){
     saveFotos(pos);
     const id=sp(pos);
     const s=gs(pos);
-    const info=document.getElementById('RAI'+id);
-    if(info){
-      const off=s.restarbeiten.filter(r=>r.txt&&!r.done).length;
-      const all=s.restarbeiten.filter(r=>r.txt).length;
-      info.textContent=all?`${all-off}/${all} erledigt`:'';
-    }
+    updRaCounts();
     delete RA_TIMERS[pos];
   },1000);
 }
@@ -4662,6 +4692,9 @@ async function expRest(){
   });
   // vorkommende Zuständigkeiten für die Filterleiste
   const gwCounts={}; rows.forEach(r=>{ const k=r.gw||'-'; gwCounts[k]=(gwCounts[k]||0)+1; });
+  // Gewerk-Filter der App übernehmen: steht oben „Sanitär", startet die Liste mit
+  // Zuständigkeit Sanitär (im Bericht weiter umschaltbar). M/E/S entsprechen RA_GW.
+  const preGw=(TF!=='all' && gwCounts[TF]) ? TF : 'all';
   const offen=rows.filter(r=>!r.done).length;
   const html=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
 <title>Restarbeitenliste ${escapeHtml(curProjName())} – ${d}</title>
@@ -4696,8 +4729,8 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 </div>
 <div class="flt-bar" style="margin:0 0 16px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
   <span style="font-size:12px;color:#a8a8a8">Zuständigkeit:</span>
-  <button class="gwf on" data-g="all" onclick="raGw('all')">Alle</button>
-  ${RA_GW.filter(([k])=>gwCounts[k]).map(([k,l])=>`<button class="gwf" data-g="${k}" onclick="raGw('${k}')">${l} (${gwCounts[k]})</button>`).join('')}
+  <button class="gwf${preGw==='all'?' on':''}" data-g="all" onclick="raGw('all')">Alle</button>
+  ${RA_GW.filter(([k])=>gwCounts[k]).map(([k,l])=>`<button class="gwf${preGw===k?' on':''}" data-g="${k}" onclick="raGw('${k}')">${l} (${gwCounts[k]})</button>`).join('')}
   ${gwCounts['-']?`<button class="gwf" data-g="-" onclick="raGw('-')">– ohne (${gwCounts['-']})</button>`:''}
 </div>
 <table><thead><tr>
@@ -4711,7 +4744,7 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
   <button onclick="window.print()" style="padding:10px 24px;background:#5b4c8a;color:#fff;border:none;border-radius:4px;font-size:13px;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">Drucken / Als PDF speichern</button>
 </div>
 <script>
-var curMode='all', curGw='all', fotosOn=true;
+var curMode='all', curGw='${preGw}', fotosOn=true;
 function toggleFotos(){ fotosOn=!fotosOn; var b=document.getElementById('fotoTgl'); if(b){ b.classList.toggle('on',fotosOn); b.textContent=fotosOn?'📷 Fotos an':'📷 Fotos aus'; } raFilter(curMode); }
 function raGw(g){ curGw=g; [].forEach.call(document.querySelectorAll('.gwf[data-g]'),function(b){ b.classList.toggle('on', b.getAttribute('data-g')===g); }); raFilter(curMode); }
 function raFilter(mode){
