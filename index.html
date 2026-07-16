@@ -1091,8 +1091,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 64;
+const APP_VERSION = 65;
 const CHANGELOG = [
+  { v:65, titel:'Dichtigkeitsprotokoll: schlankere Positionsliste', punkte:[
+    'In der Positionsliste steht jetzt Positionsnummer und Benennung; das Prüfer-Kürzel je Zeile entfällt – der Prüfer steht ohnehin im Kopf des Protokolls.',
+    'Bei einem Etagen-Protokoll entfällt die Etagen-Spalte (die Etage steht schon im Prüfumfang) – der Platz gehört der Benennung, die dadurch vollständig passt.' ]},
   { v:64, titel:'Gewerk-Filter wirkt jetzt überall', punkte:[
     'Wählt man oben ein Gewerk (z. B. Sanitär), zeigen auch die Restarbeiten nur noch die dieses Gewerks – inklusive „x/y erledigt"-Zähler. Neue Restarbeiten bekommen die gefilterte Zuständigkeit automatisch vorbelegt.',
     'Die Restarbeitenliste (PDF) öffnet passend dazu direkt mit der Zuständigkeit des gewählten Gewerks – im Bericht weiterhin umschaltbar.',
@@ -2938,7 +2941,7 @@ function openDichtForm(umfang){
       '<div style="max-height:220px;overflow:auto;border:1px solid #4a423a;border-radius:8px">'+
         (pos.length?pos.map(p=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid #3a3530;font-size:13px">'+
           '<span style="min-width:0"><span style="color:#d7c1ae">'+escapeHtml(p.pos)+'</span> '+escapeHtml(p.bez.slice(0,42))+'</span>'+
-          '<span style="flex:0 0 auto;color:'+(p.geprueft?'#8fbf6f':'#a8a8a8')+'">'+(p.geprueft?('✓ '+dtFmt(p.ts)+(p.by?(' · '+escapeHtml(p.by)):'')):'offen')+'</span>'+
+          '<span style="flex:0 0 auto;color:'+(p.geprueft?'#8fbf6f':'#a8a8a8')+'">'+(p.geprueft?('✓ '+dtFmt(p.ts)):'offen')+'</span>'+
         '</div>').join(''):'<div style="padding:10px;color:#a8a8a8;font-size:13px">Keine Sanitärpositionen im Umfang.</div>')+
       '</div>'+
       '<label style="'+lbl+'">Unterschriften</label>'+
@@ -3114,18 +3117,26 @@ async function dichtBuildPdf(entry){
   const nOk=pos.filter(p=>p.geprueft).length;
   bold(); doc.setFontSize(9); tc(copper);
   doc.text('GEPRÜFTE POSITIONEN (SANITÄR)  ·  '+nOk+' von '+pos.length,M,y); y+=3;
+  // Etagen-Spalte nur beim Baustellen-Protokoll – bei einem Etagen-Protokoll steht
+  // die Etage bereits im Kopf; der Platz gehört der Benennung.
+  const showEtage=(entry.umfang==='__all');
+  const bezX=M+32;                       // Pos-Spalte breit genug für „01.02.00.00.01."
+  const bezW=showEtage?(108-32-2):110;
   doc.setFillColor(43,43,43); doc.rect(M,y,R-M,7,'F');
   doc.setTextColor(215,193,174); doc.setFontSize(9); bold();
-  doc.text('Pos.',M+2,y+4.8); doc.text('Gerät',M+22,y+4.8); doc.text('Etage',M+108,y+4.8); doc.text('Dichtigkeitsprüfung',R-2,y+4.8,{align:'right'});
+  doc.text('Pos.',M+2,y+4.8); doc.text('Benennung',bezX,y+4.8);
+  if(showEtage) doc.text('Etage',M+108,y+4.8);
+  doc.text('Dichtigkeitsprüfung',R-2,y+4.8,{align:'right'});
   y+=7; reg();
   if(!pos.length){ tc(grey); doc.setFontSize(10); doc.text('—',M+2,y+5); y+=7; }
   pos.forEach(p=>{
     if(y>PH-46){ doc.addPage(); y=M; }
     tc(dark); doc.setFontSize(9.5);
-    doc.text(String(p.pos||''),M+2,y+5);
-    doc.text(doc.splitTextToSize(String(p.bez||''),84)[0]||'',M+22,y+5);
-    doc.text(doc.splitTextToSize(String(p.etage||''),28)[0]||'',M+108,y+5);
-    const st=p.geprueft ? ('✓ '+dtFmt(p.ts)+(p.by?(' · '+p.by):'')) : 'offen';
+    doc.text(doc.splitTextToSize(String(p.pos||''),29)[0]||'',M+2,y+5);
+    doc.text(doc.splitTextToSize(String(p.bez||''),bezW)[0]||'',bezX,y+5);
+    if(showEtage) doc.text(doc.splitTextToSize(String(p.etage||''),28)[0]||'',M+108,y+5);
+    // Kein Prüfer-Kürzel je Zeile – der Prüfer steht im Protokollkopf
+    const st=p.geprueft ? ('✓ '+dtFmt(p.ts)) : 'offen';
     if(!p.geprueft) tc(grey);
     doc.text(st,R-2,y+5,{align:'right'});
     dc(line); doc.setLineWidth(0.1); doc.line(M,y+7,R,y+7); y+=7;
