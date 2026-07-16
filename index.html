@@ -883,8 +883,9 @@ function buildPanels(){
     // Anlagen-/Übersichtsfotos dieser Etage (mit Kategorie + Verlauf)
     const etbar=document.createElement('div');
     etbar.className='etbar';
-    etbar.innerHTML='<button class="etbtn" onclick="openEtageFotos('+secIdx+')">&#128248; Anlagenfotos <span class="etcnt" id="ETC'+secIdx+'"></span></button>'+
-      '<span class="ethint">Fotos der ganzen Anlage je Kategorie – Montageverlauf</span>';
+    etbar.innerHTML='<button class="etbtn" onclick="openEtageFotos('+secIdx+',\'efotos\')">&#128248; Anlagenfotos <span class="etcnt" id="ETC'+secIdx+'"></span></button>'+
+      '<button class="etbtn" style="background:#5b4c2a" onclick="openEtageFotos('+secIdx+',\'bfotos\')">&#127959; Bauphase <span class="etcnt" id="ETCB'+secIdx+'"></span></button>'+
+      '<span class="ethint">Anlagenfotos = Montageverlauf · Bauphase = Bauleiter (Bauzustand, Installationskontrolle, Aufmaß)</span>';
     panel.appendChild(etbar);
     // Allgemeine (positionsübergreifende) Restarbeiten dieser Etage – gespeichert in der §E§-Etagenzeile
     const ekey=EKEY(sec), eid=sp(ekey);
@@ -1074,8 +1075,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 59;
+const APP_VERSION = 61;
 const CHANGELOG = [
+  { v:61, titel:'Bauphase-Fotos je Etage', punkte:[
+    'Neuer Button „🏗 Bauphase" oben in jeder Etage – ein eigenes Foto-Album für die Bauleiter-Dokumentation VOR der Montage (Bauzustand/Rohbau, Installationskontrolle, Aufmaß; eigene Kategorie frei eingebbar, z. B. offene Wände / Leitungsverlauf). Getrennt von den Anlagenfotos (Montageverlauf), gleiche Bedienung – Verlauf, Kategorie-Filter, offline.' ]},
+  { v:60, titel:'Bautagebuch: Ort & Datum bei den Unterschriften', punkte:[
+    'Bei den Unterschriften im PDF sind Ort und Datum jetzt vorausgefüllt (z. B. „Marburg-Cappel, den 14.07.2026") – muss nicht mehr von Hand ergänzt werden.' ]},
   { v:59, titel:'Bautagebuch: PDF öffnen & Mobil-Feinschliff', punkte:[
     'In der Bautagebuch-Auswahl gibt es jetzt je Eintrag einen „📄 PDF"-Knopf – das fertige Protokoll lässt sich direkt aus der App öffnen.',
     'Die Beschäftigten-Zeilen sind auf dem Smartphone neu aufgebaut: Name in voller Breite, darunter Rolle und Stunden – nichts wird mehr zusammengequetscht.' ]},
@@ -1597,27 +1602,37 @@ function clb(){document.getElementById('lb').classList.remove('on'); LB.items=[]
 // bestehende Offline-Outbox, Live-Sync und den Write-Through-Cache wie Positionen.
 // Dateien liegen in SharePoint unter  Baustelle / Etage / _Anlagenfotos / <Kat>_<ts>.jpg
 const EFOTO_KATS=['Montagebeginn','Aktueller Montagestand','Anlieferung','Sanitär fertig','Elektro fertig','Inbetriebnahme','Fertigstellung','Übergabe','Mängel'];
+// Bauphase-Fotos (Bauleiter, VOR der Montage) – eigenes Album je Etage, gleiche Mechanik.
+const BAUPHASE_KATS=['Bauzustand / Rohbau','Installationskontrolle','Aufmaß'];
+// Zwei Alben pro Etage: efotos = Montage-Anlagenfotos, bfotos = Bauphase.
+const ET_ALBUMS={
+  efotos:{ folder:'_Anlagenfotos', icon:'&#128248;', title:'Anlagenfotos', kats:EFOTO_KATS,
+    empty:'Noch keine Anlagenfotos für diese Etage.<br>Mit „Foto hinzufügen" den aktuellen Montagestand festhalten.' },
+  bfotos:{ folder:'_Bauphase', icon:'&#127959;', title:'Bauphase', kats:BAUPHASE_KATS,
+    empty:'Noch keine Bauphasen-Fotos für diese Etage.<br>Bauzustand, Installationskontrolle oder Aufmaß dokumentieren – z. B. offene Wände / Leitungsverlauf für die spätere Montage.' }
+};
 function isEKey(k){ return typeof k==='string' && k.indexOf('§E§')===0; }
 function EKEY(sec){ return '§E§'+(sec&&typeof sec==='object'?sec.pos:sec); }
-function gsE(key){ if(!ST[key]) ST[key]={__etage:true, efotos:[], restarbeiten:[]}; if(!Array.isArray(ST[key].efotos)) ST[key].efotos=[]; if(!Array.isArray(ST[key].restarbeiten)) ST[key].restarbeiten=[]; return ST[key]; }
+function gsE(key){ if(!ST[key]) ST[key]={__etage:true, efotos:[], bfotos:[], restarbeiten:[]}; if(!Array.isArray(ST[key].efotos)) ST[key].efotos=[]; if(!Array.isArray(ST[key].bfotos)) ST[key].bfotos=[]; if(!Array.isArray(ST[key].restarbeiten)) ST[key].restarbeiten=[]; return ST[key]; }
 // Etage zu einem §E§-Key (für Beschriftung/Ablagepfad der Etagen-Restarbeiten)
 function secByEKey(key){ return DATA.find(s=>EKEY(s)===key)||null; }
 // Projektweite (etagenübergreifende) Restarbeiten: eigene synthetische Zeile, gleiche §E§-Sync-Mechanik
 const PRAKEY=EKEY('__projekt');
-function etageFolder(sec){ return safeName(curProjName())+'/'+safeName(sec.label||sec.pos)+'/_Anlagenfotos'; }
+function etageFolder(sec, album){ const a=ET_ALBUMS[album||'efotos']||ET_ALBUMS.efotos; return safeName(curProjName())+'/'+safeName(sec.label||sec.pos)+'/'+a.folder; }
 function saveEtage(key){ persistCurrentState(); touchProject(PID); enqueuePos(key).then(()=>flushOutbox()); }
 
 function updEtageBar(idx){
   const sec=DATA[idx]; if(!sec) return;
-  const e=ST[EKEY(sec)]; const n=(e&&e.efotos)?e.efotos.length:0;
-  const c=document.getElementById('ETC'+idx);
-  if(c) c.textContent=n?n:'';
+  const e=ST[EKEY(sec)];
+  const ne=(e&&e.efotos)?e.efotos.length:0, nb=(e&&e.bfotos)?e.bfotos.length:0;
+  const c=document.getElementById('ETC'+idx);  if(c)  c.textContent=ne?ne:'';
+  const cb=document.getElementById('ETCB'+idx); if(cb) cb.textContent=nb?nb:'';
   const b=document.getElementById('ETB_addcnt'); // (Overlay-Titel, falls offen)
-  if(b && EF_IDX===idx) b.textContent=n?(' · '+n+' Foto'+(n>1?'s':'')):'';
+  if(b && EF_IDX===idx){ const n=(EF_ALBUM==='bfotos')?nb:ne; b.textContent=n?(' · '+n+' Foto'+(n>1?'s':'')):''; }
 }
 function updAllEtageBars(){ DATA.forEach((s,i)=>updEtageBar(i)); }
 
-let EF_IDX=null, EF_KAT='';
+let EF_IDX=null, EF_KAT='', EF_ALBUM='efotos';
 function ensureEtOv(){
   let ov=document.getElementById('etOv');
   if(ov) return ov;
@@ -1629,9 +1644,9 @@ function ensureEtOv(){
 }
 function closeEtOv(){ const ov=document.getElementById('etOv'); if(ov) ov.style.display='none'; }
 
-function openEtageFotos(idx){
+function openEtageFotos(idx, album){
   const sec=DATA[idx]; if(!sec) return;
-  EF_IDX=idx; ETF_FILTER='';
+  EF_IDX=idx; EF_ALBUM=(album==='bfotos')?'bfotos':'efotos'; ETF_FILTER='';
   const ov=ensureEtOv();
   ov.style.display='flex';
   renderEtageOverlay(idx);
@@ -1642,15 +1657,17 @@ function renderEtageOverlay(idx){
   const sec=DATA[idx]; if(!sec) return;
   const ov=ensureEtOv();
   const e=gsE(EKEY(sec));
-  const all=e.efotos.map((r,oi)=>({r,oi})).sort((a,b)=>(a.r.ts||0)-(b.r.ts||0)); // chronologisch = Verlauf
-  const kats=[]; e.efotos.forEach(r=>{ if(r.kat && kats.indexOf(r.kat)<0) kats.push(r.kat); });
+  const meta=ET_ALBUMS[EF_ALBUM]||ET_ALBUMS.efotos;
+  const list=e[EF_ALBUM]||[];
+  const all=list.map((r,oi)=>({r,oi})).sort((a,b)=>(a.r.ts||0)-(b.r.ts||0)); // chronologisch = Verlauf
+  const kats=[]; list.forEach(r=>{ if(r.kat && kats.indexOf(r.kat)<0) kats.push(r.kat); });
   const shown=all.filter(x=>!ETF_FILTER || x.r.kat===ETF_FILTER);
   const fvals=[''].concat(kats); ETF_VALS=fvals;   // Index 0 = „Alle"; per Index adressiert (attribut-quoting-sicher)
   const chip=(fi)=>'<button class="etf'+(ETF_FILTER===fvals[fi]?' on':'')+'" onclick="etSetFilter('+idx+','+fi+')">'+escapeHtml(fi===0?'Alle':fvals[fi])+'</button>';
   ov.innerHTML=
     '<div class="ethdr">'+
       '<button class="etclose" onclick="closeEtOv()">&#8249;</button>'+
-      '<div class="etttl"><div class="ett1">&#128248; Anlagenfotos</div><div class="ett2">'+escapeHtml(sec.label||sec.pos)+(sec.bez?(' · '+escapeHtml(sec.bez)):'')+'<span id="ETB_addcnt"></span></div></div>'+
+      '<div class="etttl"><div class="ett1">'+meta.icon+' '+meta.title+'</div><div class="ett2">'+escapeHtml(sec.label||sec.pos)+(sec.bez?(' · '+escapeHtml(sec.bez)):'')+'<span id="ETB_addcnt"></span></div></div>'+
     '</div>'+
     '<div class="etadd"><button class="etaddbtn" onclick="etAddStart('+idx+')">&#128247; Foto hinzufügen</button></div>'+
     (kats.length?('<div class="etfilter">'+fvals.map((v,fi)=>chip(fi)).join('')+'</div>'):'')+
@@ -1664,7 +1681,7 @@ function renderEtageOverlay(idx){
           '<div class="etmeta">'+dstr+(x.r.by?(' · '+escapeHtml(x.r.by)):'')+'</div>'+
         '</div>';
       }).join('')+'</div>'
-      : '<div class="etempty">Noch keine Anlagenfotos für diese Etage.<br>Mit „Foto hinzufügen" den aktuellen Montagestand festhalten.</div>')+
+      : '<div class="etempty">'+meta.empty+'</div>')+
     '</div>';
   // Thumbnails laden
   shown.forEach(x=>{ const img=document.getElementById('ETIMG_'+idx+'_'+x.oi); if(img) loadImageAsBlob(x.r.fname).then(u=>{ if(u) img.src=u; }); });
@@ -1681,7 +1698,7 @@ function etAddStart(idx){
   ov.innerHTML=
     '<div class="etkat-sheet">'+
       '<div class="etkat-h">Kategorie wählen</div>'+
-      '<div class="etkat-chips">'+EFOTO_KATS.map((k,i)=>'<button class="etkat-chip" onclick="etKatPick(this,'+i+')">'+escapeHtml(k)+'</button>').join('')+'</div>'+
+      '<div class="etkat-chips">'+((ET_ALBUMS[EF_ALBUM]||ET_ALBUMS.efotos).kats).map((k,i)=>'<button class="etkat-chip" onclick="etKatPick(this,'+i+')">'+escapeHtml(k)+'</button>').join('')+'</div>'+
       '<input id="etKatFree" type="text" placeholder="oder eigene Kategorie …" oninput="etKatFree(this.value)" style="width:100%;box-sizing:border-box;padding:11px 13px;border-radius:10px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin:4px 0 12px">'+
       '<div class="etkat-src">'+
         '<button class="etsrc" onclick="etPickFile(\'cam\')">&#128247; Kamera</button>'+
@@ -1690,7 +1707,7 @@ function etAddStart(idx){
       '<button class="etkat-cancel" onclick="document.getElementById(\'etKatOv\').remove()">Abbrechen</button>'+
     '</div>';
 }
-function etKatPick(btn,i){ EF_KAT=EFOTO_KATS[i]; const f=document.getElementById('etKatFree'); if(f)f.value=''; document.querySelectorAll('.etkat-chip').forEach(c=>c.classList.remove('on')); btn.classList.add('on'); }
+function etKatPick(btn,i){ EF_KAT=((ET_ALBUMS[EF_ALBUM]||ET_ALBUMS.efotos).kats)[i]; const f=document.getElementById('etKatFree'); if(f)f.value=''; document.querySelectorAll('.etkat-chip').forEach(c=>c.classList.remove('on')); btn.classList.add('on'); }
 function etKatFree(v){ EF_KAT=(v||'').trim(); document.querySelectorAll('.etkat-chip').forEach(c=>c.classList.remove('on')); }
 function etPickFile(src){
   if(!EF_KAT){ alert('Bitte zuerst eine Kategorie wählen oder eingeben.'); return; }
@@ -1709,15 +1726,16 @@ async function etDoUpload(idx, kat, files){
   files=(files||[]).filter(Boolean);
   if(!files.length) return;
   if(!PID){ alert('Keine Baustelle geöffnet.'); return; }
+  const album=(EF_ALBUM==='bfotos')?'bfotos':'efotos';       // Album beim Start festhalten
   const key=EKEY(sec); const n=files.length; let ok=0;
   for(let i=0;i<n;i++){
     showLoader(n>1 ? ('Foto '+(i+1)+' von '+n+' wird gespeichert …') : 'Foto wird gespeichert...');
     try{
       const uf=await tryCompressImage(files[i]);
       const ts=Date.now()+i;                                  // eindeutiger Zeitstempel je Bild
-      const fname=etageFolder(sec)+'/'+safeName(kat)+'_'+ts+'.jpg';
+      const fname=etageFolder(sec, album)+'/'+safeName(kat)+'_'+ts+'.jpg';
       await queueUpload(fname, uf, 'image/jpeg', key);
-      gsE(key).efotos.push({fname:fname, kat:kat, ts:ts, by:USER||''});
+      gsE(key)[album].push({fname:fname, kat:kat, ts:ts, by:USER||''});
       ok++;
     }catch(e){ console.warn('Etagenfoto übersprungen:', e&&e.message); }
   }
@@ -1728,20 +1746,20 @@ async function etDoUpload(idx, kat, files){
 }
 function etDel(idx, oi){
   const sec=DATA[idx]; if(!sec) return;
-  const key=EKEY(sec); const e=gsE(key);
-  const rec=e.efotos[oi]; if(!rec) return;
-  if(!confirm('Dieses Anlagenfoto löschen?')) return;
-  e.efotos.splice(oi,1);
+  const key=EKEY(sec); const e=gsE(key); const list=e[EF_ALBUM]||[];
+  const rec=list[oi]; if(!rec) return;
+  if(!confirm('Dieses Foto löschen?')) return;
+  list.splice(oi,1);
   saveEtage(key);
   if(rec.fname){ removeQueuedFile(rec.fname); spDelete(rec.fname); }
   renderEtageOverlay(idx);
 }
 function olbEt(idx, oi){
   const sec=DATA[idx]; if(!sec) return;
-  // In der Reihenfolge/Filterung blättern, wie sie im Overlay angezeigt wird
-  const e=gsE(EKEY(sec));
-  const shown=e.efotos.map((r,i)=>({r,i})).sort((a,b)=>(a.r.ts||0)-(b.r.ts||0))
-                       .filter(x=>!ETF_FILTER || x.r.kat===ETF_FILTER);
+  // In der Reihenfolge/Filterung des aktuellen Albums blättern
+  const e=gsE(EKEY(sec)); const list=e[EF_ALBUM]||[];
+  const shown=list.map((r,i)=>({r,i})).sort((a,b)=>(a.r.ts||0)-(b.r.ts||0))
+                  .filter(x=>!ETF_FILTER || x.r.kat===ETF_FILTER);
   let start=shown.findIndex(x=>x.i===oi); if(start<0) start=0;
   lbOpen(shown.map(x=>x.r), start, r=>r.fname);
 }
@@ -2688,9 +2706,14 @@ async function btbBuildPdf(entry){
   drawSig(entry.sigAg, R-72);
   dc(dark); doc.setLineWidth(0.3);
   doc.line(M,sy,M+72,sy); doc.line(R-72,sy,R,sy);
+  // Ort + Datum vorausgefüllt (Ort aus proj.ort, sonst 1. Wort des Projektnamens)
+  const ortName=(proj.ort||'').trim() || ((proj.name||'').replace(/^\s*\d[\d.\-\/]*\s+/,'').trim().split(/\s+/)[0]||'');
+  const _d=(entry.datum||'').split('-');   // YYYY-MM-DD -> DD.MM.YYYY (führende Nullen)
+  const dShort=_d.length===3?(_d[2]+'.'+_d[1]+'.'+_d[0]):(entry.datum||'');
+  const ortDatum=(ortName?ortName+', ':'')+'den '+dShort;
   doc.setFontSize(8); tc(grey);
-  doc.text('Ort, Datum / Unterschrift Bauleiter KPC',M,sy+4);
-  doc.text('Ort, Datum / Unterschrift Auftraggeber',R-72,sy+4);
+  doc.text(ortDatum,M,sy+4);        doc.text('Unterschrift Bauleiter KPC',M,sy+8);
+  doc.text(ortDatum,R-72,sy+4);     doc.text('Unterschrift Auftraggeber',R-72,sy+8);
   doc.setFontSize(7.5); tc(grey);
   doc.text('kpc GmbH · Haimbacher Straße 27 · 36041 Fulda',W/2,PH-8,{align:'center'});
 
@@ -2968,7 +2991,7 @@ async function spListLoadRows(){
 
 function buildPosData(pos){
   // Synthetische Etagen-Zeile (Anlagen-/Übersichtsfotos je Geschoss) – eigene Struktur
-  if(isEKey(pos)){ const e=gsE(pos); return JSON.stringify({__etage:true, efotos:e.efotos||[], restarbeiten:e.restarbeiten||[]}); }
+  if(isEKey(pos)){ const e=gsE(pos); return JSON.stringify({__etage:true, efotos:e.efotos||[], bfotos:e.bfotos||[], restarbeiten:e.restarbeiten||[]}); }
   const s = gs(pos);
   // gleiche Struktur wie früher die Supabase-Spalten (innere Felder als JSON-Strings)
   return JSON.stringify({
@@ -3082,7 +3105,7 @@ async function loadState() {
     if (data) {
       let newest = null;
       data.forEach(row => {
-        if(row.__etage || isEKey(row.pos)){ ST[row.pos] = {__etage:true, efotos: Array.isArray(row.efotos)?row.efotos:[], restarbeiten: Array.isArray(row.restarbeiten)?row.restarbeiten:[]}; if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at; return; }
+        if(row.__etage || isEKey(row.pos)){ ST[row.pos] = {__etage:true, efotos: Array.isArray(row.efotos)?row.efotos:[], bfotos: Array.isArray(row.bfotos)?row.bfotos:[], restarbeiten: Array.isArray(row.restarbeiten)?row.restarbeiten:[]}; if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at; return; }
         let fotos = [], pdfs = [];
         try { fotos = row.fotos ? JSON.parse(row.fotos) : []; } catch(e) {}
         try { pdfs = row.pdfs ? JSON.parse(row.pdfs) : []; } catch(e) {}
@@ -3196,7 +3219,7 @@ setInterval(async () => {
     let newest = null;
     data.forEach(row => {
       if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at;
-      if (row.__etage || isEKey(row.pos)){ if(!DIRTY.has(row.pos) && !ST[row.pos]){ ST[row.pos]={__etage:true, efotos:Array.isArray(row.efotos)?row.efotos:[], restarbeiten:Array.isArray(row.restarbeiten)?row.restarbeiten:[]}; if(document.getElementById('RA'+sp(row.pos))) updRA(row.pos); } return; }
+      if (row.__etage || isEKey(row.pos)){ if(!DIRTY.has(row.pos) && !ST[row.pos]){ ST[row.pos]={__etage:true, efotos:Array.isArray(row.efotos)?row.efotos:[], bfotos:Array.isArray(row.bfotos)?row.bfotos:[], restarbeiten:Array.isArray(row.restarbeiten)?row.restarbeiten:[]}; if(document.getElementById('RA'+sp(row.pos))) updRA(row.pos); } return; }
       if (DIRTY.has(row.pos)) return;     // lokale, noch nicht synchronisierte Änderung nicht überschreiben
       const cur = ST[row.pos];
       let newRest = cur ? cur.restarbeiten : [];
