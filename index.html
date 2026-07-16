@@ -267,6 +267,14 @@ select.fs option{background:var(--surface);color:var(--text);}
 .rahd{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--braun);
   text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;}
 .rahd .rai{margin-left:auto;font-size:10px;color:var(--accent2);font-weight:400;text-transform:none;letter-spacing:0;}
+/* Sanitär-Prüfprotokoll als eigene Position (eigener Abschnitt, keine Restarbeit).
+   Der Haken ist abgeleitet – er wird gesetzt, sobald ein Protokoll abgelegt ist. */
+.dtsec{display:none;}
+.dtcard{border:1px solid #2f6f8f;border-radius:10px;margin-top:4px;cursor:pointer;
+  background:rgba(47,111,143,.07);-webkit-tap-highlight-color:transparent;}
+.dtcard:active{background:rgba(47,111,143,.16);}
+.dtcard.done{border-color:var(--green);background:rgba(58,122,58,.08);}
+.dtcard .ck{cursor:default;}
 .rarow{margin:4px 0;padding:5px 6px;
   background:var(--surface2);border:1px solid var(--line);border-radius:var(--r);}
 .rarow.done{background:var(--done-bg);border-color:var(--line);}
@@ -541,11 +549,6 @@ select.fs option{background:var(--surface);color:var(--text);}
   </button>
   <button class="fab-mini fab-icon" style="background:#7a5c1d;color:#fff" onclick="openBautagebuchDialog()" title="Bautagebuch (Tag wählen)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="9" y1="7" x2="16" y2="7"/><line x1="9" y1="11" x2="16" y2="11"/></svg>
-  </button>
-  <!-- Sanitär-Aufgabe: nur sichtbar bei Gewerk-Filter „Sanitär" (updDichtBtn) -->
-  <button class="fab-mini" id="fabDicht" style="display:none;background:#2f6f8f;color:#fff" onclick="openDichtDialog()" title="Dichtigkeitsprotokoll erstellen">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M12 2.7s5.5 6.1 5.5 9.8a5.5 5.5 0 0 1-11 0C6.5 8.8 12 2.7 12 2.7z"/></svg>
-    <span class="fab-label">Dichtigkeit</span>
   </button>
 
 </div>
@@ -881,6 +884,10 @@ function buildPanels(){
     '<div id="RA'+sp(PRAKEY)+'"></div>'+
     '<button class="raadd" onclick="raAddNew(\''+PRAKEY+'\')">&#65291; Restarbeit</button>';
   main.appendChild(pra);
+  // Sanitär-Prüfprotokoll der ganzen Baustelle – eigener Abschnitt (keine Restarbeit)
+  const dtp=document.createElement('div');
+  dtp.className='rasec dtsec'; dtp.id='DT_'+sp(PRAKEY);
+  main.appendChild(dtp);
   DATA.forEach((sec,secIdx)=>{
     const panel=document.createElement('div');
     panel.className='panel'+(sec.pos===ACT?' on':'');
@@ -900,6 +907,10 @@ function buildPanels(){
       '<div id="RA'+eid+'"></div>'+
       '<button class="raadd" onclick="raAddNew(\''+ekey+'\')">&#65291; Restarbeit</button>';
     panel.appendChild(era);
+    // Sanitär-Prüfprotokoll dieser Etage – eigener Abschnitt (keine Restarbeit)
+    const dte=document.createElement('div');
+    dte.className='rasec dtsec'; dte.id='DT_'+eid;
+    panel.appendChild(dte);
     sec.subsections.forEach(sub=>{
       const div=document.createElement('div');
       div.className='bblock';
@@ -1080,10 +1091,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 62;
+const APP_VERSION = 63;
 const CHANGELOG = [
+  { v:63, titel:'Dichtigkeitsprotokoll als eigene Sanitär-Position', punkte:[
+    'Bei Gewerk-Filter „Sanitär" gibt es jetzt einen eigenen Abschnitt „💧 Prüfprotokoll – Sanitär" – einmal für die ganze Baustelle und einmal je Etage. Er zeigt als eigene Position, ob das Protokoll abgelegt ist („✓ Nr. 1 · 16.07.2026 · dicht") oder noch offen ist, samt Fortschritt „X von Y Positionen geprüft". Ein Tipp öffnet das Protokoll.',
+    'Der Haken lässt sich nicht von Hand setzen: Er wird automatisch gesetzt, sobald das Protokoll abgelegt ist – so kann Haken und Nachweis nicht auseinanderlaufen. Etagen ohne Sanitärpositionen zeigen den Abschnitt nicht.' ]},
   { v:62, titel:'Dichtigkeitsprotokoll (Sanitär)', punkte:[
-    'Neu: Wenn oben der Gewerk-Filter „Sanitär" gewählt ist, erscheint unten der Knopf „💧 Dichtigkeit". Damit lässt sich ein Dichtigkeitsprotokoll erzeugen – für die ganze Baustelle oder je Etage.',
+    'Neu: Dichtigkeitsprotokolle – für die ganze Baustelle oder je Etage, fortlaufend nummeriert.',
     'Zwei Prüfarten: „Dichtheitskontrolle unter Betriebsdruck" (unser Standardfall – Anschluss ab bauseitigem Eckventil) und „Druckprüfung nach DIN EN 806-4 / ZVSHK" (nur bei eigener Verrohrung, z. B. Installationswand). Feldbezeichnungen und Norm-Angabe passen sich automatisch an.',
     'Fester Absatz „Prüfumfang / Abgrenzung" im PDF: hält den Übergabepunkt (Eckventil) fest und grenzt das bauseitige Rohrleitungsnetz ab – anpassbar.',
     'Das Protokoll listet automatisch alle Sanitärpositionen des Umfangs mit dem Stand der Dichtigkeitsprüfung (✓ geprüft am / durch wen, oder „offen"). Prüfdaten werden einmal erfasst, dazu Prüfer und Unterschriften.',
@@ -1821,7 +1835,7 @@ function setTF(t){
   applyFieldVisibility();
   applyF();
   upStats();
-  updDichtBtn();   // Dichtigkeitsprotokoll = Sanitär-Aufgabe: nur bei Gewerk „Sanitär"
+  updDichtTasks();   // Prüfprotokoll-Position: nur bei Gewerk „Sanitär"
 }
 
 function applyF(){
@@ -2769,8 +2783,37 @@ async function saveDicht(){
   DICHT.sort((a,b)=>(a.nr||0)-(b.nr||0));
   await spUploadText('DICHT_'+PID+'.json', JSON.stringify(DICHT));
 }
-// Knopf ist eine Sanitär-Aufgabe: nur sichtbar, wenn der Gewerk-Filter auf S steht
-function updDichtBtn(){ const b=document.getElementById('fabDicht'); if(b) b.style.display=(TF==='S')?'inline-flex':'none'; }
+// Abgeleitete Aufgabe „Dichtigkeitsprotokoll" als eigene Position
+// (Baustelle allgemein + je Etage). Kein echter Restarbeiten-Datensatz – der
+// Status ergibt sich aus DICHT, kann also nicht auseinanderlaufen.
+function updDichtTasks(){
+  const render=(elId, umfang)=>{
+    const el=document.getElementById(elId); if(!el) return;
+    const pos=dichtCollect(umfang);
+    if(TF!=='S' || !pos.length){ el.innerHTML=''; el.style.display='none'; return; }   // nur als Sanitär-Aufgabe
+    el.style.display='block';   // .dtsec ist per CSS ausgeblendet -> explizit setzen
+    const p=DICHT.find(e=>e.umfang===umfang);
+    const nGepr=pos.filter(x=>x.geprueft).length;
+    // Haken ist ABGELEITET: gesetzt, sobald ein Protokoll abgelegt ist – nicht manuell abhakbar.
+    const ck='<div class="ck'+(p?' on':'')+'"><span class="ck-lbl"><span class="cki">'+(p?'&#10003;':'&#9675;')+'</span>&nbsp;<span class="ckn">Protokoll abgelegt</span></span>'+
+      (p?('<span class="ck-ts">Nr. '+p.nr+' · '+dtFmt(p.datum+'T12:00:00')+(p.ergebnis?(' · '+escapeHtml(p.ergebnis)):'')+'</span>'):'')+'</div>';
+    el.innerHTML=
+      '<div class="rahd">&#128167; Prüfprotokoll – Sanitär</div>'+
+      '<div class="card dtcard'+(p?' done':'')+'" onclick="dichtPick(\''+umfang+'\')" title="Dichtigkeitsprotokoll öffnen">'+
+        '<div class="ih">'+
+          '<span class="pb">&#128167;</span>'+
+          '<div class="ii">'+
+            '<div class="ibez">Dichtigkeitsprotokoll – '+escapeHtml(dichtUmfangLabel(umfang))+'</div>'+
+            '<div class="imet"><span class="gtag gS">Sanitär</span> '+nGepr+' von '+pos.length+' Positionen geprüft</div>'+
+          '</div>'+
+        '</div>'+
+        '<div class="crow">'+ck+'</div>'+
+        '<div class="fsec"><button class="fbtn" onclick="event.stopPropagation();dichtPick(\''+umfang+'\')">&#128167; '+(p?'Protokoll öffnen':'Protokoll erstellen')+'</button></div>'+
+      '</div>';
+  };
+  render('DT_'+sp(PRAKEY), '__all');
+  DATA.forEach(sec=>render('DT_'+sp(EKEY(sec)), sec.pos));
+}
 function dichtUmfangLabel(u){ if(u==='__all') return 'Ganze Baustelle'; const s=DATA.find(x=>x.pos===u); return s?(s.label||s.pos):u; }
 // TT.MM.JJJJ mit führenden Nullen (toLocaleDateString liefert je nach Umgebung „6.7.2026")
 function dtFmt(ts){ if(!ts) return ''; const d=new Date(ts); if(isNaN(d)) return ''; const p=n=>String(n).padStart(2,'0'); return p(d.getDate())+'.'+p(d.getMonth()+1)+'.'+d.getFullYear(); }
@@ -2964,6 +3007,7 @@ async function dichtSave(thenPdf){
   DICHT_FORM.base=entry;
   try{ await saveDicht(); }
   catch(e){ if(win) try{win.close();}catch(_){}; alert('Speichern fehlgeschlagen (online nötig): '+(e.message||e)); return; }
+  updDichtTasks();   // Aufgabe in den Restarbeiten sofort auf „erledigt" ziehen
   if(!thenPdf){ showToast('Dichtigkeitsprotokoll Nr. '+entry.nr+' gespeichert'); closeDichtForm(); openDichtDialog(); return; }
   try{
     const blob=await dichtBuildPdf(entry);
@@ -4917,7 +4961,7 @@ async function selectProject(pid){
     PID = pid;
     DATA = await loadProjectLV(pid);
     loadBautagebuch(pid).catch(()=>{});   // Bautagebuch der Baustelle nachladen (nicht blockierend)
-    loadDicht(pid).catch(()=>{});         // Dichtigkeitsprotokolle nachladen (nicht blockierend)
+    loadDicht(pid).then(()=>updDichtTasks()).catch(()=>{});   // Dichtigkeitsprotokolle nachladen (nicht blockierend)
     const proj = PROJECTS.find(p=>p.pid===pid);
     const nm = document.getElementById('projName'); if(nm) nm.textContent = proj ? proj.name : pid;
     Object.keys(ST).forEach(k=>delete ST[k]);
@@ -4925,7 +4969,7 @@ async function selectProject(pid){
     Object.keys(IMG_CACHE).forEach(k=>delete IMG_CACHE[k]);
     ACT = '__all';
     buildTabs(); buildPanels();
-    updDichtBtn();
+    updDichtTasks();
     ov.style.display='none';
     startData();
   }catch(e){
