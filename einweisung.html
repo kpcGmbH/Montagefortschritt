@@ -281,15 +281,32 @@ async function ensureFolder(path){
     parent=parent? parent+'/'+seg : seg;
   }
 }
+// Gibt das angelegte Graph-Item zurück (…​.id überlebt späteres Umbenennen/Verschieben).
 async function spUpload(fname, body, contentType){
   const i=fname.lastIndexOf('/'); if(i>0) await ensureFolder(fname.slice(0,i));
-  await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encPath(fname)+':/content',{method:'PUT',headers:{'Content-Type':contentType||'application/octet-stream'},body:body});
-  return fname;
+  const res=await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encPath(fname)+':/content',{method:'PUT',headers:{'Content-Type':contentType||'application/octet-stream'},body:body});
+  try{ return await res.json(); }catch(e){ return null; }
 }
 async function spDownloadBlob(fname){
   const meta=await (await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encPath(fname))).json();
   const dl=meta['@microsoft.graph.downloadUrl']; if(!dl) throw new Error('downloadUrl fehlt');
   const res=await fetch(dl); if(!res.ok) throw new Error('Download '+res.status); return await res.blob();
+}
+async function spDownloadBlobById(id){
+  const meta=await (await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/items/'+encodeURIComponent(id))).json();
+  const dl=meta['@microsoft.graph.downloadUrl']; if(!dl) throw new Error('downloadUrl fehlt');
+  const res=await fetch(dl); if(!res.ok) throw new Error('Download '+res.status); return await res.blob();
+}
+// Sucht die Datei im Ablageordner über den Namensstamm – fängt ab, dass jemand die
+// Datei in SharePoint umbenannt hat (z. B. Etage angehängt).
+async function spFindByStem(fname){
+  const i=fname.lastIndexOf('/'); const dir=i>0? fname.slice(0,i) : ''; const name=fname.slice(i+1);
+  const stem=name.replace(/\.[^.]+$/,'');
+  const base='/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId;
+  const ep=(dir? base+'/root:/'+encPath(dir)+':/children' : base+'/root/children')+'?$top=999&$select=id,name';
+  let list=[]; try{ list=((await (await graph(ep)).json()).value)||[]; }catch(e){ return null; }
+  const hit=list.find(x=>x.name===name) || list.find(x=>x.name.indexOf(stem)===0);
+  return hit? { id:hit.id, path:(dir? dir+'/' : '')+hit.name } : null;
 }
 async function spTryDownloadText(fname){
   try{ return await (await spDownloadBlob(fname)).text(); }
@@ -499,16 +516,31 @@ function renderOverview(){
 function protLine(p){
   const badge = p.complete? ' <span style="color:var(--green)">✓ vollständig</span>' : '';
   return '<div class="prow"><div class="pmain"><div class="pt">'+esc(p.titel||'Einweisung')+badge+'</div>'+
-    '<div class="pm">'+fmtDE(p.datum)+(p.teilnehmer? ' · '+esc(p.teilnehmer):'')+(p.positions&&p.positions.length? ' · '+p.positions.length+' Gerät(e)':'')+' · Einweiser: '+esc(p.einweiser||'')+'</div></div>'+
+    '<div class="pm">'+fmtDE(p.datum)+(p.etagen&&p.etagen.length? ' · '+esc(p.etagen.join(', ')):'')+(p.teilnehmer? ' · '+esc(p.teilnehmer):'')+(p.positions&&p.positions.length? ' · '+p.positions.length+' Gerät(e)':'')+' · Einweiser: '+esc(p.einweiser||'')+'</div></div>'+
     (p.pdf? '<button class="plink" onclick="openPdfById(\''+esc(p.id)+'\')">PDF</button>':'')+'</div>';
 }
 function toggleEt(ei){ const L=lid(LV[ei].label)+'_'+ei; const b=document.getElementById('ETB_'+L); const t=document.getElementById('TOG_'+L); if(!b)return; const hid=b.classList.toggle('hid'); if(t)t.classList.toggle('cl',hid); }
-function openPdfById(id){ const p=EW.protokolle.find(x=>x.id===id); if(p&&p.pdf) openPdf(p.pdf); }
-function openPdf(fname){
+function openPdfById(id){ const p=EW.protokolle.find(x=>x.id===id); if(p&&p.pdf) openPdf(p.pdf, p); }
+// Holt das PDF: erst über die Item-ID, dann über den Pfad, zuletzt über den
+// Namensstamm. Wird es unter neuem Namen gefunden, heilt der Eintrag sich selbst.
+async function fetchPdfBlob(fname, prot){
+  if(prot&&prot.pdfId){ try{ return await spDownloadBlobById(prot.pdfId); }catch(e){} }
+  try{ return await spDownloadBlob(fname); }
+  catch(e){
+    const m=((e&&e.message)||'')+'';
+    if(!/ 404|404:|itemnotfound/i.test(m)) throw e;
+    const hit=await spFindByStem(fname);
+    if(!hit) throw new Error('Die Datei liegt nicht mehr in SharePoint – sie wurde gelöscht oder in einen anderen Ordner verschoben.');
+    const blob=await spDownloadBlobById(hit.id);
+    if(prot){ prot.pdf=hit.path; prot.pdfId=hit.id; try{ await saveEW(); }catch(_){} }
+    return blob;
+  }
+}
+function openPdf(fname, prot){
   // Fenster SYNCHRON im Klick öffnen (sonst Popup-Blocker), Inhalt nach Download setzen
   const w=window.open('','_blank');
   showLoader('PDF wird geladen …');
-  spDownloadBlob(fname).then(blob=>{
+  fetchPdfBlob(fname, prot).then(blob=>{
     const url=URL.createObjectURL(blob);
     if(w && !w.closed){ w.location=url; }
     else { const a=document.createElement('a'); a.href=url; a.download=fname.split('/').pop(); document.body.appendChild(a); a.click(); a.remove(); }
@@ -651,17 +683,22 @@ async function finishSession(){
   try{
     const id='P'+Date.now();
     const iso=new Date(SESSION.datum+'T12:00:00').toISOString();
-    // Bereich(e) dieser Sitzung für die Benennung
-    let bereiche=[];
-    positions.forEach(pos=>{ const d=allDevices().find(x=>x.g.pos===pos); if(d){ const b=(d.b.bez||'').trim(); if(b&&bereiche.indexOf(b)<0) bereiche.push(b); } });
+    // Bereich(e) + Etage(n) dieser Sitzung für die Benennung
+    let bereiche=[], etagen=[];
+    positions.forEach(pos=>{ const d=allDevices().find(x=>x.g.pos===pos); if(!d) return;
+      const b=(d.b.bez||'').trim(); if(b&&bereiche.indexOf(b)<0) bereiche.push(b);
+      const e=(d.et.label||'').trim(); if(e&&etagen.indexOf(e)<0) etagen.push(e); });
     const titel = SESSION.typ==='allgemein' ? 'Grundlagen-Einweisung'
       : (bereiche.length? ('Einweisung – '+(bereiche.length<=2? bereiche.join(', ') : bereiche.slice(0,2).join(', ')+' …')) : 'Geräte-Einweisung');
     // PDF bauen
     const pdfBlob=buildPdf(titel, positions);
     // Ablage in SharePoint
     const folder=safeName(PROJNAME)+'/_Einweisung';
-    const fname=folder+'/Einweisung_'+(SESSION.typ)+'_'+SESSION.datum.replace(/-/g,'')+'_'+id.slice(-6)+'.pdf';
-    await spUpload(fname, pdfBlob, 'application/pdf');
+    // Etage(n) gehören in den Dateinamen: sonst sind mehrere Protokolle eines Tages
+    // in SharePoint nicht auseinanderzuhalten und werden von Hand umbenannt.
+    const etTag=etagen.length? '_'+safeName(etagen.slice(0,3).join('_')).replace(/\s+/g,'')+(etagen.length>3?'_ua':'') : '';
+    const fname=folder+'/Einweisung_'+(SESSION.typ)+'_'+SESSION.datum.replace(/-/g,'')+etTag+'_'+id.slice(-6)+'.pdf';
+    const up=await spUpload(fname, pdfBlob, 'application/pdf');
     // Status aktualisieren
     if(SESSION.typ==='geraete'){
       positions.forEach(pos=>{ EW.devices[pos]={ eingewiesen:true, datum:iso, by:USER||'', protokollId:id, sonderChecks:(SESSION.sonder[pos]||[]).map(c=>({txt:c.txt,done:c.done})) }; });
@@ -674,7 +711,7 @@ async function finishSession(){
     EW.auftraggeber=SESSION.auftraggeber.trim(); EW.ort=SESSION.ort.trim();
     // "vollständig" = alle einweisungspflichtigen Geräte des Projekts jetzt eingewiesen
     let complete=false; if(SESSION.typ==='geraete'){ const c=counts(); complete = c.tot>0 && c.ein>=c.tot; }
-    EW.protokolle.push({ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), einweiser:SESSION.einweiser.trim(), kommentar:(SESSION.kommentar||'').trim(), positions, bereiche, titel, complete, pdf:fname, ts:Date.now() });
+    EW.protokolle.push({ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), einweiser:SESSION.einweiser.trim(), kommentar:(SESSION.kommentar||'').trim(), positions, bereiche, etagen, titel, complete, pdf:fname, pdfId:(up&&up.id)||'', ts:Date.now() });
     showLoader('Wird in SharePoint gespeichert …');
     await saveEW();
     hideLoader();

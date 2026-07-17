@@ -1091,8 +1091,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 65;
+const APP_VERSION = 66;
 const CHANGELOG = [
+  { v:66, titel:'Bautagebuch: Restarbeiten sauber getrennt', punkte:[
+    'Unter „Leistung" stehen jetzt nur noch die an diesem Tag erbrachten Leistungen: die Statusänderungen der Positionen und erledigte Restarbeiten. Neu erfasste Restarbeiten tauchen dort nicht mehr auf – sie sind ein offener Mangel und keine Tagesleistung.' ]},
   { v:65, titel:'Dichtigkeitsprotokoll: schlankere Positionsliste', punkte:[
     'In der Positionsliste steht jetzt Positionsnummer und Benennung; das Prüfer-Kürzel je Zeile entfällt – der Prüfer steht ohnehin im Kopf des Protokolls.',
     'Bei einem Etagen-Protokoll entfällt die Etagen-Spalte (die Etage steht schon im Prüfumfang) – der Platz gehört der Benennung, die dadurch vollständig passt.' ]},
@@ -2264,13 +2266,12 @@ function btbCollectPrefill(tag){
     const schritte=tf.map(([f,lbl])=>lbl).join(', ');
     zeilen.push('• '+it.pos+' '+it.bez.trim()+' – '+schritte);
   }); }); });
-  // Restarbeiten des Tages
+  // Erledigte Restarbeiten des Tages. NUR erledigte: eine neu erfasste Restarbeit ist
+  // ein offener Mangel und keine an diesem Tag erbrachte Leistung.
   const raSammeln=(list,ort)=>{(list||[]).forEach(r=>{ if(!r.txt) return;
-    const neu=r.erstelltAm&&localDay(r.erstelltAm)===tag;
-    const erl=r.done&&r.erledigtAm&&localDay(r.erledigtAm)===tag;
-    if(!neu&&!erl) return;
-    if(r.ersteller) kuerzel.add(r.ersteller); if(erl&&r.erledigtVon) kuerzel.add(r.erledigtVon);
-    zeilen.push('• Restarbeit'+(ort?(' ('+ort+')'):'')+': '+r.txt+(neu?' – neu erfasst':'')+(erl?' – erledigt':''));
+    if(!(r.done&&r.erledigtAm&&localDay(r.erledigtAm)===tag)) return;
+    if(r.erledigtVon) kuerzel.add(r.erledigtVon);
+    zeilen.push('• Restarbeit'+(ort?(' ('+ort+')'):'')+' erledigt: '+r.txt);
   });};
   if(ST[PRAKEY]) raSammeln(ST[PRAKEY].restarbeiten,'Baustelle allg.');
   DATA.forEach(sec=>{ const e=ST[EKEY(sec)]; if(e) raSammeln(e.restarbeiten, (sec.label||'')+' allg.');
