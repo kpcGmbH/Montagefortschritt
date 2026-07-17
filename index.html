@@ -1001,6 +1001,9 @@ let USER = localStorage.getItem('kpc_user') || '';
 let FIRMEN = (()=>{ try{ return JSON.parse(localStorage.getItem('kpc_firmen')||'["GTS"]'); }catch(e){ return ['GTS']; } })();
 // Feste Liste eigener Monteure für die Schnellauswahl im Ausführer-Dialog
 const MONTEURE = ['Milenko STANIC','Sava JELICIC','Luis PINHEIRO','Ivan RUSEV','Kurt HERRMANN','Boban PETROVIC','Emil SAJGO','Laszlo SIPOS'];
+// Die Einweisungs-App liegt auf derselben Origin und teilt sich damit das localStorage.
+// Sie liest die Liste hier heraus, statt eine zweite Kopie zu pflegen (die auseinanderliefe).
+try{ localStorage.setItem('kpc_monteure', JSON.stringify(MONTEURE)); }catch(e){}
 function ausfTyp(){ return localStorage.getItem('kpc_user_typ')||'monteur'; }
 function istFirma(name){ return FIRMEN.includes(name) || (ausfTyp()==='firma' && name===USER); }
 function applyUserBadge(){
@@ -1091,8 +1094,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 66;
+const APP_VERSION = 67;
 const CHANGELOG = [
+  { v:67, titel:'Einweisung: Benutzer wechselbar', punkte:[
+    'In der Einweisungs-App lässt sich oben rechts über das 👤-Feld umstellen, wer gerade arbeitet – z. B. wenn die Bauleitung die Einweisung übernimmt. Der in der Hauptapp gewählte Ausführer wandert automatisch mit; die Microsoft-Anmeldung bleibt davon unberührt, sie ist nur der Zugang.',
+    'Der Einweiser wird jetzt auch an den eingewiesenen Geräten vermerkt – bisher stand dort immer das angemeldete Konto, selbst wenn jemand anderes eingewiesen hat. Das Feld „Einweiser" ist deshalb Pflicht.' ]},
   { v:66, titel:'Bautagebuch & Einweisungsprotokolle', punkte:[
     'Bautagebuch: Unter „Leistung" stehen jetzt nur noch die an diesem Tag erbrachten Leistungen – die Statusänderungen der Positionen und erledigte Restarbeiten. Neu erfasste Restarbeiten tauchen dort nicht mehr auf; sie sind ein offener Mangel und keine Tagesleistung.',
     'Einweisung: Protokolle ließen sich nicht mehr öffnen, wenn die PDF-Datei in SharePoint umbenannt worden war. Sie werden jetzt zuverlässig gefunden; die Etage steht zur Unterscheidung im Dateinamen und in der Liste.',

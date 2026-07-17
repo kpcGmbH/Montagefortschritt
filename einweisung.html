@@ -51,7 +51,8 @@ header{background:var(--chrome-bg);position:sticky;top:0;z-index:100;box-shadow:
 .theme-btn:hover{background:rgba(255,255,255,.14);}
 .proj{font-size:12px;color:var(--accent2);text-align:right;line-height:1.35;}
 .proj strong{display:block;color:#fff;font-size:13px;font-weight:700;max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.userbadge{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:4px 10px;font-size:11px;font-weight:700;color:#fff;}
+.userbadge{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);border-radius:12px;padding:4px 10px;font-size:11px;font-weight:700;color:#fff;cursor:pointer;}
+.userbadge:hover{background:rgba(255,255,255,.22);}
 
 /* MAIN */
 main{padding:14px 12px 40px;max-width:900px;margin:0 auto;}
@@ -197,7 +198,7 @@ main{padding:14px 12px 40px;max-width:900px;margin:0 auto;}
       <button class="theme-btn" onclick="backToApp()" title="Zurück zur Montagefortschritt-App">‹ Hauptapp</button>
       <button class="theme-btn" onclick="cycleTheme()" title="Erscheinungsbild: Automatik / Hell / Dunkel"><span id="themeIcon">🌓</span><span id="themeLbl">Auto</span></button>
       <div class="proj"><strong id="projName">–</strong><span id="projSub">Baustelle</span></div>
-      <span class="userbadge" id="userBadge">–</span>
+      <span class="userbadge" id="userBadge" onclick="switchUser()" title="Tippen zum Wechseln">–</span>
     </div>
   </div>
 </header>
@@ -228,7 +229,12 @@ const GRAPH_SCOPES=['User.Read','Sites.Selected'];
 const USE_REDIRECT=/Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent) || (typeof window.matchMedia==='function' && window.matchMedia('(pointer: coarse)').matches);
 let msalApp=null, msalAccount=null;
 const SPIDS={ siteId:null, listId:null, driveId:null };
-let PID=null, PROJNAME='', USER='', PROJ_AG='', PROJ_ORT='';   // aus Projekt-Stammdaten (__projects.json)
+// USER = wer gerade arbeitet (voller Name, z. B. "Milenko STANIC") – NICHT das
+// Microsoft-Konto: das ist nur der Zugang. Geteilt mit der Hauptapp über
+// localStorage 'kpc_user' (gleiche Origin), damit ein dort gewählter Ausführer
+// mitwandert. Über das Badge im Kopf jederzeit wechselbar (z. B. auf die
+// Bauleitung, wenn sie die Einweisung übernimmt).
+let PID=null, PROJNAME='', USER=(()=>{ try{ return localStorage.getItem('kpc_user')||''; }catch(e){ return ''; } })(), PROJ_AG='', PROJ_ORT='';   // aus Projekt-Stammdaten (__projects.json)
 let LV=[];                 // Etagen/Bereiche/Geräte aus LV_<pid>.json
 let EW={ v:1, devices:{}, std:{}, protokolle:[] };  // Einweisungs-Status (EINWEISUNG_<pid>.json)
 
@@ -396,7 +402,8 @@ async function writeBackNichtEingewiesen(positions){
   }
 }
 // Schreibt "Einweisung erledigt" (ew) für die angegebenen Positionen zurück, ohne andere Felder zu verlieren.
-async function writeBackEingewiesen(positions, iso){
+// `by` = wer eingewiesen hat (Einweiser aus dem Protokoll) – nicht, wer angemeldet ist.
+async function writeBackEingewiesen(positions, iso, by){
   if(!positions.length) return;
   const items=await loadPositionItems();
   for(const pos of positions){
@@ -404,7 +411,7 @@ async function writeBackEingewiesen(positions, iso){
     let d=ex? ex.data : {};
     d.ew=true;
     let ts={}; try{ ts=d.ts? JSON.parse(d.ts):{}; }catch(e){ ts={}; } ts.ew=iso; d.ts=JSON.stringify(ts);
-    let usr={}; try{ usr=d.usr? JSON.parse(d.usr):{}; }catch(e){ usr={}; } usr.ew=USER||''; d.usr=JSON.stringify(usr);
+    let usr={}; try{ usr=d.usr? JSON.parse(d.usr):{}; }catch(e){ usr={}; } usr.ew=by||USER||''; d.usr=JSON.stringify(usr);
     const fields={ pos:pos, projekt:PID, data:JSON.stringify(d) };
     if(ex&&ex.id){ await graph('/sites/'+SPIDS.siteId+'/lists/'+SPIDS.listId+'/items/'+ex.id+'/fields',{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(fields)}); }
     else { await graph('/sites/'+SPIDS.siteId+'/lists/'+SPIDS.listId+'/items',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({fields})}); }
@@ -444,12 +451,64 @@ async function doLogin(){
   try{ st.textContent='Anmeldung läuft …'; await msalLogin(); if(msalAccount) await onLoggedIn(); }
   catch(e){ st.textContent='Fehler: '+((e&&e.message)||e); console.error(e); }
 }
+// Namensform EXAKT wie in der Hauptapp (index.html: deriveName) – sonst steht in den
+// Positionen mal "Wahl, Johannes" und mal "Johannes Wahl".
+function deriveName(account){
+  if(!account) return '';
+  let n=(account.name||account.username||'').trim();
+  if(n.includes(',')){ const p=n.split(',').map(s=>s.trim()); if(p.length===2&&p[0]&&p[1]) n=p[1]+' '+p[0]; }
+  if(/@/.test(n)){ n=n.split('@')[0].replace(/[._]+/g,' ').trim().replace(/\b\w/g,c=>c.toUpperCase()); }
+  return n;
+}
+function setUser(name){
+  name=(name||'').trim(); if(!name) return false;
+  USER=name;
+  try{ localStorage.setItem('kpc_user',USER); localStorage.setItem('kpc_user_typ','monteur'); }catch(e){}
+  applyUserBadge(); return true;
+}
+function applyUserBadge(){
+  const b=document.getElementById('userBadge'); if(!b) return;
+  b.textContent='👤 '+(USER? USER.split(' ')[0] : 'Wer?');
+  b.title=(USER||'Niemand gewählt')+' – tippen zum Wechseln';
+}
+// Namensliste kommt aus der Hauptapp (gleiche Origin) – hier bewusst keine zweite Kopie.
+function monteurListe(){ try{ return JSON.parse(localStorage.getItem('kpc_monteure')||'[]')||[]; }catch(e){ return []; } }
+function switchUser(){
+  const namen=monteurListe().filter(n=>n!==USER);
+  const eigen=deriveName(msalAccount);
+  if(eigen && namen.indexOf(eigen)<0 && eigen!==USER) namen.unshift(eigen);
+  let ov=document.getElementById('usrOv'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='usrOv'; ov.className='ov';
+  ov.innerHTML='<div class="sheet"><div class="sheet-h"><button class="sheet-close" onclick="closeUserOv()">&#10005;</button><span class="ttl">Wer arbeitet gerade?</span></div>'+
+    '<div class="sheet-b">'+
+    '<div class="hint">Wird als Einweiser vorgeschlagen und in den Positionen vermerkt. Übernimmt z. B. die Bauleitung, hier umstellen.</div>'+
+    (USER? '<div class="fld"><label>Aktuell</label><div style="padding:4px 0">'+esc(USER)+'</div></div>' : '')+
+    (namen.length? '<div class="fld"><label>Wechseln auf</label>'+namen.map(n=>'<button class="opt" onclick="pickUser('+esc(JSON.stringify(n))+')">'+esc(n)+'</button>').join('')+'</div>' : '')+
+    '<div class="fld"><label>Anderer Name</label><input id="usrFrei" placeholder="Vorname Nachname" value=""></div>'+
+    '<button class="finish" onclick="pickUser(document.getElementById(\'usrFrei\').value)">Übernehmen</button>'+
+    '</div></div>';
+  document.body.appendChild(ov);
+}
+function closeUserOv(){ const ov=document.getElementById('usrOv'); if(ov) ov.remove(); }
+function pickUser(name){
+  const vorher=USER;
+  if(!setUser(name)){ alert('Bitte einen Namen eingeben.'); return; }
+  // Läuft gerade eine Einweisung, zieht das Einweiser-Feld mit – aber nur, solange
+  // es niemand von Hand angepasst hat.
+  if(SESSION && (!SESSION.einweiser || SESSION.einweiser===vorher)){
+    SESSION.einweiser=USER;
+    const f=document.getElementById('f_einw'); if(f) f.value=USER;
+  }
+  closeUserOv();
+}
 async function onLoggedIn(){
-  USER=(msalAccount&&(msalAccount.name||msalAccount.username))||'';
+  // Das MS-Konto ist der Zugang, nicht die Identität: es füllt USER nur, wenn noch
+  // niemand gewählt ist. Ein bewusst gewählter Ausführer bleibt stehen.
+  if(!USER) setUser(deriveName(msalAccount));
   document.getElementById('loginOv').style.display='none';
   document.getElementById('appHeader').style.display='block';
   document.getElementById('main').style.display='block';
-  document.getElementById('userBadge').textContent='👤 '+(USER? USER.split(' ')[0] : '–');
+  applyUserBadge();
   updateThemeBtn();
   showLoader('Verbindung zu SharePoint …');
   try{ await resolveIds(); }catch(e){ hideLoader(); document.getElementById('main').innerHTML='<div class="empty">SharePoint-Verbindung fehlgeschlagen:<br>'+esc((e&&e.message)||e)+'</div>'; return; }
@@ -739,7 +798,7 @@ function footerFields(){
   return '<div class="step-title" style="margin-top:16px">2. Teilnehmer & Unterschrift</div>'+
     '<div class="fld"><label>Auftraggeber</label><input id="f_ag" value="'+esc(SESSION.auftraggeber)+'" oninput="SESSION.auftraggeber=this.value" placeholder="z.B. Goetze KG Armaturen"></div>'+
     '<div class="fld"><label>Bedienungsperson / eingewiesene Person *</label><input id="f_teil" value="'+esc(SESSION.teilnehmer)+'" oninput="SESSION.teilnehmer=this.value" placeholder="Name (Techniker, Hausmeister, Küchenpersonal …)"></div>'+
-    '<div class="fld"><label>Einweiser (KPC)</label><input id="f_einw" value="'+esc(SESSION.einweiser)+'" oninput="SESSION.einweiser=this.value"></div>'+
+    '<div class="fld"><label>Einweiser (KPC)</label><input id="f_einw" value="'+esc(SESSION.einweiser)+'" oninput="SESSION.einweiser=this.value" placeholder="Vorname Nachname"><small class="hint" style="display:block;margin-top:4px">Steht im Protokoll und wird an den eingewiesenen Geräten vermerkt.</small></div>'+
     '<div class="fld"><label>Ort (für „Anerkannt")</label><input id="f_ort" value="'+esc(SESSION.ort)+'" oninput="SESSION.ort=this.value" placeholder="Ort"></div>'+
     '<div class="fld"><label>Datum</label><input id="f_datum" type="date" value="'+esc(SESSION.datum)+'" oninput="SESSION.datum=this.value"></div>'+
     '<div class="fld"><label>Kommentar (optional)</label><textarea id="f_komm" rows="2" oninput="SESSION.kommentar=this.value" placeholder="Bemerkungen, Auffälligkeiten, Ausnahmen …" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-family:inherit;background:var(--white);color:var(--text);resize:vertical">'+esc(SESSION.kommentar||'')+'</textarea></div>'+
@@ -780,6 +839,9 @@ function clearSig(){ SESSION.sig=''; const cv=document.getElementById('sigCanvas
 async function finishSession(){
   if(!SESSION.teilnehmer.trim()){ alert('Bitte den Namen der eingewiesenen Person eingeben.'); return; }
   if(!SESSION.sig){ alert('Bitte die Unterschrift der eingewiesenen Person erfassen.'); return; }
+  // Der Einweiser steht im PDF UND in den Positionen – deshalb Pflichtfeld.
+  const einw=(SESSION.einweiser||'').trim();
+  if(!einw){ alert('Bitte den Einweiser eintragen – er steht im Protokoll und wird an den Geräten vermerkt.'); return; }
   let positions=[];
   if(SESSION.typ==='geraete'){
     positions=Object.keys(SESSION.selected);
@@ -807,9 +869,9 @@ async function finishSession(){
     const up=await spUpload(fname, pdfBlob, 'application/pdf');
     // Status aktualisieren
     if(SESSION.typ==='geraete'){
-      positions.forEach(pos=>{ EW.devices[pos]={ eingewiesen:true, datum:iso, by:USER||'', protokollId:id, sonderChecks:(SESSION.sonder[pos]||[]).map(c=>({txt:c.txt,done:c.done})) }; });
+      positions.forEach(pos=>{ EW.devices[pos]={ eingewiesen:true, datum:iso, by:einw, protokollId:id, sonderChecks:(SESSION.sonder[pos]||[]).map(c=>({txt:c.txt,done:c.done})) }; });
       showLoader('Status wird in die Positionen zurückgeschrieben …');
-      await writeBackEingewiesen(positions, iso);
+      await writeBackEingewiesen(positions, iso, einw);
     } else {
       Object.keys(SESSION.std).forEach(fid=>{ EW.std[fid]={ checks:SESSION.std[fid].map(c=>({txt:c.txt,done:c.done})) }; });
     }
