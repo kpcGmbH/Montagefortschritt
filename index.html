@@ -1099,8 +1099,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 67;
+const APP_VERSION = 68;
 const CHANGELOG = [
+  { v:68, titel:'Einweisung: Unterschrift des Einweisers + Korrektur', punkte:[
+    'Das Protokoll hatte im PDF immer schon zwei Unterschriftsspalten, aber nur die des Kunden ließ sich erfassen – die KPC-Zeile blieb leer. Jetzt gibt es ein zweites Unterschriftsfeld für den Einweiser; beide sind Pflicht.',
+    'Fertige Protokolle lassen sich über ✎ korrigieren: Angaben ändern, beide unterschreiben neu, das PDF wird ersetzt. Die alten Unterschriften werden bewusst verworfen – sie galten dem alten Text. Die Vorversion bleibt im SharePoint-Versionsverlauf erhalten.',
+    'Fällt bei einer Korrektur ein Gerät aus dem Protokoll, verliert es seinen Einweisungs-Haken – außer ein anderes Protokoll weist es nach.' ]},
   { v:67, titel:'Einweisung: Benutzer wechselbar', punkte:[
     'In der Einweisungs-App lässt sich oben rechts über das 👤-Feld umstellen, wer gerade arbeitet – z. B. wenn die Bauleitung die Einweisung übernimmt. Der in der Hauptapp gewählte Ausführer wandert automatisch mit; die Microsoft-Anmeldung bleibt davon unberührt, sie ist nur der Zugang.',
     'Der Einweiser wird jetzt auch an den eingewiesenen Geräten vermerkt – bisher stand dort immer das angemeldete Konto, selbst wenn jemand anderes eingewiesen hat. Das Feld „Einweiser" ist deshalb Pflicht.',

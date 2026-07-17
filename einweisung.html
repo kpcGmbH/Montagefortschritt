@@ -131,7 +131,7 @@ main{padding:14px 12px 40px;max-width:900px;margin:0 auto;}
 .fld input{width:100%;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-family:inherit;background:var(--white);color:var(--text);}
 .confbox{border:1px solid var(--border);border-left:4px solid var(--braun);border-radius:8px;background:var(--bg2);padding:11px 13px;font-size:13px;line-height:1.55;color:var(--text);}
 .sigwrap{border:1px dashed var(--border);border-radius:8px;background:var(--white);}
-#sigCanvas{width:100%;height:160px;display:block;touch-action:none;border-radius:8px;}
+#sigCanvas,#sigCanvasKpc{width:100%;height:160px;display:block;touch-action:none;border-radius:8px;}
 .sigtools{display:flex;justify-content:space-between;align-items:center;padding:6px 10px;border-top:1px solid var(--bg2);}
 .sigtools button{background:none;border:none;color:var(--braun);font-size:12px;font-weight:700;cursor:pointer;}
 .finish{width:100%;background:var(--green);color:#fff;border:none;border-radius:12px;padding:15px;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px;}
@@ -618,6 +618,7 @@ function protLine(p){
   return '<div class="prow"><div class="pmain"><div class="pt">'+esc(p.titel||'Einweisung')+badge+hinweis+'</div>'+
     '<div class="pm">'+fmtDE(p.datum)+(p.etagen&&p.etagen.length? ' · '+esc(p.etagen.join(', ')):'')+(p.teilnehmer? ' · '+esc(p.teilnehmer):'')+(p.positions&&p.positions.length? ' · '+p.positions.length+' Gerät(e)':'')+' · Einweiser: '+esc(p.einweiser||'')+'</div></div>'+
     (p.pdf&&!fehlt? '<button class="plink" onclick="openPdfById(\''+esc(p.id)+'\')">PDF</button>':'')+
+    '<button class="pdel" onclick="editProt(\''+esc(p.id)+'\')" title="Protokoll korrigieren – beide unterschreiben neu">✎</button>'+
     '<button class="pdel" onclick="deleteProt(\''+esc(p.id)+'\')" title="'+(fehlt?'Eintrag aus der Historie entfernen':'Protokoll löschen')+'">🗑</button></div>';
 }
 function toggleEt(ei){ const L=lid(LV[ei].label)+'_'+ei; const b=document.getElementById('ETB_'+L); const t=document.getElementById('TOG_'+L); if(!b)return; const hid=b.classList.toggle('hid'); if(t)t.classList.toggle('cl',hid); }
@@ -652,9 +653,10 @@ async function reconcilePdfs(){
 // ── Protokoll löschen ──
 // Welche Geräte verlieren durch das Löschen ihren Nachweis? Geräte, die ein anderes
 // Protokoll ebenfalls abdeckt, bleiben eingewiesen und werden dorthin umgehängt.
-function protFolgen(p){
+// posListe = Teilmenge (beim Korrigieren: die weggefallenen Geräte); sonst alle des Protokolls.
+function protFolgen(p, posListe){
   const zurueck=[], umhaengen=[];
-  if(p.typ==='geraete') (p.positions||[]).forEach(pos=>{
+  if(p.typ==='geraete') (posListe||p.positions||[]).forEach(pos=>{
     const st=EW.devices[pos];
     if(!st||!st.eingewiesen) return;
     if(st.protokollId&&st.protokollId!==p.id) return;   // Haken hängt an einem anderen Protokoll
@@ -730,6 +732,27 @@ function openPdf(fname, prot){
     .finally(()=>hideLoader());
 }
 
+// ── Protokoll korrigieren ──
+// Die Sitzung wird aus dem Eintrag rekonstruiert (Häkchen liegen in EW.devices/EW.std).
+// Die Unterschriften bleiben BEWUSST leer: die alten gelten dem alten Text – wer den
+// Text ändert, muss neu unterschreiben lassen.
+function editProt(id){
+  const p=EW.protokolle.find(x=>x.id===id); if(!p) return;
+  const selected={}, sonder={};
+  (p.positions||[]).forEach(pos=>{ selected[pos]=true;
+    const st=EW.devices[pos];
+    if(st&&st.sonderChecks) sonder[pos]=st.sonderChecks.map(c=>({txt:c.txt,done:!!c.done}));
+  });
+  const std={};
+  Object.keys(EW.std||{}).forEach(fid=>{ const c=(EW.std[fid]||{}).checks; if(c) std[fid]=c.map(x=>({txt:x.txt,done:!!x.done})); });
+  SESSION={ editId:id, typ:p.typ, selected, sonder, std, collapsed:{},
+    teilnehmer:p.teilnehmer||'', auftraggeber:p.auftraggeber||'', ort:p.ort||'',
+    datum:(p.datum||'').slice(0,10)||todayISO(), einweiser:p.einweiser||'',
+    kommentar:p.kommentar||'', sig:'', sigKpc:'' };
+  mkOverlay('Protokoll korrigieren');
+  if(SESSION.typ==='geraete') renderSessionGeraete(); else renderSessionAllgemein();
+}
+
 // ══════════════════ Sitzung (Neue Einweisung) ══════════════════
 let SESSION=null;
 function startSession(){
@@ -742,7 +765,7 @@ function startSession(){
 // Ort aus dem Projektnamen ableiten (Schema "Nummer Ort Objekt")
 function deriveOrt(){ const p=(PROJNAME||'').trim().split(/\s+/); return p.length>=2? p[1] : ''; }
 function sessionType(typ){
-  SESSION={ typ, selected:{}, sonder:{}, std:{}, collapsed:{}, teilnehmer:'', auftraggeber:(PROJ_AG||EW.auftraggeber||''), ort:(EW.ort||PROJ_ORT||deriveOrt()), datum:todayISO(), einweiser:USER||'', kommentar:'', sig:'' };
+  SESSION={ typ, selected:{}, sonder:{}, std:{}, collapsed:{}, teilnehmer:'', auftraggeber:(PROJ_AG||EW.auftraggeber||''), ort:(EW.ort||PROJ_ORT||deriveOrt()), datum:todayISO(), einweiser:USER||'', kommentar:'', sig:'', sigKpc:'' };
   if(typ==='geraete') renderSessionGeraete(); else renderSessionAllgemein();
 }
 
@@ -819,9 +842,11 @@ function footerFields(){
     '<div class="fld"><label>Ort (für „Anerkannt")</label><input id="f_ort" value="'+esc(SESSION.ort)+'" oninput="SESSION.ort=this.value" placeholder="Ort"></div>'+
     '<div class="fld"><label>Datum</label><input id="f_datum" type="date" value="'+esc(SESSION.datum)+'" oninput="SESSION.datum=this.value"></div>'+
     '<div class="fld"><label>Kommentar (optional)</label><textarea id="f_komm" rows="2" oninput="SESSION.kommentar=this.value" placeholder="Bemerkungen, Auffälligkeiten, Ausnahmen …" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-family:inherit;background:var(--white);color:var(--text);resize:vertical">'+esc(SESSION.kommentar||'')+'</textarea></div>'+
+    '<div class="fld"><label>Unterschrift Einweiser (KPC) *</label><div class="sigwrap"><canvas id="sigCanvasKpc"></canvas><div class="sigtools"><span style="font-size:11px;color:var(--accent2)">Auftragnehmer – steht links im Protokoll</span><button onclick="clearSig(\'sigKpc\')">Löschen</button></div></div></div>'+
     '<div class="fld"><label>Bestätigung der eingewiesenen Person</label><div class="confbox">'+esc(confText())+'</div></div>'+
-    '<div class="fld"><label>Unterschrift der eingewiesenen Person *</label><div class="sigwrap"><canvas id="sigCanvas"></canvas><div class="sigtools"><span style="font-size:11px;color:var(--accent2)">Mit der Unterschrift wird die obige Bestätigung anerkannt</span><button onclick="clearSig()">Löschen</button></div></div></div>'+
-    '<button class="finish" onclick="finishSession()">Protokoll abschließen &amp; speichern</button>';
+    '<div class="fld"><label>Unterschrift der eingewiesenen Person *</label><div class="sigwrap"><canvas id="sigCanvas"></canvas><div class="sigtools"><span style="font-size:11px;color:var(--accent2)">Mit der Unterschrift wird die obige Bestätigung anerkannt</span><button onclick="clearSig(\'sig\')">Löschen</button></div></div></div>'+
+    (SESSION.editId? '<div class="hint" style="margin-bottom:8px">Korrektur: Beide Unterschriften werden neu erfasst – die alten gelten dem alten Text. Das bisherige PDF wird ersetzt (die Vorversion bleibt im SharePoint-Versionsverlauf).</div>' : '')+
+    '<button class="finish" onclick="finishSession()">'+(SESSION.editId? 'Korrektur speichern' : 'Protokoll abschließen &amp; speichern')+'</button>';
 }
 function devByPos(pos){ const d=allDevices().find(x=>x.g.pos===pos); return d?d.g:null; }
 // Checkliste nur für einweisungspflichtige (Elektro) Geräte anlegen
@@ -833,9 +858,13 @@ function toggleEtColl(ei){ SESSION.collapsed[ei]=!(SESSION.collapsed[ei]!==false
 function toggleSck(pos,ci){ SESSION.sonder[pos][ci].done=!SESSION.sonder[pos][ci].done; renderSessionGeraete(); }
 function toggleStd(fid,ci){ SESSION.std[fid][ci].done=!SESSION.std[fid][ci].done; renderSessionAllgemein(); }
 
-// ── Unterschrift-Pad ──
-function initSig(){
-  const cv=document.getElementById('sigCanvas'); if(!cv) return;
+// ── Unterschrift-Pads ──
+// Zwei Stück: der Einweiser (KPC) und die eingewiesene Person. Das PDF hat für beide
+// seit jeher eine Spalte – die linke blieb nur leer, weil das Pad fehlte.
+const SIG_PADS={ sigCanvas:'sig', sigCanvasKpc:'sigKpc' };
+function initSig(){ Object.keys(SIG_PADS).forEach(id=>sigPad(id, SIG_PADS[id])); }
+function sigPad(id, key){
+  const cv=document.getElementById(id); if(!cv) return;
   const ratio=window.devicePixelRatio||1;
   const rect=cv.getBoundingClientRect();
   cv.width=Math.max(300,rect.width)*ratio; cv.height=160*ratio;
@@ -844,29 +873,37 @@ function initSig(){
   function pt(e){ const r=cv.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return {x:t.clientX-r.left, y:t.clientY-r.top}; }
   function down(e){ e.preventDefault(); drawing=true; last=pt(e); }
   function move(e){ if(!drawing)return; e.preventDefault(); const p=pt(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; dirty=true; }
-  function up(){ if(drawing&&dirty){ SESSION.sig=cv.toDataURL('image/png'); } drawing=false; }
+  function up(){ if(drawing&&dirty&&SESSION){ SESSION[key]=cv.toDataURL('image/png'); } drawing=false; }
   cv.addEventListener('mousedown',down); cv.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
   cv.addEventListener('touchstart',down,{passive:false}); cv.addEventListener('touchmove',move,{passive:false}); cv.addEventListener('touchend',up);
   // vorhandene Unterschrift wiederherstellen
-  if(SESSION.sig){ const img=new Image(); img.onload=()=>ctx.drawImage(img,0,0,cv.width/ratio,cv.height/ratio); img.src=SESSION.sig; }
+  if(SESSION && SESSION[key]){ const img=new Image(); img.onload=()=>ctx.drawImage(img,0,0,cv.width/ratio,cv.height/ratio); img.src=SESSION[key]; }
 }
-function clearSig(){ SESSION.sig=''; const cv=document.getElementById('sigCanvas'); if(cv){ cv.getContext('2d').clearRect(0,0,cv.width,cv.height); } }
+function clearSig(key){
+  key=key||'sig';
+  if(SESSION) SESSION[key]='';
+  const id=Object.keys(SIG_PADS).find(k=>SIG_PADS[k]===key);
+  const cv=id&&document.getElementById(id); if(cv){ cv.getContext('2d').clearRect(0,0,cv.width,cv.height); }
+}
 
 // ══════════════════ Abschluss: PDF + SharePoint + Rückschreibung ══════════════════
 async function finishSession(){
   if(!SESSION.teilnehmer.trim()){ alert('Bitte den Namen der eingewiesenen Person eingeben.'); return; }
-  if(!SESSION.sig){ alert('Bitte die Unterschrift der eingewiesenen Person erfassen.'); return; }
   // Der Einweiser steht im PDF UND in den Positionen – deshalb Pflichtfeld.
   const einw=(SESSION.einweiser||'').trim();
   if(!einw){ alert('Bitte den Einweiser eintragen – er steht im Protokoll und wird an den Geräten vermerkt.'); return; }
+  if(!SESSION.sigKpc){ alert('Bitte die Unterschrift des Einweisers (KPC) erfassen.'); return; }
+  if(!SESSION.sig){ alert('Bitte die Unterschrift der eingewiesenen Person erfassen.'); return; }
   let positions=[];
   if(SESSION.typ==='geraete'){
     positions=Object.keys(SESSION.selected);
     if(!positions.length){ alert('Bitte mindestens ein Gerät auswählen.'); return; }
   }
-  showLoader('Protokoll wird erstellt …');
+  // Korrektur eines bestehenden Protokolls oder neues Protokoll?
+  const alt = SESSION.editId? EW.protokolle.find(x=>x.id===SESSION.editId) : null;
+  showLoader(alt? 'Korrektur wird erstellt …' : 'Protokoll wird erstellt …');
   try{
-    const id='P'+Date.now();
+    const id=alt? alt.id : 'P'+Date.now();
     const iso=new Date(SESSION.datum+'T12:00:00').toISOString();
     // Bereich(e) + Etage(n) dieser Sitzung für die Benennung
     let bereiche=[], etagen=[];
@@ -877,15 +914,33 @@ async function finishSession(){
       : (bereiche.length? ('Einweisung – '+(bereiche.length<=2? bereiche.join(', ') : bereiche.slice(0,2).join(', ')+' …')) : 'Geräte-Einweisung');
     // PDF bauen
     const pdfBlob=buildPdf(titel, positions);
-    // Ablage in SharePoint
-    const folder=safeName(PROJNAME)+'/_Einweisung';
-    // Etage(n) gehören in den Dateinamen: sonst sind mehrere Protokolle eines Tages
-    // in SharePoint nicht auseinanderzuhalten und werden von Hand umbenannt.
-    const etTag=etagen.length? '_'+safeName(etagen.slice(0,3).join('_')).replace(/\s+/g,'')+(etagen.length>3?'_ua':'') : '';
-    const fname=folder+'/Einweisung_'+(SESSION.typ)+'_'+SESSION.datum.replace(/-/g,'')+etTag+'_'+id.slice(-6)+'.pdf';
+    // Ablage in SharePoint. Bei einer Korrektur bewusst DERSELBE Pfad: die Datei behält
+    // ihre Identität, und der SharePoint-Versionsverlauf hält fest, was korrigiert wurde.
+    let fname;
+    if(alt){ fname=alt.pdf; }
+    else {
+      const folder=safeName(PROJNAME)+'/_Einweisung';
+      // Etage(n) gehören in den Dateinamen: sonst sind mehrere Protokolle eines Tages
+      // in SharePoint nicht auseinanderzuhalten und werden von Hand umbenannt.
+      const etTag=etagen.length? '_'+safeName(etagen.slice(0,3).join('_')).replace(/\s+/g,'')+(etagen.length>3?'_ua':'') : '';
+      fname=folder+'/Einweisung_'+(SESSION.typ)+'_'+SESSION.datum.replace(/-/g,'')+etTag+'_'+id.slice(-6)+'.pdf';
+    }
     const up=await spUpload(fname, pdfBlob, 'application/pdf');
     // Status aktualisieren
     if(SESSION.typ==='geraete'){
+      // Bei einer Korrektur können Geräte weggefallen sein – die verlieren ihren Nachweis.
+      if(alt){
+        const weg=(alt.positions||[]).filter(p=>positions.indexOf(p)<0);
+        if(weg.length){
+          const f=protFolgen(alt, weg);
+          if(f.zurueck.length){
+            showLoader('Haken „eingewiesen" werden zurückgenommen …');
+            await writeBackNichtEingewiesen(f.zurueck);
+            f.zurueck.forEach(pos=>{ delete EW.devices[pos]; });
+          }
+          f.umhaengen.forEach(u=>{ const st=EW.devices[u.pos]; if(st){ st.protokollId=u.prot.id; st.datum=u.prot.datum; } });
+        }
+      }
       positions.forEach(pos=>{ EW.devices[pos]={ eingewiesen:true, datum:iso, by:einw, protokollId:id, sonderChecks:(SESSION.sonder[pos]||[]).map(c=>({txt:c.txt,done:c.done})) }; });
       showLoader('Status wird in die Positionen zurückgeschrieben …');
       await writeBackEingewiesen(positions, iso, einw);
@@ -896,13 +951,15 @@ async function finishSession(){
     EW.auftraggeber=SESSION.auftraggeber.trim(); EW.ort=SESSION.ort.trim();
     // "vollständig" = alle einweisungspflichtigen Geräte des Projekts jetzt eingewiesen
     let complete=false; if(SESSION.typ==='geraete'){ const c=counts(); complete = c.tot>0 && c.ein>=c.tot; }
-    EW.protokolle.push({ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), einweiser:SESSION.einweiser.trim(), kommentar:(SESSION.kommentar||'').trim(), positions, bereiche, etagen, titel, complete, pdf:fname, pdfId:(up&&up.id)||'', ts:Date.now() });
+    const daten={ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), einweiser:einw, kommentar:(SESSION.kommentar||'').trim(), positions, bereiche, etagen, titel, complete, pdf:fname, pdfId:(up&&up.id)||(alt&&alt.pdfId)||'', ts:Date.now() };
+    if(alt){ Object.assign(alt, daten, { korrigiertAm:new Date().toISOString(), korrigiertVon:USER||einw }); MISSING.delete(id); }
+    else { EW.protokolle.push(daten); }
     showLoader('Wird in SharePoint gespeichert …');
     await saveEW();
     hideLoader();
     closeOverlay();
     renderOverview();
-    toast('✓ Einweisungsprotokoll gespeichert');
+    toast(alt? '✓ Korrektur gespeichert' : '✓ Einweisungsprotokoll gespeichert');
     // PDF gleich anzeigen
     try{ window.open(URL.createObjectURL(pdfBlob),'_blank'); }catch(e){}
   }catch(e){ hideLoader(); console.error(e); alert('Speichern fehlgeschlagen: '+((e&&e.message)||e)); }
@@ -992,6 +1049,7 @@ function buildPdf(titel, positions){
   lab('Anerkannt:',M,by); val((SESSION.ort||'')+(SESSION.ort?', ':'')+datumDE,M+24,by); by+=(isAllg?10:14);
   // Unterschriften direkt darunter
   const colW=(W-2*M-16)/2; const sy=by;
+  if(SESSION.sigKpc){ try{ doc.addImage(SESSION.sigKpc,'PNG',M,sy-1,colW*0.8,17); }catch(e){} }
   if(SESSION.sig){ try{ doc.addImage(SESSION.sig,'PNG',M+colW+16,sy-1,colW*0.8,17); }catch(e){} }
   doc.setDrawColor.apply(doc,dark); doc.setLineWidth(0.3);
   doc.line(M,sy+19,M+colW,sy+19); doc.line(M+colW+16,sy+19,M+2*colW+16,sy+19);
