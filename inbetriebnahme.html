@@ -1012,7 +1012,14 @@ function applyUrlContext(){var hash=(location.hash||'').replace(/^#/,'');if(!has
   try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
   // Direkter Einsprung ins DGUV-V3-Prüfprotokoll (aus der Hauptapp: „DGUV digital ausfüllen")
   if(p.proto==='dguv'&&DB['DGUV V3']){CUR.mfr='DGUV V3';openForm('Prüfprotokoll elektrische Geräte');ctxPrefill(p);return true;}
-  if(p.hersteller||p.typ){var mfr=ctxMatchMfr(p.hersteller);var dev=mfr?ctxMatchDev(mfr,p.typ):null;
+  // Sagt die Bezeichnung "Zubehör", wird gar nicht erst zugeordnet – auch nicht über
+  // typ: "Haubenverblendung" traf sonst über das Wort "Haube" im Protokollnamen die
+  // Spülmaschine.
+  if((p.hersteller||p.typ||p.bez)&&!ctxIstZubehoer(p.bez)){
+    var mfr=ctxMatchMfr(p.hersteller);var dev=mfr?ctxMatchDev(mfr,p.typ):null;
+    // typ hat Vorrang, ist in den Stücklisten aber oft nur ein Modellcode ("DV270.2",
+    // "2023105"). Die Geräteart steht in der Bezeichnung -> als Zweitversuch nutzen.
+    if(!dev&&mfr)dev=ctxMatchDevBez(mfr,(p.typ||'')+' '+(p.bez||''));
     if(mfr&&dev){CUR.mfr=mfr;openForm(dev);ctxPrefill(p);return true;}}
   goHome();return true;}  // kein passendes Protokoll -> Startseite (Baustelle ist gesetzt)
 DB.MKN.devices={
@@ -1044,6 +1051,68 @@ DB.MKN.devices={
    'Infragrill':{tags:['Elektro','Wasser'],match:['infragrill','grill'],kopf:mKopf(),sections:[mAllg(),mElektro(),mWasser(),mFunc(),mAbschluss()],sign:genSig({wasser:1})},
    'Kondensationsablufthaube':{tags:['Elektro','Abluft'],match:['ablufthaube','haube','kondensation'],kopf:mKopf(),sections:[mAllg(),mElektro(),mAbluft(),mFunc(),mAbschluss()],sign:genSig({abluft:1})}
 };
+// ── Suchbegriffe für die Vorauswahl aus der Hauptapp ──
+// Bis hierher hatte NUR MKN welche – deshalb sprang die Vorauswahl fast nie an:
+// bei allen anderen Herstellern gab es nichts, woran ein Protokoll erkennbar war.
+// Bewusst EINE Tabelle statt verstreuter match-Arrays: so steht die Zuordnung
+// "Geräteart -> Protokoll" an einer Stelle und lässt sich am Stück prüfen.
+// Achtung ctxNorm: 'ß' fällt raus ("Heißluft" -> "hei luft"), Umlaute bleiben.
+// Deshalb beide Schreibweisen (heiss.../heiß...) und getrennte Wortformen abdecken.
+var CTX_MATCH={
+ 'Allgemein':{
+  'Kombidämpfer / Heißluftdämpfer':['kombidämpfer','kombi-dämpfer','combidämpfer','combi-dämpfer','heissluftdämpfer','konvektomat','hlcd'],
+  'Kochkessel / Druckkochkessel':['kochkessel','druckkochkessel'],
+  'Kippbratpfanne / Multifunktionsbräter':['kippbratpfanne','kipp-bratpfanne','bratpfanne','braisiere','multifunktionsbräter','koch- und bratgerät'],
+  'Fritteuse':['fritteuse','frittier'],
+  'Herd / Kochfeld (Elektro/Induktion)':['induktionskochfeld','kochfeld','induktionsherd','elektroherd','kochstelle'],
+  'Backofen / Heißluftofen':['backofen','heissluftofen','umluftofen'],
+  'Bain-Marie / Wärmewanne':['bain-marie','bainmarie','bain marie','wärmewanne','warmhaltewanne'],
+  'Nudel- / Pastakocher':['nudelkocher','pastakocher','nudelkochgerät'],
+  'Salamander / Grill':['salamander','infragrill','kontaktgrill','grillplatte'],
+  'Spülmaschine (Unterbau / Haube)':['geschirrspülmaschine','gläserspülmaschine','topfspülmaschine','haubenspülmaschine','unterbauspülmaschine','universalspülmaschine','spülmaschine'],
+  'Band- / Korbtransportspülmaschine':['korbtransportspülmaschine','bandspülmaschine','korbtransport','bandtransport'],
+  'Kühl- / Tiefkühlgerät (Schrank/Truhe)':['kühlschrank','tiefkühlschrank','kühltisch','tiefkühltisch','kühlunterbau','kühltruhe','kühlgerät','tiefkühlgerät'],
+  'Kühl- / Tiefkühlzelle':['kühlzelle','tiefkühlzelle'],
+  'Schockfroster / Schnellkühler':['schockfroster','schnellkühler'],
+  'Eiswürfelbereiter / Eismaschine':['eiswürfel','eismaschine','eisbereiter','scherbeneis'],
+  'Dunstabzugshaube / Lüftungsdecke':['ablufthaube','dunstabzug','lüftungsdecke','induktionshaube','kondensationshaube'],
+  'Wasserenthärter / Umkehrosmose':['enthärter','umkehrosmose','osmose','wasseraufbereitung'],
+  'Kaffee- / Heißgetränkemaschine':['kaffeemaschine','kaffeevollautomat','siebträger','heissgetränke'],
+  'Verarbeitungsmaschine (Aufschnitt/Kutter/Mixer)':['aufschnittmaschine','kutter','rührmaschine','fleischwolf','gemüseschneider','planetenrührwerk']
+ },
+ // Rational hat nur zwei Protokolle (Kochgerät vs. Dämpfer) – deshalb darf hier auch
+ // ein generisches "dämpfer" greifen, ohne dass etwas Falsches aufgehen kann.
+ 'Rational':{
+  'iVario Pro':['ivario','koch- und bratgerät','multifunktionales gargerät','multifunktionales koch'],
+  'iCombi Pro / Classic':['icombi','selfcooking','combimaster','kombidämpfer','kombi-dämpfer','combi-dämpfer','dämpfer']
+ },
+ 'Meiko':{ 'Spültechnik (Übergabeprotokoll)':['spülmaschine','spültechnik','topfspülmaschine','bandspülmaschine','haubenspülmaschine','universaltopfspülmaschine'] },
+ 'Hobart':{
+  'Geschirr-/Universalspülmaschine':['geschirrspülmaschine','universalspülmaschine','spülmaschine'],
+  'CHEF’S COMBI (Dämpfer)':['chef s combi','kombidämpfer','kombi-dämpfer','combi-dämpfer','hics']
+ },
+ 'Winterhalter':{ 'Spülmaschine (IB-Karte)':['spülmaschine','gläserspülmaschine','geschirrspülmaschine'] }
+};
+Object.keys(CTX_MATCH).forEach(function(m){ if(!DB[m]||!DB[m].devices) return;
+  Object.keys(CTX_MATCH[m]).forEach(function(d){ var dev=DB[m].devices[d]; if(!dev) return;
+    dev.match=(dev.match||[]).concat(CTX_MATCH[m][d]); }); });
+// Zubehör erbt NICHT das Protokoll des Geräts, auf das es sich bezieht: ein
+// Untergestell "für den vorgenannten Kombidämpfer" ist kein Kombidämpfer. Lieber
+// Startseite als das falsche Protokoll - das würde jemand ahnungslos ausfüllen.
+// "f." = abgekürztes "für" ("Neutralausgabe f. Kaffeemaschine").
+var CTX_ZUBEHOER=/\b(für|fuer|f\.)\s|untergestell|stapelkit|anbaublock|sonderbau|magichood|abdeckung|zwischenboden|zubehör|blende|verblend|aufsatz|korbbord|wandbord|zulauftisch|auslauftisch|arbeitstisch|neutralausgabe/i;
+function ctxIstZubehoer(bez){ return CTX_ZUBEHOER.test(bez||''); }
+// Zuordnung über die BEZEICHNUNG – strikt nur über die hinterlegten Suchbegriffe.
+// Bewusst NICHT ctxMatchDev: das zerlegt zusätzlich den Protokollnamen in Wörter, und
+// "Kühl- / Tiefkühlgerät (Schrank/Truhe)" macht damit jeden "Wandhängeschrank" zum
+// Kühlgerät. Bei typ (Modellcodes) fällt das nicht auf, bei Klartext schon.
+// Der LÄNGSTE Treffer gewinnt, sonst bliebe "Bandspülmaschine" an "Spülmaschine" hängen.
+function ctxMatchDevBez(mfr,text){ if(!text||!DB[mfr])return null;
+  var t=ctxNorm(text),best=null,bs=0;
+  Object.keys(DB[mfr].devices).forEach(function(d){ var score=0;
+    (DB[mfr].devices[d].match||[]).forEach(function(w){ var n=ctxNorm(w); if(n&&t.indexOf(n)>=0&&n.length>score)score=n.length; });
+    if(score>bs){bs=score;best=d;}});
+  return bs>0?best:null; }
 function applyLoadState(){var raw;try{raw=localStorage.getItem('ibn:load');}catch(e){return false;}if(!raw)return false;try{localStorage.removeItem('ibn:load');}catch(e){}
   var o;try{o=JSON.parse(raw);}catch(e){return false;}
   if(!o||!o.mfr||!o.dev||!DB[o.mfr]||!DB[o.mfr].devices[o.dev])return false;
