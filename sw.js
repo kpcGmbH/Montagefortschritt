@@ -2,7 +2,7 @@
 // Cacht die App-Shell + CDN-Bibliotheken (cache-first), damit die App offline startet.
 // Microsoft Graph / Login / SharePoint werden NIE gecacht (network-only) – Daten und
 // Tokens laufen ausschließlich live. Bei jeder Veröffentlichung CACHE-Version erhöhen.
-const CACHE = 'kpc-montage-v70';
+const CACHE = 'kpc-montage-v71';
 
 const SHELL = [
   './',
@@ -52,19 +52,25 @@ self.addEventListener('fetch', e => {
   // Graph, Login, SharePoint-Downloads etc. -> network-only, NICHT abfangen.
   if (!sameOrigin && !isCDN) return;
 
-  // App-Shell-Navigation: network-first (immer neueste index.html online),
+  // Navigation same-origin: network-first (immer die neueste Seite online),
   // bei fehlendem Netz aus dem Cache.
+  // WICHTIG: Nur die Hauptapp ist die App-Shell. Die Nebenseiten (einweisung.html,
+  // inbetriebnahme.html) werden unter IHRER eigenen URL abgelegt – lägen sie unter
+  // './index.html', zeigte die Hauptapp offline die zuletzt geöffnete Nebenseite.
   if (sameOrigin && req.mode === 'navigate') {
+    const isShell = url.pathname.endsWith('/') || /\/index\.html$/.test(url.pathname);
     e.respondWith((async () => {
       try {
         // no-cache: immer beim Server revalidieren -> beim Öffnen sofort die neue Ansicht
         const net = await fetch(req.url, {cache: 'no-cache'});
         const c = await caches.open(CACHE);
-        c.put('./index.html', net.clone());
+        c.put(isShell ? './index.html' : req.url, net.clone());
         return net;
       } catch (_) {
-        const cached = await caches.match('./index.html') || await caches.match('./');
-        return cached || new Response('Offline – App-Shell nicht im Cache.', {status: 503});
+        const cached = isShell
+          ? (await caches.match('./index.html') || await caches.match('./'))
+          : await caches.match(req.url);
+        return cached || new Response('Offline – Seite nicht im Cache.', {status: 503});
       }
     })());
     return;

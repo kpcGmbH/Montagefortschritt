@@ -1093,8 +1093,10 @@ function startData(){
 // die zuletzt vom Nutzer gesehene Version.
 const APP_VERSION = 66;
 const CHANGELOG = [
-  { v:66, titel:'Bautagebuch: Restarbeiten sauber getrennt', punkte:[
-    'Unter „Leistung" stehen jetzt nur noch die an diesem Tag erbrachten Leistungen: die Statusänderungen der Positionen und erledigte Restarbeiten. Neu erfasste Restarbeiten tauchen dort nicht mehr auf – sie sind ein offener Mangel und keine Tagesleistung.' ]},
+  { v:66, titel:'Bautagebuch & Einweisungsprotokolle', punkte:[
+    'Bautagebuch: Unter „Leistung" stehen jetzt nur noch die an diesem Tag erbrachten Leistungen – die Statusänderungen der Positionen und erledigte Restarbeiten. Neu erfasste Restarbeiten tauchen dort nicht mehr auf; sie sind ein offener Mangel und keine Tagesleistung.',
+    'Einweisung: Protokolle ließen sich nicht mehr öffnen, wenn die PDF-Datei in SharePoint umbenannt worden war. Sie werden jetzt zuverlässig gefunden; die Etage steht zur Unterscheidung im Dateinamen und in der Liste.',
+    'Einweisung: Protokolle lassen sich in der Historie löschen (🗑). Die PDF-Datei wandert in den SharePoint-Papierkorb und ist dort 93 Tage wiederherstellbar. Der Haken „Einweisung" wird dabei nur für Geräte zurückgenommen, für die es danach keinen Nachweis mehr gibt.' ]},
   { v:65, titel:'Dichtigkeitsprotokoll: schlankere Positionsliste', punkte:[
     'In der Positionsliste steht jetzt Positionsnummer und Benennung; das Prüfer-Kürzel je Zeile entfällt – der Prüfer steht ohnehin im Kopf des Protokolls.',
     'Bei einem Etagen-Protokoll entfällt die Etagen-Spalte (die Etage steht schon im Prüfumfang) – der Platz gehört der Benennung, die dadurch vollständig passt.' ]},
