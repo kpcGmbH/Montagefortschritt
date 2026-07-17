@@ -471,7 +471,11 @@ Winterhalter:{label:'Winterhalter',desc:'Spülmaschinen · Inbetriebnahmekarte &
        sec('Chemie & Wasser',[txt('Klarspüler'),txt('Reiniger'),txt('Rohwasserqualität'),txt('Wasseraufbereitung'),mea('Gesamthärte (GH)','°dH'),mea('Karbonathärte (KH)','°dH'),mea('Leitwert','µS/cm'),mea('Fließdruck','bar')],{comment:false}),
        single('Inbetriebnahme-Prüfungen',[chk('Elektroanschlüsse geprüft'),chk('MTR+MTF: Abluft ohne Festanschluss ausgeführt'),chk('Reiniger eingestellt (ml/l oder g/l)'),chk('Wasseranschlüsse auf Dichtheit geprüft'),chk('Gerät erklärt und Personal eingewiesen'),chk('Klarspüler eingestellt (ml/l oder g/l)'),chk('Kapazität Wasseraufbereitung geprüft und eingestellt'),chk('Betriebsanleitung übergeben'),mea('Rohwasser-Zulauftemperatur','°C')]),
        sec('Altmaschine',[chk('Wurde eine Altmaschine ausgebaut?'),chk('Wurde die Altmaschine entsorgt?'),txt('Fabrikat der Altmaschine'),txt('Modell der Altmaschine'),txt('Serialnummer der Altmaschine')])
-     ],sign:{mode:'unterschrift',roles:['Kunde']}}
+     // 'Kunde' bleibt bewusst im Array (wird über sigAus ausgeblendet, siehe dort) und
+     // 'Techniker' wird ANGEHÄNGT statt ersetzt: ein neuer Index kann keine alte
+     // Kundenunterschrift aus einem gespeicherten Entwurf erben. Ohne den Techniker
+     // wäre die IB-Karte das einzige Protokoll ganz ohne Unterschrift.
+     ],sign:{mode:'unterschrift',roles:['Kunde','Techniker']}}
   }},
 
 'DGUV V3':{label:'DGUV V3',desc:'Prüfprotokoll für elektrische Geräte nach Instandsetzung, Änderung – Wiederholungsprüfung (BetrSichV / DGUV Vorschrift 3, Prüfgrundlage DIN VDE 0701-0702)',icon:'⚡',
@@ -535,6 +539,13 @@ function initProjectBar(){var a=$('bsProj'),b=$('bsOrt');
   if(a){a.value=PROJECT.name;a.oninput=function(){PROJECT.name=a.value;saveProject();};a.onchange=function(){if(CUR.dev){applyPrefills();openForm(CUR.dev,true);}};}
   if(b){b.value=PROJECT.ort;b.oninput=function(){PROJECT.ort=b.value;saveProject();};b.onchange=function(){if(CUR.dev){applyPrefills();openForm(CUR.dev,true);}};}}
 function isKunde(role){return /kunde/i.test(role);}
+// Kundenunterschriften entfallen in den IBN-Protokollen: die Bestätigung durch den
+// Kunden gehört zur Einweisung (eigene App, mit Bestätigungstext). Zwei Unterschriften
+// derselben Person für inhaltlich Verschiedenes wären nur verwirrend.
+// WICHTIG: Die Rollen werden NICHT aus sign.roles entfernt, sondern nur übersprungen.
+// Sonst verschieben sich die Indizes (g0/g1) und ein gespeicherter Entwurf zeigte die
+// Kundenunterschrift plötzlich als Technikerunterschrift.
+function sigAus(role){return isKunde(role);}
 function isTech(role,mode){if(mode==='ausgefuehrt')return true;if(/Kunde/i.test(role))return false;if(/Vertriebspartner/i.test(role))return false;return true;}
 function applyPrefills(){if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev];const today=todayDE();
   STATE.__auto=STATE.__auto||{};
@@ -556,12 +567,6 @@ function applyPrefills(){if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev]
       setAuto(gk+'.firma',KPC_FIRMA,function(){return g.firma;},function(v){g.firma=v;});
       setAuto(gk+'.name',TECH.name,function(){return g.name;},function(v){g.name=v;});
       if(MYSIG)setAuto(gk+'.img',MYSIG,function(){return g.img;},function(v){g.img=v;});
-    } else if(isKunde(r)){
-      // Kundenblock: Name = Auftraggeber aus den Stammdaten, frei überschreibbar
-      // (unterschreibt eine Person, wird ihr Name eingetippt). Die Unterschrift selbst
-      // wird NIE vorbelegt – die gehört dem Kunden.
-      setAuto(gk+'.name',PROJECT.kunde,function(){return g.name;},function(v){g.name=v;});
-      setAuto(gk+'.ort',ortVal,function(){return g.ort;},function(v){g.ort=v;});
     }});}
 
 function storeKey(){return 'ibn:'+CUR.mfr+':'+CUR.dev+(CUR.pos?(':'+CUR.pos):'');}
@@ -636,7 +641,7 @@ function openForm(dev,keepScroll){
   });
   // Unterschriften
   h+='<div class="section"><div class="sh"><span class="bar"></span><h3>Abschluss &amp; Unterschriften</h3></div><div class="body">';
-  o.sign.roles.forEach((r,gi)=>{h+=sigHTML('g'+gi,r,o.sign.mode);});
+  o.sign.roles.forEach((r,gi)=>{if(sigAus(r))return;h+=sigHTML('g'+gi,r,o.sign.mode);});
   h+='</div></div>';
   view.innerHTML=h;
   // canvases initialisieren
@@ -837,10 +842,10 @@ function exportPDF(){
     y+=2;
   });
   // Unterschriften (leere optionale Kundenunterschriften werden weggelassen)
-  const anySig=o.sign.roles.some(function(r,gi){const g=STATE['g'+gi]||{};return !(isKunde(r)&&!(g.img||g.firma||g.name||g.ort));});
+  const anySig=o.sign.roles.some(function(r){return !sigAus(r);});
   if(anySig){
     secHead('Abschluss & Unterschriften');
-    o.sign.roles.forEach((r,gi)=>sigBlock('g'+gi,r,o.sign.mode));
+    o.sign.roles.forEach((r,gi)=>{if(sigAus(r))return;sigBlock('g'+gi,r,o.sign.mode);});
   }
 
   const fname=('Inbetriebnahme_'+CUR.mfr+'_'+CUR.dev).replace(/[^\wäöüÄÖÜ.-]+/g,'_').replace(/_+/g,'_');
