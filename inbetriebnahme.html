@@ -111,6 +111,18 @@ textarea{border:1.4px solid var(--line);border-radius:8px;min-height:64px;resize
 .actionbar-in{max-width:980px;margin:0 auto;display:flex;align-items:center;gap:12px;padding:11px 16px}
 .actionbar .status{color:var(--gray);font-size:14px}
 .actionbar .spacer{margin-left:auto}
+/* Die Leiste ist am Handy knapp: dort trägt der Knopf nur "Speichern", der Zusatz
+   "& an Position ablegen" erscheint erst, wenn Platz da ist. Nie umbrechen lassen. */
+#pdfBtn{white-space:nowrap}
+@media(max-width:620px){
+  #pdfBtn .lang{display:none}
+  /* Die Leiste brauchte schon vorher ~495px und schob den Speichern-Knopf aus dem
+     Bild. Auf schmalen Geräten deshalb umbrechen statt abschneiden. */
+  .actionbar-in{flex-wrap:wrap;gap:8px;padding:9px 12px}
+  .actionbar .status{order:3;width:100%;font-size:12px;text-align:center}
+  .actionbar .spacer{display:none}
+  #pdfBtn{margin-left:auto}
+}
 .btn{font-family:inherit;font-weight:400;font-size:16px;border-radius:10px;padding:11px 20px;cursor:pointer;border:1.4px solid var(--copper);transition:.13s}
 .btn.ghost{background:#fff;color:var(--copper)}
 .btn.ghost:hover{background:#fbf5ec}
@@ -192,6 +204,7 @@ textarea{border:1.4px solid var(--line);border-radius:8px;min-height:64px;resize
   <span class="status" id="status"></span>
   <span class="spacer"></span>
   <button class="btn ghost" onclick="resetForm()">Zurücksetzen</button>
+  <!-- Beschriftung setzt ibnUpdatePdfBtn je nach Positionskontext -->
   <button class="btn primary" id="pdfBtn" onclick="exportPDF()">PDF exportieren ⬇</button>
 </div></div>
 <div class="toast" id="toast"></div>
@@ -586,8 +599,19 @@ function pickDevice(dev){CUR.dev=dev;CUR.pos=null;CUR.fresh=true;DRAFTAVAIL=fals
   try{var raw=localStorage.getItem('ibn:'+CUR.mfr+':'+dev);if(raw){var o=JSON.parse(raw);DRAFTAVAIL=Object.keys(o).filter(function(k){return k!=='__auto';}).length>0;}}catch(e){}
   STATE={};openForm(dev);}
 function continueDraft(){CUR.fresh=false;DRAFTAVAIL=false;loadState();openForm(CUR.dev,true);toast('Entwurf fortgesetzt');}
+// Der Knopf tut zweierlei: PDF herunterladen UND - nur wenn die App aus einer Position
+// heraus geöffnet wurde - das Protokoll dort ablegen (ibnSendBack). Ohne Positions-
+// kontext gibt es nichts, wo abgelegt werden könnte; die Beschriftung darf das dann
+// auch nicht behaupten.
+function ibnUpdatePdfBtn(){
+  var b=document.getElementById('pdfBtn'); if(!b) return;
+  var anPos=!!(IBNCTX&&IBNCTX.pos);
+  b.innerHTML = anPos? 'Speichern<span class="lang"> &amp; an Position ablegen</span> ⬇' : 'PDF exportieren ⬇';
+  b.title = anPos? 'Protokoll als PDF sichern und an Position '+IBNCTX.pos+' in der Montagefortschritt-App ablegen'
+                 : 'Protokoll als PDF herunterladen (keine Position gewählt – wird nicht in der App abgelegt)';
+}
 function openForm(dev,keepScroll){
-  CUR.dev=dev;if(!(CUR.fresh&&!CUR.pos))loadState();applyPrefills();setCrumbs();
+  CUR.dev=dev;if(!(CUR.fresh&&!CUR.pos))loadState();applyPrefills();setCrumbs();ibnUpdatePdfBtn();
   const o=DB[CUR.mfr].devices[dev];
   let h='<div class="formhead"><h2>'+CUR.mfr+' · '+dev+'</h2><div class="sub">'+(o.pdfSub?(o.pdfTitle?o.pdfTitle.charAt(0)+o.pdfTitle.slice(1).toLowerCase()+' · ':'')+o.pdfSub:'Inbetriebnahmeprotokoll · Leistungsfeststellung')+'</div>'+
         '<div class="progress"><i id="prog"></i></div></div>'+((CUR.fresh&&!CUR.pos&&DRAFTAVAIL)?'<div class="draftbar">📝 Für dieses Gerät existiert ein früherer Entwurf. <button class="btn ghost small" onclick="continueDraft()">Letzten Entwurf fortsetzen</button></div>':'');
