@@ -510,7 +510,9 @@ const view=$('view');
 const KPC_FIRMA='kpc GmbH, Haimbacher Straße 27, 36041 Fulda';
 const TECH={name:'',email:''};
 function todayDE(){var d=new Date(),p=function(n){return String(n).padStart(2,'0');};return p(d.getDate())+'.'+p(d.getMonth()+1)+'.'+d.getFullYear();}
-const PROJECT={name:'',ort:''};
+// kunde = Auftraggeber aus den Projekt-Stammdaten der Hauptapp (__projects.json).
+// Die IBN-App kann ihn nirgends selbst herleiten – er kommt nur über den Hash herein.
+const PROJECT={name:'',ort:'',kunde:''};
 let MYSIG='';
 function loadMySig(){try{MYSIG=localStorage.getItem('ibn:mysig')||'';}catch(e){MYSIG='';}}
 function renderSigBtn(){var b=$('sigBtn');if(b){b.classList.toggle('on',!!MYSIG);b.innerHTML=MYSIG?'✍ Signatur ✓':'✍ Meine Signatur';}}
@@ -527,8 +529,8 @@ function initMySigPad(){var cv=$('cv_mysig'),wrap=$('wrap_mysig');if(!cv)return;
 function clearMySig(){var cv=$('cv_mysig');if(cv){var ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);cv.__ink=false;}var ph=$('ph_mysig');if(ph)ph.style.display='';}
 function saveMySig(){var cv=$('cv_mysig');MYSIG=(cv&&cv.__ink)?cv.toDataURL('image/png'):'';try{localStorage.setItem('ibn:mysig',MYSIG);}catch(e){}toast(MYSIG?'Eigene Signatur gespeichert':'Signatur entfernt');renderSigBtn();closeMySig();if(CUR.dev){applyPrefills();openForm(CUR.dev,true);}}
 function projLabel(){return PROJECT.name?(PROJECT.ort?PROJECT.name+' · '+PROJECT.ort:PROJECT.name):PROJECT.ort;}
-function loadProject(){try{var j=JSON.parse(localStorage.getItem('ibn:project')||'{}');PROJECT.name=j.name||'';PROJECT.ort=j.ort||'';}catch(e){}}
-function saveProject(){try{localStorage.setItem('ibn:project',JSON.stringify({name:PROJECT.name,ort:PROJECT.ort}));}catch(e){}}
+function loadProject(){try{var j=JSON.parse(localStorage.getItem('ibn:project')||'{}');PROJECT.name=j.name||'';PROJECT.ort=j.ort||'';PROJECT.kunde=j.kunde||'';}catch(e){}}
+function saveProject(){try{localStorage.setItem('ibn:project',JSON.stringify({name:PROJECT.name,ort:PROJECT.ort,kunde:PROJECT.kunde}));}catch(e){}}
 function initProjectBar(){var a=$('bsProj'),b=$('bsOrt');
   if(a){a.value=PROJECT.name;a.oninput=function(){PROJECT.name=a.value;saveProject();};a.onchange=function(){if(CUR.dev){applyPrefills();openForm(CUR.dev,true);}};}
   if(b){b.value=PROJECT.ort;b.oninput=function(){PROJECT.ort=b.value;saveProject();};b.onchange=function(){if(CUR.dev){applyPrefills();openForm(CUR.dev,true);}};}}
@@ -542,17 +544,24 @@ function applyPrefills(){if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev]
     else if(/Name \(Techniker\)|Name des Mitarbeiters/.test(f.l))val=TECH.name;
     else if(/^Baustelle$/.test(f.l))val=projLabel();
     else if(/^Ort$/.test(f.l))val=PROJECT.ort;
+    else if(/^Kunde$/i.test(f.l))val=PROJECT.kunde;
     else if(/Datum/i.test(f.l))val=today;
     setAuto(key,val,function(){return STATE[key];},function(v){STATE[key]=v;});});
   o.sections.forEach(function(s,si){s.items.forEach(function(it,ii){var key='s'+si+'i'+ii;
     if(it.k==='text'&&/Datum|Durchgeführt am/i.test(it.l))setAuto(key,today,function(){return STATE[key];},function(v){STATE[key]=v;});});});
+  var ortVal=(PROJECT.ort?PROJECT.ort+', ':'')+today;
   o.sign.roles.forEach(function(r,gi){var gk='g'+gi,g=STATE[gk]||{};STATE[gk]=g;
     if(isTech(r,o.sign.mode)){
-      var ortVal=(PROJECT.ort?PROJECT.ort+', ':'')+today;
       setAuto(gk+'.ort',ortVal,function(){return g.ort;},function(v){g.ort=v;});
       setAuto(gk+'.firma',KPC_FIRMA,function(){return g.firma;},function(v){g.firma=v;});
       setAuto(gk+'.name',TECH.name,function(){return g.name;},function(v){g.name=v;});
       if(MYSIG)setAuto(gk+'.img',MYSIG,function(){return g.img;},function(v){g.img=v;});
+    } else if(isKunde(r)){
+      // Kundenblock: Name = Auftraggeber aus den Stammdaten, frei überschreibbar
+      // (unterschreibt eine Person, wird ihr Name eingetippt). Die Unterschrift selbst
+      // wird NIE vorbelegt – die gehört dem Kunden.
+      setAuto(gk+'.name',PROJECT.kunde,function(){return g.name;},function(v){g.name=v;});
+      setAuto(gk+'.ort',ortVal,function(){return g.ort;},function(v){g.ort=v;});
     }});}
 
 function storeKey(){return 'ibn:'+CUR.mfr+':'+CUR.dev+(CUR.pos?(':'+CUR.pos):'');}
@@ -1031,7 +1040,12 @@ function ibnSendBack(durl,name){if(!IBNCTX||!IBNCTX.pos)return false;
 function applyUrlContext(){var hash=(location.hash||'').replace(/^#/,'');if(!hash)return false;
   var p={};hash.split('&').forEach(function(kv){var i=kv.indexOf('=');if(i>0)try{p[decodeURIComponent(kv.slice(0,i))]=decodeURIComponent(kv.slice(i+1));}catch(e){}});
   if(!p.projekt&&!p.ort&&!p.hersteller&&!p.typ&&!p.proto)return false;
-  if(p.projekt!==undefined)PROJECT.name=p.projekt;if(p.ort!==undefined&&p.ort!=='')PROJECT.ort=p.ort;saveProject();
+  if(p.projekt!==undefined)PROJECT.name=p.projekt;if(p.ort!==undefined&&p.ort!=='')PROJECT.ort=p.ort;
+  // Der Kunde der aufrufenden Baustelle gilt – AUCH wenn er leer ist. PROJECT.kunde
+  // überlebt im localStorage; ohne das Leeren stünde bei einer Baustelle ohne
+  // Auftraggeber der Kunde der zuletzt geöffneten Baustelle im Protokoll.
+  if(p.kunde!==undefined)PROJECT.kunde=p.kunde;
+  saveProject();
   if(p.pos){IBNCTX={pos:p.pos,projekt:p.projekt||''};CUR.pos=p.pos;}
   try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
   // Direkter Einsprung ins DGUV-V3-Prüfprotokoll (aus der Hauptapp: „DGUV digital ausfüllen")

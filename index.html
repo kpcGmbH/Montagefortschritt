@@ -1099,8 +1099,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 69;
+const APP_VERSION = 70;
 const CHANGELOG = [
+  { v:70, titel:'Inbetriebnahme: Kunde und Ort werden vorausgefüllt', punkte:[
+    'Beim Öffnen eines IBN-Protokolls stehen Auftraggeber und Ort jetzt automatisch drin – im Kopf und bei der Kundenunterschrift. Bisher wurden sie beim Aufruf gar nicht mitgegeben und blieben leer.',
+    'Der Knopf unten heißt jetzt „Speichern & an Position ablegen": er lädt das PDF nicht nur herunter, sondern legt es auch bei der Position ab. Am Handy ist er endlich vollständig sichtbar.',
+    'Voraussetzung ist ein hinterlegter Auftraggeber – bei Baustellen ohne Angabe bleibt das Feld leer. Über 🏢 in der Baustellen-Auswahl lässt er sich nachtragen.' ]},
   { v:69, titel:'Inbetriebnahme: Protokoll wird wieder vorausgewählt', punkte:[
     '„📝 IBN digital ausfüllen" öffnet jetzt viel häufiger direkt das passende Protokoll. Bisher hatte nur MKN Suchbegriffe hinterlegt – bei allen anderen Herstellern gab es nichts, woran ein Protokoll erkennbar war, deshalb kam fast immer die Startseite.',
     'Zugeordnet wird jetzt auch über die Bezeichnung der Position, nicht nur über den Typ: in den Stücklisten steht dort oft nur ein Modellcode („DV270.2"), die Geräteart aber in der Benennung.',
@@ -3780,7 +3784,11 @@ function openEinweisung(){
 const IBN_URL='inbetriebnahme.html';
 function itemByPos(pos){for(const s of DATA)for(const su of s.subsections)for(const it of su.items)if(it.pos===pos)return it;return null;}
 function openIbnDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.classList.remove('open');const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
-  const url=IBN_URL+'#projekt='+q(curProjName())+'&ort='+q('')+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez);
+  // Auftraggeber + Ort aus den Projekt-Stammdaten mitgeben – wie openDguvDigital.
+  // Ohne das blieben "Kunde" und "Ort" im Protokoll leer (ort ging bisher als '' raus,
+  // kunde gar nicht) – die IBN-App kann sie sonst nirgends herholen.
+  const proj=(typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS.find(x=>x.pid===PID):null;
+  const url=IBN_URL+'#projekt='+q(curProjName())+'&ort='+q(proj&&proj.ort)+'&kunde='+q(proj&&proj.auftraggeber)+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez);
   window.open(url,'_blank','noopener');}
 // ── DGUV digital: öffnet die IBN-App direkt beim DGUV-V3-Prüfprotokoll (Kontext + Kunde per Hash) ──
 function openDguvDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.classList.remove('open');const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
