@@ -466,14 +466,31 @@ function setUser(name){
   try{ localStorage.setItem('kpc_user',USER); localStorage.setItem('kpc_user_typ','monteur'); }catch(e){}
   applyUserBadge(); return true;
 }
+// Rollen kommen aus der Hauptapp (localStorage 'kpc_rollen') – die Listen leben dort.
+// Geprüft wird das MICROSOFT-KONTO, NIEMALS USER: USER ist ja das, was gewechselt wird.
+// Leitplanke gegen versehentliches Umstellen, KEINE Sicherheitsgrenze.
+function rollen(){ try{ return JSON.parse(localStorage.getItem('kpc_rollen')||'null'); }catch(e){ return null; } }
+function darfBenutzerWechseln(){
+  const r=rollen(); if(!r) return false;   // Rollen unbekannt -> im Zweifel gesperrt
+  const n=String(deriveName(msalAccount)||'').trim().toLowerCase(); if(!n) return false;
+  return (r.bauleitung||[]).concat(r.innendienst||[]).some(x=>String(x).trim().toLowerCase()===n);
+}
 function applyUserBadge(){
   const b=document.getElementById('userBadge'); if(!b) return;
+  const darf=darfBenutzerWechseln();
   b.textContent='👤 '+(USER? USER.split(' ')[0] : 'Wer?');
-  b.title=(USER||'Niemand gewählt')+' – tippen zum Wechseln';
+  b.style.cursor=darf? 'pointer' : 'default';
+  b.title=darf? ((USER||'Niemand gewählt')+' – tippen zum Wechseln') : (USER||'');
 }
 // Namensliste kommt aus der Hauptapp (gleiche Origin) – hier bewusst keine zweite Kopie.
 function monteurListe(){ try{ return JSON.parse(localStorage.getItem('kpc_monteure')||'[]')||[]; }catch(e){ return []; } }
 function switchUser(){
+  if(!darfBenutzerWechseln()){
+    alert(rollen()
+      ? 'Den Benutzer können nur Bauleitung und Innendienst wechseln.'
+      : 'Den Benutzer können nur Bauleitung und Innendienst wechseln.\n\nHinweis: Die Rollen sind auf diesem Gerät noch nicht bekannt – bitte einmal die Hauptapp öffnen.');
+    return;
+  }
   const namen=monteurListe().filter(n=>n!==USER);
   const eigen=deriveName(msalAccount);
   if(eigen && namen.indexOf(eigen)<0 && eigen!==USER) namen.unshift(eigen);

@@ -1008,6 +1008,11 @@ function ausfTyp(){ return localStorage.getItem('kpc_user_typ')||'monteur'; }
 function istFirma(name){ return FIRMEN.includes(name) || (ausfTyp()==='firma' && name===USER); }
 function applyUserBadge(){
   const b=document.getElementById('userBadge'); if(!b) return;
+  // Nur wer wechseln darf, bekommt das Badge auch als Knopf angeboten.
+  const darf=darfBenutzerWechseln();
+  b.style.cursor = darf? 'pointer' : 'default';
+  b.style.textDecoration = darf? 'underline' : 'none';
+  b.title = darf? 'Ausf\u00fchrer wechseln' : (USER||'');
   if(!USER){ b.textContent='Ausf\u00fchrer'; return; }
   b.textContent = (istFirma(USER)?'\ud83c\udfe2 ':'\u270e ')+USER;
 }
@@ -1098,7 +1103,8 @@ const APP_VERSION = 67;
 const CHANGELOG = [
   { v:67, titel:'Einweisung: Benutzer wechselbar', punkte:[
     'In der Einweisungs-App lässt sich oben rechts über das 👤-Feld umstellen, wer gerade arbeitet – z. B. wenn die Bauleitung die Einweisung übernimmt. Der in der Hauptapp gewählte Ausführer wandert automatisch mit; die Microsoft-Anmeldung bleibt davon unberührt, sie ist nur der Zugang.',
-    'Der Einweiser wird jetzt auch an den eingewiesenen Geräten vermerkt – bisher stand dort immer das angemeldete Konto, selbst wenn jemand anderes eingewiesen hat. Das Feld „Einweiser" ist deshalb Pflicht.' ]},
+    'Der Einweiser wird jetzt auch an den eingewiesenen Geräten vermerkt – bisher stand dort immer das angemeldete Konto, selbst wenn jemand anderes eingewiesen hat. Das Feld „Einweiser" ist deshalb Pflicht.',
+    'Den Ausführer bzw. Benutzer wechseln können nur noch Bauleitung und Innendienst – in beiden Apps. Maßgeblich ist dafür die Microsoft-Anmeldung.' ]},
   { v:66, titel:'Bautagebuch & Einweisungsprotokolle', punkte:[
     'Bautagebuch: Unter „Leistung" stehen jetzt nur noch die an diesem Tag erbrachten Leistungen – die Statusänderungen der Positionen und erledigte Restarbeiten. Neu erfasste Restarbeiten tauchen dort nicht mehr auf; sie sind ein offener Mangel und keine Tagesleistung.',
     'Einweisung: Protokolle ließen sich nicht mehr öffnen, wenn die PDF-Datei in SharePoint umbenannt worden war. Sie werden jetzt zuverlässig gefunden; die Etage steht zur Unterscheidung im Dateinamen und in der Liste.',
@@ -1253,6 +1259,10 @@ function confirmAusfuehrer(){
   else alert('Bitte Name bzw. Firma eingeben.');
 }
 function chooseAusfuehrer(){
+  if(!darfBenutzerWechseln()){
+    showToast('Den Ausführer können nur Bauleitung und Innendienst wechseln.',{bg:'#8b6d22'});
+    return;
+  }
   let ov=document.getElementById('ausfOv');
   if(!ov){ ov=document.createElement('div'); ov.id='ausfOv'; ov.style.cssText='position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
   const curName=(ausfTyp()!=='firma' && USER)?USER:(deriveName(msalAccount)||'');
@@ -3350,6 +3360,24 @@ let BTB = [];        // Bautagebuch-Einträge der Baustelle (BAUTAGEBUCH_<pid>.j
 const BTB_ROLLEN = ['Monteur','Elektriker','Monteurhelfer','Sanitär','Bauleitung','Nachunternehmer'];
 const BTB_WETTER = ['Sonne','Regen','Frost','Wind','Schnee'];
 const BTB_BAULEITER = ['Alexander HOSE','Kai KUEHNE','Christopher RODEMER','Tomasz PANKOWSKI','Horst NAUMANN','Johannes WAHL'];
+// Innendienst – ergänzen, sobald die Namen feststehen (Schreibweise egal, Vergleich
+// ist case-insensitiv; maßgeblich ist der Name des MICROSOFT-Kontos).
+const INNENDIENST = [];
+// Den Ausführer/Benutzer dürfen nur Bauleitung + Innendienst wechseln – Monteure,
+// Elektriker und Sanitär nicht.
+// WICHTIG: geprüft wird das MICROSOFT-KONTO, NIEMALS `USER` – USER ist genau das,
+// was gewechselt wird (wer sich zum Bauleiter macht, dürfte sonst danach wechseln).
+// Das ist eine Leitplanke gegen versehentliches Umstellen, KEINE Sicherheitsgrenze:
+// clientseitige Prüfungen sind umgehbar, und in SharePoint haben alle Angemeldeten
+// dieselben Rechte.
+function darfBenutzerWechseln(){
+  let n=''; try{ n=deriveName(msalAccount); }catch(e){}
+  n=String(n||'').trim().toLowerCase(); if(!n) return false;
+  return BTB_BAULEITER.concat(INNENDIENST).some(x=>String(x).trim().toLowerCase()===n);
+}
+// Die Einweisungs-App (gleiche Origin) prüft dasselbe gegen ihr eigenes MS-Konto –
+// die Listen leben nur hier.
+try{ localStorage.setItem('kpc_rollen', JSON.stringify({bauleitung:BTB_BAULEITER, innendienst:INNENDIENST})); }catch(e){}
 function itemKey(pos){ return (PID||'')+''+pos; }
 
 async function msalInit(){
