@@ -313,6 +313,25 @@ Allgemein:{label:'Allgemein',desc:'Herstellerneutrale Protokolle nach Gerätetyp
      sections:[mAllg(),mElektro(),mWasser(),mAbwasser(),mFunc([chk('Korbheber funktioniert?')]),mAbschluss()],sign:genSig({wasser:1,abwasser:1})},
    'Salamander / Grill':{tags:['Elektro'],kopf:genKopf(),
      sections:[mAllg(),mElektro(),mFunc(),mAbschluss()],sign:genSig({})},
+   'Grillplatte / Griddleplatte':{tags:['Elektro'],kopf:genKopf(),
+     sections:[mAllg(),mElektro(),
+       sec('Grillplatte',[
+         opt('Plattenausführung',['glatt','gerillt','kombiniert glatt/gerillt']),
+         opt('Plattenmaterial',['Stahl verchromt','Edelstahl','Guss','Sonstiges']),
+         chk('Heizzonen einzeln regelbar?'),
+         chk('Fettauffangbehälter / Fettschublade eingesetzt und zugänglich?'),
+         chk('Spritzschutz montiert?'),
+         chk('Aufstellung unter Lüftungsanlage / Haube?')
+       ]),
+       mFunc([
+         chk('Alle Heizzonen werden gleichmäßig warm?'),
+         chk('Temperaturregelung / Thermostat funktioniert?'),
+         chk('Sicherheitstemperaturbegrenzer geprüft?'),
+         mea('Eingestellte Solltemperatur','°C'),
+         mea('Erreichte Temperatur','°C'),
+         mea('Aufheizzeit','min')
+       ]),
+       mAbschluss()],sign:genSig({})},
    'Spülmaschine (Unterbau / Haube)':{tags:['Elektro','Wasser','Abwasser'],kopf:genKopf(),
      sections:[mAllg(),mElektro(),mWasser([chk('Trinkwasser entspricht den Vorgaben?')]),mAbwasser(),genChemie(),genSpuelFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1})},
    'Band- / Korbtransportspülmaschine':{tags:['Elektro','Wasser','Abwasser','Abluft'],kopf:genKopf(),
@@ -1150,7 +1169,9 @@ var CTX_MATCH={
   'Backofen / Heißluftofen':['backofen','heissluftofen','umluftofen'],
   'Bain-Marie / Wärmewanne':['bain-marie','bainmarie','bain marie','wärmewanne','warmhaltewanne'],
   'Nudel- / Pastakocher':['nudelkocher','pastakocher','nudelkochgerät'],
-  'Salamander / Grill':['salamander','infragrill','kontaktgrill','grillplatte'],
+  'Salamander / Grill':['salamander','infragrill','kontaktgrill'],
+  // 'grillplatte' zeigte bis 2026-07-21 auf 'Salamander / Grill' – jetzt eigenes Protokoll.
+  'Grillplatte / Griddleplatte':['grillplatte','griddleplatte','griddle','bratplatte','plancha'],
   'Spülmaschine (Unterbau / Haube)':['geschirrspülmaschine','gläserspülmaschine','topfspülmaschine','haubenspülmaschine','unterbauspülmaschine','universalspülmaschine','spülmaschine'],
   'Band- / Korbtransportspülmaschine':['korbtransportspülmaschine','bandspülmaschine','korbtransport','bandtransport'],
   'Kühl- / Tiefkühlgerät (Schrank/Truhe)':['kühlschrank','tiefkühlschrank','kühltisch','tiefkühltisch','kühlunterbau','kühltruhe','kühlgerät','tiefkühlgerät'],
