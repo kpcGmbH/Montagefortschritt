@@ -332,6 +332,30 @@ Allgemein:{label:'Allgemein',desc:'Herstellerneutrale Protokolle nach Gerätetyp
          mea('Aufheizzeit','min')
        ]),
        mAbschluss()],sign:genSig({})},
+   // Real verbaut sind Induktions-Woks (Berner) und Front-Cooking-Sonderbauten.
+   // GAS bewusst NICHT abgedeckt – das bräuchte eigene Prüfpunkte (Gasanschluss,
+   // Dichtheit, Abgasführung); wie bei allen Allgemein-Protokollen hier nur Elektro.
+   'Wok (Induktion/Elektro)':{tags:['Elektro'],kopf:genKopf(),
+     sections:[mAllg(),mElektro(),
+       sec('Wok',[
+         opt('Beheizung',['Induktion','Elektro (Strahlungsheizkörper)']),
+         opt('Bauform',['Auftischgerät','Einbau / Mulde','Standgerät','Front-Cooking-Station']),
+         mea('Anzahl Wokmulden','Stück'),
+         mea('Muldendurchmesser','mm'),
+         chk('Topferkennung mit der vorhandenen Wokpfanne geprüft?'),
+         chk('Passende Wokpfanne(n) übergeben?'),
+         chk('Lüftungsöffnungen frei, Kühlluft ungehindert?'),
+         chk('Aufstellung unter Lüftungsanlage / Haube?'),
+         chk('Wasserzulauf / Ablauf vorhanden und dicht?')
+       ]),
+       mFunc([
+         chk('Alle Mulden heizen?'),
+         chk('Leistungsstufen durchgeschaltet und regelbar?'),
+         chk('Restwärme- / Betriebsanzeige funktioniert?'),
+         chk('Abschaltung bei abgenommener Pfanne geprüft?'),
+         mea('Aufheizzeit','min')
+       ]),
+       mAbschluss()],sign:genSig({})},
    'Spülmaschine (Unterbau / Haube)':{tags:['Elektro','Wasser','Abwasser'],kopf:genKopf(),
      sections:[mAllg(),mElektro(),mWasser([chk('Trinkwasser entspricht den Vorgaben?')]),mAbwasser(),genChemie(),genSpuelFunc(),mAbschluss()],sign:genSig({wasser:1,abwasser:1})},
    'Band- / Korbtransportspülmaschine':{tags:['Elektro','Wasser','Abwasser','Abluft'],kopf:genKopf(),
@@ -1172,6 +1196,7 @@ var CTX_MATCH={
   'Salamander / Grill':['salamander','infragrill','kontaktgrill'],
   // 'grillplatte' zeigte bis 2026-07-21 auf 'Salamander / Grill' – jetzt eigenes Protokoll.
   'Grillplatte / Griddleplatte':['grillplatte','griddleplatte','griddle','bratplatte','plancha'],
+  'Wok (Induktion/Elektro)':['wok','induktionswok','wokmulde','wokpfanne'],
   'Spülmaschine (Unterbau / Haube)':['geschirrspülmaschine','gläserspülmaschine','topfspülmaschine','haubenspülmaschine','unterbauspülmaschine','universalspülmaschine','spülmaschine'],
   'Band- / Korbtransportspülmaschine':['korbtransportspülmaschine','bandspülmaschine','korbtransport','bandtransport'],
   'Kühl- / Tiefkühlgerät (Schrank/Truhe)':['kühlschrank','tiefkühlschrank','kühltisch','tiefkühltisch','kühlunterbau','kühltruhe','kühlgerät','tiefkühlgerät'],
