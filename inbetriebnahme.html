@@ -851,8 +851,30 @@ function exportPDF(){
   const fname=('Inbetriebnahme_'+CUR.mfr+'_'+CUR.dev).replace(/[^\wäöüÄÖÜ.-]+/g,'_').replace(/_+/g,'_');
   var __durl=null;try{__durl=doc.output('datauristring');}catch(e){}
   doc.save(fname+'.pdf');
-  if(__durl&&ibnSendBack(__durl,fname+'.pdf'))toast('PDF erstellt & an Position '+IBNCTX.pos+' in der App abgelegt – du kannst zurück zur Montagefortschritt-App.');
+  if(__durl&&ibnSendBack(__durl,fname+'.pdf')){
+    var __pos=IBNCTX.pos;
+    toast('Gespeichert – zurück zu Position '+__pos+' …');
+    ibnZurueckZurPosition(__pos);
+  }
   else toast('PDF erstellt');
+}
+// Nach dem Speichern zurück zur Position, aus der heraus das Protokoll geöffnet wurde.
+// Bevorzugt das Elternfenster (dort ist die Baustelle bereits geladen); ist es weg
+// – am Handy werden Hintergrund-Tabs verworfen –, wird diese Seite selbst dorthin
+// navigiert. Der kurze Verzug lässt den PDF-Download noch anlaufen.
+function ibnZurueckZurPosition(pos){
+  setTimeout(function(){
+    try{
+      if(window.opener&&!window.opener.closed){
+        try{ window.opener.focus(); }catch(e){}
+        window.close();
+        // window.close() greift nicht überall (z. B. iOS) -> dann selbst zurücknavigieren
+        setTimeout(function(){ location.href='index.html#ibnpos='+encodeURIComponent(pos||''); }, 400);
+        return;
+      }
+    }catch(e){}
+    location.href='index.html#ibnpos='+encodeURIComponent(pos||'');
+  }, 1200);
 }
 
 /* ===== Eigene Protokolle: PDF-Import + Editor ===== */

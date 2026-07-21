@@ -1099,8 +1099,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 70;
+const APP_VERSION = 71;
 const CHANGELOG = [
+  { v:71, titel:'Inbetriebnahme: zuverlässige Ablage + Rücksprung zur Position', punkte:[
+    'Nach dem Speichern springt die App automatisch zurück zu der Position, aus der das Protokoll geöffnet wurde – die Karte wird kurz hervorgehoben.',
+    'Wichtiger Fehler behoben: War beim Zurückkommen noch keine Baustelle geöffnet (z. B. weil das Handy den Tab im Hintergrund verworfen hatte), meldete die App „wird automatisch übernommen" – das Protokoll war aber schon verworfen und damit endgültig weg. Es wird jetzt aufgehoben und abgelegt, sobald die Baustelle offen ist.',
+    'Die Übergabe wird erst gelöscht, wenn das Protokoll wirklich bei der Position liegt.' ]},
   { v:70, titel:'Inbetriebnahme: Kunde und Ort werden vorausgefüllt', punkte:[
     'Die Kundenunterschrift entfällt in allen IBN-Protokollen – die Bestätigung durch den Kunden gehört zur Einweisung und wird dort erfasst. Unterschrieben wird das IBN-Protokoll von KPC.',
     'Beim Öffnen eines IBN-Protokolls stehen Auftraggeber und Ort jetzt automatisch drin. Bisher wurden sie beim Aufruf gar nicht mitgegeben und blieben leer.',
@@ -3790,14 +3794,24 @@ function openIbnDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.c
   // kunde gar nicht) – die IBN-App kann sie sonst nirgends herholen.
   const proj=(typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS.find(x=>x.pid===PID):null;
   const url=IBN_URL+'#projekt='+q(curProjName())+'&ort='+q(proj&&proj.ort)+'&kunde='+q(proj&&proj.auftraggeber)+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez);
-  window.open(url,'_blank','noopener');}
+  // BEWUSST OHNE 'noopener': die IBN-App ist unsere eigene Seite auf derselben Origin
+  // und braucht window.opener, um das Protokoll direkt zurückzureichen und nach dem
+  // Speichern hierher zurückzuspringen. Mit noopener war beides tot.
+  window.open(url,'_blank');}
 // ── DGUV digital: öffnet die IBN-App direkt beim DGUV-V3-Prüfprotokoll (Kontext + Kunde per Hash) ──
 function openDguvDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.classList.remove('open');const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
   const proj=(typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS.find(x=>x.pid===PID):null;
   const url=IBN_URL+'#proto=dguv&projekt='+q(curProjName())+'&ort='+q(proj&&proj.ort)+'&kunde='+q(proj&&proj.auftraggeber)+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez);
-  window.open(url,'_blank','noopener');}
+  window.open(url,'_blank');}   // ohne noopener – siehe openIbnDigital
 // ── Empfang des fertigen IBN-PDFs aus der IBN-App und Ablage bei der Position ──
 const _ibnSeen=new Set();
+// Rücksprungziel aus der IBN-App (#ibnpos=…). Hash sofort auslesen und entfernen,
+// damit er nicht in der Adresszeile stehen bleibt (und den MSAL-Redirect stört).
+let _ibnJumpPos=(function(){
+  try{ const m=(location.hash||'').match(/[#&]ibnpos=([^&]*)/); if(!m) return '';
+    history.replaceState(null,'',location.pathname+location.search);
+    return decodeURIComponent(m[1]||''); }catch(e){ return ''; }
+})();
 function _dataURLtoBlob(d){const a=d.split(',');const mime=((a[0].match(/:(.*?);/))||[])[1]||'application/pdf';const bin=atob(a[1]);const n=bin.length;const u=new Uint8Array(n);for(let i=0;i<n;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime});}
 async function editIbnProto(pos,i){
   const p=gs(pos).pdfs[i]; if(!p||!p.dataFname){alert('Für dieses Protokoll sind keine bearbeitbaren Daten gespeichert.');return;}
@@ -3808,12 +3822,16 @@ async function editIbnProto(pos,i){
     o.pos=pos; o.editFname=p.fname;
     localStorage.setItem('ibn:load', JSON.stringify(o));
     hideLoader();
-    window.open(IBN_URL,'_blank','noopener');
+    window.open(IBN_URL,'_blank');   // ohne noopener – siehe openIbnDigital
   }catch(e){hideLoader();alert('Konnte IBN-Protokoll nicht laden: '+((e&&e.message)||e));}
 }
+// Gibt true zurück, wenn das Protokoll wirklich abgelegt wurde. NUR dann darf der
+// Aufrufer die Übergabe aus dem localStorage löschen – sonst ist das PDF weg.
 async function ibnReceive(p){
-  if(!p||!p.pos||!p.pdf||!p.id||_ibnSeen.has(p.id))return; _ibnSeen.add(p.id);
-  if(!PID){ alert('IBN-Protokoll empfangen, aber es ist keine Baustelle geöffnet. Bitte Baustelle öffnen – das Protokoll wird dann automatisch übernommen.'); _ibnSeen.delete(p.id); return; }
+  if(!p||!p.pos||!p.pdf||!p.id)return false;
+  if(_ibnSeen.has(p.id))return true;                 // schon abgelegt -> Übergabe darf weg
+  if(!PID) return false;                             // noch keine Baustelle offen -> aufheben, nicht verwerfen
+  _ibnSeen.add(p.id);
   try{
     const pos=p.pos, type=p.ptype||'IBN Protokoll', ts=Date.now();
     const base=protoDir(type,pos)+'/'+pos.replace(/\./g,'_')+'_'+type.replace(/ /g,'_')+'_'+ts;
@@ -3834,12 +3852,65 @@ async function ibnReceive(p){
     if(!replaced) gs(pos).pdfs.push(entry);
     saveFotos(pos); updPG(pos);
     showToast('✓ '+type+' bei Position '+pos+(replaced?' aktualisiert':' abgelegt'));
-  }catch(e){ alert('IBN-Protokoll konnte nicht abgelegt werden: '+((e&&e.message)||e)); }
+    ibnGoToPos(pos);
+    return true;
+  }catch(e){ _ibnSeen.delete(p.id); alert('IBN-Protokoll konnte nicht abgelegt werden: '+((e&&e.message)||e)); return false; }
 }
-function ibnCheckPending(){ try{var v=localStorage.getItem('ibn:return'); if(v){ localStorage.removeItem('ibn:return'); ibnReceive(JSON.parse(v)); } }catch(e){} }
-window.addEventListener('message',function(e){ if(e.origin===location.origin && e.data && e.data.__ibnReturn) ibnReceive(e.data.payload); });
-window.addEventListener('storage',function(e){ if(e.key==='ibn:return' && e.newValue){ var p; try{p=JSON.parse(e.newValue);}catch(x){return;} try{localStorage.removeItem('ibn:return');}catch(x){} ibnReceive(p); } });
+// Springt die Position an, an der das Protokoll gelandet ist, und hebt sie kurz hervor –
+// sonst steht der Monteur nach dem Speichern irgendwo in der Liste.
+function ibnGoToPos(pos){
+  const el=document.getElementById('C'+sp(pos));
+  if(!el) return;
+  // Die Karte kann in einem anderen Etagen-Tab liegen oder von Status-/Gewerk-/
+  // Suchfilter ausgeblendet sein – sonst scrollt man ins Leere.
+  try{
+    const srch=document.getElementById('srch');
+    if(srch&&srch.value){ srch.value=''; }
+    SF='all'; TF='all';
+    const pn=el.closest('.panel');
+    if(pn&&ACT!=='__all'&&pn.dataset.p!==ACT) swTab('__all');   // swTab scrollt selbst auf 0 – danach positionieren
+    applyF();                                   // MUSS auch nach swTab laufen: sonst bleibt
+                                                // das display:none des alten Filters kleben
+    const list=el.closest('.ilist'); if(list) list.classList.remove('hid');   // zugeklappte Liste öffnen
+  }catch(e){}
+  // Nach dem Umschalten/Filtern neu messen und scrollen. scrollIntoView('smooth')
+  // bleibt in manchen Umgebungen wirkungslos -> selbst rechnen, mit Direkt-Fallback.
+  setTimeout(()=>{
+    const e2=document.getElementById('C'+sp(pos)); if(!e2) return;
+    const kopf=()=>(document.querySelector('header')||{}).offsetHeight||0;
+    const ziel=()=>Math.max(0, e2.getBoundingClientRect().top+window.scrollY-kopf()-16);
+    try{ window.scrollTo({top:ziel(),behavior:'smooth'}); }catch(e){ window.scrollTo(0,ziel()); }
+    // Nachkorrektur: die Kopfleiste ist beim Scrollen unterschiedlich hoch, dadurch
+    // rutscht die Karte sonst dahinter. Zweimal nachmessen genügt.
+    setTimeout(()=>{ window.scrollTo(0,ziel());
+      setTimeout(()=>{ if(e2.getBoundingClientRect().top<kopf()) window.scrollTo(0,ziel()); }, 120);
+    }, 650);
+    e2.style.transition='box-shadow .3s'; e2.style.boxShadow='0 0 0 3px var(--braun)';
+    setTimeout(()=>{ e2.style.boxShadow=''; }, 2800);
+  }, 80);
+}
+// Übergabe erst löschen, wenn sie WIRKLICH abgelegt wurde. Vorher wurde sie sofort
+// entfernt und bei fehlender Baustelle verworfen – das PDF war dann unwiederbringlich weg,
+// obwohl die Meldung „wird automatisch übernommen" versprach.
+let _ibnBusy=false;
+async function ibnCheckPending(){
+  if(_ibnBusy) return; _ibnBusy=true;
+  try{
+    const v=localStorage.getItem('ibn:return'); if(!v) return;
+    let p; try{ p=JSON.parse(v); }catch(x){ localStorage.removeItem('ibn:return'); return; }
+    if(await ibnReceive(p)) { try{ localStorage.removeItem('ibn:return'); }catch(x){} }
+  }catch(e){}
+  finally{ _ibnBusy=false; }
+}
+// postMessage trägt die Nutzlast selbst – nutzen, falls das Ablegen im localStorage
+// (Grössenlimit!) fehlgeschlagen ist. Danach die Kopie dort aufräumen.
+window.addEventListener('message',async function(e){
+  if(e.origin!==location.origin || !e.data || !e.data.__ibnReturn) return;
+  if(await ibnReceive(e.data.payload)){ try{ localStorage.removeItem('ibn:return'); }catch(x){} }
+});
+window.addEventListener('storage',function(e){ if(e.key==='ibn:return' && e.newValue) ibnCheckPending(); });
 window.addEventListener('focus',ibnCheckPending);
+document.addEventListener('visibilitychange',function(){ if(!document.hidden) ibnCheckPending(); });
 function trpdf(pos,btn){
   PPOS=pos;
   let menu=document.getElementById('ptypeMenu');
@@ -5072,6 +5143,15 @@ async function selectProject(pid){
     updDichtTasks();
     ov.style.display='none';
     startData();
+    // Wartet ein Protokoll aus der IBN-App? Jetzt ist eine Baustelle offen, also
+    // kann es abgelegt werden (der focus-Handler allein greift zu spät bzw. gar
+    // nicht, wenn der Tab beim Laden schon im Vordergrund war).
+    setTimeout(async ()=>{
+      await ibnCheckPending();
+      // Rücksprung aus der IBN-App (#ibnpos=…) – greift auch, wenn das Protokoll
+      // schon über das Elternfenster abgelegt wurde.
+      if(_ibnJumpPos){ const p=_ibnJumpPos; _ibnJumpPos=''; ibnGoToPos(p); }
+    }, 400);
   }catch(e){
     alert('Projekt konnte nicht geladen werden: '+(e.message||e));
     renderProjectPicker();
