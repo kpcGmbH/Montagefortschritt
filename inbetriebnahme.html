@@ -569,7 +569,11 @@ function applyPrefills(){if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev]
       if(MYSIG)setAuto(gk+'.img',MYSIG,function(){return g.img;},function(v){g.img=v;});
     }});}
 
-function storeKey(){return 'ibn:'+CUR.mfr+':'+CUR.dev+(CUR.pos?(':'+CUR.pos):'');}
+// Gerätenummer gehört in den Schlüssel: sonst teilen sich alle Geräte einer Position
+// mit Stückzahl > 1 EINEN Entwurf (Gerät 2 erbte die Daten von Gerät 1).
+function storeKey(){return 'ibn:'+CUR.mfr+':'+CUR.dev+(CUR.pos?(':'+CUR.pos):'')+((CUR.nr>1)?('#'+CUR.nr):'');}
+// "Gerät 2 von 5" – nur wenn es an der Position wirklich mehrere gibt.
+function ibnStueckLabel(){ const c=IBNCTX||{}; if(!c.nr||(c.von||1)<2) return ''; return 'Gerät '+c.nr+' von '+c.von; }
 function saveState(){ if(CUR.fresh)CUR.fresh=false; if(CUR.dev){try{localStorage.setItem(storeKey(),JSON.stringify(STATE));}catch(e){}} updateProgress(); }
 function loadState(){ try{STATE=JSON.parse(localStorage.getItem(storeKey())||'{}')||{};}catch(e){STATE={};} }
 
@@ -627,7 +631,8 @@ function ibnUpdatePdfBtn(){
 function openForm(dev,keepScroll){
   CUR.dev=dev;if(!(CUR.fresh&&!CUR.pos))loadState();applyPrefills();setCrumbs();ibnUpdatePdfBtn();
   const o=DB[CUR.mfr].devices[dev];
-  let h='<div class="formhead"><h2>'+CUR.mfr+' · '+dev+'</h2><div class="sub">'+(o.pdfSub?(o.pdfTitle?o.pdfTitle.charAt(0)+o.pdfTitle.slice(1).toLowerCase()+' · ':'')+o.pdfSub:'Inbetriebnahmeprotokoll · Leistungsfeststellung')+'</div>'+
+  var __sl=ibnStueckLabel();
+  let h='<div class="formhead"><h2>'+CUR.mfr+' · '+dev+(__sl?(' <span class="tag">'+__sl+'</span>'):'')+'</h2><div class="sub">'+(o.pdfSub?(o.pdfTitle?o.pdfTitle.charAt(0)+o.pdfTitle.slice(1).toLowerCase()+' · ':'')+o.pdfSub:'Inbetriebnahmeprotokoll · Leistungsfeststellung')+'</div>'+
         '<div class="progress"><i id="prog"></i></div></div>'+((CUR.fresh&&!CUR.pos&&DRAFTAVAIL)?'<div class="draftbar">📝 Für dieses Gerät existiert ein früherer Entwurf. <button class="btn ghost small" onclick="continueDraft()">Letzten Entwurf fortsetzen</button></div>':'');
   // Kopfdaten
   h+='<div class="section"><div class="sh"><span class="bar"></span><h3>Allgemeine Angaben</h3></div><div class="body"><div class="grid2">';
@@ -749,7 +754,10 @@ function exportPDF(){
   function header(){
     try{doc.addImage("data:image/png;base64,"+LOGO_B64,'PNG',mL,11,24,17.3);}catch(e){}
     doc.setFont('RC');doc.setFontSize(15);doc.setTextColor(20,20,20);doc.text(o.pdfTitle||'INBETRIEBNAHMEPROTOKOLL',W-mR,16,{align:'right'});
-    doc.setFontSize(9.5);doc.setTextColor(...gray);doc.text(CUR.mfr+'  ·  '+CUR.dev,W-mR,21.5,{align:'right'});
+    // Gerätezähler in den Kopf, NICHT in ein Kopffeld: viele Hersteller-Protokolle
+    // (z. B. Meiko) haben gar kein Standort-/Positionsfeld.
+    var __sl=ibnStueckLabel();
+    doc.setFontSize(9.5);doc.setTextColor(...gray);doc.text(CUR.mfr+'  ·  '+CUR.dev+(__sl?('  ·  '+__sl):''),W-mR,21.5,{align:'right'});
     doc.setFontSize(8);doc.text(o.pdfSub||'Leistungsfeststellung',W-mR,25.5,{align:'right'});
     doc.setDrawColor(...copper);doc.setLineWidth(0.5);doc.line(mL,32,W-mR,32);
     y=40;
@@ -848,7 +856,10 @@ function exportPDF(){
     o.sign.roles.forEach((r,gi)=>{if(sigAus(r))return;sigBlock('g'+gi,r,o.sign.mode);});
   }
 
-  const fname=('Inbetriebnahme_'+CUR.mfr+'_'+CUR.dev).replace(/[^\wäöüÄÖÜ.-]+/g,'_').replace(/_+/g,'_');
+  // Gerätenummer in den Dateinamen: sonst heissen bei Stückzahl > 1 alle Protokolle
+  // einer Position gleich und sind in der Liste nicht auseinanderzuhalten.
+  var __nrTag=(IBNCTX&&IBNCTX.nr>1)?('_Nr'+IBNCTX.nr):'';
+  const fname=('Inbetriebnahme_'+CUR.mfr+'_'+CUR.dev+__nrTag).replace(/[^\wäöüÄÖÜ.-]+/g,'_').replace(/_+/g,'_');
   var __durl=null;try{__durl=doc.output('datauristring');}catch(e){}
   doc.save(fname+'.pdf');
   if(__durl&&ibnSendBack(__durl,fname+'.pdf')){
@@ -1051,7 +1062,10 @@ function ctxMatchDev(mfr,typ){if(!typ||!DB[mfr])return null;var devs=Object.keys
 function ctxPrefill(p){if(!CUR.dev)return;var o=DB[CUR.mfr].devices[CUR.dev];var ch=false;
   o.kopf.forEach(function(f,i){var key='k'+i;
     if(p.typ&&!STATE[key]&&/Typ|Modell/i.test(f.l)){STATE[key]=p.typ;ch=true;}
-    else if(p.pos&&!STATE[key]&&/Position|Standort/i.test(f.l)){STATE[key]=p.pos;ch=true;}
+    // Wo es ein Standortfeld gibt, kommt die Gerätenummer zusätzlich mit hinein.
+    // Verlassen darf man sich darauf nicht – etliche Protokolle haben kein solches Feld,
+    // deshalb steht der Zähler zusätzlich im PDF-Kopf (siehe header() in exportPDF).
+    else if(p.pos&&!STATE[key]&&/Position|Standort/i.test(f.l)){var __sl=ibnStueckLabel();STATE[key]=p.pos+(__sl?(' · '+__sl):'');ch=true;}
     else if(p.sn&&!STATE[key]&&/Seriennummer|Serien-?Nr/i.test(f.l)){STATE[key]=p.sn;ch=true;}
     else if(p.bez&&!STATE[key]&&/Gerät|Bezeichnung/i.test(f.l)){STATE[key]=p.bez;ch=true;}
     else if(p.hersteller&&!STATE[key]&&/Fabrikat|^Hersteller$/i.test(f.l)){STATE[key]=p.hersteller;ch=true;}
@@ -1060,7 +1074,7 @@ function ctxPrefill(p){if(!CUR.dev)return;var o=DB[CUR.mfr].devices[CUR.dev];var
 let IBNCTX=null;
 function ibnSendBack(durl,name){if(!IBNCTX||!IBNCTX.pos)return false;
   var __o=(DB[CUR.mfr]&&DB[CUR.mfr].devices[CUR.dev])||{};
-  var payload={id:String(Date.now())+'_'+IBNCTX.pos,pos:IBNCTX.pos,pdf:durl,name:name,ptype:(__o.ptype||'IBN Protokoll'),projekt:IBNCTX.projekt||'',mfr:CUR.mfr,dev:CUR.dev,state:STATE,replaceFname:(IBNCTX.replaceFname||'')};
+  var payload={id:String(Date.now())+'_'+IBNCTX.pos,pos:IBNCTX.pos,pdf:durl,name:name,ptype:(__o.ptype||'IBN Protokoll'),projekt:IBNCTX.projekt||'',mfr:CUR.mfr,dev:CUR.dev,state:STATE,replaceFname:(IBNCTX.replaceFname||''),nr:(IBNCTX.nr||0),von:(IBNCTX.von||0)};
   try{localStorage.setItem('ibn:return',JSON.stringify(payload));}catch(e){}
   try{if(window.opener&&!window.opener.closed)window.opener.postMessage({__ibnReturn:true,payload:payload},location.origin);}catch(e){}
   return true;}
@@ -1073,7 +1087,10 @@ function applyUrlContext(){var hash=(location.hash||'').replace(/^#/,'');if(!has
   // Auftraggeber der Kunde der zuletzt geöffneten Baustelle im Protokoll.
   if(p.kunde!==undefined)PROJECT.kunde=p.kunde;
   saveProject();
-  if(p.pos){IBNCTX={pos:p.pos,projekt:p.projekt||''};CUR.pos=p.pos;}
+  // nr/von = "Gerät n von m" bei Positionen mit Stückzahl > 1. Ohne diese Kennung
+  // teilten sich alle Geräte einer Position denselben Entwurf – das nächste Gerät
+  // startete dann mit der Seriennummer des vorherigen.
+  if(p.pos){IBNCTX={pos:p.pos,projekt:p.projekt||'',nr:parseInt(p.nr,10)||0,von:parseInt(p.von,10)||0};CUR.pos=p.pos;CUR.nr=IBNCTX.nr;}
   try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
   // Direkter Einsprung ins DGUV-V3-Prüfprotokoll (aus der Hauptapp: „DGUV digital ausfüllen")
   if(p.proto==='dguv'&&DB['DGUV V3']){CUR.mfr='DGUV V3';openForm('Prüfprotokoll elektrische Geräte');ctxPrefill(p);return true;}

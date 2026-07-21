@@ -196,6 +196,7 @@ select.fs option{background:var(--surface);color:var(--text);}
 
 /* PROTOKOLL EDIT/DEL BUTTONS */
 .pdoc .pdoc-name{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700;cursor:pointer;}
+.pdoc .pdoc-nr{flex:0 0 auto;background:var(--chrome-bg2);border:1px solid var(--line);border-radius:10px;padding:1px 7px;font-size:11px;font-weight:700;white-space:nowrap;}
 .pdoc .pdoc-name:hover{text-decoration:underline;}
 .pdoc-btn{background:transparent;border:none;cursor:pointer;font-size:13px;padding:2px 5px;border-radius:3px;}
 .pdoc-edit{color:var(--braun);}
@@ -1099,8 +1100,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 71;
+const APP_VERSION = 72;
 const CHANGELOG = [
+  { v:72, titel:'Inbetriebnahme: mehrere Geräte je Position', punkte:[
+    'Bei Positionen mit Stückzahl größer 1 kann jedes Gerät sein eigenes Protokoll bekommen. Liegt schon eines vor, fragt die App: neues Gerät anlegen oder das letzte weiterbearbeiten.',
+    'Die Protokolle sind jetzt unterscheidbar: „Gerät 2 von 5" steht am Eintrag, im Dateinamen und im PDF-Kopf.',
+    'Wichtig behoben: Bisher teilten sich alle Geräte einer Position denselben Entwurf – das zweite Gerät startete mit der Seriennummer des ersten. Jedes Gerät hat nun seinen eigenen Stand.' ]},
   { v:71, titel:'Inbetriebnahme: zuverlässige Ablage + Rücksprung zur Position', punkte:[
     'Nach dem Speichern springt die App automatisch zurück zu der Position, aus der das Protokoll geöffnet wurde – die Karte wird kurz hervorgehoben.',
     'Wichtiger Fehler behoben: War beim Zurückkommen noch keine Baustelle geöffnet (z. B. weil das Handy den Tab im Hintergrund verworfen hatte), meldete die App „wird automatisch übernommen" – das Protokoll war aber schon verworfen und damit endgültig weg. Es wird jetzt aufgehoben und abgelegt, sobald die Baustelle offen ist.',
@@ -3788,20 +3793,53 @@ function openEinweisung(){
 // ── IBN digital: Übergabe an die Inbetriebnahme-App (gleiche Origin) ──
 const IBN_URL='inbetriebnahme.html';
 function itemByPos(pos){for(const s of DATA)for(const su of s.subsections)for(const it of su.items)if(it.pos===pos)return it;return null;}
-function openIbnDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.classList.remove('open');const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
+// Bei Stückzahl > 1 braucht jedes Gerät sein eigenes Protokoll. Wie viele liegen
+// an dieser Position schon? (nur Protokolle desselben Typs zählen)
+function ibnCount(pos,type){ return (gs(pos).pdfs||[]).filter(p=>p.ibn&&(p.type||'')===type).length; }
+function ibnMenge(it){ const n=parseInt(String((it&&it.menge)||'').replace(/[^0-9]/g,''),10); return (n>0)?n:1; }
+// Liegt schon eins vor, nicht kommentarlos den alten Entwurf laden – das gab dem
+// nächsten Gerät die Seriennummer des vorherigen.
+function ibnStart(pos,type,starten){
+  const it=itemByPos(pos)||{}; const n=ibnCount(pos,type), menge=ibnMenge(it);
+  if(n===0){ starten(1,menge); return; }
+  const arr=(gs(pos).pdfs||[]); let letzterIdx=-1;
+  arr.forEach((p,i)=>{ if(p.ibn&&(p.type||'')===type) letzterIdx=i; });
+  const weiter=(letzterIdx>=0&&arr[letzterIdx].dataFname);
+  let ov=document.getElementById('ibnAskOv'); if(ov) ov.remove();
+  ov=document.createElement('div'); ov.id='ibnAskOv';
+  ov.style.cssText='position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px;';
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);border-radius:14px;padding:22px;max-width:420px;width:100%;color:var(--text);font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:16px;font-weight:700;margin-bottom:6px">Position '+escapeHtml(pos)+'</div>'+
+    '<div style="font-size:13px;color:var(--muted,#8a8f92);margin-bottom:16px">Hier '+(n===1?'liegt bereits 1 Protokoll':'liegen bereits '+n+' Protokolle')+
+      (menge>1?(' · Stückzahl '+menge):'')+'.</div>'+
+    '<button id="ibnNeu" style="width:100%;background:var(--braun);color:#fff;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:8px">'+
+      '＋ Neues Gerät'+(menge>1?(' (Nr. '+(n+1)+' von '+menge+')'):'')+'</button>'+
+    (weiter?'<button id="ibnWeiter" style="width:100%;background:transparent;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:13px;font-size:15px;cursor:pointer;font-family:inherit;margin-bottom:8px">✎ Letztes Protokoll weiterbearbeiten</button>':'')+
+    '<button onclick="document.getElementById(\'ibnAskOv\').remove()" style="width:100%;background:transparent;color:var(--muted,#8a8f92);border:none;padding:9px;font-size:13px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
+    '</div>';
+  document.body.appendChild(ov);
+  document.getElementById('ibnNeu').onclick=function(){ ov.remove(); starten(n+1,menge); };
+  if(weiter) document.getElementById('ibnWeiter').onclick=function(){ ov.remove(); editIbnProto(pos,letzterIdx); };
+}
+function openIbnDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.classList.remove('open');
+  ibnStart(pos,'IBN Protokoll',function(nr,menge){ _openIbnDigital(pos,nr,menge); });}
+function _openIbnDigital(pos,nr,menge){const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
   // Auftraggeber + Ort aus den Projekt-Stammdaten mitgeben – wie openDguvDigital.
   // Ohne das blieben "Kunde" und "Ort" im Protokoll leer (ort ging bisher als '' raus,
   // kunde gar nicht) – die IBN-App kann sie sonst nirgends herholen.
   const proj=(typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS.find(x=>x.pid===PID):null;
-  const url=IBN_URL+'#projekt='+q(curProjName())+'&ort='+q(proj&&proj.ort)+'&kunde='+q(proj&&proj.auftraggeber)+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez);
+  const url=IBN_URL+'#projekt='+q(curProjName())+'&ort='+q(proj&&proj.ort)+'&kunde='+q(proj&&proj.auftraggeber)+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez)+'&nr='+q(nr)+'&von='+q(menge);
   // BEWUSST OHNE 'noopener': die IBN-App ist unsere eigene Seite auf derselben Origin
   // und braucht window.opener, um das Protokoll direkt zurückzureichen und nach dem
   // Speichern hierher zurückzuspringen. Mit noopener war beides tot.
   window.open(url,'_blank');}
 // ── DGUV digital: öffnet die IBN-App direkt beim DGUV-V3-Prüfprotokoll (Kontext + Kunde per Hash) ──
-function openDguvDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.classList.remove('open');const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
+function openDguvDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.classList.remove('open');
+  ibnStart(pos,'DGUV Protokoll',function(nr,menge){ _openDguvDigital(pos,nr,menge); });}
+function _openDguvDigital(pos,nr,menge){const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
   const proj=(typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS.find(x=>x.pid===PID):null;
-  const url=IBN_URL+'#proto=dguv&projekt='+q(curProjName())+'&ort='+q(proj&&proj.ort)+'&kunde='+q(proj&&proj.auftraggeber)+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez);
+  const url=IBN_URL+'#proto=dguv&projekt='+q(curProjName())+'&ort='+q(proj&&proj.ort)+'&kunde='+q(proj&&proj.auftraggeber)+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez)+'&nr='+q(nr)+'&von='+q(menge);
   window.open(url,'_blank');}   // ohne noopener – siehe openIbnDigital
 // ── Empfang des fertigen IBN-PDFs aus der IBN-App und Ablage bei der Position ──
 const _ibnSeen=new Set();
@@ -3843,7 +3881,7 @@ async function ibnReceive(p){
       await queueUpload(dataFname, jb, 'application/json', pos);
     }
     if(!gs(pos).pdfs) gs(pos).pdfs=[];
-    const entry={type:type, name:p.name||(type+'.pdf'), fname:fname, ibn:true, mfr:p.mfr||'', dev:p.dev||'', dataFname:dataFname};
+    const entry={type:type, name:p.name||(type+'.pdf'), fname:fname, ibn:true, mfr:p.mfr||'', dev:p.dev||'', dataFname:dataFname, nr:(p.nr||0), von:(p.von||0)};
     let replaced=false;
     if(p.replaceFname){ const arr=gs(pos).pdfs, idx=arr.findIndex(x=>x.fname===p.replaceFname);
       if(idx>=0){ const old=arr[idx]; arr[idx]=entry; replaced=true;
@@ -3964,7 +4002,9 @@ function updPG(pos){
     const isPdf=(p.fname||p.name||'').toLowerCase().endsWith('.pdf');
     const ibnBtn=p.dataFname?`<button class="pdoc-btn pdoc-edit" onclick="editIbnProto('${pos}',${i})" title="IBN digital bearbeiten">&#9999;&#65039;</button>`:'';
     const editBtn=(isPdf&&!p.dataFname)?`<button class="pdoc-btn pdoc-edit" onclick="pdfOpen('${pos}',${i})" title="Ausfüllen">&#9999;&#65039;</button>`:'';
-    return `<div class="pdoc">&#128196; <span class="pdoc-name" onclick="pdfView('${pos}',${i})">${p.type}: ${p.name}</span>${ibnBtn}${editBtn}<button class="pdoc-btn pdoc-del" onclick="delProto('${pos}',${i})" title="Löschen">&#10005;</button></div>`;
+    // Bei Stückzahl > 1 den Gerätezähler zeigen – sonst heissen alle Einträge gleich
+    const nrTag=(p.nr&&p.von>1)?` <span class="pdoc-nr">Gerät ${p.nr}/${p.von}</span>`:'';
+    return `<div class="pdoc">&#128196; <span class="pdoc-name" onclick="pdfView('${pos}',${i})">${p.type}: ${p.name}</span>${nrTag}${ibnBtn}${editBtn}<button class="pdoc-btn pdoc-del" onclick="delProto('${pos}',${i})" title="Löschen">&#10005;</button></div>`;
   }).join('');
 }
 
