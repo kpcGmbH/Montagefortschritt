@@ -413,6 +413,26 @@ select.fs option{background:var(--surface);color:var(--text);}
 .clog-ok{margin:4px 18px 18px;padding:13px;background:var(--braun);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;}
 
 /* ── Smartphones: gezielt größere Schrift & Touch-Ziele (KEINE globale Skalierung, siehe Übergabe §8) ── */
+/* ── Aktivitätsverlauf je Position (nur Desktop – am Handy zählt der Platz) ── */
+.ov-hist{position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.55);display:none;align-items:center;justify-content:center;padding:24px;}
+.ov-hist .hbox{background:var(--surface);color:var(--text);border-radius:14px;width:100%;max-width:620px;max-height:78vh;display:flex;flex-direction:column;box-shadow:0 10px 40px rgba(0,0,0,.5);overflow:hidden;}
+.ov-hist .hhead{display:flex;align-items:flex-start;gap:12px;padding:16px 18px;border-bottom:1px solid var(--line);}
+.ov-hist .hhead strong{font-size:15px;}
+.ov-hist .hsub{font-size:12px;color:var(--accent2);margin-top:2px;}
+.ov-hist .hclose{margin-left:auto;background:transparent;border:none;color:var(--accent2);font-size:18px;cursor:pointer;font-family:inherit;padding:0 2px;}
+.ov-hist .hbody{overflow-y:auto;padding:6px 0;}
+.ov-hist .hrow{display:grid;grid-template-columns:112px 150px 1fr;gap:10px;padding:7px 18px;border-bottom:1px solid var(--bg2);font-size:12px;align-items:baseline;}
+.ov-hist .hrow:last-child{border-bottom:none;}
+.ov-hist .hz{color:var(--accent2);white-space:nowrap;font-size:11px;}
+.ov-hist .hu{font-weight:700;overflow:hidden;text-overflow:ellipsis;}
+.ov-hist .he{font-weight:300;font-size:10px;color:var(--braun);margin-top:1px;line-height:1.3;}
+.ov-hist .hd{color:var(--accent2);}
+.ov-hist .hleer{padding:26px 18px;color:var(--accent2);font-size:13px;text-align:center;line-height:1.6;}
+.ov-hist .hfoot{padding:8px 18px;border-top:1px solid var(--line);font-size:11px;color:var(--accent2);}
+@media (max-width:480px){
+  .histbtn{display:none;}      /* Verlauf ist bewusst Desktop-only */
+  .ov-hist{display:none!important;}
+}
 @media (max-width:480px){
   body{overflow-x:hidden;}                  /* Kopfzeile darf die Seite nie seitlich scrollbar machen */
   .h-top{flex-wrap:wrap;row-gap:6px;}
@@ -565,6 +585,21 @@ let DATA = [];   // Berlin-Upbeat-LV liegt in SharePoint (LV_berlin-upbeat.json)
 
 const ST={};
 const NOTE_TIMERS={};
+const NOTE_VOR={};   // Stand vor dem Tippen – für den Verlaufseintrag
+// Anmerkung: erst nach der Tipppause speichern UND protokollieren, sonst gäbe es
+// einen Verlaufseintrag je Tastendruck.
+function noteEdit(pos, el){
+  const s=gs(pos);
+  if(NOTE_VOR[pos]===undefined) NOTE_VOR[pos]=s.note||'';
+  autoR(el); s.note=el.value; rc(pos);
+  clearTimeout(NOTE_TIMERS[pos]);
+  NOTE_TIMERS[pos]=setTimeout(()=>{
+    const vorher=NOTE_VOR[pos]||''; delete NOTE_VOR[pos];
+    const jetzt=(s.note||'').trim();
+    if(jetzt!==vorher.trim()) histAdd(pos, jetzt? 'notiz':'notiz-weg', jetzt);
+    savePos(pos);
+  },1500);
+}
 function sp(p){return p.replace(/\./g,'_');}
 
 // ============================================================================
@@ -945,10 +980,11 @@ function buildPanels(){
   <div class="fsec">
     <button class="fbtn" id="FB${id}" onclick="trf('${item.pos}')">&#128247; Foto</button>
     <button class="fbtn" style="background:#4a3a28;margin-left:6px" onclick="trpdf('${item.pos}',this)">&#128196; Protokoll</button>
+    <button class="fbtn histbtn" style="background:transparent;border:1px solid var(--line);color:var(--accent2);margin-left:6px" onclick="openHist('${item.pos}')" title="Änderungsverlauf dieser Position">&#128338; Verlauf</button>
     <div class="fgrid" id="FG${id}"></div>
     <div class="pgrid" id="PG${id}"></div>
   </div>
-  <textarea class="anm" rows="1" placeholder="Anmerkung &#8230;" oninput="autoR(this);gs('${item.pos}').note=this.value;rc('${item.pos}');clearTimeout(NOTE_TIMERS['${item.pos}']);NOTE_TIMERS['${item.pos}']=setTimeout(()=>savePos('${item.pos}'),1500)"></textarea>
+  <textarea class="anm" rows="1" placeholder="Anmerkung &#8230;" oninput="noteEdit('${item.pos}',this)"></textarea>
   <div class="rasec">
     <div class="rahd">&#128203; Restarbeiten <span class="rai" id="RAI${id}"></span></div>
     <div id="RA${id}"></div>
@@ -1105,8 +1141,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 75;
+const APP_VERSION = 76;
 const CHANGELOG = [
+  { v:76, titel:'Änderungsverlauf je Position', punkte:[
+    'Jede Position hat am Desktop einen neuen Knopf „🕒 Verlauf". Er zeigt, wer wann was geändert hat – zum Beispiel „Horst NAUMANN · abgehakt: Geliefert". Auch zurückgenommene Haken erscheinen, damit nichts unbemerkt verschwindet.',
+    'Protokolliert werden die sieben Haken, Änderungen der Anmerkung sowie erfasste und erledigte Restarbeiten. Aufbewahrt werden die letzten 50 Änderungen je Position.',
+    'Trägt jemand für einen anderen ein – etwa die Bauleitung für einen Monteur –, steht das dabei: „Milenko STANIC · erfasst von Johannes WAHL". Maßgeblich ist dafür die Microsoft-Anmeldung, die sich nicht umstellen lässt.',
+    'Der Verlauf startet ab dieser Version – frühere Änderungen ließen sich nicht nachträglich rekonstruieren, weil sie nie gespeichert wurden. Am Handy ist der Verlauf bewusst ausgeblendet.' ]},
   { v:75, titel:'Restarbeiten und offene Leistungen in einem Bericht', punkte:[
     'Aus „Restarbeitenliste" und „Offene Leistungen" ist ein Bericht geworden: „Offene Punkte". Oben die Positionen mit noch ausstehenden Arbeitsschritten aus der Stückliste, darunter die Restarbeiten wie gewohnt mit Fotos und Erledigt-Ansicht.',
     'Damit bekommt ein Nachunternehmer ein Blatt mit allem: Wählt man sein Gewerk, erscheinen dessen offene Leistungen, dessen Restarbeiten und zusätzlich alle Punkte mit Zuständigkeit „Nachunternehmer". Bei Büro und Bauleitung entfällt der Leistungsteil, weil es dafür keine Stücklisten-Schritte gibt.',
@@ -1447,12 +1488,77 @@ function maybeOfferKonsolidieren(){
     }
   }catch(e){ console.warn('Konsolidierungs-Check:', e); }
 }
+// ── Aktivitätsverlauf je Position ──────────────────────────────────────────
+// ts/by halten nur den LETZTEN Stand je Feld und werden beim Abwählen gelöscht.
+// Für einen nachvollziehbaren Verlauf braucht es ein eigenes, anhängendes Log.
+// Bewusst je Position gespeichert (im vorhandenen data-Blob), damit es dem
+// bestehenden Offline-/Sync-Weg folgt und keine zusätzlichen Anfragen kostet.
+const HIST_MAX=50;   // ältere Einträge fallen heraus – hält den Blob dauerhaft klein
+function histAdd(pos,art,txt){
+  if(isEKey(pos)) return;                    // synthetische Etagenzeilen haben keinen Verlauf
+  const s=gs(pos);
+  if(!Array.isArray(s.hist)) s.hist=[];
+  // u = Ausführer (umstellbar), e = wer tatsächlich eingetragen hat.
+  // Maßgeblich ist dafür das MICROSOFT-KONTO: USER lässt sich wechseln, das Konto
+  // nicht. Trägt die Bauleitung für einen Monteur ein, wäre sonst nicht erkennbar,
+  // dass der Monteur es nicht selbst war.
+  let konto=''; try{ konto=deriveName(msalAccount)||''; }catch(e){}
+  const eintrag={t:new Date().toISOString(), u:USER||'', a:art, x:txt||''};
+  // Schreibweise ignorieren: „Johannes Wahl" (Ausführerliste) und „Johannes WAHL"
+  // (aus dem Konto abgeleitet) sind dieselbe Person – sonst stünde dort ein
+  // irreführendes „erfasst von".
+  const norm=s2=>String(s2||'').trim().toLowerCase().replace(/\s+/g,' ');
+  if(konto && norm(konto)!==norm(USER)) eintrag.e=konto;
+  s.hist.push(eintrag);
+  if(s.hist.length>HIST_MAX) s.hist=s.hist.slice(-HIST_MAX);
+  const ov=document.getElementById('histOv');
+  if(ov && ov.dataset.pos===pos) renderHist(pos);   // offenes Fenster mitführen
+}
+const HIST_TXT={set:'abgehakt',unset:'Haken entfernt',notiz:'Anmerkung geändert',
+  'notiz-weg':'Anmerkung gelöscht','ra-neu':'Restarbeit erfasst','ra-erledigt':'Restarbeit erledigt',
+  'ra-offen':'Restarbeit wieder offen'};
+function histFmt(t){ try{ const d=new Date(t);
+  return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+d.getFullYear()+
+    ' · '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }catch(e){ return ''; } }
+function openHist(pos){
+  let ov=document.getElementById('histOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='histOv'; ov.className='ov-hist';
+    ov.onclick=function(e){ if(e.target===ov) closeHist(); };
+    document.body.appendChild(ov); }
+  ov.dataset.pos=pos; ov.style.display='flex';
+  renderHist(pos);
+}
+function closeHist(){ const ov=document.getElementById('histOv'); if(ov){ ov.style.display='none'; ov.dataset.pos=''; } }
+function renderHist(pos){
+  const ov=document.getElementById('histOv'); if(!ov) return;
+  const s=gs(pos), it=itemByPos(pos)||{};
+  const eintraege=(s.hist||[]).slice().reverse();   // neueste zuerst
+  const zeilen = eintraege.length ? eintraege.map(e=>{
+    const was=HIST_TXT[e.a]||e.a;
+    const detail=e.x?('<span class="hd">'+escapeHtml(e.x)+'</span>'):'';
+    const farbe=(e.a==='set'||e.a==='ra-erledigt')?'#3a7a3a':(e.a==='unset'||e.a==='ra-offen'?'#b3261e':'var(--braun)');
+    // Hat jemand anderes eingetragen, gehört das dazu – sonst behauptet der Verlauf,
+    // der Monteur habe es selbst getan.
+    const fremd=e.e?('<div class="he">erfasst von '+escapeHtml(e.e)+'</div>'):'';
+    return '<div class="hrow"><div class="hz">'+histFmt(e.t)+'</div>'+
+      '<div class="hu">'+escapeHtml(e.u||'–')+fremd+'</div>'+
+      '<div class="hw"><span style="color:'+farbe+';font-weight:700">'+escapeHtml(was)+'</span> '+detail+'</div></div>';
+  }).join('') : '<div class="hleer">Für diese Position ist noch nichts protokolliert.<br><span style="font-size:11px">Der Verlauf wird ab jetzt mitgeschrieben – frühere Änderungen konnten nicht gespeichert werden.</span></div>';
+  ov.innerHTML='<div class="hbox" onclick="event.stopPropagation()">'+
+    '<div class="hhead"><div><strong>Verlauf · Position '+escapeHtml(pos)+'</strong>'+
+      '<div class="hsub">'+escapeHtml((it.bez||'').trim())+'</div></div>'+
+      '<button class="hclose" onclick="closeHist()">&#10005;</button></div>'+
+    '<div class="hbody">'+zeilen+'</div>'+
+    (eintraege.length>=HIST_MAX?'<div class="hfoot">Es werden die letzten '+HIST_MAX+' Änderungen je Position aufbewahrt.</div>':'')+
+  '</div>';
+}
 function ckLabel(s,f){const k=s.by&&s.by[f]?shortName(s.by[f])+' · ':'';return k+tsFmt(s.ts[f]);}
 function tc(pos,f){
   const s=gs(pos);
   s[f]=!s[f];
   if(s[f]){ s.ts[f]=new Date().toISOString(); s.by[f]=USER; }
   else { delete s.ts[f]; delete s.by[f]; }
+  histAdd(pos, s[f]?'set':'unset', FLD_LBL[f]||f);
   const id=sp(pos);
   const el=document.getElementById('K'+f+id);
   if(el){el.classList.toggle('on',s[f]);el.querySelector('.cki').innerHTML=s[f]?'&#10003;':'&#9675;';}
@@ -3532,7 +3638,8 @@ function buildPosData(pos){
     pdfs: JSON.stringify(s.pdfs||[]),
     restarbeiten: JSON.stringify(s.restarbeiten||[]),
     ts: JSON.stringify(s.ts||{}),
-    usr: JSON.stringify(s.by||{})
+    usr: JSON.stringify(s.by||{}),
+    hist: JSON.stringify(s.hist||[])
   });
 }
 
@@ -3646,10 +3753,13 @@ async function loadState() {
         try { tsObj = row.ts ? JSON.parse(row.ts) : {}; } catch(e) {}
         let byObj = {};
         try { byObj = row.usr ? JSON.parse(row.usr) : {}; } catch(e) {}
+        let histArr = [];
+        try { histArr = row.hist ? JSON.parse(row.hist) : []; } catch(e) {}
         ST[row.pos] = {
           g: row.g||false, m: row.m||false, a: row.a||false,
           sa: row.sa||false, dp: row.dp||false, ea: row.ea||false, ib: row.ib||false, ew: row.ew||false,
-          note: row.note||'', fotos: fotos, pdfs: pdfs, restarbeiten: rest, ts: tsObj, by: byObj
+          note: row.note||'', fotos: fotos, pdfs: pdfs, restarbeiten: rest, ts: tsObj, by: byObj,
+          hist: Array.isArray(histArr)?histArr:[]
         };
         if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at;
       });
@@ -3765,9 +3875,15 @@ setInterval(async () => {
           cur.sa!==row.sa || cur.dp!==row.dp || cur.ea!==row.ea || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged) {
         let pdfs = cur ? cur.pdfs : [];
         try { if(row.pdfs) pdfs = JSON.parse(row.pdfs); } catch(e) {}
+        // Verlauf: den längeren der beiden Stände behalten. Ohne das würde das
+        // Polling lokal erfasste Einträge wegwerfen, die noch nicht hochgeladen sind.
+        let newHist = cur ? (cur.hist||[]) : [];
+        try { if(row.hist){ const h=JSON.parse(row.hist);
+          if(Array.isArray(h) && h.length>=newHist.length) newHist=h; } }catch(e){}
         ST[row.pos] = { g:row.g||false, m:row.m||false, a:row.a||false,
           sa:row.sa||false, dp:row.dp||false, ea:row.ea||false, ib:row.ib||false, ew:row.ew||false,
-          note:row.note||'', fotos:cur?cur.fotos:[], pdfs:pdfs, restarbeiten:newRest, ts:newTs, by:newBy };
+          note:row.note||'', fotos:cur?cur.fotos:[], pdfs:pdfs, restarbeiten:newRest, ts:newTs, by:newBy,
+          hist:newHist };
         changed = true;
         const id = row.pos.replace(/\./g,'_');
         const fields = ['g','m','a','sa','dp','ea','ib','ew'];
@@ -4600,7 +4716,10 @@ function raSetTxt(pos,i,val){
   const s=gs(pos);
   if(!s.restarbeiten[i])return;
   raEnsure(s.restarbeiten[i]);
+  const warLeer=!(s.restarbeiten[i].txt||'').trim();
   s.restarbeiten[i].txt=val;
+  // Nur beim ERSTEN Text protokollieren, nicht bei jedem Tastendruck
+  if(warLeer && val.trim()) histAdd(pos,'ra-neu',val.trim());
   if(val.trim() && !s.restarbeiten[i].erstelltAm) s.restarbeiten[i].erstelltAm=new Date().toISOString();
   // Ersteller mit dem Login-Kürzel vorbelegen (bleibt änderbar)
   if(val.trim() && !s.restarbeiten[i].ersteller && USER){
@@ -4650,6 +4769,7 @@ function raToggle(pos,i,done){
   s.restarbeiten[i].erledigtAm=done?new Date().toISOString():null;
   if(done && !s.restarbeiten[i].erledigtVon) s.restarbeiten[i].erledigtVon=USER||'';   // wer abhakt, hat's erledigt
   if(!done) s.restarbeiten[i].erledigtVon='';
+  histAdd(pos, done?'ra-erledigt':'ra-offen', (s.restarbeiten[i].txt||'').trim());
   updRA(pos);
   saveFotos(pos);
 }
