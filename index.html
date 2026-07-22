@@ -545,6 +545,9 @@ select.fs option{background:var(--surface);color:var(--text);}
   <button class="fab-mini fab-icon" style="background:#1d6f42;color:#fff" onclick="expRestXlsx()" title="Restarbeitenliste als Excel">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 8l8 8M16 8l-8 8"/></svg>
   </button>
+  <button class="fab-mini fab-icon" style="background:#2a6f8a;color:#fff" onclick="expOffeneLeistungen()" title="Offene Leistungen je Gewerk – Übergabe an Nachunternehmer">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><rect x="8" y="2" width="8" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
+  </button>
   <button class="fab-mini fab-icon" style="background:#b8860b;color:#fff" onclick="openTagesberichtDialog()" title="Tagesbericht (Datum wählen)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/></svg>
   </button>
@@ -1105,8 +1108,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 73;
+const APP_VERSION = 74;
 const CHANGELOG = [
+  { v:74, titel:'Neuer Bericht „Offene Leistungen"', punkte:[
+    'Neuer Knopf in der Berichtsleiste: eine Übersicht aller Positionen, bei denen im gewählten Gewerk noch Arbeitsschritte offen sind – zum Ausdrucken und Übergeben an Nachunternehmer oder Fremdgewerke.',
+    'Je Position steht rot, was noch fehlt (z. B. Elektroanschluss, Inbetriebnahme, Einweisung) und grau, was schon erledigt ist. Umschaltbar zwischen Montage, Elektro und Sanitär; das oben gewählte Gewerk ist vorausgewählt.',
+    'Darunter ein Abschnitt „Zusätzliche Restarbeiten" mit den offenen Restarbeiten dieses Gewerks plus allen Punkten mit Zuständigkeit „Nachunternehmer" – so bekommt die ausführende Firma ein Blatt mit allem. Mit Unterschriftsfeld für beide Seiten.' ]},
   { v:73, titel:'„Offen" zeigt jetzt nur noch unberührte Positionen', punkte:[
     '„Offen" hieß bisher „noch nicht vollständig" – dort standen auch Geräte, die längst angeschlossen waren und bei denen nur noch Inbetriebnahme, Einweisung oder die Dichtigkeitsprüfung fehlten. Jetzt zeigt „Offen" ausschließlich Positionen, an denen im gewählten Gewerk noch gar nichts erledigt ist.',
     'Sobald ein Schritt steht – etwa der Sanitäranschluss, während die Dichtigkeitsprüfung noch aussteht – rutscht die Position zu „Teilweise". Damit sieht man bei Elektro und Sanitär auf einen Blick, wo noch kein Anschluss liegt.',
@@ -4816,7 +4823,28 @@ function collectRestRows(){
   });
   return rows;
 }
-// Restarbeitenliste als Excel (.xlsx) – nutzt bereits geladenes SheetJS
+// ── Offene Leistungen je Gewerk (Übergabe an Nachunternehmer / Fremdgewerk) ──
+// Anders als die Restarbeitenliste (= Mängel/Nacharbeiten) listet das die noch
+// NICHT erbrachten Leistungen aus dem LV: fehlender Anschluss, Inbetriebnahme,
+// Einweisung, Dichtigkeitsprüfung.
+const FLD_LBL={g:'Geliefert',m:'Montiert',sa:'Sanitäranschluss',dp:'Dichtigkeitsprüfung',ea:'Elektroanschluss',ib:'Inbetriebnahme',ew:'Einweisung'};
+function collectOffeneLeistungen(gw){
+  const felder=GEW_FIELDS[gw]||[];
+  const rows=[];
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(item=>{
+    if(!(item.gew||[]).includes(gw)) return;         // nur Positionen dieses Gewerks
+    const s=gs(item.pos);
+    const offen=felder.filter(f=>!s[f]);
+    if(!offen.length) return;                         // hier ist alles erledigt
+    rows.push({
+      geschoss:sec.label, bereich:sub.bez, pos:item.pos, bez:(item.bez||'').trim(),
+      fabrikat:(item.fabrikat||'').trim(), typ:(item.typ||'').trim(),
+      menge:item.menge||'', einh:item.einh||'',
+      offen, erledigt:felder.filter(f=>s[f]), note:(s.note||'').trim()
+    });
+  })));
+  return rows;
+}
 function expRestXlsx(){
   if(typeof XLSX==='undefined'){ alert('Excel-Bibliothek ist nicht geladen (Internet nötig).'); return; }
   const rows=collectRestRows();
@@ -4967,6 +4995,127 @@ raFilter('all');
   w.document.open();
   w.document.write(html);
   w.document.close();
+}
+
+// ── Bericht „Offene Leistungen" (Übergabe an Nachunternehmer / Fremdgewerk) ──
+const OL_GEW=[['M','🔧 Montage'],['E','⚡ Elektro'],['S','🚿 Sanitär']];
+function expOffeneLeistungen(){
+  const now=new Date(), d=now.toLocaleDateString('de-DE');
+  // Alle drei Gewerke sammeln – im Bericht wird umgeschaltet (wie bei expRest)
+  const daten={}; let gesamt=0;
+  OL_GEW.forEach(([g])=>{ daten[g]=collectOffeneLeistungen(g); gesamt+=daten[g].length; });
+  // Offene Restarbeiten je Zuständigkeit (Mängel – gehören in einen eigenen Abschnitt)
+  const raOffen=collectRestRows().filter(r=>!r.done);
+  if(gesamt===0 && raOffen.length===0){ alert('Es sind keine offenen Leistungen erfasst – alle Positionen sind vollständig.'); return; }
+  const w=window.open('','_blank');
+  if(!w){ alert('Das Berichtsfenster wurde vom Browser blockiert. Bitte Popups für diese Seite erlauben.'); return; }
+
+  const chip=(t,farbe)=>`<span style="display:inline-block;font-size:10px;font-weight:700;padding:1px 7px;border-radius:9px;background:${farbe};color:#fff;white-space:nowrap;margin:0 3px 3px 0">${escapeHtml(t)}</span>`;
+  let tableRows='';
+  OL_GEW.forEach(([g])=>{
+    let lastG='',lastB='';
+    daten[g].forEach((r,i)=>{
+      if(r.geschoss!==lastG){
+        tableRows+=`<tr class="grp geschoss" data-g="${g}"><td colspan="5" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:7px 10px;letter-spacing:1px">${escapeHtml(r.geschoss)}</td></tr>`;
+        lastG=r.geschoss; lastB='';
+      }
+      if(r.bereich!==lastB){
+        tableRows+=`<tr class="grp bereich" data-g="${g}"><td colspan="5" style="background:#eeecea;color:#895500;font-weight:700;font-size:12px;padding:4px 10px;border-left:3px solid #d7c1ae">${escapeHtml(r.bereich)}</td></tr>`;
+        lastB=r.bereich;
+      }
+      const offenChips=r.offen.map(f=>chip(FLD_LBL[f]||f,'#c0392b')).join('');
+      const fertigChips=r.erledigt.map(f=>chip('✓ '+(FLD_LBL[f]||f),'#7a8a7a')).join('');
+      tableRows+=`<tr class="ol" data-g="${g}" style="background:${i%2===0?'#fff':'#faf9f7'}">
+        <td style="padding:5px 8px;font-size:10px;color:#a8a8a8;white-space:nowrap;vertical-align:top">${escapeHtml(r.pos)}</td>
+        <td style="padding:5px 8px;font-size:12px;font-weight:700;vertical-align:top">${escapeHtml(r.bez)}${r.note?`<div style="font-weight:300;font-size:10px;color:#895500;margin-top:2px">${escapeHtml(r.note)}</div>`:''}</td>
+        <td style="padding:5px 8px;font-size:11px;color:#a8a8a8;white-space:nowrap;vertical-align:top">${escapeHtml(r.fabrikat)}${r.typ?'<br>'+escapeHtml(r.typ):''}</td>
+        <td style="padding:5px 8px;font-size:11px;text-align:center;white-space:nowrap;vertical-align:top">${escapeHtml(String(r.menge||''))} ${escapeHtml(String(r.einh||''))}</td>
+        <td style="padding:5px 8px;vertical-align:top">${offenChips}${fertigChips}</td>
+      </tr>`;
+    });
+  });
+  // Restarbeiten-Abschnitt: dem Gewerk zugeordnet + alles mit Zuständigkeit „Nachunternehmer"
+  let raRows='';
+  raOffen.forEach((r,i)=>{
+    raRows+=`<tr class="rr" data-gw="${r.gw||'-'}" style="background:${i%2===0?'#fff':'#faf9f7'}">
+      <td style="padding:5px 8px;font-size:10px;color:#a8a8a8;white-space:nowrap">${escapeHtml(r.pos)}</td>
+      <td style="padding:5px 8px;font-size:12px;font-weight:700">${escapeHtml(r.bez)}</td>
+      <td style="padding:5px 8px;font-size:12px">${escapeHtml(r.txt)}</td>
+      <td style="padding:5px 8px;font-size:11px;text-align:center">${escapeHtml(RA_GW_LBL[r.gw]||'–')}</td>
+      <td style="padding:5px 8px;font-size:10px;color:#895500;white-space:nowrap">${escapeHtml(r.geschoss)}</td>
+    </tr>`;
+  });
+  const preGw=(TF!=='all'&&daten[TF]&&daten[TF].length)?TF:(OL_GEW.find(([g])=>daten[g].length)||['E'])[0];
+  const zaehler=JSON.stringify(Object.fromEntries(OL_GEW.map(([g])=>[g,daten[g].length])));
+  const html=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+<title>Offene Leistungen ${escapeHtml(curProjName())} – ${d}</title>
+<style>@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&display=swap');body{font-family:'Roboto Condensed','Arial Narrow',Arial,sans-serif;font-weight:300;margin:0;padding:20px;color:#2b2b2b;}
+.kpc{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #895500;padding-bottom:12px;margin-bottom:20px;}
+.logo-img{height:48px;width:auto;display:block;}
+.meta{text-align:right;font-size:12px;color:#a8a8a8;line-height:1.6;padding-right:96px;}
+.meta strong{display:block;font-size:15px;color:#2b2b2b;font-weight:700;}
+.tw{overflow-x:auto;}                       /* schmale Geräte: Tabelle scrollen statt abschneiden */
+table{width:100%;border-collapse:collapse;margin-bottom:10px;min-width:620px;}
+th{background:#2b2b2b;color:#d7c1ae;font-size:11px;padding:7px 8px;text-align:left;font-weight:700;letter-spacing:0.5px;}
+td{border-bottom:1px solid #eeecea;vertical-align:middle;}
+h2{font-size:14px;color:#895500;margin:26px 0 8px;padding-bottom:4px;border-bottom:1px solid #d7c1ae;letter-spacing:.5px;}
+.gwf{font-family:inherit;font-size:12px;font-weight:700;padding:6px 13px;border-radius:16px;border:1px solid #d4cdc6;background:#fff;color:#2b2b2b;cursor:pointer;}
+.gwf.on{background:#895500;color:#fff;border-color:#895500;}
+.hint{font-size:11px;color:#a8a8a8;margin:0 0 14px}
+.sig{margin-top:40px;display:flex;gap:60px;}
+.sig-box{flex:1;}
+.sig-line{border-top:1px solid #2b2b2b;padding-top:6px;font-size:11px;color:#a8a8a8;margin-top:40px;}
+@media print{body{padding:10px;}button,.flt-bar{display:none!important;}.meta{padding-right:0;}.tw{overflow:visible;}table{min-width:0;}}</style></head><body>
+<button onclick="window.close()" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
+<div class="kpc">
+  <img class="logo-img" src="${repLogo()}" alt="KPC GmbH">
+  <div class="meta"><strong>Offene Leistungen</strong>Projekt: ${escapeHtml(curProjName())}<br>Datum: ${d}<br>Dok.-Nr.: OL-${curProjCode()}-${now.toISOString().slice(0,10).replace(/-/g,'')}</div>
+</div>
+<div class="flt-bar" style="margin:0 0 6px;display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <span style="font-size:12px;color:#a8a8a8">Gewerk:</span>
+  ${OL_GEW.map(([g,l])=>`<button class="gwf" data-g="${g}" onclick="olGw('${g}')">${l} (${daten[g].length})</button>`).join('')}
+</div>
+<p class="hint">Aufgeführt sind alle Positionen dieses Gewerks, bei denen noch Arbeitsschritte offen sind. <span style="color:#c0392b;font-weight:700">Rot</span> = noch zu erledigen, grau = bereits erledigt.</p>
+<div class="tw"><table><thead><tr>
+  <th style="width:70px">Pos.</th><th>Gerät</th><th style="width:130px">Fabrikat / Typ</th><th style="width:60px">Menge</th><th style="width:270px">Offene Schritte</th>
+</tr></thead><tbody>${tableRows||'<tr><td colspan="5" style="padding:14px;color:#a8a8a8;font-size:12px">Keine offenen Leistungen.</td></tr>'}</tbody></table></div>
+<h2 id="raHead">Zusätzliche Restarbeiten</h2>
+<p class="hint" id="raHint">Offene Restarbeiten mit dieser Zuständigkeit sowie alle Punkte für Nachunternehmer.</p>
+<div class="tw"><table><thead><tr>
+  <th style="width:70px">Pos.</th><th>Gerät</th><th>Restarbeit</th><th style="width:110px">Zuständigkeit</th><th style="width:110px">Etage</th>
+</tr></thead><tbody id="raBody">${raRows||'<tr><td colspan="5" style="padding:14px;color:#a8a8a8;font-size:12px">Keine offenen Restarbeiten.</td></tr>'}</tbody></table></div>
+<div class="sig">
+  <div class="sig-box"><div class="sig-line">Datum / Unterschrift KPC GmbH</div></div>
+  <div class="sig-box"><div class="sig-line">Datum / Unterschrift ausführende Firma</div></div>
+</div>
+<div style="margin-top:16px;text-align:center">
+  <button onclick="window.print()" style="padding:10px 24px;background:#895500;color:#fff;border:none;border-radius:4px;font-size:13px;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">Drucken / Als PDF speichern</button>
+</div>
+<script>
+var ZAHL=${zaehler};
+function olGw(g){
+  [].forEach.call(document.querySelectorAll('.gwf[data-g]'),function(b){ b.classList.toggle('on', b.getAttribute('data-g')===g); });
+  [].forEach.call(document.querySelectorAll('tbody tr[data-g]'),function(tr){ tr.style.display=(tr.getAttribute('data-g')===g)?'':'none'; });
+  // Gruppenzeilen ohne sichtbare Position ausblenden
+  var alle=[].slice.call(document.querySelectorAll('tbody tr'));
+  for(var i=0;i<alle.length;i++){ var tr=alle[i]; if(!tr.classList.contains('grp'))continue;
+    var isG=tr.classList.contains('geschoss'), vis=false;
+    for(var j=i+1;j<alle.length;j++){ var t=alle[j];
+      if(t.classList.contains('grp')){ if(!isG)break; if(t.classList.contains('geschoss'))break; }
+      if(t.classList.contains('ol')&&t.style.display!=='none'){vis=true;break;} }
+    if(tr.style.display!=='none') tr.style.display=vis?'':'none'; }
+  // Restarbeiten: die des Gewerks + alles für Nachunternehmer
+  [].forEach.call(document.querySelectorAll('#raBody tr.rr'),function(tr){
+    var gw=tr.getAttribute('data-gw');
+    tr.style.display=(gw===g||gw==='NU')?'':'none'; });
+  var n=[].filter.call(document.querySelectorAll('#raBody tr.rr'),function(t){return t.style.display!=='none';}).length;
+  document.getElementById('raHint').textContent = n? ('Offene Restarbeiten mit dieser Zuständigkeit sowie alle Punkte für Nachunternehmer.') : 'Keine offenen Restarbeiten für dieses Gewerk.';
+}
+olGw('${preGw}');
+<\/script>
+</body></html>`;
+  if(w.closed){return;}
+  w.document.open(); w.document.write(html); w.document.close();
 }
 
 // ================= MEHRPROJEKT + STÜCKLISTEN-IMPORT =================
