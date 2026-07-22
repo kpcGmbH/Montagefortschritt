@@ -3641,133 +3641,176 @@ async function svcBuildPdf(entry){
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'p',unit:'mm',format:'a4'});
   const M=16, W=210, R=W-M, PH=297;
-  const copper=[137,86,0], dark=[43,43,43], grey=[120,120,120], line=[214,209,203];
+  const dark=[43,43,43], grey=[120,120,120];
   const tc=c=>doc.setTextColor(c[0],c[1],c[2]);
   const dc=c=>doc.setDrawColor(c[0],c[1],c[2]);
   let FF='helvetica';
   try{ if(typeof BTB_FONT_B64!=='undefined' && BTB_FONT_B64){ doc.addFileToVFS('RC.ttf',BTB_FONT_B64); doc.addFont('RC.ttf','RobotoCondensed','normal'); FF='RobotoCondensed'; } }catch(e){ FF='helvetica'; }
   const bold=()=>doc.setFont(FF, FF==='helvetica'?'bold':'normal');
   const reg=()=>doc.setFont(FF,'normal');
-  reg();
-  let y=M, logoBottom=y+14;
-  const logo=await btbSvgToPng(repLogo(),300);
-  if(logo){ const lw=28, lh=lw*logo.h/logo.w; doc.addImage(logo.png,'PNG',M,y,lw,lh); logoBottom=y+lh; }
-  bold(); tc(dark); doc.setFontSize(19);
-  doc.text('Servicebericht',R,y+7,{align:'right'});
-  reg(); doc.setFontSize(10); tc(grey);
-  doc.text('Nr. '+entry.nr,R,y+13,{align:'right'});
-  y=Math.max(logoBottom, y+15)+3; dc(copper); doc.setLineWidth(0.8); doc.line(M,y,R,y); y+=8;
+  reg(); dc(dark); tc(dark); doc.setLineWidth(0.3);
 
-  // Einsatzart – sechs Optionen wie auf dem Papierformular, gewählte gefüllt
-  const colX=[M, M+62, M+124];
-  SVC_ARTEN.forEach((o,i)=>{
-    const x=colX[i%3], yy=y+Math.floor(i/3)*8;
-    const on=(entry.art===o[0]);
-    dc(dark); doc.setLineWidth(0.3); doc.circle(x+2.2, yy, 2.2);
-    if(on){ doc.setFillColor(137,86,0); doc.circle(x+2.2, yy, 1.25, 'F'); }
-    if(on) bold(); else reg();
-    doc.setFontSize(10); tc(on?copper:dark);
-    doc.text(o[1], x+6.5, yy+1.3);
-  });
-  reg(); y+=8+7;
-
-  const kv=(x,label,val,w)=>{
-    reg(); doc.setFontSize(7.5); tc(grey); doc.text(label.toUpperCase(),x,y);
-    bold(); doc.setFontSize(11); tc(dark);
-    const t=doc.splitTextToSize((val||'—')+'', (w||(R-x))-2);
-    doc.text(t[0],x,y+5);
-  };
-  const half=(R-M-6)/2;
-  kv(M,'Kunde',entry.kunde,half);            kv(M+half+6,'Auftrag erteilt durch',entry.auftragErteilt,half); y+=11;
-  kv(M,'Straße',entry.strasse,half);         kv(M+half+6,'Auftrag vom',svcDatShort(entry.auftragDatum),half); y+=11;
-  kv(M,'Ort',entry.ort,half);                kv(M+half+6,'Lieferadresse (falls abweichend)',entry.lieferadresse,half); y+=11;
-  kv(M,'Telefon',entry.telefon,half);        kv(M+half+6,'Objekt / Baustelle',curProjName(),half); y+=13;
-
-  // Einsätze
-  bold(); doc.setFontSize(9); tc(copper); doc.text('EINSÄTZE',M,y); y+=3;
-  doc.setFillColor(43,43,43); doc.rect(M,y,R-M,7,'F');
-  doc.setTextColor(215,193,174); doc.setFontSize(9); bold();
-  doc.text('Datum',M+2,y+4.8); doc.text('Techniker / Monteur',M+26,y+4.8);
-  doc.text('Check In',M+94,y+4.8); doc.text('Check Out',M+114,y+4.8);
-  doc.text('Fahrzeit',M+136,y+4.8); doc.text('Kilometer',R-2,y+4.8,{align:'right'});
-  y+=7; reg();
-  const eins=entry.einsaetze||[];
-  if(!eins.length){ tc(grey); doc.setFontSize(10); doc.text('—',M+2,y+5); dc(line); doc.setLineWidth(0.1); doc.line(M,y+7,R,y+7); y+=7; }
-  eins.forEach(e=>{
-    if(y>PH-60){ doc.addPage(); y=M; }
-    tc(dark); doc.setFontSize(9.5);
-    doc.text(svcDatShort(e.datum),M+2,y+5);
-    doc.text(doc.splitTextToSize(String(e.monteur||''),64)[0]||'',M+26,y+5);
-    doc.text(String(e.checkIn||''),M+94,y+5); doc.text(String(e.checkOut||''),M+114,y+5);
-    doc.text(String(e.fahrzeit||''),M+136,y+5); doc.text(String(e.km||''),R-2,y+5,{align:'right'});
-    dc(line); doc.setLineWidth(0.1); doc.line(M,y+7,R,y+7); y+=7;
-  });
-  y+=6;
-
-  const block=(title,text)=>{
-    if(y>PH-60){ doc.addPage(); y=M; }
-    bold(); doc.setFontSize(9); tc(copper); doc.text(title,M,y); y+=5;
-    reg(); doc.setFontSize(10); tc(dark);
-    const lines=doc.splitTextToSize((text&&text.trim())?text:'—', R-M);
-    lines.forEach(ln=>{ if(y>PH-24){ doc.addPage(); y=M; } doc.text(ln,M,y+4); y+=5; });
-    y+=5;
-  };
-  block('ARBEITSAUFTRAG', entry.arbeitsauftrag);
-  block('GERÄTEDATEN', entry.geraetedaten);
-  block('BERICHT', entry.bericht);
-
-  // Material (nur wenn erfasst)
-  const mat=entry.material||[];
-  if(mat.length){
-    if(y>PH-70){ doc.addPage(); y=M; }
-    bold(); doc.setFontSize(9); tc(copper); doc.text('MATERIAL',M,y); y+=3;
-    doc.setFillColor(43,43,43); doc.rect(M,y,R-M,7,'F');
-    doc.setTextColor(215,193,174); doc.setFontSize(9); bold();
-    doc.text('Menge',M+2,y+4.8); doc.text('Material / Artikel',M+30,y+4.8);
-    y+=7; reg();
-    mat.forEach(m=>{
-      if(y>PH-60){ doc.addPage(); y=M; }
-      tc(dark); doc.setFontSize(9.5);
-      doc.text(String(m.menge||''),M+2,y+5);
-      doc.text(doc.splitTextToSize(String(m.text||''),R-M-32)[0]||'',M+30,y+5);
-      dc(line); doc.setLineWidth(0.1); doc.line(M,y+7,R,y+7); y+=7;
-    });
-    y+=6;
-  }
-
-  // Schlussblock „Einsatz beendet" + Bestätigungstext + Unterschriften: als EINE
-  // Einheit am Seitenende verankert (wie auf dem Papierformular) – so strandet
-  // „Einsatz beendet" nie allein oben auf einer Folgeseite.
-  const sy=PH-32, sigW=64, sigH=20;
-  reg(); doc.setFontSize(7);
+  // Layout des Papierformulars. Der Schlussblock (Einsatz beendet + Ort/Datum +
+  // Unterschriften + Kleingedrucktes) ist am Seitenende verankert; seine Geometrie
+  // wird vorab berechnet, damit der fließende Inhalt (LIMIT) nicht hineinläuft.
+  doc.setFontSize(6.8);
   const confLines=doc.splitTextToSize(SVC_CONF, R-M);
-  const confH=confLines.length*2.9+4;
-  const confTop=sy-sigH-2-confH;
-  const beY=confTop-8;                       // „Einsatz beendet" direkt über dem Bestätigungstext
-  if(y>beY-4){ doc.addPage(); y=M; }
-  bold(); doc.setFontSize(10); tc(dark); doc.text('Einsatz beendet:',M,beY+1.3);
-  [['ja','Ja'],['nein','Nein']].forEach((o,i)=>{
-    const x=M+44+i*26; const on=(entry.beendet===o[0]);
-    dc(dark); doc.setLineWidth(0.3); doc.circle(x+2.2,beY,2.2);
-    if(on){ doc.setFillColor(137,86,0); doc.circle(x+2.2,beY,1.25,'F'); }
-    if(on) bold(); else reg();
-    doc.setFontSize(10); tc(on?copper:dark); doc.text(o[1],x+6.5,beY+1.3);
+  const confH=confLines.length*2.8;
+  const confTop=PH-14-confH;
+  const sigH=20, sigTop=confTop-2-sigH;
+  const odH=9, odTop=sigTop-odH;
+  const beY=odTop-6;
+  const LIMIT=beY-4;
+
+  // Kopf: Logo groß rechts oben, links die sechs Einsatzarten mit Kreisen
+  let y=M, logoBottom=y+16;
+  const logo=await btbSvgToPng(repLogo(),300);
+  if(logo){ const lw=32, lh=lw*logo.h/logo.w; doc.addImage(logo.png,'PNG',R-lw,y,lw,lh); logoBottom=y+lh; }
+  reg(); doc.setFontSize(8); tc(grey);
+  doc.text('Servicebericht Nr. '+entry.nr, R, logoBottom+4, {align:'right'});
+  // Spalten wie auf dem Papier: Service/Montage · Notdienst/Wartung · Lieferschein/Abholschein
+  const optY=y+10, colX=[M, M+46, M+96], circOff=34;
+  SVC_ARTEN.forEach((o,idx)=>{
+    const x=colX[idx%3], yy=optY+Math.floor(idx/3)*10;
+    const on=(entry.art===o[0]);
+    reg(); doc.setFontSize(10.5); tc(dark);
+    doc.text(o[1], x, yy+1.4);
+    dc(dark); doc.setLineWidth(0.35); doc.circle(x+circOff, yy, 2.6);
+    if(on){ doc.setFillColor(43,43,43); doc.circle(x+circOff, yy, 1.4, 'F'); }
   });
-  let cy=confTop;
-  reg(); doc.setFontSize(7); tc(grey);
-  confLines.forEach(ln=>{ doc.text(ln,M,cy); cy+=2.9; });
-  const drawSig=(data,x)=>{ if(data){ try{ doc.addImage(data,'PNG',x,sy-sigH-1,sigW,sigH); }catch(e){} } };
-  drawSig(entry.sigKunde, M);
-  drawSig(entry.sigKpc, R-72);
+  y=Math.max(optY+16, logoBottom+8);
+
+  // Zwei umrandete Blöcke: links Kunde, rechts Auftrag (je 5 Zeilen, gleiche Höhe)
+  const rowH=7;
+  const kTbl=(x,w,labW,rows)=>{
+    const h=rows.length*rowH;
+    dc(dark); doc.setLineWidth(0.3); doc.rect(x,y,w,h);
+    doc.line(x+labW,y,x+labW,y+h);
+    rows.forEach((r,i)=>{
+      const ry=y+i*rowH;
+      if(i) doc.line(x,ry,x+w,ry);
+      reg(); doc.setFontSize(8.5); tc(dark);
+      doc.text(r[0],x+2,ry+4.7);
+      doc.setFontSize(10);
+      const v=doc.splitTextToSize((r[1]||'')+'', w-labW-4)[0]||'';
+      doc.text(v,x+labW+2,ry+4.8);
+    });
+  };
+  const lief=doc.splitTextToSize((entry.lieferadresse||'')+'', 86-30-4);
+  kTbl(M,86,22,[
+    ['Kunde:',entry.kunde],['Straße:',entry.strasse],['Ort:',entry.ort],
+    ['Telefon:',entry.telefon],['Objekt:',curProjName()]]);
+  kTbl(M+92,86,30,[
+    ['Auftrag erteilt:',entry.auftragErteilt],['Datum:',svcDatShort(entry.auftragDatum)],
+    ['Lieferadresse:',lief[0]||''],['(falls abweichend)',lief[1]||''],['','']]);
+  y+=5*rowH+5;
+
+  // Einsatztabelle: Datum · Techniker/Monteur · Check In · Check Out · Fahrzeit · Kilometer
+  const eCols=[26,56,24,26,22,24];
+  const eX=[M]; eCols.forEach((w,i)=>eX.push(eX[i]+w));
+  const eList=entry.einsaetze||[];
+  const eRows=Math.max(3,eList.length);
+  const headH=8, eH=headH+eRows*rowH;
+  if(y+eH>LIMIT){ doc.addPage(); y=M; }
+  dc(dark); doc.setLineWidth(0.3); doc.rect(M,y,R-M,eH);
+  for(let i=1;i<6;i++) doc.line(eX[i],y,eX[i],y+eH);
+  doc.line(M,y+headH,R,y+headH);
+  reg(); doc.setFontSize(8.5); tc(dark);
+  doc.text('Datum',eX[0]+2,y+5.2);
+  doc.text('Techniker/',eX[1]+2,y+3.6); doc.text('Monteur',eX[1]+2,y+6.8);
+  doc.text('Check In',eX[2]+2,y+5.2); doc.text('Check Out',eX[3]+2,y+5.2);
+  doc.text('Fahrzeit',eX[4]+2,y+5.2); doc.text('Kilometer',eX[5]+2,y+5.2);
+  for(let i=0;i<eRows;i++){
+    const ry=y+headH+i*rowH;
+    if(i) doc.line(M,ry,R,ry);
+    const e=eList[i]; if(!e) continue;
+    reg(); doc.setFontSize(9.5); tc(dark);
+    doc.text(svcDatShort(e.datum),eX[0]+2,ry+4.8);
+    doc.text(doc.splitTextToSize(String(e.monteur||''),eCols[1]-4)[0]||'',eX[1]+2,ry+4.8);
+    doc.text(String(e.checkIn||''),eX[2]+2,ry+4.8);
+    doc.text(String(e.checkOut||''),eX[3]+2,ry+4.8);
+    doc.text(String(e.fahrzeit||''),eX[4]+2,ry+4.8);
+    doc.text(String(e.km||''),eX[5]+2,ry+4.8);
+  }
+  y+=eH+5;
+
+  // Textkästen mit Label-Spalte wie auf dem Formular; lange Texte laufen auf Folgeseiten weiter
+  const blockLabW=32;
+  const textBlock=(label,text,minH)=>{
+    doc.setFontSize(10);
+    let rest=doc.splitTextToSize((text&&text.trim())?text.trim():'', R-M-blockLabW-6);
+    let first=true;
+    do{
+      let cap=LIMIT-y;
+      if(cap<Math.min(minH,16)){ doc.addPage(); y=M; cap=LIMIT-y; }
+      const nFit=Math.max(1,Math.floor((cap-6)/4.6));
+      const take=rest.slice(0,nFit);
+      const h=(rest.length>nFit)?(take.length*4.6+6):Math.max(first?minH:10,take.length*4.6+6);
+      dc(dark); doc.setLineWidth(0.3); doc.rect(M,y,R-M,h);
+      doc.line(M+blockLabW,y,M+blockLabW,y+h);
+      reg(); doc.setFontSize(8.5); tc(dark);
+      doc.text(label+(first?'':' (Forts.)'),M+2,y+5);
+      doc.setFontSize(10);
+      take.forEach((ln,k)=>doc.text(ln,M+blockLabW+3,y+5+k*4.6));
+      y+=h;
+      rest=rest.slice(nFit);
+      first=false;
+    }while(rest.length);
+  };
+  textBlock('Arbeitsauftrag:',entry.arbeitsauftrag,14);
+  textBlock('Gerätedaten:',entry.geraetedaten,12);
+  textBlock('Bericht:',entry.bericht,40);
+  y+=5;
+
+  // Material: Menge | Material (mindestens 4 Zeilen wie auf dem Papier)
+  const mat=entry.material||[];
+  const mRows=Math.max(4,mat.length), mLabW=28, mH=rowH*(mRows+1);
+  if(y+mH>LIMIT){ doc.addPage(); y=M; }
+  dc(dark); doc.setLineWidth(0.3); doc.rect(M,y,R-M,mH);
+  doc.line(M+mLabW,y,M+mLabW,y+mH);
+  reg(); doc.setFontSize(8.5); tc(dark);
+  doc.text('Menge:',M+2,y+4.7); doc.text('Material:',M+mLabW+2,y+4.7);
+  for(let i=0;i<mRows;i++){
+    const ry=y+rowH*(i+1);
+    doc.line(M,ry,R,ry);
+    const m=mat[i]; if(!m) continue;
+    reg(); doc.setFontSize(9.5); tc(dark);
+    doc.text(String(m.menge||''),M+2,ry+4.8);
+    doc.text(doc.splitTextToSize(String(m.text||''),R-M-mLabW-4)[0]||'',M+mLabW+2,ry+4.8);
+  }
+  y+=mH;
+
+  // Schlussblock (am Seitenende verankert)
+  if(y>beY-4){ doc.addPage(); y=M; }
+  reg(); doc.setFontSize(10.5); tc(dark);
+  doc.text('Einsatz beendet:',M,beY+1.4);
+  [['ja','Ja',8],['nein','Nein',12]].forEach((o,i)=>{
+    const x=M+44+i*30; const on=(entry.beendet===o[0]);
+    doc.text(o[1],x,beY+1.4);
+    dc(dark); doc.setLineWidth(0.35); doc.circle(x+o[2],beY,2.6);
+    if(on){ doc.setFillColor(43,43,43); doc.circle(x+o[2],beY,1.4,'F'); }
+  });
+  // Ort/Datum + Unterschriften als umrandete Zeilen mit Mittelteilung
   dc(dark); doc.setLineWidth(0.3);
-  doc.line(M,sy,M+72,sy); doc.line(R-72,sy,R,sy);
-  const ortDatum=((entry.sigOrt||'').trim()?entry.sigOrt.trim()+', ':'')+'den '+svcDatShort(entry.sigDatum);
-  doc.setFontSize(8); tc(grey);
-  doc.text(ortDatum,M,sy+4);      doc.text('Unterschrift Kunde / Auftraggeber',M,sy+8);
-  doc.text(ortDatum,R-72,sy+4);   doc.text('Unterschrift kpc',R-72,sy+8);
+  doc.rect(M,odTop,R-M,odH); doc.rect(M,sigTop,R-M,sigH);
+  doc.line(W/2,odTop,W/2,sigTop+sigH);
+  reg(); doc.setFontSize(8.5); tc(dark);
+  doc.text('Ort:',M+2,odTop+5.6); doc.text('Datum:',W/2+2,odTop+5.6);
+  doc.setFontSize(10);
+  doc.text((entry.sigOrt||''),M+12,odTop+5.7);
+  doc.text(svcDatShort(entry.sigDatum),W/2+15,odTop+5.7);
+  reg(); doc.setFontSize(8.5);
+  doc.text('Unterschrift',M+2,sigTop+6); doc.text('Kunde:',M+2,sigTop+10);
+  doc.text('Unterschrift',W/2+2,sigTop+6); doc.text('kpc:',W/2+2,sigTop+10);
+  const drawSig=(data,x)=>{ if(data){ try{ doc.addImage(data,'PNG',x,sigTop+1.2,56,17.5); }catch(e){} } };
+  drawSig(entry.sigKunde, M+24);
+  drawSig(entry.sigKpc, W/2+24);
+  // Kleingedrucktes + Fußzeile (Wortlaut des Papierformulars)
+  reg(); doc.setFontSize(6.8); tc(grey);
+  let cy=confTop; confLines.forEach(ln=>{ doc.text(ln,M,cy); cy+=2.8; });
   doc.setFontSize(7.5); tc(grey);
-  doc.text('kpc GmbH · Haimbacher Straße 27 · 36041 Fulda',W/2,PH-11,{align:'center'});
-  doc.text('Telefon 0661 941 62-0 · info@kpc-project.com',W/2,PH-8,{align:'center'});
+  doc.text('kpc GmbH I Haimbacher Str. 27 I D – 36041 Fulda',W/2,PH-9,{align:'center'});
+  doc.text('Telefon 0661/ 941 62-0 I info@kpc-project.com',W/2,PH-6,{align:'center'});
   return doc.output('blob');
 }
 
