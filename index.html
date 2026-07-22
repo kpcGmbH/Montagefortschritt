@@ -571,6 +571,9 @@ select.fs option{background:var(--surface);color:var(--text);}
   <button class="fab-mini fab-icon" style="background:#7a5c1d;color:#fff" onclick="openBautagebuchDialog()" title="Bautagebuch (Tag wählen)">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="9" y1="7" x2="16" y2="7"/><line x1="9" y1="11" x2="16" y2="11"/></svg>
   </button>
+  <button class="fab-mini fab-icon" style="background:#2f6b8a;color:#fff" onclick="openServiceDialog()" title="Servicebericht (kpc-Formular)">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
+  </button>
 
 </div>
 <input type="file" id="fi" accept="image/*" style="display:none">
@@ -1141,8 +1144,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 76;
+const APP_VERSION = 77;
 const CHANGELOG = [
+  { v:77, titel:'Servicebericht als digitales Formular', punkte:[
+    'Neuer Knopf „🔧" in der Berichtsleiste: der kpc-Servicebericht (Service, Notdienst, Lieferschein, Montage, Wartung, Abholschein) lässt sich direkt in der App ausfüllen. Kunde, Ort, Datum und der angemeldete Monteur sind aus den Baustellen-Stammdaten vorbelegt – alles bleibt änderbar.',
+    'Einsätze (Datum, Techniker, Check-In/Out, Fahrzeit, Kilometer) und Material lassen sich zeilenweise ergänzen. Kunde und kpc unterschreiben direkt auf dem Gerät; die eigene gespeicherte Unterschrift kann übernommen werden.',
+    'Ausgabe als PDF im kpc-Design mit dem gewohnten Bestätigungstext, fortlaufend nummeriert und je Baustelle im Ordner „_Servicebericht" abgelegt. Bestehende Berichte lassen sich wieder öffnen, ändern und erneut als PDF ausgeben.' ]},
   { v:76, titel:'Änderungsverlauf je Position', punkte:[
     'Jede Position hat am Desktop einen neuen Knopf „🕒 Verlauf". Er zeigt, wer wann was geändert hat – zum Beispiel „Horst NAUMANN · abgehakt: Geliefert". Auch zurückgenommene Haken erscheinen, damit nichts unbemerkt verschwindet.',
     'Protokolliert werden die sieben Haken, Änderungen der Anmerkung sowie erfasste und erledigte Restarbeiten. Aufbewahrt werden die letzten 50 Änderungen je Position.',
@@ -3339,6 +3346,431 @@ async function dichtBuildPdf(entry){
   return doc.output('blob');
 }
 
+// ============================================================================
+//  SERVICEBERICHT – das kpc-Serviceformular (Service/Notdienst/Lieferschein/
+//  Montage/Wartung/Abholschein) als digitales Formular je Baustelle.
+//  Fortlaufend nummeriert, vorbelegt aus den Projekt-Stammdaten (Kunde =
+//  Auftraggeber, Ort; erster Einsatz = heute + angemeldeter Ausführer).
+//  Ablage: SERVICE_<pid>.json, PDF in <Baustelle>/_Servicebericht/.
+// ============================================================================
+let SVC=[], SVC_FORM=null;
+// Reihenfolge = Anordnung auf dem Papierformular (Zeile 1 / Zeile 2 je 3 Spalten)
+const SVC_ARTEN=[['service','Service'],['notdienst','Notdienst'],['lieferschein','Lieferschein'],
+                 ['montage','Montage'],['wartung','Wartung'],['abholschein','Abholschein']];
+function svcArtLabel(k){ const a=SVC_ARTEN.find(x=>x[0]===k); return a?a[1]:(k||''); }
+// Bestätigungstext des Papierformulars (erscheint über den Unterschriften)
+const SVC_CONF='Die aufgeführten Leistungen werden durch die beauftragende Stelle mit der Unterschrift bestätigt. Zum Zeitpunkt des Einsatzes erfüllt die Anlage/das Gerät nach der Überprüfung durch die Fachkraft die Anforderungen und ist in funktionsfähigem Zustand, soweit die Arbeiten abgeschlossen wurden. Für etwaige Mängel, die zum Zeitpunkt dieser Abnahme offensichtlich waren, wird keine Haftung übernommen. Weitere Arbeiten, die zur vollständigen Behebung notwendig sind, werden gesondert vereinbart und durchgeführt.';
+async function loadService(pid){
+  SVC=[];
+  try{ const t=await spTryDownloadTextStrict('SERVICE_'+pid+'.json'); if(t){ const a=JSON.parse(t); if(Array.isArray(a)) SVC=a; } }
+  catch(e){ /* offline: leer starten, Speichern erfordert online */ }
+}
+async function saveService(){
+  if(!PID) return;
+  SVC.sort((a,b)=>(a.nr||0)-(b.nr||0));
+  await spUploadText('SERVICE_'+PID+'.json', JSON.stringify(SVC));
+}
+function svcDatShort(d){ const p=(d||'').split('-'); return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):(d||''); }
+
+// ---- Dialog: bestehende Berichte + „Neuer Servicebericht" ----
+function openServiceDialog(){
+  if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
+  let ov=document.getElementById('svcDlg');
+  if(!ov){ ov=document.createElement('div'); ov.id='svcDlg'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) svcCloseDlg(); };
+  const liste=SVC.length
+    ? '<div style="font-size:12px;color:#a8a8a8;margin:16px 0 6px">Bereits erstellte Serviceberichte:</div>'+
+      '<div style="max-height:200px;overflow:auto;display:flex;flex-direction:column;gap:5px">'+
+      SVC.slice().sort((a,b)=>(b.nr||0)-(a.nr||0)).map(en=>{
+        const d=(en.einsaetze&&en.einsaetze[0]&&en.einsaetze[0].datum)||'';
+        const sub=(en.arbeitsauftrag||'').trim().split('\n')[0].slice(0,40);
+        return '<div style="display:flex;gap:6px;align-items:stretch">'+
+          '<button type="button" onclick="svcPick('+en.nr+')" title="Bearbeiten" style="flex:1;display:flex;justify-content:space-between;align-items:center;gap:10px;background:#332f2b;border:1px solid #4a423a;color:#fff;border-radius:8px;padding:8px 11px;font-size:13px;cursor:pointer;font-family:inherit;text-align:left;min-width:0">'+
+            '<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">Nr. '+en.nr+' · '+escapeHtml(svcArtLabel(en.art))+(d?(' · '+svcDatShort(d)):'')+'</span>'+
+            '<span style="color:#8a8f92;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:0 1 auto">'+escapeHtml(sub)+'</span></button>'+
+          '<button type="button" onclick="svcOpenPdf('+en.nr+')" title="PDF öffnen" style="flex:0 0 auto;background:#3a3530;border:1px solid #895500;color:#d7c1ae;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap">📄 PDF</button>'+
+        '</div>'; }).join('')+'</div>'
+    : '';
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:22px;max-width:460px;width:100%;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:17px;font-weight:700;margin-bottom:4px">🔧 Servicebericht</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:14px">Das kpc-Serviceformular – vorbelegt mit Kunde, Ort, Datum und Monteur. Kunde und kpc unterschreiben direkt auf dem Gerät, das PDF wird je Baustelle in „_Servicebericht" abgelegt.</div>'+
+    '<button type="button" onclick="svcPick(0)" style="width:100%;background:#b8860b;border:none;color:#fff;border-radius:8px;padding:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">＋ Neuer Servicebericht</button>'+
+    liste+
+    '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">'+
+      '<button type="button" onclick="svcCloseDlg()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;font-family:inherit">Schließen</button>'+
+    '</div></div>';
+}
+function svcCloseDlg(){ const o=document.getElementById('svcDlg'); if(o) o.remove(); }
+function svcPick(nr){ svcCloseDlg(); openSvcForm(nr); }
+
+// ---- Formular ----
+function openSvcForm(nr){
+  const vorhanden=nr?SVC.find(e=>e.nr===nr):null;
+  const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
+  const today=localDay(new Date().toISOString());
+  // Ort aus den Stammdaten, sonst 1. Wort des Projektnamens (7 von 9 Altprojekten haben kein ort-Feld)
+  const ortName=(proj.ort||'').trim() || ((proj.name||'').replace(/^\s*\d[\d.\-\/]*\s+/,'').trim().split(/\s+/)[0]||'');
+  // D = Anzeige-Werte: bestehender Eintrag oder Vorbelegung aus den Stammdaten
+  const D=vorhanden||{ kunde:(proj.auftraggeber||''), strasse:'', ort:ortName, telefon:'',
+    auftragErteilt:'', auftragDatum:'', lieferadresse:'', arbeitsauftrag:'', geraetedaten:'',
+    bericht:'', sigOrt:ortName, sigDatum:today };
+  SVC_FORM={
+    base:vorhanden||null,
+    art:(vorhanden&&vorhanden.art)||'montage',
+    beendet:(vorhanden&&vorhanden.beendet)||'ja',
+    einsaetze:(vorhanden&&vorhanden.einsaetze&&vorhanden.einsaetze.length)
+      ? vorhanden.einsaetze.map(e=>({datum:e.datum||'',monteur:e.monteur||'',checkIn:e.checkIn||'',checkOut:e.checkOut||'',fahrzeit:e.fahrzeit||'',km:e.km||''}))
+      : [{datum:today,monteur:USER||'',checkIn:'',checkOut:'',fahrzeit:'',km:''}],
+    material:(vorhanden&&vorhanden.material&&vorhanden.material.length)
+      ? vorhanden.material.map(m=>({menge:m.menge||'',text:m.text||''}))
+      : [{menge:'',text:''}],
+    proj };
+  let ov=document.getElementById('svcForm');
+  if(!ov){ ov=document.createElement('div'); ov.id='svcForm'; document.body.appendChild(ov); }
+  ov.style.cssText='position:fixed;inset:0;z-index:2050;background:#2b2b2b;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top);overflow-y:auto;';
+  const fld='width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:16px;font-family:inherit';
+  const lbl='display:block;font-size:12px;color:#a8a8a8;margin:12px 0 5px;font-weight:700;letter-spacing:.3px';
+  const artChips=SVC_ARTEN.map(a=>
+    '<button type="button" data-v="'+a[0]+'" onclick="svcPickArt(this)" style="background:'+(a[0]===SVC_FORM.art?'#895500':'#3a3530')+';border:1px solid #895500;color:#fff;border-radius:16px;padding:7px 13px;font-size:14px;cursor:pointer;font-family:inherit">'+a[1]+'</button>').join(' ');
+  const beChips=[['ja','Ja'],['nein','Nein']].map(a=>
+    '<button type="button" data-v="'+a[0]+'" onclick="svcPickBeendet(this)" style="background:'+(a[0]===SVC_FORM.beendet?'#895500':'#3a3530')+';border:1px solid #895500;color:#fff;border-radius:16px;padding:7px 16px;font-size:14px;cursor:pointer;font-family:inherit">'+a[1]+'</button>').join(' ');
+  ov.innerHTML=
+    '<div style="position:sticky;top:0;background:#2b2b2b;border-bottom:1px solid #4a423a;display:flex;align-items:center;gap:10px;padding:14px 16px;z-index:2">'+
+      '<button onclick="closeSvcForm()" style="background:none;border:none;color:#d7c1ae;font-size:24px;cursor:pointer;line-height:1">‹</button>'+
+      '<div style="flex:1"><div style="font-size:16px;font-weight:700">🔧 Servicebericht'+(vorhanden?(' · Nr. '+vorhanden.nr):' · neu')+'</div>'+
+        '<div style="font-size:12px;color:#a8a8a8">'+escapeHtml(curProjName())+'</div></div>'+
+    '</div>'+
+    '<div style="max-width:640px;width:100%;margin:0 auto;padding:8px 16px 40px;box-sizing:border-box">'+
+      '<label style="'+lbl+'">Einsatzart</label>'+
+      '<div style="display:flex;flex-wrap:wrap;gap:7px">'+artChips+'</div>'+
+      '<label style="'+lbl+'">Kunde</label>'+
+      '<input id="svcKunde" type="text" value="'+escapeHtml(D.kunde||'')+'" placeholder="Kunde / Auftraggeber" style="'+fld+'">'+
+      '<div style="display:flex;gap:12px">'+
+        '<div style="flex:1.4"><label style="'+lbl+'">Straße</label><input id="svcStrasse" type="text" value="'+escapeHtml(D.strasse||'')+'" style="'+fld+'"></div>'+
+        '<div style="flex:1"><label style="'+lbl+'">Ort</label><input id="svcOrt" type="text" value="'+escapeHtml(D.ort||'')+'" style="'+fld+'"></div>'+
+      '</div>'+
+      '<div style="display:flex;gap:12px">'+
+        '<div style="flex:1"><label style="'+lbl+'">Telefon</label><input id="svcTel" type="tel" value="'+escapeHtml(D.telefon||'')+'" style="'+fld+'"></div>'+
+        '<div style="flex:1"><label style="'+lbl+'">Auftrag erteilt durch</label><input id="svcAuftragVon" type="text" value="'+escapeHtml(D.auftragErteilt||'')+'" placeholder="Name / Stelle" style="'+fld+'"></div>'+
+      '</div>'+
+      '<div style="display:flex;gap:12px">'+
+        '<div style="flex:0 0 160px"><label style="'+lbl+'">Auftrag vom</label><input id="svcAuftragDat" type="date" value="'+escapeHtml(D.auftragDatum||'')+'" style="'+fld+'"></div>'+
+        '<div style="flex:1;min-width:0"><label style="'+lbl+'">Lieferadresse (falls abweichend)</label><input id="svcLieferadr" type="text" value="'+escapeHtml(D.lieferadresse||'')+'" style="'+fld+'"></div>'+
+      '</div>'+
+      '<label style="'+lbl+'">Einsätze (Datum · Techniker/Monteur · Check In/Out · Fahrzeit · Kilometer)</label>'+
+      '<div id="svcEins"></div>'+
+      '<button type="button" onclick="svcAddEins()" style="background:#3a3530;border:1px dashed #895500;color:#d7c1ae;border-radius:8px;padding:9px 14px;font-size:14px;cursor:pointer;font-family:inherit;width:100%">＋ Einsatz hinzufügen</button>'+
+      '<label style="'+lbl+'">Arbeitsauftrag</label>'+
+      '<textarea id="svcAuftrag" rows="3" placeholder="Was wurde beauftragt?" style="'+fld+';resize:vertical;line-height:1.5">'+escapeHtml(D.arbeitsauftrag||'')+'</textarea>'+
+      '<label style="'+lbl+'">Gerätedaten</label>'+
+      '<textarea id="svcGeraete" rows="2" placeholder="Hersteller, Typ, Seriennummer …" style="'+fld+';resize:vertical;line-height:1.5">'+escapeHtml(D.geraetedaten||'')+'</textarea>'+
+      '<label style="'+lbl+'">Bericht</label>'+
+      '<textarea id="svcBericht" rows="6" placeholder="Durchgeführte Arbeiten, Feststellungen …" style="'+fld+';resize:vertical;line-height:1.5">'+escapeHtml(D.bericht||'')+'</textarea>'+
+      '<label style="'+lbl+'">Material (Menge · Material/Artikel)</label>'+
+      '<div id="svcMat"></div>'+
+      '<button type="button" onclick="svcAddMat()" style="background:#3a3530;border:1px dashed #895500;color:#d7c1ae;border-radius:8px;padding:9px 14px;font-size:14px;cursor:pointer;font-family:inherit;width:100%">＋ Material hinzufügen</button>'+
+      '<label style="'+lbl+'">Einsatz beendet</label>'+
+      '<div style="display:flex;gap:7px">'+beChips+'</div>'+
+      '<div style="display:flex;gap:12px">'+
+        '<div style="flex:1"><label style="'+lbl+'">Ort (Unterschrift)</label><input id="svcSigOrt" type="text" value="'+escapeHtml(D.sigOrt||'')+'" style="'+fld+'"></div>'+
+        '<div style="flex:0 0 160px"><label style="'+lbl+'">Datum</label><input id="svcSigDatum" type="date" value="'+escapeHtml(D.sigDatum||today)+'" style="'+fld+'"></div>'+
+      '</div>'+
+      '<label style="'+lbl+'">Unterschriften</label>'+
+      '<div style="display:flex;gap:12px;flex-wrap:wrap">'+
+        '<div style="flex:1;min-width:230px">'+
+          '<div style="font-size:11px;color:#a8a8a8;margin-bottom:4px">Kunde / Auftraggeber</div>'+
+          '<canvas id="svcSigKunde" width="500" height="150" style="width:100%;height:110px;background:#fff;border:1px solid #895500;border-radius:8px;touch-action:none;display:block"></canvas>'+
+          '<div style="margin-top:5px"><button type="button" onclick="btbSigClear(\'svcSigKunde\')" style="width:100%;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit">Löschen</button></div>'+
+        '</div>'+
+        '<div style="flex:1;min-width:230px">'+
+          '<div style="font-size:11px;color:#a8a8a8;margin-bottom:4px">kpc (Techniker/Monteur)</div>'+
+          '<canvas id="svcSigKpc" width="500" height="150" style="width:100%;height:110px;background:#fff;border:1px solid #895500;border-radius:8px;touch-action:none;display:block"></canvas>'+
+          '<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">'+
+            '<button type="button" onclick="btbSigClear(\'svcSigKpc\')" style="flex:1;min-width:70px;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px 6px;font-size:12px;cursor:pointer;font-family:inherit">Löschen</button>'+
+            '<button type="button" onclick="svcSaveOwnSig()" style="flex:1;min-width:70px;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px 6px;font-size:12px;cursor:pointer;font-family:inherit">Als meine speichern</button>'+
+            '<button type="button" onclick="svcUseOwnSig()" style="flex:1;min-width:70px;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px 6px;font-size:12px;cursor:pointer;font-family:inherit">Gespeicherte</button>'+
+          '</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap">'+
+        '<button type="button" onclick="svcSave(false)" style="flex:1;min-width:130px;background:#3a7a3a;border:none;color:#fff;border-radius:8px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Speichern</button>'+
+        '<button type="button" onclick="svcSave(true)" style="flex:1;min-width:130px;background:#b8860b;border:none;color:#fff;border-radius:8px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Speichern &amp; PDF</button>'+
+      '</div>'+
+    '</div>';
+  svcRenderEins(); svcRenderMat();
+  btbSigSetup(document.getElementById('svcSigKunde'));
+  btbSigSetup(document.getElementById('svcSigKpc'));
+  if(vorhanden&&vorhanden.sigKunde) btbSigDrawImage('svcSigKunde', vorhanden.sigKunde);
+  if(vorhanden&&vorhanden.sigKpc) btbSigDrawImage('svcSigKpc', vorhanden.sigKpc);
+  else if(!vorhanden){ const own=localStorage.getItem('kpc_btb_sig'); if(own) btbSigDrawImage('svcSigKpc', own); }
+}
+function closeSvcForm(){ const o=document.getElementById('svcForm'); if(o) o.remove(); SVC_FORM=null; }
+function svcPickArt(btn){ if(!SVC_FORM) return; SVC_FORM.art=btn.getAttribute('data-v'); [...btn.parentNode.children].forEach(b=>b.style.background=(b===btn)?'#895500':'#3a3530'); }
+function svcPickBeendet(btn){ if(!SVC_FORM) return; SVC_FORM.beendet=btn.getAttribute('data-v'); [...btn.parentNode.children].forEach(b=>b.style.background=(b===btn)?'#895500':'#3a3530'); }
+function svcSaveOwnSig(){ const d=btbSigData('svcSigKpc'); if(!d){ showToast('Bitte zuerst unterschreiben',{bg:'#8b6d22'}); return; } try{ localStorage.setItem('kpc_btb_sig',d); showToast('Signatur gespeichert'); }catch(e){ showToast('Speichern fehlgeschlagen',{bg:'#8b6d22'}); } }
+function svcUseOwnSig(){ const d=localStorage.getItem('kpc_btb_sig'); if(!d){ showToast('Keine gespeicherte Signatur',{bg:'#8b6d22'}); return; } btbSigClear('svcSigKpc'); btbSigDrawImage('svcSigKpc',d); }
+
+// ---- Einsatzzeilen ----
+function svcSyncEins(){
+  if(!SVC_FORM) return;
+  const cont=document.getElementById('svcEins'); if(!cont) return;
+  [...cont.children].forEach((row,i)=>{
+    const e=SVC_FORM.einsaetze[i]; if(!e) return;
+    e.datum=row.querySelector('.svcE-datum').value;
+    e.monteur=row.querySelector('.svcE-mont').value;
+    e.checkIn=row.querySelector('.svcE-in').value;
+    e.checkOut=row.querySelector('.svcE-out').value;
+    e.fahrzeit=row.querySelector('.svcE-fahr').value;
+    e.km=row.querySelector('.svcE-km').value;
+  });
+}
+function svcRenderEins(){
+  const cont=document.getElementById('svcEins'); if(!cont||!SVC_FORM) return;
+  const fld='box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid #6a5433;background:#3a3530;color:#fff;font-size:16px;font-family:inherit';
+  const sl='display:block;font-size:10px;color:#8a8f92;margin:0 0 3px';
+  cont.innerHTML=SVC_FORM.einsaetze.map((e,i)=>
+    '<div style="border:1px solid #4a423a;border-radius:9px;padding:8px;margin-bottom:8px;background:#332f2b">'+
+      '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">'+
+        '<div style="flex:1 1 140px;min-width:130px"><span style="'+sl+'">Datum</span><input class="svcE-datum" type="date" value="'+escapeHtml(e.datum||'')+'" style="'+fld+';width:100%"></div>'+
+        '<div style="flex:2 1 180px;min-width:160px"><span style="'+sl+'">Techniker / Monteur</span><div style="display:flex">'+
+          '<input class="svcE-mont btbMenuAnchor" value="'+escapeHtml(e.monteur||'')+'" placeholder="Name" onfocus="svcMontOpen(this,'+i+')" autocomplete="off" style="'+fld+';flex:1;min-width:0;border-radius:8px 0 0 8px">'+
+          '<button type="button" class="btbMenuAnchor" onclick="svcMontOpen(this.previousElementSibling,'+i+')" title="Monteur wählen" style="flex:0 0 42px;border:1px solid #6a5433;border-left:none;border-radius:0 8px 8px 0;background:#3a3530;color:#d7c1ae;font-size:14px;cursor:pointer">▾</button>'+
+        '</div></div>'+
+        '<button type="button" onclick="svcDelEins('+i+')" title="Einsatz entfernen" style="flex:0 0 auto;background:none;border:none;color:#c26;font-size:22px;cursor:pointer;padding:0 2px 6px">✕</button>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;margin-top:6px;flex-wrap:wrap">'+
+        '<div style="flex:1;min-width:96px"><span style="'+sl+'">Check In</span><input class="svcE-in" type="time" value="'+escapeHtml(e.checkIn||'')+'" style="'+fld+';width:100%"></div>'+
+        '<div style="flex:1;min-width:96px"><span style="'+sl+'">Check Out</span><input class="svcE-out" type="time" value="'+escapeHtml(e.checkOut||'')+'" style="'+fld+';width:100%"></div>'+
+        '<div style="flex:1;min-width:80px"><span style="'+sl+'">Fahrzeit</span><input class="svcE-fahr" type="text" value="'+escapeHtml(e.fahrzeit||'')+'" placeholder="h" style="'+fld+';width:100%"></div>'+
+        '<div style="flex:1;min-width:80px"><span style="'+sl+'">Kilometer</span><input class="svcE-km" type="text" inputmode="numeric" value="'+escapeHtml(e.km||'')+'" placeholder="km" style="'+fld+';width:100%"></div>'+
+      '</div>'+
+    '</div>').join('');
+}
+function svcMontOpen(inp,i){
+  if(!SVC_FORM) return;
+  svcSyncEins();
+  let loginPresent=!!USER; try{ if(!loginPresent&&deriveName(msalAccount)) loginPresent=true; }catch(e){}
+  btbOpenMenu(inp, btbNameList(), function(name){ if(SVC_FORM&&SVC_FORM.einsaetze[i]) SVC_FORM.einsaetze[i].monteur=name; }, loginPresent);
+}
+function svcAddEins(){ if(!SVC_FORM) return; svcSyncEins(); const today=localDay(new Date().toISOString()); SVC_FORM.einsaetze.push({datum:today,monteur:'',checkIn:'',checkOut:'',fahrzeit:'',km:''}); svcRenderEins(); }
+function svcDelEins(i){ if(!SVC_FORM) return; svcSyncEins(); SVC_FORM.einsaetze.splice(i,1); if(!SVC_FORM.einsaetze.length) SVC_FORM.einsaetze.push({datum:'',monteur:'',checkIn:'',checkOut:'',fahrzeit:'',km:''}); svcRenderEins(); }
+
+// ---- Materialzeilen ----
+function svcSyncMat(){
+  if(!SVC_FORM) return;
+  const cont=document.getElementById('svcMat'); if(!cont) return;
+  [...cont.children].forEach((row,i)=>{
+    const m=SVC_FORM.material[i]; if(!m) return;
+    m.menge=row.querySelector('.svcM-menge').value;
+    m.text=row.querySelector('.svcM-text').value;
+  });
+}
+function svcRenderMat(){
+  const cont=document.getElementById('svcMat'); if(!cont||!SVC_FORM) return;
+  const fld='box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid #6a5433;background:#3a3530;color:#fff;font-size:16px;font-family:inherit';
+  cont.innerHTML=SVC_FORM.material.map((m,i)=>
+    '<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">'+
+      '<input class="svcM-menge" value="'+escapeHtml(m.menge||'')+'" placeholder="Menge" style="'+fld+';flex:0 0 84px;text-align:center">'+
+      '<input class="svcM-text" value="'+escapeHtml(m.text||'')+'" placeholder="Material / Artikel" style="'+fld+';flex:1;min-width:0">'+
+      '<button type="button" onclick="svcDelMat('+i+')" title="Zeile entfernen" style="flex:0 0 auto;background:none;border:none;color:#c26;font-size:22px;cursor:pointer;padding:0 4px">✕</button>'+
+    '</div>').join('');
+}
+function svcAddMat(){ if(!SVC_FORM) return; svcSyncMat(); SVC_FORM.material.push({menge:'',text:''}); svcRenderMat(); }
+function svcDelMat(i){ if(!SVC_FORM) return; svcSyncMat(); SVC_FORM.material.splice(i,1); if(!SVC_FORM.material.length) SVC_FORM.material.push({menge:'',text:''}); svcRenderMat(); }
+
+// ---- Speichern + PDF ----
+function svcGather(){
+  svcSyncEins(); svcSyncMat();
+  const val=id=>{ const e=document.getElementById(id); return e?e.value.trim():''; };
+  const now=new Date().toISOString();
+  const b=SVC_FORM.base;
+  const nr=b?b.nr:((SVC.reduce((m,e)=>Math.max(m,e.nr||0),0))+1);
+  return {
+    nr, art:SVC_FORM.art,
+    kunde:val('svcKunde'), strasse:val('svcStrasse'), ort:val('svcOrt'), telefon:val('svcTel'),
+    auftragErteilt:val('svcAuftragVon'), auftragDatum:val('svcAuftragDat'), lieferadresse:val('svcLieferadr'),
+    einsaetze:SVC_FORM.einsaetze.map(e=>({datum:(e.datum||'').trim(),monteur:(e.monteur||'').trim(),checkIn:(e.checkIn||'').trim(),checkOut:(e.checkOut||'').trim(),fahrzeit:(e.fahrzeit||'').trim(),km:(e.km||'').trim()}))
+                                .filter(e=>e.datum||e.monteur||e.checkIn||e.checkOut||e.fahrzeit||e.km),
+    arbeitsauftrag:(document.getElementById('svcAuftrag')||{}).value||'',
+    geraetedaten:(document.getElementById('svcGeraete')||{}).value||'',
+    bericht:(document.getElementById('svcBericht')||{}).value||'',
+    material:SVC_FORM.material.map(m=>({menge:(m.menge||'').trim(),text:(m.text||'').trim()})).filter(m=>m.menge||m.text),
+    beendet:SVC_FORM.beendet,
+    sigOrt:val('svcSigOrt'), sigDatum:val('svcSigDatum'),
+    sigKunde:btbSigData('svcSigKunde'), sigKpc:btbSigData('svcSigKpc'),
+    erstelltAm:(b&&b.erstelltAm)||now, erstelltVon:(b&&b.erstelltVon)||USER||'',
+    geaendertAm:now, geaendertVon:USER||''
+  };
+}
+async function svcSave(thenPdf){
+  if(!SVC_FORM) return;
+  // Bei „& PDF": Fenster SYNCHRON im Klick öffnen (mobiler Popup-Blocker)
+  let win=null;
+  if(thenPdf){ win=window.open('','_blank'); if(win){ try{ win.document.write('<title>Servicebericht</title><body style="font-family:Arial,sans-serif;padding:24px;color:#666">PDF wird erstellt …</body>'); }catch(e){} } }
+  const entry=svcGather();
+  const i=SVC.findIndex(e=>e.nr===entry.nr);
+  if(i>=0) SVC[i]=entry; else SVC.push(entry);
+  SVC_FORM.base=entry;
+  try{ await saveService(); }
+  catch(e){ if(win) try{win.close();}catch(_){}; alert('Speichern fehlgeschlagen (online nötig): '+(e.message||e)); return; }
+  if(!thenPdf){ showToast('Servicebericht Nr. '+entry.nr+' gespeichert'); closeSvcForm(); openServiceDialog(); return; }
+  try{
+    const blob=await svcBuildPdf(entry);
+    const fname=safeName(curProjName())+'/_Servicebericht/Servicebericht_'+String(entry.nr).padStart(3,'0')+'_'+(entry.sigDatum||localDay(new Date().toISOString()))+'.pdf';
+    const url=URL.createObjectURL(blob);
+    if(win) win.location=url; else window.open(url,'_blank');
+    try{ await spUpload(fname, blob, 'application/pdf'); showToast('PDF erstellt & in _Servicebericht abgelegt'); }
+    catch(e){ showToast('PDF erstellt, Upload fehlgeschlagen (offline?)',{bg:'#8b6d22'}); }
+    closeSvcForm();
+  }catch(e){ if(win) try{win.close();}catch(_){}; alert('PDF-Erstellung fehlgeschlagen: '+(e.message||e)); }
+}
+// PDF eines bestehenden Berichts öffnen (Fenster SYNCHRON im Klick, §8)
+function svcOpenPdf(nr){
+  const entry=SVC.find(e=>e.nr===nr);
+  if(!entry){ alert('Servicebericht nicht gefunden.'); return; }
+  const win=window.open('','_blank');
+  if(win){ try{ win.document.write('<title>Servicebericht Nr. '+entry.nr+'</title><body style="font-family:Arial,sans-serif;padding:24px;color:#666">PDF wird erstellt …</body>'); }catch(e){} }
+  svcBuildPdf(entry).then(blob=>{
+    const url=URL.createObjectURL(blob);
+    if(win) win.location=url; else window.open(url,'_blank');
+  }).catch(e=>{ if(win){ try{ win.close(); }catch(_){} } alert('PDF konnte nicht erstellt werden: '+(e.message||e)); });
+}
+
+async function svcBuildPdf(entry){
+  if(!window.jspdf) throw new Error('PDF-Bibliothek nicht geladen (Seite neu laden)');
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'p',unit:'mm',format:'a4'});
+  const M=16, W=210, R=W-M, PH=297;
+  const copper=[137,86,0], dark=[43,43,43], grey=[120,120,120], line=[214,209,203];
+  const tc=c=>doc.setTextColor(c[0],c[1],c[2]);
+  const dc=c=>doc.setDrawColor(c[0],c[1],c[2]);
+  let FF='helvetica';
+  try{ if(typeof BTB_FONT_B64!=='undefined' && BTB_FONT_B64){ doc.addFileToVFS('RC.ttf',BTB_FONT_B64); doc.addFont('RC.ttf','RobotoCondensed','normal'); FF='RobotoCondensed'; } }catch(e){ FF='helvetica'; }
+  const bold=()=>doc.setFont(FF, FF==='helvetica'?'bold':'normal');
+  const reg=()=>doc.setFont(FF,'normal');
+  reg();
+  let y=M, logoBottom=y+14;
+  const logo=await btbSvgToPng(repLogo(),300);
+  if(logo){ const lw=28, lh=lw*logo.h/logo.w; doc.addImage(logo.png,'PNG',M,y,lw,lh); logoBottom=y+lh; }
+  bold(); tc(dark); doc.setFontSize(19);
+  doc.text('Servicebericht',R,y+7,{align:'right'});
+  reg(); doc.setFontSize(10); tc(grey);
+  doc.text('Nr. '+entry.nr,R,y+13,{align:'right'});
+  y=Math.max(logoBottom, y+15)+3; dc(copper); doc.setLineWidth(0.8); doc.line(M,y,R,y); y+=8;
+
+  // Einsatzart – sechs Optionen wie auf dem Papierformular, gewählte gefüllt
+  const colX=[M, M+62, M+124];
+  SVC_ARTEN.forEach((o,i)=>{
+    const x=colX[i%3], yy=y+Math.floor(i/3)*8;
+    const on=(entry.art===o[0]);
+    dc(dark); doc.setLineWidth(0.3); doc.circle(x+2.2, yy, 2.2);
+    if(on){ doc.setFillColor(137,86,0); doc.circle(x+2.2, yy, 1.25, 'F'); }
+    if(on) bold(); else reg();
+    doc.setFontSize(10); tc(on?copper:dark);
+    doc.text(o[1], x+6.5, yy+1.3);
+  });
+  reg(); y+=8+7;
+
+  const kv=(x,label,val,w)=>{
+    reg(); doc.setFontSize(7.5); tc(grey); doc.text(label.toUpperCase(),x,y);
+    bold(); doc.setFontSize(11); tc(dark);
+    const t=doc.splitTextToSize((val||'—')+'', (w||(R-x))-2);
+    doc.text(t[0],x,y+5);
+  };
+  const half=(R-M-6)/2;
+  kv(M,'Kunde',entry.kunde,half);            kv(M+half+6,'Auftrag erteilt durch',entry.auftragErteilt,half); y+=11;
+  kv(M,'Straße',entry.strasse,half);         kv(M+half+6,'Auftrag vom',svcDatShort(entry.auftragDatum),half); y+=11;
+  kv(M,'Ort',entry.ort,half);                kv(M+half+6,'Lieferadresse (falls abweichend)',entry.lieferadresse,half); y+=11;
+  kv(M,'Telefon',entry.telefon,half);        kv(M+half+6,'Objekt / Baustelle',curProjName(),half); y+=13;
+
+  // Einsätze
+  bold(); doc.setFontSize(9); tc(copper); doc.text('EINSÄTZE',M,y); y+=3;
+  doc.setFillColor(43,43,43); doc.rect(M,y,R-M,7,'F');
+  doc.setTextColor(215,193,174); doc.setFontSize(9); bold();
+  doc.text('Datum',M+2,y+4.8); doc.text('Techniker / Monteur',M+26,y+4.8);
+  doc.text('Check In',M+94,y+4.8); doc.text('Check Out',M+114,y+4.8);
+  doc.text('Fahrzeit',M+136,y+4.8); doc.text('Kilometer',R-2,y+4.8,{align:'right'});
+  y+=7; reg();
+  const eins=entry.einsaetze||[];
+  if(!eins.length){ tc(grey); doc.setFontSize(10); doc.text('—',M+2,y+5); dc(line); doc.setLineWidth(0.1); doc.line(M,y+7,R,y+7); y+=7; }
+  eins.forEach(e=>{
+    if(y>PH-60){ doc.addPage(); y=M; }
+    tc(dark); doc.setFontSize(9.5);
+    doc.text(svcDatShort(e.datum),M+2,y+5);
+    doc.text(doc.splitTextToSize(String(e.monteur||''),64)[0]||'',M+26,y+5);
+    doc.text(String(e.checkIn||''),M+94,y+5); doc.text(String(e.checkOut||''),M+114,y+5);
+    doc.text(String(e.fahrzeit||''),M+136,y+5); doc.text(String(e.km||''),R-2,y+5,{align:'right'});
+    dc(line); doc.setLineWidth(0.1); doc.line(M,y+7,R,y+7); y+=7;
+  });
+  y+=6;
+
+  const block=(title,text)=>{
+    if(y>PH-60){ doc.addPage(); y=M; }
+    bold(); doc.setFontSize(9); tc(copper); doc.text(title,M,y); y+=5;
+    reg(); doc.setFontSize(10); tc(dark);
+    const lines=doc.splitTextToSize((text&&text.trim())?text:'—', R-M);
+    lines.forEach(ln=>{ if(y>PH-24){ doc.addPage(); y=M; } doc.text(ln,M,y+4); y+=5; });
+    y+=5;
+  };
+  block('ARBEITSAUFTRAG', entry.arbeitsauftrag);
+  block('GERÄTEDATEN', entry.geraetedaten);
+  block('BERICHT', entry.bericht);
+
+  // Material (nur wenn erfasst)
+  const mat=entry.material||[];
+  if(mat.length){
+    if(y>PH-70){ doc.addPage(); y=M; }
+    bold(); doc.setFontSize(9); tc(copper); doc.text('MATERIAL',M,y); y+=3;
+    doc.setFillColor(43,43,43); doc.rect(M,y,R-M,7,'F');
+    doc.setTextColor(215,193,174); doc.setFontSize(9); bold();
+    doc.text('Menge',M+2,y+4.8); doc.text('Material / Artikel',M+30,y+4.8);
+    y+=7; reg();
+    mat.forEach(m=>{
+      if(y>PH-60){ doc.addPage(); y=M; }
+      tc(dark); doc.setFontSize(9.5);
+      doc.text(String(m.menge||''),M+2,y+5);
+      doc.text(doc.splitTextToSize(String(m.text||''),R-M-32)[0]||'',M+30,y+5);
+      dc(line); doc.setLineWidth(0.1); doc.line(M,y+7,R,y+7); y+=7;
+    });
+    y+=6;
+  }
+
+  // Schlussblock „Einsatz beendet" + Bestätigungstext + Unterschriften: als EINE
+  // Einheit am Seitenende verankert (wie auf dem Papierformular) – so strandet
+  // „Einsatz beendet" nie allein oben auf einer Folgeseite.
+  const sy=PH-32, sigW=64, sigH=20;
+  reg(); doc.setFontSize(7);
+  const confLines=doc.splitTextToSize(SVC_CONF, R-M);
+  const confH=confLines.length*2.9+4;
+  const confTop=sy-sigH-2-confH;
+  const beY=confTop-8;                       // „Einsatz beendet" direkt über dem Bestätigungstext
+  if(y>beY-4){ doc.addPage(); y=M; }
+  bold(); doc.setFontSize(10); tc(dark); doc.text('Einsatz beendet:',M,beY+1.3);
+  [['ja','Ja'],['nein','Nein']].forEach((o,i)=>{
+    const x=M+44+i*26; const on=(entry.beendet===o[0]);
+    dc(dark); doc.setLineWidth(0.3); doc.circle(x+2.2,beY,2.2);
+    if(on){ doc.setFillColor(137,86,0); doc.circle(x+2.2,beY,1.25,'F'); }
+    if(on) bold(); else reg();
+    doc.setFontSize(10); tc(on?copper:dark); doc.text(o[1],x+6.5,beY+1.3);
+  });
+  let cy=confTop;
+  reg(); doc.setFontSize(7); tc(grey);
+  confLines.forEach(ln=>{ doc.text(ln,M,cy); cy+=2.9; });
+  const drawSig=(data,x)=>{ if(data){ try{ doc.addImage(data,'PNG',x,sy-sigH-1,sigW,sigH); }catch(e){} } };
+  drawSig(entry.sigKunde, M);
+  drawSig(entry.sigKpc, R-72);
+  dc(dark); doc.setLineWidth(0.3);
+  doc.line(M,sy,M+72,sy); doc.line(R-72,sy,R,sy);
+  const ortDatum=((entry.sigOrt||'').trim()?entry.sigOrt.trim()+', ':'')+'den '+svcDatShort(entry.sigDatum);
+  doc.setFontSize(8); tc(grey);
+  doc.text(ortDatum,M,sy+4);      doc.text('Unterschrift Kunde / Auftraggeber',M,sy+8);
+  doc.text(ortDatum,R-72,sy+4);   doc.text('Unterschrift kpc',R-72,sy+8);
+  doc.setFontSize(7.5); tc(grey);
+  doc.text('kpc GmbH · Haimbacher Straße 27 · 36041 Fulda',W/2,PH-11,{align:'center'});
+  doc.text('Telefon 0661 941 62-0 · info@kpc-project.com',W/2,PH-8,{align:'center'});
+  return doc.output('blob');
+}
+
 async function expKunde(withFotos=false){
   const now=new Date();
   const d=now.toLocaleDateString('de-DE');
@@ -5402,6 +5834,7 @@ async function selectProject(pid){
     DATA = await loadProjectLV(pid);
     loadBautagebuch(pid).catch(()=>{});   // Bautagebuch der Baustelle nachladen (nicht blockierend)
     loadDicht(pid).then(()=>updDichtTasks()).catch(()=>{});   // Dichtigkeitsprotokolle nachladen (nicht blockierend)
+    loadService(pid).catch(()=>{});   // Serviceberichte nachladen (nicht blockierend)
     const proj = PROJECTS.find(p=>p.pid===pid);
     const nm = document.getElementById('projName'); if(nm) nm.textContent = proj ? proj.name : pid;
     Object.keys(ST).forEach(k=>delete ST[k]);
