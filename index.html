@@ -847,16 +847,21 @@ function buildTabs(){
   });
   updTabBadges();
 }
-// Offene Arbeiten je Etage in den Tabs (berücksichtigt den Gewerk-Filter; offen = nicht vollständig)
+// Offene Arbeiten je Etage in den Tabs (berücksichtigt den Gewerk-Filter).
+// „offen" = noch gar nichts erledigt – wie Filter und Zähler.
 function updTabBadges(){
   const ea=document.getElementById('TNO___all');
-  if(ea){ let t=0,d=0;
+  if(ea){ let t=0,d=0,o=0;
     DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(item=>{
-      if(TF!=='all'){ const g=item.gew||[]; if(!g.includes(TF)) return; } t++; if(ist(item.pos,TF)==='done') d++; })));
-    const o=t-d;
+      if(TF!=='all'){ const g=item.gew||[]; if(!g.includes(TF)) return; } t++;
+      const st=ist(item.pos,TF); if(st==='done') d++; else if(st==='open') o++; })));
+    const tlw=t-d-o;
     if(!t){ ea.textContent=''; ea.className='tno'; }
-    else if(o===0){ ea.innerHTML='&#10003;'; ea.className='tno done'; }
-    else { ea.textContent=o+' offen'; ea.className='tno'; }
+    // Haken NUR wenn wirklich alles fertig ist. Sonst stünde er auch da, wenn
+    // überall erst angefangen wurde.
+    else if(d===t){ ea.innerHTML='&#10003;'; ea.className='tno done'; }
+    else if(o>0){ ea.textContent=o+' offen'; ea.className='tno'; }
+    else { ea.textContent=tlw+' tlw.'; ea.className='tno'; }   // nichts unberührt, aber noch nicht fertig
   }
 }
 
@@ -1100,8 +1105,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 72;
+const APP_VERSION = 73;
 const CHANGELOG = [
+  { v:73, titel:'„Offen" zeigt jetzt nur noch unberührte Positionen', punkte:[
+    '„Offen" hieß bisher „noch nicht vollständig" – dort standen auch Geräte, die längst angeschlossen waren und bei denen nur noch Inbetriebnahme, Einweisung oder die Dichtigkeitsprüfung fehlten. Jetzt zeigt „Offen" ausschließlich Positionen, an denen im gewählten Gewerk noch gar nichts erledigt ist.',
+    'Sobald ein Schritt steht – etwa der Sanitäranschluss, während die Dichtigkeitsprüfung noch aussteht – rutscht die Position zu „Teilweise". Damit sieht man bei Elektro und Sanitär auf einen Blick, wo noch kein Anschluss liegt.',
+    'Zähler und Etagen-Badge zählen genauso; ihre Zahlen werden dadurch kleiner als bisher. Dafür ergeben Vollständig + Teilweise + Offen jetzt genau die Gesamtzahl.' ]},
   { v:72, titel:'Inbetriebnahme: mehrere Geräte je Position', punkte:[
     'Bei Positionen mit Stückzahl größer 1 kann jedes Gerät sein eigenes Protokoll bekommen. Liegt schon eines vor, fragt die App: neues Gerät anlegen oder das letzte weiterbearbeiten.',
     'Die Protokolle sind jetzt unterscheidbar: „Gerät 2 von 5" steht am Eintrag, im Dateinamen und im PDF-Kopf.',
@@ -1442,6 +1451,9 @@ function tc(pos,f){
   if(el){el.classList.toggle('on',s[f]);el.querySelector('.cki').innerHTML=s[f]?'&#10003;':'&#9675;';}
   const tsEl=document.getElementById('T'+f+id);
   if(tsEl) tsEl.textContent=s[f]?ckLabel(s,f):'';
+  // upStats() führt den Feldfilter-Zähler mit. Die abgehakte Position verschwindet
+  // bewusst NICHT sofort aus der gefilterten Liste (kein applyF hier) – sonst
+  // springt sie unter dem Finger weg.
   rc(pos);updRA(pos);upStats();savePos(pos);
 }
 
@@ -1851,7 +1863,7 @@ function upStats(){
   document.getElementById('cD').textContent=dn;
   document.getElementById('cP').textContent=pt;
   document.getElementById('cC').textContent=ang;
-  document.getElementById('cO').textContent=pt+op;   // offen = alles außer vollständig (wie Etagen-Badges/Filter)
+  document.getElementById('cO').textContent=op;   // offen = noch gar nichts erledigt (teilweise zählt bei „Teilweise")
   document.getElementById('cT').textContent=tot;
   updTabBadges();
 }
@@ -1870,6 +1882,7 @@ function setSF(f){
 }
 
 let TF='all';   // Gewerk-Filter: 'all' | 'M' | 'E' | 'S'
+
 function setTF(t){
   TF=t;
   document.querySelectorAll('#gwbar .gw').forEach(b=>b.classList.toggle('on', b.dataset.t===TF));
@@ -1918,7 +1931,11 @@ function applyF(){
     if(SF==='done') stOk=done;
     else if(SF==='part') stOk=part;
     else if(SF==='angeschl') stOk=angeschl(pos);
-    else if(SF==='open') stOk=!done;              // offen = noch nicht vollständig (inkl. teilweise) – wie die Etagen-Badges
+    // „Offen" = an dieser Position ist im gewählten Gewerk noch NICHTS erledigt.
+    // Sobald ein Schritt steht (z. B. Sanitäranschluss gesetzt, nur die Dichtigkeits-
+    // prüfung fehlt noch), gehört sie unter „Teilweise" – sonst stehen in der
+    // Offen-Liste auch längst angeschlossene Geräte.
+    else if(SF==='open') stOk=!done && !part;
     const gwOk = TF==='all' || (c.dataset.gew||'').includes(TF);
     const show=txtOk && stOk && gwOk;
     c.style.display=show?'':'none';
