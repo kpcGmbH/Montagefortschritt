@@ -71,6 +71,7 @@ canvas.sig{width:100%;height:110px;background:#fff;border:1px solid var(--copper
     (Kunde + ausführender Monteur) und anschließend „PDF erstellen &amp; senden" – das fertige
     PDF bitte an kpc zurückschicken.
   </div>
+  <button type="button" class="sbtn" id="btnUnlock" onclick="unlockForm()" style="display:none;margin-top:8px;padding:9px;width:100%">✏️ Vorbelegung ändern (nur kpc – erzeugt neuen Link)</button>
 
   <label class="l">Einsatzart</label>
   <div class="chips" id="artChips"></div>
@@ -250,6 +251,25 @@ function resetForm(){
   if(!confirm('Formular leeren und neuen Bericht beginnen? Der gespeicherte Stand auf diesem Gerät wird gelöscht.')) return;
   try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
   location.hash=''; location.reload();
+}
+// Ein verschickter Link ist unveränderlich (Inhalt = Link). Anpassen heißt:
+// hier entsperren, ändern, NEUEN Link erzeugen und senden. Keine Sicherheits-
+// grenze (der Linkinhalt ist ohnehin lesbar), nur eine Leitplanke gegen
+// versehentliches Ändern der Beauftragung durch den Dienstleister.
+function unlockForm(){
+  if(!confirm('Nur für kpc gedacht: Kopfdaten und Arbeitsauftrag werden wieder bearbeitbar. Danach über „Link für Dienstleister" einen NEUEN Link erzeugen und senden – der alte Link behält den alten Stand.')) return;
+  LOCKED=false;
+  ['fKunde','fStrasse','fOrt','fTel','fObjekt','fAuftragVon','fAuftragDat','fLieferadr','fAuftrag']
+    .forEach(id=>$(id).removeAttribute('readonly'));
+  $('artChips').classList.remove('locked');
+  $('lockNote').style.display='none';
+  $('btnUnlock').style.display='none';
+  $('btnLink').style.display='';
+  $('btnReset').style.display='';
+  $('btnPdf').textContent='📄 PDF erstellen';
+  $('modeHint').textContent='Vorbereiten & als Link an den Dienstleister geben';
+  document.querySelector('.hint').textContent='Der komplette Inhalt steckt im Link selbst – es wird nichts auf einem Server gespeichert. Wer den Link hat, kann den Zettel lesen: nur an den Dienstleister weitergeben.';
+  toast('Bearbeitung freigeschaltet – danach neuen Link erzeugen und senden');
 }
 
 // ---- Daten sammeln / Link ----
@@ -511,6 +531,7 @@ async function sharePdf(){
     ['fKunde','fStrasse','fOrt','fTel','fObjekt','fAuftragVon','fAuftragDat','fLieferadr','fAuftrag']
       .forEach(id=>$(id).setAttribute('readonly','readonly'));
     $('lockNote').style.display='block';
+    $('btnUnlock').style.display='';
     $('btnLink').style.display='none';
     $('btnReset').style.display='none';   // Extern: kein versehentliches Wegwerfen des Standes
     $('btnPdf').textContent='📄 PDF erstellen & senden';
