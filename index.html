@@ -3657,7 +3657,7 @@ async function svcBuildPdf(entry){
   const confLines=doc.splitTextToSize(SVC_CONF, R-M);
   const confH=confLines.length*2.8;
   const confTop=PH-14-confH;
-  const sigH=20, sigTop=confTop-2-sigH;
+  const sigH=20, sigTop=confTop-6-sigH;
   const odH=9, odTop=sigTop-odH;
   const beY=odTop-6;
   const LIMIT=beY-4;
@@ -3678,7 +3678,7 @@ async function svcBuildPdf(entry){
     dc(dark); doc.setLineWidth(0.35); doc.circle(x+circOff, yy, 2.6);
     if(on){ doc.setFillColor(43,43,43); doc.circle(x+circOff, yy, 1.4, 'F'); }
   });
-  y=Math.max(optY+16, logoBottom+8);
+  y=Math.max(optY+16, logoBottom+6);
 
   // Zwei umrandete Blöcke: links Kunde, rechts Auftrag (je 5 Zeilen, gleiche Höhe)
   const rowH=7;
