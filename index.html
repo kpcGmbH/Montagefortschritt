@@ -96,6 +96,14 @@ header{background:var(--chrome-bg);position:sticky;top:0;z-index:100;box-shadow:
   background:var(--surface);color:var(--text);font-size:13px;font-family:Arial Narrow,Arial,sans-serif;}
 .sw input::placeholder{color:var(--accent2);}
 .sw .si{position:absolute;left:9px;top:50%;transform:translateY(-50%);color:var(--accent2);font-size:12px;}
+/* „Fertige ausblenden" – Fokus-Schalter für Monteure: zeigt nur offene + angefangene
+   Positionen (fertige werden versteckt). Wirkt zusammen mit dem Gewerk-Filter, d. h.
+   „fertig" bezieht sich immer auf das aktuell gewählte Gewerk. */
+.hidedone{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;padding:7px 11px;border-radius:var(--r);
+  border:1px solid var(--line);background:var(--surface);color:var(--accent2);font-size:12px;font-weight:700;
+  cursor:pointer;font-family:inherit;white-space:nowrap;-webkit-tap-highlight-color:transparent;}
+.hidedone .hd-ic{font-size:12px;}
+.hidedone.on{background:var(--green);border-color:var(--green);color:#fff;}
 select.fs{padding:7px 9px;border-radius:var(--r);border:1px solid var(--line);
   background:var(--surface);color:var(--text);font-size:12px;font-family:Arial Narrow,Arial,sans-serif;}
 select.fs option{background:var(--surface);color:var(--text);}
@@ -274,6 +282,22 @@ select.fs option{background:var(--surface);color:var(--text);}
   border-radius:var(--r);font-size:12px;color:var(--text);background:var(--surface);
   resize:none;min-height:32px;font-family:Arial Narrow,Arial,sans-serif;}
 .anm:focus{outline:none;border-color:var(--braun);}
+
+/* Anmerkung + Restarbeiten je Position hinter einen schlanken Balken legen.
+   Unberührte Positionen bleiben so kompakt (nur der Balken); sobald eine Notiz
+   oder Restarbeit existiert, klappt der Bereich automatisch auf (nie automatisch zu). */
+.cntgl{display:flex;align-items:center;gap:8px;width:100%;margin-top:8px;padding:7px 10px;
+  background:transparent;border:1px dashed var(--line);border-radius:8px;color:var(--accent2);
+  font-family:inherit;font-size:12px;font-weight:700;cursor:pointer;text-align:left;
+  -webkit-tap-highlight-color:transparent;}
+.cntgl:active{background:var(--chrome-bg2);}
+.cntgl.has{color:var(--braun);border-color:var(--braun);border-style:solid;}
+.cnbadge{background:var(--braun);color:#fff;font-size:10px;font-weight:700;padding:0 6px;
+  border-radius:9px;min-width:16px;text-align:center;display:none;line-height:16px;}
+.cnchev{margin-left:auto;transition:transform .15s;font-size:11px;}
+.cntgl.act .cnchev{transform:rotate(180deg);}
+.cnotes{display:none;}
+.cnotes.open{display:block;}
 
 /* Restarbeiten an JEDER Position erfassbar – auch an noch nicht begonnenen
    („beschädigt angeliefert", „Anschluss fehlt bauseits"). Früher nur bei
@@ -479,7 +503,16 @@ select.fs option{background:var(--surface);color:var(--text);}
   .tab{font-size:14px;padding:11px 12px;}   /* Etagen-Tabs */
   .tab .n{font-size:11px;}
   .gw{font-size:13.5px;padding:6px 14px;}   /* Gewerk-Filter-Chips */
-  .sbar{font-size:12px;}                    /* Zusammenfassungszeile */
+  /* Statuszeile mobil: EINE Zeile statt zwei (spart ~24px Kopfhöhe). Horizontal
+     scrollbar wie die Gewerk-Leiste; „Offen" steht vorn (das interessiert den
+     Monteur zuerst), „Zuletzt bearbeitet" ist Bauleiter-Info und entfällt hier. */
+  .sbar{font-size:12px;flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;
+    scrollbar-width:none;gap:4px 8px;padding:5px 12px;}
+  .sbar::-webkit-scrollbar{display:none;}
+  .sbar .sp{flex:0 0 auto;white-space:nowrap;}
+  #sfO{order:-1;}                           /* „Offen" nach vorne */
+  #lastEditWrap{display:none;}              /* Desktop-Info */
+  #syncStatus{margin-left:4px;}             /* im Scroll-Container kein auto-Margin */
   .bhdr h3{font-size:15px;}                 /* Bereichs-Überschriften */
   .bpos,.bcnt,.bprog{font-size:11px;}
   .sw input{font-size:16px;}                /* Suche (16px verhindert iOS-Auto-Zoom) */
@@ -540,6 +573,7 @@ select.fs option{background:var(--surface);color:var(--text);}
       <span class="si">&#128269;</span>
       <input type="text" id="srch" placeholder="Suche: Bezeichnung, Fabrikat, Pos&#46;&#46;&#46;">
     </div>
+    <button id="hideDoneBtn" class="hidedone" onclick="toggleHideDone()" title="Fertige Positionen ausblenden – nur offene und angefangene zeigen"><span class="hd-ic">&#10003;</span><span class="hd-lbl">Fertige aus</span></button>
   </div>
   <div class="fbar gwbar" id="gwbar">
     <button class="gw on" data-t="all" onclick="setTF('all')">Alle</button>
@@ -631,7 +665,7 @@ const NOTE_VOR={};   // Stand vor dem Tippen – für den Verlaufseintrag
 function noteEdit(pos, el){
   const s=gs(pos);
   if(NOTE_VOR[pos]===undefined) NOTE_VOR[pos]=s.note||'';
-  autoR(el); s.note=el.value; rc(pos);
+  autoR(el); s.note=el.value; rc(pos); cnUpdate(pos);
   clearTimeout(NOTE_TIMERS[pos]);
   NOTE_TIMERS[pos]=setTimeout(()=>{
     const vorher=NOTE_VOR[pos]||''; delete NOTE_VOR[pos];
@@ -1050,11 +1084,14 @@ function buildPanels(){
     <div class="fgrid" id="FG${id}"></div>
     <div class="pgrid" id="PG${id}"></div>
   </div>
-  <textarea class="anm" rows="1" placeholder="Anmerkung &#8230;" oninput="noteEdit('${item.pos}',this)"></textarea>
-  <div class="rasec">
-    <div class="rahd">&#128203; Restarbeiten <span class="rai" id="RAI${id}"></span></div>
-    <div class="ragrp" id="RA${id}"></div>
-    <button class="raadd" onclick="raAddNew('${item.pos}')">&#65291; Restarbeit</button>
+  <button class="cntgl" id="CNT${id}" onclick="tgNotes('${item.pos}')" title="Anmerkung und Restarbeiten dieser Position">&#128203; Restarbeit / Notiz <span class="cnbadge" id="CNB${id}"></span><span class="cnchev">&#9662;</span></button>
+  <div class="cnotes" id="CN${id}">
+    <textarea class="anm" rows="1" placeholder="Anmerkung &#8230;" oninput="noteEdit('${item.pos}',this)"></textarea>
+    <div class="rasec">
+      <div class="rahd">&#128203; Restarbeiten <span class="rai" id="RAI${id}"></span></div>
+      <div class="ragrp" id="RA${id}"></div>
+      <button class="raadd" onclick="raAddNew('${item.pos}')">&#65291; Restarbeit</button>
+    </div>
   </div>
 </div>`;
       });
@@ -1207,8 +1244,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 85;
+const APP_VERSION = 86;
 const CHANGELOG = [
+  { v:86, titel:'Übersichtlicher am Handy – und Schritte setzen sich mit', punkte:[
+    'Wird ein späterer Schritt gesetzt, markiert die App die zwingenden Vorstufen automatisch mit. Beispiel: Wer den Elektro- oder Sanitäranschluss abhakt, bei dem werden „Geliefert" und „Montiert" automatisch gesetzt, falls das Montageteam sie noch nicht angehakt hatte – schließlich lässt sich nur anschließen, was geliefert und montiert ist. Das gilt für die ganze Kette (Inbetriebnahme, Einweisung, Dichtigkeitsprüfung ziehen ihre Vorstufen mit). Als „entfällt" gekennzeichnete Schritte bleiben unangetastet; im Änderungsverlauf steht „automatisch mitgesetzt".',
+    'Die Statuszeile oben ist am Handy jetzt einzeilig und lässt sich seitlich schieben; „Offen" steht vorn. Das spart Platz, so ist mehr von der Liste zu sehen.',
+    'Anmerkung und Restarbeiten liegen je Position hinter einem schlanken Balken „Restarbeit / Notiz". Unberührte Positionen bleiben dadurch kompakt; sobald eine Notiz oder Restarbeit vorhanden ist, klappt der Bereich automatisch auf und zeigt ein Zeichen (Anzahl bzw. ✎).',
+    'Neuer Schalter „✓ Fertige aus" neben der Suche: Er blendet fertige Positionen aus und zeigt nur offene und angefangene. Bei aktivem Gewerk-Filter bezieht sich „fertig" auf dieses Gewerk – der Elektriker sieht so genau seine Restliste. Die Einstellung bleibt erhalten.' ]},
   { v:85, titel:'Filter für Büro, Bauleitung und Lager', punkte:[
     'Die Leiste oben hat drei weitere Filter: 🏢 Büro, 👷 Bauleitung und 📦 Lager. Sie zeigen alle Positionen, an denen eine Restarbeit dieser Zuständigkeit hängt – zusammen mit den allgemeinen Restarbeiten der Etage und der Baustelle.',
     'Damit sieht jeder auf einen Blick seine eigenen Aufgaben, ohne die Stückliste durchsuchen zu müssen. Die Statusfelder der Positionen werden dabei ausgeblendet, weil es für diese Zuständigkeiten keine Stücklisten-Schritte gibt.',
@@ -1620,7 +1662,7 @@ function histAdd(pos,art,txt){
   const ov=document.getElementById('histOv');
   if(ov && ov.dataset.pos===pos) renderHist(pos);   // offenes Fenster mitführen
 }
-const HIST_TXT={set:'abgehakt',unset:'Haken entfernt',notiz:'Anmerkung geändert',
+const HIST_TXT={set:'abgehakt','set-auto':'automatisch mitgesetzt',unset:'Haken entfernt',notiz:'Anmerkung geändert',
   'notiz-weg':'Anmerkung gelöscht','ra-neu':'Restarbeit erfasst','ra-erledigt':'Restarbeit erledigt',
   'ra-offen':'Restarbeit wieder offen','na-set':'entfällt','na-unset':'entfällt aufgehoben'};
 function histFmt(t){ try{ const d=new Date(t);
@@ -1642,7 +1684,7 @@ function renderHist(pos){
   const zeilen = eintraege.length ? eintraege.map(e=>{
     const was=HIST_TXT[e.a]||e.a;
     const detail=e.x?('<span class="hd">'+escapeHtml(e.x)+'</span>'):'';
-    const farbe=(e.a==='set'||e.a==='ra-erledigt')?'#3a7a3a':(e.a==='unset'||e.a==='ra-offen'?'#b3261e':'var(--braun)');
+    const farbe=(e.a==='set'||e.a==='set-auto'||e.a==='ra-erledigt')?'#3a7a3a':(e.a==='unset'||e.a==='ra-offen'?'#b3261e':'var(--braun)');
     // Hat jemand anderes eingetragen, gehört das dazu – sonst behauptet der Verlauf,
     // der Monteur habe es selbst getan.
     const fremd=e.e?('<div class="he">erfasst von '+escapeHtml(e.e)+'</div>'):'';
@@ -1685,10 +1727,29 @@ function tc(pos,f){
   else { delete s.ts[f]; delete s.by[f]; }
   histAdd(pos, s[f]?'set':'unset', FLD_LBL[f]||f);
   ckRender(pos,f);
+  if(s[f]) autoFillVorstufen(pos,f);       // Chronologie: Vorstufen zwangsläufig mitsetzen
   // upStats() führt den Feldfilter-Zähler mit. Die abgehakte Position verschwindet
   // bewusst NICHT sofort aus der gefilterten Liste (kein applyF hier) – sonst
   // springt sie unter dem Finger weg.
   rc(pos);updRA(pos);upStats();savePos(pos);
+}
+// Chronologie-Automatik: Ein Schritt lässt sich fachlich nur erledigen, wenn seine
+// Vorstufen erledigt sind (angeschlossen ⇒ montiert ⇒ geliefert; in Betrieb ⇒ angeschlossen …).
+// Setzt jemand einen späteren Schritt, obwohl eine Vorstufe (z. B. vom Montageteam)
+// noch nicht angehakt wurde, wird sie automatisch mitgesetzt – mit Zeitstempel und
+// aktuellem Ausführer, über denselben Weg wie ein Klick (Verlauf/Statistik/Sync stimmen).
+// „Entfällt"-Schritte bleiben unangetastet, ebenso Schritte, die zum Gerät nicht gehören.
+const VORSTUFEN={m:['g'],nu:['g'],sa:['g','m'],dp:['g','m','sa'],ea:['g','m'],ib:['g','m','ea'],ew:['g','m','ea','ib']};
+function autoFillVorstufen(pos,f){
+  const s=gs(pos), rel=relFields(pos);
+  (VORSTUFEN[f]||[]).forEach(p=>{
+    if(s[p]) return;                 // schon erledigt
+    if(!rel.includes(p)) return;     // gehört nicht zu diesem Gerät (Feld wird gar nicht gezeigt)
+    if(entf(s,p)) return;            // als „entfällt" markiert -> nie automatisch setzen
+    s[p]=true; s.ts[p]=new Date().toISOString(); s.by[p]=USER;
+    histAdd(pos,'set-auto',FLD_LBL[p]||p);
+    ckRender(pos,p);
+  });
 }
 // „Schritt entfällt" setzen/aufheben. Erreichbar über langen Druck bzw. Rechtsklick
 // auf den Chip – eine seltene, bewusste Entscheidung soll das Abhaken im Alltag
@@ -2158,6 +2219,14 @@ function zustLabels(an){
 // SEARCH/FILTER
 
 let SF='all';
+// „Fertige ausblenden": versteckt fertige Positionen (fertig = im aktuellen Gewerk-
+// Filter alles erledigt). Bleibt über Gewerkwechsel und Sitzungen erhalten.
+let HIDE_DONE = (()=>{ try{ return localStorage.getItem('kpc_hide_done')==='1'; }catch(e){ return false; } })();
+function toggleHideDone(){
+  HIDE_DONE=!HIDE_DONE;
+  try{ localStorage.setItem('kpc_hide_done', HIDE_DONE?'1':'0'); }catch(e){}
+  applyF();
+}
 function setSF(f){
   SF=(SF===f && f!=='all')?'all':f;
   document.getElementById('sfD').classList.toggle('on',SF==='done');
@@ -2200,7 +2269,8 @@ function setTF(t){
 
 function applyF(){
   const q=document.getElementById('srch').value.toLowerCase().trim();
-  const active = q || SF!=='all' || TF!=='all';
+  const active = q || SF!=='all' || TF!=='all' || HIDE_DONE;
+  const hb=document.getElementById('hideDoneBtn'); if(hb) hb.classList.toggle('on',HIDE_DONE);
 
   // NUR die Suche zeigt alle Etagen; Status-/Gewerk-Filter bleiben in der Etagen-Ansicht
   // (Bauleiter-Workflow: Etage wählen -> Gewerk/Offen filtern -> nur diese Etage sehen)
@@ -2232,7 +2302,8 @@ function applyF(){
     // Offen-Liste auch längst angeschlossene Geräte.
     else if(SF==='open') stOk=!done && !part;
     const gwOk = TF==='all' || (ZUST_ONLY[TF] ? hatRA(pos,TF) : (c.dataset.gew||'').includes(TF));
-    const show=txtOk && stOk && gwOk;
+    const doneOk = !(HIDE_DONE && done);   // „Fertige ausblenden": fertige Karten raus
+    const show=txtOk && stOk && gwOk && doneOk;
     c.style.display=show?'':'none';
     if(show && active){
       const ilist=c.closest('.ilist');
@@ -5404,6 +5475,37 @@ function updRA(pos){
   g.querySelectorAll('textarea.radesc').forEach(raDescFit);
   updRaGwVis(g);
   updRaCounts();
+  cnUpdate(pos);
+}
+// Anmerkung-/Restarbeiten-Balken je Position: Badge + „hat Inhalt"-Zustand pflegen
+// und bei vorhandenem Inhalt automatisch aufklappen (nie automatisch zuklappen –
+// sonst verschwände die Sektion, während jemand eine leere Zeile befüllt).
+function cnUpdate(pos){
+  const id=sp(pos), s=gs(pos);
+  const box=document.getElementById('CN'+id); if(!box) return;   // Etagen-/Projektlisten haben keinen Balken
+  const btn=document.getElementById('CNT'+id), bd=document.getElementById('CNB'+id);
+  const nRA=(s.restarbeiten||[]).filter(r=>(r.txt||'').trim()||(r.fotos&&r.fotos.length)).length;
+  const hasNote=!!(s.note||'').trim();
+  const hasContent=nRA>0||hasNote;
+  if(bd){
+    if(nRA){ bd.textContent=nRA; bd.style.display='inline-block'; }
+    else if(hasNote){ bd.textContent='✎'; bd.style.display='inline-block'; }
+    else { bd.textContent=''; bd.style.display='none'; }
+  }
+  if(btn) btn.classList.toggle('has', hasContent);
+  if(hasContent && !box.classList.contains('open')){ box.classList.add('open'); if(btn) btn.classList.add('act'); }
+}
+function tgNotes(pos){
+  const id=sp(pos);
+  const box=document.getElementById('CN'+id), btn=document.getElementById('CNT'+id);
+  if(!box) return;
+  const open=box.classList.toggle('open');
+  if(btn) btn.classList.toggle('act', open);
+  if(open){
+    // Höhen nachziehen: hidden hatte scrollHeight 0 (Anmerkung + Beschreibungsfelder)
+    const anm=box.querySelector('.anm'); if(anm) autoR(anm);
+    box.querySelectorAll('textarea.radesc').forEach(raDescFit);
+  }
 }
 // Beschreibung: Höhe an den Inhalt anpassen (kein Scrollen innerhalb des Feldes –
 // beim Diktieren sieht man sonst nicht, was gesprochen wurde).
