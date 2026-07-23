@@ -1144,8 +1144,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 77;
+const APP_VERSION = 78;
 const CHANGELOG = [
+  { v:78, titel:'Aufgaben-Liste für Büro, Bauleitung und Lager', punkte:[
+    'Restarbeiten haben eine neue Zuständigkeit „📦 Lager" (fest zuständig: Wigbert ALT und Ina RUSEVA).',
+    'Restarbeiten mit Zuständigkeit „Büro", „Bauleitung" oder „Lager" landen ab jetzt zusätzlich in der SharePoint-Liste „Aufgaben" – mit Baustelle, Position, Text, Erfasser und Status. Die Liste legt die App beim ersten Mal selbst an.',
+    'Benachrichtigungen kommen über SharePoint: In der Liste „Benachrichtigen" wählen (oder ein Power-Automate-Flow auf „Element erstellt") – dann gibt es bei jeder neuen Büro-/Bauleitungs-Aufgabe automatisch eine E-Mail.',
+    'Über 👷 in der Baustellen-Auswahl lassen sich je Baustelle die Zuständigen hinterlegen – mehrere Bauleiter und mehrere Büro-/Innendienst-Personen, per Häkchen aus den bekannten Listen plus freie Namen. Sie stehen dann in jedem Aufgaben-Eintrag.',
+    'Wird die Restarbeit abgehakt oder die Zuständigkeit geändert, zieht der Listeneintrag mit (erledigt / zurückgezogen). Offline erfasste Aufgaben werden nachgereicht, sobald wieder Netz da ist.' ]},
   { v:77, titel:'Servicebericht als digitales Formular', punkte:[
     'Neuer Knopf „🔧" in der Berichtsleiste: der kpc-Servicebericht (Service, Notdienst, Lieferschein, Montage, Wartung, Abholschein) lässt sich direkt in der App ausfüllen. Kunde, Ort, Datum und der angemeldete Monteur sind aus den Baustellen-Stammdaten vorbelegt – alles bleibt änderbar.',
     'Einsätze (Datum, Techniker, Check-In/Out, Fahrzeit, Kilometer) und Material lassen sich zeilenweise ergänzen. Kunde und kpc unterschreiben direkt auf dem Gerät; die eigene gespeicherte Unterschrift kann übernommen werden.',
@@ -5061,8 +5067,10 @@ function raFmtTs(iso){
     +' '+d.toLocaleTimeString('de-DE',{hour:'2-digit',minute:'2-digit'});
 }
 // Zuständigkeit/Gewerk je Restarbeit – inkl. Büro (B) für Innendienst-Aufgaben
-const RA_GW=[['M','🔧 Montage'],['E','⚡ Elektro'],['S','🚿 Sanitär'],['B','🏢 Büro'],['BL','👷 Bauleitung'],['NU','🏗️ Nachunternehmer']];
-const RA_GW_LBL={M:'Montage',E:'Elektro',S:'Sanitär',B:'Büro',BL:'Bauleitung',NU:'Nachunternehmer'};
+const RA_GW=[['M','🔧 Montage'],['E','⚡ Elektro'],['S','🚿 Sanitär'],['B','🏢 Büro'],['BL','👷 Bauleitung'],['L','📦 Lager'],['NU','🏗️ Nachunternehmer']];
+const RA_GW_LBL={M:'Montage',E:'Elektro',S:'Sanitär',B:'Büro',BL:'Bauleitung',L:'Lager',NU:'Nachunternehmer'};
+// Lager-Zuständige sind FEST (kein Stammdatum je Baustelle) – auf Wunsch immer:
+const LAGER=['Wigbert ALT','Ina RUSEVA'];
 // Vorbelegung der Zuständigkeit: bei Positions-Restarbeit das eindeutige Gewerk der Position, sonst offen
 // Vorbelegung der Zuständigkeit: eindeutiges Positions-Gewerk, sonst – wenn oben
 // ein Gewerk gefiltert ist – dieses (sonst wäre die neue Zeile sofort ausgeblendet).
@@ -5224,7 +5232,14 @@ function raSetGw(pos,i,val){
   const s=gs(pos);
   if(!s.restarbeiten[i])return;
   raEnsure(s.restarbeiten[i]);
-  s.restarbeiten[i].gw=val;
+  const r=s.restarbeiten[i];
+  r.gw=val;
+  // Aufgabe existiert schon: Zuständigkeitswechsel in der Liste nachziehen –
+  // weg von B/BL = zurückgezogen, zurück zu B/BL = wieder offen (bzw. erledigt).
+  if(r.aufg){
+    if(val==='B'||val==='BL'||val==='L') aufgEnqueue({op:'status', key:r.aufg, status:r.done?'erledigt':'offen', zustaendig:val});
+    else aufgEnqueue({op:'status', key:r.aufg, status:'zurückgezogen'});
+  }
   const sel=document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+i+'"] .ragw');
   if(sel) sel.classList.toggle('set',!!val);
   raDebouncedSave(pos);
@@ -5236,6 +5251,102 @@ function raSetErledigtVon(pos,i,val){
   s.restarbeiten[i].erledigtVon=val;
   raDebouncedSave(pos);
 }
+
+// ============================================================================
+//  AUFGABEN-LISTE – Benachrichtigung für Büro (B) + Bauleitung (BL)
+//  Restarbeiten mit diesen Zuständigkeiten werden zusätzlich in die
+//  SharePoint-Liste „Aufgaben" geschrieben (App legt sie bei Bedarf an).
+//  Die Benachrichtigung selbst macht SharePoint („Benachrichtigen") bzw. ein
+//  Power-Automate-Flow auf „Element erstellt" – die App verschickt KEINE Mails.
+//  Offline: eigene kleine Queue in localStorage (die IndexedDB-Outbox gehört
+//  den Positions-Daten; Aufgaben sind nachgelagert und dürfen später kommen).
+//  Merker r.aufg (Schlüssel) wandert im data-Blob mit -> andere Geräte legen
+//  dieselbe Aufgabe nicht noch einmal an.
+// ============================================================================
+let AUFG_LIST_ID=null, AUFG_FLUSHING=false;
+async function aufgEnsureList(){
+  if(AUFG_LIST_ID) return AUFG_LIST_ID;
+  const ls=await (await graph('/sites/'+SPIDS.siteId+'/lists?$filter='+encodeURIComponent("displayName eq 'Aufgaben'"))).json();
+  if(ls.value && ls.value.length){ AUFG_LIST_ID=ls.value[0].id; return AUFG_LIST_ID; }
+  const res=await graph('/sites/'+SPIDS.siteId+'/lists', {method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ displayName:'Aufgaben', list:{template:'genericList'},
+      columns:[
+        {name:'projekt', text:{}}, {name:'ort', text:{}}, {name:'zustaendig', text:{}},
+        {name:'bauleiter', text:{}}, {name:'buero', text:{}}, {name:'lager', text:{}},
+        {name:'erfasser', text:{}}, {name:'status', text:{}}, {name:'erlediger', text:{}},
+        {name:'aufgKey', indexed:true, text:{}} ] })});
+  const created=await res.json();
+  AUFG_LIST_ID=created.id;
+  return AUFG_LIST_ID;
+}
+function aufgQueue(){ try{ return JSON.parse(localStorage.getItem('kpc_aufg_queue')||'[]'); }catch(e){ return []; } }
+function aufgQueueSet(q){ try{ localStorage.setItem('kpc_aufg_queue', JSON.stringify(q)); }catch(e){} }
+function aufgEnqueue(op){ const q=aufgQueue(); q.push(op); aufgQueueSet(q); aufgFlush(); }
+async function aufgFlush(){
+  if(AUFG_FLUSHING || !navigator.onLine || !SPIDS.siteId) return;
+  AUFG_FLUSHING=true;
+  try{
+    while(aufgQueue().length){
+      await aufgExec(aufgQueue()[0]);        // wirft bei Fehler -> bleibt in der Queue
+      const q=aufgQueue(); q.shift(); aufgQueueSet(q);
+    }
+  }catch(e){ /* offline/Fehler: nächster Anlauf (online-Event, Intervall, Projektwechsel) */ }
+  AUFG_FLUSHING=false;
+}
+async function aufgExec(op){
+  const listId=await aufgEnsureList();
+  if(op.op==='neu'){
+    await graph('/sites/'+SPIDS.siteId+'/lists/'+listId+'/items', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({fields:{Title:op.titel, projekt:op.projekt, ort:op.ort, zustaendig:op.zustaendig,
+        bauleiter:op.bauleiter, buero:op.buero||'', lager:op.lager||'', erfasser:op.erfasser, status:'offen', aufgKey:op.key}})});
+    return;
+  }
+  // Status-Änderung: Eintrag über den Schlüssel finden (Spalte ist indiziert)
+  const r=await (await graph('/sites/'+SPIDS.siteId+'/lists/'+listId+'/items?$expand=fields&$filter='+
+    encodeURIComponent("fields/aufgKey eq '"+String(op.key).replace(/'/g,"''")+"'"),
+    {headers:{'Prefer':'HonorNonIndexedQueriesWarningMayFailRandomly'}})).json();
+  const it=(r.value||[])[0];
+  if(!it) return;   // nie angelegt (Altbestand) -> nichts zu tun
+  const f={status:op.status};
+  if(op.von!==undefined) f.erlediger=op.von;
+  if(op.zustaendig) f.zustaendig=op.zustaendig;
+  await graph('/sites/'+SPIDS.siteId+'/lists/'+listId+'/items/'+it.id+'/fields',
+    {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(f)});
+}
+// Lesbarer Ort der Restarbeit (Position, Etage allgemein oder Baustelle allgemein)
+function aufgOrtLabel(pos){
+  if(pos===PRAKEY) return 'Baustelle allgemein';
+  if(isEKey(pos)){ const sec=(DATA||[]).find(s=>EKEY(s)===pos); return (sec?(sec.label||sec.pos):pos)+' – allgemein'; }
+  let bez='';
+  (DATA||[]).some(sec=>sec.subsections.some(sub=>sub.items.some(it=>{ if(it.pos===pos){ bez=(it.bez||'').trim(); return true; } return false; })));
+  return pos+(bez?(' '+bez):'');
+}
+// Nach jedem Restarbeiten-Speichern: neue Büro-/BL-Restarbeiten als Aufgabe anlegen.
+// r.aufg (im data-Blob gespeichert) verhindert Doppel-Anlage – auch geräteübergreifend.
+function aufgCheck(pos){
+  if(!PID) return;
+  const s=gs(pos); if(!s.restarbeiten) return;
+  s.restarbeiten.forEach(r=>{
+    if(!r || r.aufg) return;
+    if(r.gw!=='B' && r.gw!=='BL' && r.gw!=='L') return;
+    if(!(r.txt||'').trim()) return;
+    if(!r.erstelltAm) r.erstelltAm=new Date().toISOString();
+    r.aufg=PID+'|'+pos+'|'+r.erstelltAm;
+    const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
+    aufgEnqueue({op:'neu', key:r.aufg, titel:r.txt.trim(), projekt:curProjName(), ort:aufgOrtLabel(pos),
+      zustaendig:r.gw, bauleiter:namesStr(proj.bauleiter), buero:namesStr(proj.buero),
+      lager:namesStr(LAGER), erfasser:r.ersteller||USER||''});
+  });
+}
+// Zuständigen-Felder: Array (neu) oder kommagetrennter String (tolerant lesen)
+function namesArr(v){
+  if(Array.isArray(v)) return v.filter(Boolean);
+  if(typeof v==='string'&&v.trim()) return v.split(',').map(s=>s.trim()).filter(Boolean);
+  return [];
+}
+function namesStr(v){ return namesArr(v).join(', '); }
+window.addEventListener('online', ()=>{ aufgFlush(); });
+setInterval(()=>{ aufgFlush(); }, 60000);
 function raToggle(pos,i,done){
   const s=gs(pos);
   if(!s.restarbeiten[i])return;
@@ -5245,6 +5356,8 @@ function raToggle(pos,i,done){
   if(done && !s.restarbeiten[i].erledigtVon) s.restarbeiten[i].erledigtVon=USER||'';   // wer abhakt, hat's erledigt
   if(!done) s.restarbeiten[i].erledigtVon='';
   histAdd(pos, done?'ra-erledigt':'ra-offen', (s.restarbeiten[i].txt||'').trim());
+  if(s.restarbeiten[i].aufg) aufgEnqueue({op:'status', key:s.restarbeiten[i].aufg,
+    status:done?'erledigt':'offen', von:done?(s.restarbeiten[i].erledigtVon||''):''});
   updRA(pos);
   saveFotos(pos);
 }
@@ -5286,6 +5399,7 @@ function raAddNew(pos){
 function raDebouncedSave(pos){
   if(RA_TIMERS[pos])clearTimeout(RA_TIMERS[pos]);
   RA_TIMERS[pos]=setTimeout(()=>{
+    aufgCheck(pos);      // VOR dem Speichern: setzt r.aufg, das mit in den Blob soll
     saveFotos(pos);
     const id=sp(pos);
     const s=gs(pos);
@@ -5807,6 +5921,7 @@ function renderProjectPicker(){
           '<span style="display:block;font-size:11px;color:'+(p.auftraggeber?'#c0a780':'#e0a060')+';margin-top:2px">'+(p.auftraggeber?('👤 '+escapeHtml(p.auftraggeber)):'⚠ Auftraggeber fehlt')+'</span>'+
           '<span style="display:block;font-size:11px;color:#a8a8a8;margin-top:1px">'+((p.lastEdit||p.created)?('Geändert: '+new Date(p.lastEdit||p.created).toLocaleDateString('de-DE')):'')+'</span></span>'+
           '<button onclick="editAuftraggeber(\''+p.pid+'\',event)" title="Auftraggeber bearbeiten" style="background:none;border:none;color:#d7c1ae;font-size:15px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">🏢</button>'+
+         '<button onclick="editBauleiter(\''+p.pid+'\',event)" title="Bauleiter zuordnen (für Aufgaben-Benachrichtigungen)" style="background:none;border:none;color:#d7c1ae;font-size:15px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">👷</button>'+
           '<button onclick="renameProject(\''+p.pid+'\',event)" title="Baustelle umbenennen" style="background:none;border:none;color:#d7c1ae;font-size:16px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">✏️</button>'+
           '<span style="color:#d7c1ae;font-size:18px">›</span>'+
         '</div>'
@@ -5846,6 +5961,57 @@ async function editAuftraggeber(pid, ev){
   renderProjectPicker();
 }
 
+// Zuständige je Baustelle (Stammdaten): MEHRERE Bauleiter + MEHRERE Büro-/
+// Innendienst-Personen. Häkchen aus den festen Listen, Freitext für weitere.
+// Gespeichert als Arrays PROJECTS[].bauleiter / .buero; in den Aufgaben-
+// Einträgen stehen sie kommagetrennt (namesStr) – Routing-Grundlage im Flow.
+function editBauleiter(pid, ev){
+  if(ev){ ev.stopPropagation(); ev.preventDefault(); }
+  const p = PROJECTS.find(x=>x.pid===pid);
+  if(!p){ return; }
+  const selBL=namesArr(p.bauleiter), selB=namesArr(p.buero);
+  const inList=(list,n)=>list.some(x=>x.toLowerCase()===n.toLowerCase());
+  const freiBL=selBL.filter(n=>!inList(BTB_BAULEITER,n)).join(', ');
+  const freiB=selB.filter(n=>!inList(INNENDIENST,n)).join(', ');
+  let ov=document.getElementById('zustDlg');
+  if(!ov){ ov=document.createElement('div'); ov.id='zustDlg'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) zustClose(); };
+  const chk=(cls,name,on)=>'<label style="display:flex;align-items:center;gap:9px;padding:7px 4px;font-size:14px;cursor:pointer">'+
+    '<input type="checkbox" class="'+cls+'" value="'+escapeHtml(name)+'"'+(on?' checked':'')+' style="width:18px;height:18px;accent-color:#b8860b">'+escapeHtml(name)+'</label>';
+  const fld='width:100%;box-sizing:border-box;padding:9px;border-radius:8px;border:1px solid #6a5433;background:#3a3530;color:#fff;font-size:14px;font-family:inherit';
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:22px;max-width:440px;width:100%;max-height:86vh;overflow:auto;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:17px;font-weight:700;margin-bottom:2px">👷 Zuständige</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:12px">'+escapeHtml(p.name)+' – Empfänger der Aufgaben-Benachrichtigungen (Restarbeiten mit Zuständigkeit Bauleitung bzw. Büro). Mehrfachauswahl möglich.</div>'+
+    '<div style="font-size:12px;color:#d7c1ae;font-weight:700;letter-spacing:.3px;margin:10px 0 2px">BAULEITER</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">'+BTB_BAULEITER.map(n=>chk('zustBL',n,inList(selBL,n))).join('')+'</div>'+
+    '<input id="zustBLfrei" type="text" value="'+escapeHtml(freiBL)+'" placeholder="Weitere Namen (kommagetrennt)" style="'+fld+';margin-top:6px">'+
+    '<div style="font-size:12px;color:#d7c1ae;font-weight:700;letter-spacing:.3px;margin:16px 0 2px">BÜRO / INNENDIENST</div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:0 10px">'+INNENDIENST.map(n=>chk('zustB',n,inList(selB,n))).join('')+'</div>'+
+    '<input id="zustBfrei" type="text" value="'+escapeHtml(freiB)+'" placeholder="Weitere Namen (kommagetrennt)" style="'+fld+';margin-top:6px">'+
+    '<div style="font-size:12px;color:#d7c1ae;font-weight:700;letter-spacing:.3px;margin:16px 0 2px">LAGER</div>'+
+    '<div style="font-size:13px;color:#a8a8a8;padding:4px">'+escapeHtml(LAGER.join(', '))+' <span style="font-size:11px;color:#8a8f92">(fest hinterlegt, gilt für alle Baustellen)</span></div>'+
+    '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">'+
+      '<button type="button" onclick="zustClose()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
+      '<button type="button" onclick="zustSave(\''+pid+'\')" style="background:#b8860b;border:none;color:#fff;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Speichern</button>'+
+    '</div></div>';
+}
+function zustClose(){ const o=document.getElementById('zustDlg'); if(o) o.remove(); }
+async function zustSave(pid){
+  const p=PROJECTS.find(x=>x.pid===pid); if(!p){ zustClose(); return; }
+  const collect=(cls,freiId)=>{
+    const n=[...document.querySelectorAll('input.'+cls+':checked')].map(c=>c.value);
+    ((document.getElementById(freiId)||{}).value||'').split(',').map(s=>s.trim()).filter(Boolean)
+      .forEach(x=>{ if(!n.some(y=>y.toLowerCase()===x.toLowerCase())) n.push(x); });
+    return n;
+  };
+  const altBL=p.bauleiter, altB=p.buero;
+  p.bauleiter=collect('zustBL','zustBLfrei');
+  p.buero=collect('zustB','zustBfrei');
+  try{ await saveProjects(); }
+  catch(e){ p.bauleiter=altBL; p.buero=altB; alert('Speichern fehlgeschlagen: '+(e.message||e)); return; }
+  zustClose(); renderProjectPicker();
+}
+
 // Baustelle umbenennen (nur der Anzeigename; pid + LV-Datei bleiben unverändert,
 // damit Fortschritt und Fotos in SharePoint erhalten bleiben).
 async function renameProject(pid, ev){
@@ -5878,6 +6044,7 @@ async function selectProject(pid){
     loadBautagebuch(pid).catch(()=>{});   // Bautagebuch der Baustelle nachladen (nicht blockierend)
     loadDicht(pid).then(()=>updDichtTasks()).catch(()=>{});   // Dichtigkeitsprotokolle nachladen (nicht blockierend)
     loadService(pid).catch(()=>{});   // Serviceberichte nachladen (nicht blockierend)
+    aufgFlush();                      // wartende Aufgaben-Einträge nachreichen
     const proj = PROJECTS.find(p=>p.pid===pid);
     const nm = document.getElementById('projName'); if(nm) nm.textContent = proj ? proj.name : pid;
     Object.keys(ST).forEach(k=>delete ST[k]);
