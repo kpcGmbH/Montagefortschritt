@@ -4471,6 +4471,14 @@ let _ibnJumpPos=(function(){
     history.replaceState(null,'',location.pathname+location.search);
     return decodeURIComponent(m[1]||''); }catch(e){ return ''; }
 })();
+// Direktsprung aus der Aufgaben-Mail (#aufgabe=<pid>|<posKey>): nach dem Login
+// wird die Baustelle geöffnet und (bei echten Positionen) die Karte angesprungen.
+let _aufgJump=(function(){
+  try{ const m=(location.hash||'').match(/[#&]aufgabe=([^&]*)/); if(!m) return null;
+    history.replaceState(null,'',location.pathname+location.search);
+    const t=decodeURIComponent(m[1]||'').split('|');
+    return t[0]?{pid:t[0], pos:t.slice(1).join('|')}:null; }catch(e){ return null; }
+})();
 function _dataURLtoBlob(d){const a=d.split(',');const mime=((a[0].match(/:(.*?);/))||[])[1]||'application/pdf';const bin=atob(a[1]);const n=bin.length;const u=new Uint8Array(n);for(let i=0;i<n;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime});}
 async function editIbnProto(pos,i){
   const p=gs(pos).pdfs[i]; if(!p||!p.dataFname){alert('Für dieses Protokoll sind keine bearbeitbaren Daten gespeichert.');return;}
@@ -5239,7 +5247,7 @@ function raSetGw(pos,i,val){
   if(r.aufg){
     if(val==='B'||val==='BL'||val==='L'){
       const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
-      aufgEnqueue({op:'status', key:r.aufg, status:r.done?'erledigt':'offen', zustaendig:val, empfaenger:aufgEmpfaenger(val,proj)});
+      aufgEnqueue({op:'status', key:r.aufg, status:r.done?'erledigt':'offen', zustaendig:RA_GW_LBL[val]||val, empfaenger:aufgEmpfaenger(val,proj)});
     }
     else aufgEnqueue({op:'status', key:r.aufg, status:'zurückgezogen'});
   }
@@ -5267,7 +5275,7 @@ function raSetErledigtVon(pos,i,val){
 //  dieselbe Aufgabe nicht noch einmal an.
 // ============================================================================
 let AUFG_LIST_ID=null, AUFG_COLS=null, AUFG_FLUSHING=false;
-const AUFG_FELDER=['projekt','ort','zustaendig','bauleiter','buero','lager','erfasser','status','erlediger','empfaenger','aufgKey'];
+const AUFG_FELDER=['projekt','ort','zustaendig','bauleiter','buero','lager','erfasser','status','erlediger','empfaenger','link','aufgKey'];
 // Empfänger-Mailadressen nach Namensschema vorname.nachname@… (Umlaute
 // transliteriert). Ausnahmen hier eintragen (Schlüssel = Name kleingeschrieben):
 const EMAIL_DOMAIN='kpc-project.com';
@@ -5346,7 +5354,8 @@ async function aufgExec(op){
     const F=(logisch,wert)=>{ const n=AUFG_COLS[logisch]; if(n) fields[n]=wert; };   // fehlende Spalten auslassen
     F('projekt',op.projekt); F('ort',op.ort); F('zustaendig',op.zustaendig);
     F('bauleiter',op.bauleiter); F('buero',op.buero||''); F('lager',op.lager||'');
-    F('erfasser',op.erfasser); F('status','offen'); F('empfaenger',op.empfaenger||''); F('aufgKey',op.key);
+    F('erfasser',op.erfasser); F('status','offen'); F('empfaenger',op.empfaenger||'');
+    F('link',op.link||''); F('aufgKey',op.key);
     await graph('/sites/'+SPIDS.siteId+'/lists/'+listId+'/items', {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({fields})});
     return;
@@ -5389,8 +5398,9 @@ function aufgCheck(pos){
     r.aufg=PID+'|'+pos+'|'+r.erstelltAm;
     const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
     aufgEnqueue({op:'neu', key:r.aufg, titel:r.txt.trim(), projekt:curProjName(), ort:aufgOrtLabel(pos),
-      zustaendig:r.gw, bauleiter:namesStr(proj.bauleiter), buero:namesStr(proj.buero),
-      lager:namesStr(LAGER), empfaenger:aufgEmpfaenger(r.gw,proj), erfasser:r.ersteller||USER||''});
+      zustaendig:RA_GW_LBL[r.gw]||r.gw, bauleiter:namesStr(proj.bauleiter), buero:namesStr(proj.buero),
+      lager:namesStr(LAGER), empfaenger:aufgEmpfaenger(r.gw,proj), erfasser:r.ersteller||USER||'',
+      link:location.origin+location.pathname+'#aufgabe='+encodeURIComponent(PID)+'|'+encodeURIComponent(pos)});
   });
 }
 // Zuständigen-Felder: Array (neu) oder kommagetrennter String (tolerant lesen)
@@ -5955,7 +5965,17 @@ async function openProjectFlow(){
   const ov=ensureProjOverlay();
   ov.style.display='flex';
   ov.innerHTML='<div style="color:#d7c1ae;font-size:15px;margin-top:50px">Projekte werden geladen …</div>';
-  try{ await loadProjects(); renderProjectPicker(); }
+  try{
+    await loadProjects();
+    // Aus einer Aufgaben-Mail gekommen? Direkt in die Baustelle springen statt Picker.
+    if(_aufgJump && PROJECTS.some(p=>p.pid===_aufgJump.pid)){
+      const z=_aufgJump; _aufgJump=null;
+      if(z.pos && !isEKey(z.pos)) _ibnJumpPos=z.pos;   // Kartensprung über den vorhandenen Mechanismus
+      await selectProject(z.pid);
+      return;
+    }
+    renderProjectPicker();
+  }
   catch(e){ ov.innerHTML='<div style="color:#e08a8a;font-size:14px;max-width:520px;text-align:center;margin-top:50px">Projekte konnten nicht geladen werden:<br>'+escapeHtml(e.message||e)+'</div>'; console.error(e); }
 }
 function renderProjectPicker(){
