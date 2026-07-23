@@ -1260,8 +1260,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 89;
+const APP_VERSION = 90;
 const CHANGELOG = [
+  { v:90, titel:'Bericht „Offene Punkte" lädt wieder zuverlässig', punkte:[
+    'Bei Baustellen mit vielen Fotos (z. B. Berlin Upbeat) konnte der Bericht „Offene Punkte" hängen bleiben und wurde nicht fertig – ein einzelnes Foto, das sich nicht laden ließ, blockierte den ganzen Bericht.',
+    'Jetzt werden die Fotos parallel und mit Zeitlimit geladen (mit Fortschrittsanzeige). Lädt ein Foto nicht, erscheint es einfach ohne Bild – der Bericht wird trotzdem fertig.' ]},
   { v:89, titel:'Untere Leiste aufgeräumt: ein „Berichte"-Knopf', punkte:[
     'Statt sieben gedrängter Knöpfe unten gibt es jetzt EINEN Knopf „📄 Berichte". Ein Tipp öffnet eine Liste mit allen Berichten – jeweils mit Symbol, Klartext-Name und kurzer Erklärung, statt der bisherigen Rätsel-Icons.',
     'Enthalten sind wie bisher: Kundenbericht (ohne/mit Fotos), Offene Punkte, Tagesbericht, Bautagebuch, Servicebericht und die Restarbeitenliste als Excel. Es geht nichts verloren – es ist nur aufgeräumter und die Positionsliste hat mehr Platz.' ]},
@@ -6125,12 +6128,34 @@ async function expOffenePunkte(){
   const w=window.open('','_blank');
   if(!w){ alert('Das Berichtsfenster wurde vom Browser blockiert. Bitte Popups für diese Seite erlauben.'); return; }
   try{ w.document.write('<title>Offene Punkte</title><body style="font-family:Arial,sans-serif;padding:24px;color:#666">Bericht wird erstellt …</body>'); }catch(e){}
-  // Fotos vorab als Daten-URLs (das Berichts-Popup hat keinen Graph-Token)
+  // Fotos vorab als Daten-URLs (das Berichts-Popup hat keinen Graph-Token).
+  // WICHTIG: parallel + mit Zeitlimit. Früher lief das sequenziell OHNE Timeout –
+  // ein einziges hängendes/fehlendes Foto (z. B. Upbeat: verschobene Datei, langsamer
+  // Mobilfunk) blockierte dann den GESAMTEN Bericht dauerhaft („lädt nicht mehr").
+  // Jetzt: je Foto max. 15 s, insgesamt max. 45 s; was nicht lädt, erscheint ohne Bild.
   const fotoData={};
-  const anyFoto=raRowsAll.some(r=>r.fotos&&r.fotos.length);
+  const alleSrc=[...new Set(raRowsAll.flatMap(r=>r.fotos||[]))];
+  const anyFoto=alleSrc.length>0;
   if(anyFoto){
-    showLoader('Bericht wird vorbereitet...');
-    for(const r of raRowsAll){ for(const src of (r.fotos||[])){ if(fotoData[src]!==undefined) continue; try{ fotoData[src]=await blobToDataURL(await getFileBlob(src)); }catch(e){ fotoData[src]=''; } } }
+    const DEADLINE=performance.now()+45000;
+    const withTimeout=(p,ms)=>new Promise((resolve,reject)=>{
+      const t=setTimeout(()=>reject(new Error('timeout')),ms);
+      p.then(v=>{clearTimeout(t);resolve(v);},e=>{clearTimeout(t);reject(e);});
+    });
+    let fertig=0;
+    const ladeEins=async(src)=>{
+      try{
+        const rest=DEADLINE-performance.now();
+        if(rest<=0){ fotoData[src]=''; }
+        else { const blob=await withTimeout(getFileBlob(src), Math.min(15000, rest));
+          fotoData[src]=blob?await blobToDataURL(blob):''; }
+      }catch(e){ fotoData[src]=''; }
+      fertig++;
+      if(fertig%3===0||fertig===alleSrc.length) showLoader('Fotos werden geladen … '+fertig+'/'+alleSrc.length);
+    };
+    showLoader('Fotos werden geladen … 0/'+alleSrc.length);
+    const CHUNK=6;   // in Blöcken parallel – schneller, und ein Ausreißer bremst nur seinen Block
+    for(let i=0;i<alleSrc.length;i+=CHUNK){ await Promise.all(alleSrc.slice(i,i+CHUNK).map(ladeEins)); }
     hideLoader();
   }
 
