@@ -5237,7 +5237,10 @@ function raSetGw(pos,i,val){
   // Aufgabe existiert schon: Zuständigkeitswechsel in der Liste nachziehen –
   // weg von B/BL = zurückgezogen, zurück zu B/BL = wieder offen (bzw. erledigt).
   if(r.aufg){
-    if(val==='B'||val==='BL'||val==='L') aufgEnqueue({op:'status', key:r.aufg, status:r.done?'erledigt':'offen', zustaendig:val});
+    if(val==='B'||val==='BL'||val==='L'){
+      const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
+      aufgEnqueue({op:'status', key:r.aufg, status:r.done?'erledigt':'offen', zustaendig:val, empfaenger:aufgEmpfaenger(val,proj)});
+    }
     else aufgEnqueue({op:'status', key:r.aufg, status:'zurückgezogen'});
   }
   const sel=document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+i+'"] .ragw');
@@ -5264,7 +5267,31 @@ function raSetErledigtVon(pos,i,val){
 //  dieselbe Aufgabe nicht noch einmal an.
 // ============================================================================
 let AUFG_LIST_ID=null, AUFG_COLS=null, AUFG_FLUSHING=false;
-const AUFG_FELDER=['projekt','ort','zustaendig','bauleiter','buero','lager','erfasser','status','erlediger','aufgKey'];
+const AUFG_FELDER=['projekt','ort','zustaendig','bauleiter','buero','lager','erfasser','status','erlediger','empfaenger','aufgKey'];
+// Empfänger-Mailadressen nach Namensschema vorname.nachname@… (Umlaute
+// transliteriert). Ausnahmen hier eintragen (Schlüssel = Name kleingeschrieben):
+const EMAIL_DOMAIN='kpc-project.com';
+const EMAIL_OVERRIDES={ /* 'max mustermann':'m.mustermann@kpc-project.com' */ };
+function mailFromName(n){
+  const key=String(n||'').trim().toLowerCase();
+  if(!key) return '';
+  if(EMAIL_OVERRIDES[key]) return EMAIL_OVERRIDES[key];
+  const s=key.replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue').replace(/ß/g,'ss')
+             .replace(/[^a-z\s.-]/g,'');
+  const parts=s.split(/\s+/).filter(Boolean);
+  if(parts.length<2) return '';                    // ohne Nachnamen keine Adresse ableitbar
+  return parts.join('.')+'@'+EMAIL_DOMAIN;
+}
+// Wer bekommt die Mail? B -> Büro der Baustelle (sonst Innendienst gesamt),
+// BL -> Bauleiter der Baustelle (sonst Auffangnetz Büro), L -> Lager (fest).
+function aufgEmpfaenger(gw, proj){
+  let namen;
+  if(gw==='L') namen=LAGER;
+  else if(gw==='BL'){ namen=namesArr(proj.bauleiter); if(!namen.length) namen=namesArr(proj.buero); if(!namen.length) namen=INNENDIENST; }
+  else { namen=namesArr(proj.buero); if(!namen.length) namen=INNENDIENST; }
+  const mails=namen.map(mailFromName).filter(Boolean);
+  return [...new Set(mails)].join('; ');
+}
 async function aufgEnsureList(){
   if(AUFG_LIST_ID && AUFG_COLS) return AUFG_LIST_ID;
   const ls=await (await graph('/sites/'+SPIDS.siteId+'/lists?$filter='+encodeURIComponent("displayName eq 'Aufgaben'"))).json();
@@ -5278,7 +5305,7 @@ async function aufgEnsureList(){
           {name:'projekt', text:{}}, {name:'ort', text:{}}, {name:'zustaendig', text:{}},
           {name:'bauleiter', text:{}}, {name:'buero', text:{}}, {name:'lager', text:{}},
           {name:'erfasser', text:{}}, {name:'status', text:{}}, {name:'erlediger', text:{}},
-          {name:'aufgKey', indexed:true, text:{}} ] })});
+          {name:'empfaenger', text:{}}, {name:'aufgKey', indexed:true, text:{}} ] })});
     const created=await res.json();
     AUFG_LIST_ID=created.id;
   }
@@ -5319,7 +5346,7 @@ async function aufgExec(op){
     const F=(logisch,wert)=>{ const n=AUFG_COLS[logisch]; if(n) fields[n]=wert; };   // fehlende Spalten auslassen
     F('projekt',op.projekt); F('ort',op.ort); F('zustaendig',op.zustaendig);
     F('bauleiter',op.bauleiter); F('buero',op.buero||''); F('lager',op.lager||'');
-    F('erfasser',op.erfasser); F('status','offen'); F('aufgKey',op.key);
+    F('erfasser',op.erfasser); F('status','offen'); F('empfaenger',op.empfaenger||''); F('aufgKey',op.key);
     await graph('/sites/'+SPIDS.siteId+'/lists/'+listId+'/items', {method:'POST', headers:{'Content-Type':'application/json'},
       body: JSON.stringify({fields})});
     return;
@@ -5336,6 +5363,7 @@ async function aufgExec(op){
   if(AUFG_COLS.status) f[AUFG_COLS.status]=op.status;
   if(op.von!==undefined && AUFG_COLS.erlediger) f[AUFG_COLS.erlediger]=op.von;
   if(op.zustaendig && AUFG_COLS.zustaendig) f[AUFG_COLS.zustaendig]=op.zustaendig;
+  if(op.empfaenger!==undefined && AUFG_COLS.empfaenger) f[AUFG_COLS.empfaenger]=op.empfaenger;
   if(!Object.keys(f).length) return;
   await graph('/sites/'+SPIDS.siteId+'/lists/'+listId+'/items/'+it.id+'/fields',
     {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(f)});
@@ -5362,7 +5390,7 @@ function aufgCheck(pos){
     const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
     aufgEnqueue({op:'neu', key:r.aufg, titel:r.txt.trim(), projekt:curProjName(), ort:aufgOrtLabel(pos),
       zustaendig:r.gw, bauleiter:namesStr(proj.bauleiter), buero:namesStr(proj.buero),
-      lager:namesStr(LAGER), erfasser:r.ersteller||USER||''});
+      lager:namesStr(LAGER), empfaenger:aufgEmpfaenger(r.gw,proj), erfasser:r.ersteller||USER||''});
   });
 }
 // Zuständigen-Felder: Array (neu) oder kommagetrennter String (tolerant lesen)
