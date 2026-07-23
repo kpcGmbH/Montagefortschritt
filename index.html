@@ -114,7 +114,7 @@ select.fs option{background:var(--surface);color:var(--text);}
 .gw:hover{border-color:var(--chrome-accent);}
 .gw.on{background:var(--chrome-accent);color:var(--surface);border-color:var(--chrome-accent);}
 .gtag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:8px;margin-left:4px;vertical-align:middle;color:#fff;}
-.gtag.gM{background:#6b7a8a;} .gtag.gE{background:#b8860b;} .gtag.gS{background:#3f7a8a;}
+.gtag.gM{background:#6b7a8a;} .gtag.gE{background:#b8860b;} .gtag.gS{background:#3f7a8a;} .gtag.gNU{background:#7a5c1d;}
 .gtag.gEdit{background:transparent;color:var(--accent2);border:1px dashed var(--accent2);}
 .gwedit{cursor:pointer;-webkit-tap-highlight-color:transparent;}
 .sp strong{color:var(--text);}
@@ -224,6 +224,7 @@ select.fs option{background:var(--surface);color:var(--text);}
 .ck:active{transform:scale(.95);}
 .ck-lbl{display:flex;align-items:center;gap:5px;}
 .ck.on{border-color:var(--green);background:var(--green);color:#fff;}
+.ck-nu.on{border-color:#7a5c1d;background:#7a5c1d;}
 .ck-ib.on{border-color:#5b4c8a;background:#5b4c8a;}
 .ck-sa.on{border-color:#1a5f7a;background:#1a5f7a;}
 .ck-dp.on{border-color:#2a7fa6;background:#2a7fa6;}
@@ -538,6 +539,7 @@ select.fs option{background:var(--surface);color:var(--text);}
     <button class="gw" data-t="M" onclick="setTF('M')">&#128295; Montage</button>
     <button class="gw" data-t="E" onclick="setTF('E')">&#9889; Elektro</button>
     <button class="gw" data-t="S" onclick="setTF('S')">&#128703; Sanit&#228;r</button>
+    <button class="gw" data-t="NU" onclick="setTF('NU')">&#127959;&#65039; Nachunternehmer</button>
   </div>
   <div class="tabs" id="tabs"></div>
   <div class="sbar">
@@ -837,13 +839,13 @@ function savePos(pos) {
 }
 let ACT='__all', FPOS=null;   // Standard: „Alle" (keine Etagen-Auswahl)
 
-function gs(p){if(!ST[p])ST[p]={g:false,m:false,a:false,sa:false,dp:false,ea:false,ib:false,ew:false,fotos:[],pdfs:[],restarbeiten:[],note:'',ts:{},by:{},na:{}};if(!ST[p].pdfs)ST[p].pdfs=[];if(!ST[p].restarbeiten)ST[p].restarbeiten=[];if(!ST[p].ts)ST[p].ts={};if(!ST[p].by)ST[p].by={};if(!ST[p].na)ST[p].na={};return ST[p];}
+function gs(p){if(!ST[p])ST[p]={g:false,m:false,nu:false,a:false,sa:false,dp:false,ea:false,ib:false,ew:false,fotos:[],pdfs:[],restarbeiten:[],note:'',ts:{},by:{},na:{}};if(!ST[p].pdfs)ST[p].pdfs=[];if(!ST[p].restarbeiten)ST[p].restarbeiten=[];if(!ST[p].ts)ST[p].ts={};if(!ST[p].by)ST[p].by={};if(!ST[p].na)ST[p].na={};return ST[p];}
 // Gewerk -> die Haken, die dieses Gewerk "vollständig erledigen":
 //   Montage (M) = Geliefert + Montiert.
 //   Sanitär (S) = Sanitär-Anschluss + Dichtheit,  Elektro (E) = Elektro-Anschluss + Inbetriebnahme + Einweisung.
 // Dichtheit (dp) = Dichtigkeitsprüfung; gehört zum Sanitär-Gewerk und kann später nachgezogen werden.
-const GEW_FIELDS={M:['g','m'],S:['sa','dp'],E:['ea','ib','ew']};
-const ALL_CK=['g','m','sa','dp','ea','ib','ew'];
+const GEW_FIELDS={M:['g','m'],S:['sa','dp'],E:['ea','ib','ew'],NU:['g','nu']};
+const ALL_CK=['g','m','nu','sa','dp','ea','ib','ew'];
 // Auswahlfelder zeigen/verbergen (feste, ausgeschriebene Beschriftung steht im Markup).
 // Gewerk-Filter -> die Felder dieses Gewerks; "Alle" -> die für die Gewerke der Position
 // relevanten Felder (= relFields). Damit ist die Anzeige deckungsgleich mit den gefilterten
@@ -1009,6 +1011,7 @@ function buildPanels(){
   <div class="crow">
     <div class="ck" data-f="g" id="Kg${id}" onclick="tc('${item.pos}','g')" oncontextmenu="tcNA('${item.pos}','g');return false" ontouchstart="ckHoldStart(event,'${item.pos}','g')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Geliefert</span></span><span class="ck-ts" id="Tg${id}"></span></div>
     <div class="ck" data-f="m" id="Km${id}" onclick="tc('${item.pos}','m')" oncontextmenu="tcNA('${item.pos}','m');return false" ontouchstart="ckHoldStart(event,'${item.pos}','m')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Montiert</span></span><span class="ck-ts" id="Tm${id}"></span></div>
+    <div class="ck ck-nu" data-f="nu" id="Knu${id}" onclick="tc('${item.pos}','nu')" oncontextmenu="tcNA('${item.pos}','nu');return false" ontouchstart="ckHoldStart(event,'${item.pos}','nu')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Ausgef&#252;hrt</span></span><span class="ck-ts" id="Tnu${id}"></span></div>
     <div class="ck ck-sa" data-f="sa" id="Ksa${id}" onclick="tc('${item.pos}','sa')" oncontextmenu="tcNA('${item.pos}','sa');return false" ontouchstart="ckHoldStart(event,'${item.pos}','sa')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Sanitäranschluss</span></span><span class="ck-ts" id="Tsa${id}"></span></div>
     <div class="ck ck-dp" data-f="dp" id="Kdp${id}" onclick="tc('${item.pos}','dp')" oncontextmenu="tcNA('${item.pos}','dp');return false" ontouchstart="ckHoldStart(event,'${item.pos}','dp')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Dichtigkeitsprüfung</span></span><span class="ck-ts" id="Tdp${id}"></span></div>
     <div class="ck ck-ea" data-f="ea" id="Kea${id}" onclick="tc('${item.pos}','ea')" oncontextmenu="tcNA('${item.pos}','ea');return false" ontouchstart="ckHoldStart(event,'${item.pos}','ea')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Elektroanschluss</span></span><span class="ck-ts" id="Tea${id}"></span></div>
@@ -1179,8 +1182,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 83;
+const APP_VERSION = 84;
 const CHANGELOG = [
+  { v:84, titel:'Neues Gewerk „Nachunternehmer"', punkte:[
+    'Neben Montage, Elektro und Sanitär gibt es jetzt das Gewerk „🏗️ Nachunternehmer" – für Leistungen, die komplett ein Fremdunternehmen erbringt, etwa Kältetechnik oder Brandschutz.',
+    'Weil solche Leistungen sehr unterschiedlich sind, hat das Gewerk bewusst nur einen allgemeinen Schritt: „Ausgeführt". Zusammen mit „Geliefert" reicht das für die meisten Fälle; fällt die Lieferung nicht an, setzt man sie mit langem Druck auf „entfällt".',
+    'Das Gewerk lässt sich je Position über das Gewerk-Feld zuordnen, oben als Filter wählen und im Bericht „Offene Punkte" separat ausgeben – so bekommt der Nachunternehmer sein eigenes Blatt.' ]},
   { v:83, titel:'Restarbeiten verschwinden nicht mehr scheinbar', punkte:[
     'Ist oben ein Gewerk gefiltert (z. B. Montage) und man gibt einer Restarbeit eine andere Zuständigkeit (z. B. Büro), wurde sie ausgeblendet – sichtbar wurde das aber erst beim Hinzufügen der nächsten Restarbeit. Es sah so aus, als sei die vorherige Eingabe verloren.',
     'Jetzt steht in solchen Fällen unter der Liste ein Hinweis wie „1 weitere Restarbeit anderer Zuständigkeit – anzeigen". Ein Tipp darauf blendet sie wieder ein; nichts geht verloren.',
@@ -2193,7 +2200,7 @@ function restoreUI() {
     const s = ST[pos];
     const id = sp(pos);
     // Restore checkboxes (inkl. „entfällt"-Kennzeichen)
-    ['g','m','a','sa','dp','ea','ib','ew'].forEach(f => {
+    ['g','m','nu','a','sa','dp','ea','ib','ew'].forEach(f => {
       if(s[f] || entf(s,f)) ckRender(pos,f);
     });
     // Restore card color
@@ -3930,7 +3937,7 @@ async function expKunde(withFotos=false){
           bez:item.bez.trim(),
           fabrikat:item.fabrikat.trim(),
           typ:item.typ.trim(),
-          g:s.g,m:s.m,a:s.a,sa:s.sa,dp:s.dp,ea:s.ea,ib:s.ib,ew:s.ew,
+          g:s.g,m:s.m,nu:s.nu,a:s.a,sa:s.sa,dp:s.dp,ea:s.ea,ib:s.ib,ew:s.ew,
           ts:s.ts||{}, na:s.na||{},
           fotos:s.fotos,note:s.note
         });
@@ -3964,12 +3971,12 @@ async function expKunde(withFotos=false){
   let tableRows='';
   rows.forEach((r,i)=>{
     if(r.geschoss!==lastG){
-      if(lastG!=='')tableRows+='<tr><td colspan="12" style="height:12px;background:#f5f3f0;border:none"></td></tr>';
-      tableRows+=`<tr><td colspan="12" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:8px 10px;letter-spacing:1px">${r.geschoss}: ${DATA.find(s=>s.label===r.geschoss)?.bez||''}</td></tr>`;
+      if(lastG!=='')tableRows+='<tr><td colspan="13" style="height:12px;background:#f5f3f0;border:none"></td></tr>';
+      tableRows+=`<tr><td colspan="13" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:8px 10px;letter-spacing:1px">${r.geschoss}: ${DATA.find(s=>s.label===r.geschoss)?.bez||''}</td></tr>`;
       lastG=r.geschoss; lastB='';
     }
     if(r.bereich!==lastB){
-      tableRows+=`<tr><td colspan="12" style="background:#eeecea;color:#895500;font-weight:700;font-size:12px;padding:5px 10px;border-left:3px solid #d7c1ae">${r.bereich}</td></tr>`;
+      tableRows+=`<tr><td colspan="13" style="background:#eeecea;color:#895500;font-weight:700;font-size:12px;padding:5px 10px;border-left:3px solid #d7c1ae">${r.bereich}</td></tr>`;
       lastB=r.bereich;
     }
     const tsShort=iso=>{if(!iso)return'';const d=new Date(iso);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});};
@@ -3989,15 +3996,16 @@ async function expKunde(withFotos=false){
       <td style="padding:5px 8px;font-size:12px;font-weight:700;text-align:center;white-space:nowrap">${r.menge} ${r.einh}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.g,'g')}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.m,'m')}</td>
+      <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.nu,'nu')}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.sa,'sa')}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.dp,'dp')}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.ea,'ea')}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.ib,'ib')}</td>
       <td style="padding:5px 8px;text-align:center;vertical-align:top">${chk(r.ew,'ew')}</td>
     </tr>`;
-    if(r.note)tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}"><td colspan="12" style="padding:2px 8px 6px 28px;font-size:11px;color:#895500;font-style:italic">↳ ${r.note}</td></tr>`;
+    if(r.note)tableRows+=`<tr style="background:${i%2===0?'#fff':'#faf9f7'}"><td colspan="13" style="padding:2px 8px 6px 28px;font-size:11px;color:#895500;font-style:italic">↳ ${r.note}</td></tr>`;
     if(withFotos && r.fotos && r.fotos.length){
-      let fhtml='<td colspan="12" style="padding:4px 8px 8px 28px;"><div style="display:flex;gap:8px;flex-wrap:wrap;">';
+      let fhtml='<td colspan="13" style="padding:4px 8px 8px 28px;"><div style="display:flex;gap:8px;flex-wrap:wrap;">';
       r.fotos.forEach((src,fi)=>{
         const ts = src.match(/_(\d+)\.jpg/)?.[1];
         const dt = ts ? new Date(parseInt(ts)).toLocaleString('de-DE') : '';
@@ -4039,7 +4047,7 @@ td{border-bottom:1px solid #eeecea;vertical-align:middle;}
 <table>
 <thead><tr>
   <th>Pos.-Nr.</th><th>Bezeichnung</th><th>Fabrikat</th><th>Typ</th><th class="center">Menge</th>
-  <th class="center">Geliefert</th><th class="center">Montiert</th><th class="center">Sanitäranschluss</th><th class="center">Dichtigkeitsprüfung</th><th class="center">Elektroanschluss</th><th class="center">Inbetriebnahme</th><th class="center">Einweisung</th>
+  <th class="center">Geliefert</th><th class="center">Montiert</th><th class="center">Ausgeführt</th><th class="center">Sanitäranschluss</th><th class="center">Dichtigkeitsprüfung</th><th class="center">Elektroanschluss</th><th class="center">Inbetriebnahme</th><th class="center">Einweisung</th>
 </tr></thead>
 <tbody>${tableRows}</tbody>
 </table>
@@ -4207,7 +4215,7 @@ function buildPosData(pos){
   const s = gs(pos);
   // gleiche Struktur wie früher die Supabase-Spalten (innere Felder als JSON-Strings)
   return JSON.stringify({
-    g:s.g, m:s.m, a:s.a, sa:s.sa, dp:s.dp, ea:s.ea, ib:s.ib, ew:s.ew,
+    g:s.g, m:s.m, nu:s.nu, a:s.a, sa:s.sa, dp:s.dp, ea:s.ea, ib:s.ib, ew:s.ew,
     note:s.note,
     fotos: JSON.stringify(s.fotos),
     pdfs: JSON.stringify(s.pdfs||[]),
@@ -4334,7 +4342,7 @@ async function loadState() {
         let naObj = {};
         try { naObj = row.na ? JSON.parse(row.na) : {}; } catch(e) {}
         ST[row.pos] = {
-          g: row.g||false, m: row.m||false, a: row.a||false,
+          g: row.g||false, m: row.m||false, nu: row.nu||false, a: row.a||false,
           sa: row.sa||false, dp: row.dp||false, ea: row.ea||false, ib: row.ib||false, ew: row.ew||false,
           note: row.note||'', fotos: fotos, pdfs: pdfs, restarbeiten: rest, ts: tsObj, by: byObj,
           na: (naObj&&typeof naObj==='object')?naObj:{},
@@ -4454,7 +4462,7 @@ setInterval(async () => {
       try { if(row.na){ const n=JSON.parse(row.na); if(n&&typeof n==='object') newNa=n; } } catch(e) {}
       const tsChanged = JSON.stringify(cur?(cur.ts||{}):{})!==JSON.stringify(newTs);
       const naChanged = JSON.stringify(cur?(cur.na||{}):{})!==JSON.stringify(newNa);
-      if (!cur || cur.g!==row.g || cur.m!==row.m || cur.a!==row.a ||
+      if (!cur || cur.g!==row.g || cur.m!==row.m || cur.nu!==row.nu || cur.a!==row.a ||
           cur.sa!==row.sa || cur.dp!==row.dp || cur.ea!==row.ea || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged || naChanged) {
         let pdfs = cur ? cur.pdfs : [];
         try { if(row.pdfs) pdfs = JSON.parse(row.pdfs); } catch(e) {}
@@ -4463,13 +4471,13 @@ setInterval(async () => {
         let newHist = cur ? (cur.hist||[]) : [];
         try { if(row.hist){ const h=JSON.parse(row.hist);
           if(Array.isArray(h) && h.length>=newHist.length) newHist=h; } }catch(e){}
-        ST[row.pos] = { g:row.g||false, m:row.m||false, a:row.a||false,
+        ST[row.pos] = { g:row.g||false, m:row.m||false, nu:row.nu||false, a:row.a||false,
           sa:row.sa||false, dp:row.dp||false, ea:row.ea||false, ib:row.ib||false, ew:row.ew||false,
           note:row.note||'', fotos:cur?cur.fotos:[], pdfs:pdfs, restarbeiten:newRest, ts:newTs, by:newBy,
           na:newNa, hist:newHist };
         changed = true;
         const id = row.pos.replace(/\./g,'_');
-        ['g','m','a','sa','dp','ea','ib','ew'].forEach(f => ckRender(row.pos,f));
+        ['g','m','nu','a','sa','dp','ea','ib','ew'].forEach(f => ckRender(row.pos,f));
         const card = document.getElementById('C'+id);
         const st = ist(row.pos, TF);
         if(card) card.className = 'card'+(st!=='open'?' '+st:'');
@@ -5763,7 +5771,7 @@ function collectRestRows(){
 // Anders als die Restarbeitenliste (= Mängel/Nacharbeiten) listet das die noch
 // NICHT erbrachten Leistungen aus dem LV: fehlender Anschluss, Inbetriebnahme,
 // Einweisung, Dichtigkeitsprüfung.
-const FLD_LBL={g:'Geliefert',m:'Montiert',sa:'Sanitäranschluss',dp:'Dichtigkeitsprüfung',ea:'Elektroanschluss',ib:'Inbetriebnahme',ew:'Einweisung'};
+const FLD_LBL={g:'Geliefert',m:'Montiert',nu:'Ausgeführt',sa:'Sanitäranschluss',dp:'Dichtigkeitsprüfung',ea:'Elektroanschluss',ib:'Inbetriebnahme',ew:'Einweisung'};
 function collectOffeneLeistungen(gw){
   const felder=GEW_FIELDS[gw]||[];
   const rows=[];
@@ -5808,7 +5816,7 @@ function expRestXlsx(){
 // gleich aussehende Listen nebeneinander luden zur Verwechslung ein.
 // Abschnitt 1 = noch nicht erbrachte LV-Leistungen (nur für die Gewerke M/E/S),
 // Abschnitt 2 = Restarbeiten (Mängel) mit Fotos, auch für Büro/Bauleitung/NU.
-const OL_GEW=[['M','🔧 Montage'],['E','⚡ Elektro'],['S','🚿 Sanitär']];
+const OL_GEW=[['M','🔧 Montage'],['E','⚡ Elektro'],['S','🚿 Sanitär'],['NU','🏗️ Nachunternehmer']];
 async function expOffenePunkte(){
   const now=new Date(), d=now.toLocaleDateString('de-DE');
   const daten={}; let gesamtL=0;
@@ -5947,7 +5955,7 @@ h2{font-size:14px;color:#895500;margin:26px 0 6px;padding-bottom:4px;border-bott
 </div>
 <script>
 var curMode='all', curGw='${preGw}', fotosOn=true;
-var LEIST={M:1,E:1,S:1};   // nur diese Gewerke haben LV-Schritte
+var LEIST={M:1,E:1,S:1,NU:1};   // nur diese Gewerke haben LV-Schritte
 function toggleFotos(){ fotosOn=!fotosOn; var b=document.getElementById('fotoTgl'); if(b){ b.classList.toggle('on',fotosOn); b.textContent=fotosOn?'📷 Fotos an':'📷 Fotos aus'; } opFilter(curMode); }
 function opGw(g){ curGw=g; [].forEach.call(document.querySelectorAll('.gwf[data-g]'),function(b){ b.classList.toggle('on', b.getAttribute('data-g')===g); }); opFilter(curMode); }
 function grpAufraeumen(body, zeilenKlasse){
@@ -6403,7 +6411,7 @@ function parseGewerk(v){
   if(/sanit|wasser|\bs\b/.test(s)) out.push('S');
   return out;
 }
-const GEWERK_LABEL={M:'Montage',E:'Elektro',S:'Sanitär'};
+const GEWERK_LABEL={M:'Montage',E:'Elektro',S:'Sanitär',NU:'Nachunternehmer'};
 function gewBadge(gew){
   if(!gew||!gew.length) return '';
   return ' '+gew.map(g=>'<span class="gtag g'+g+'">'+(GEWERK_LABEL[g]||g)+'</span>').join('');
@@ -6423,7 +6431,7 @@ function openGewerkChooser(pos){
   ov.innerHTML='<div style="background:var(--surface);color:var(--text);border-radius:12px;max-width:380px;width:100%;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.45)">'
     +'<div style="font-size:16px;font-weight:700;margin-bottom:4px">Gewerk korrigieren</div>'
     +'<div style="font-size:12px;color:var(--accent2);margin-bottom:14px">Position '+pos+' · bestimmt, welche Status-Felder gelten.</div>'
-    +row('M')+row('S')+row('E')
+    +row('M')+row('S')+row('E')+row('NU')
     +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">'
     +'<button onclick="(document.getElementById(\'gwOv\')||{}).remove&&document.getElementById(\'gwOv\').remove()" style="padding:9px 16px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-family:inherit">Abbrechen</button>'
     +'<button onclick="confirmGewerk(\''+pos+'\')" style="padding:9px 18px;border:none;background:var(--accent);color:#2b2b2b;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Übernehmen</button>'
