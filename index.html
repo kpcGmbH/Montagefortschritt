@@ -299,6 +299,18 @@ select.fs option{background:var(--surface);color:var(--text);}
 .cnotes{display:none;}
 .cnotes.open{display:block;}
 
+/* Sammel-Balken „Allgemeine Restarbeiten" (Projekt + Etagen), oben über der Liste.
+   Optik wie der Positions-Balken; Inhalt nach Bereich gruppiert. */
+.allg-sec{padding:8px 14px 0;border-top:none;margin-top:0;}
+.allg-grp{margin:2px 0 10px;}
+.allg-gh{display:flex;align-items:center;gap:8px;font-size:11px;font-weight:700;color:var(--braun);
+  text-transform:uppercase;letter-spacing:.4px;margin:6px 0 2px;}
+.allg-gh .rai{margin-left:auto;font-size:10px;color:var(--accent2);font-weight:400;text-transform:none;letter-spacing:0;}
+.allg-empty{font-size:12px;color:var(--accent2);padding:4px 2px 8px;}
+.allg-add{margin-top:2px;}
+.ptype-h{padding:9px 14px 7px;color:var(--accent);font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.4px;border-bottom:1px solid var(--braun);opacity:.85;}
+
 /* Restarbeiten an JEDER Position erfassbar – auch an noch nicht begonnenen
    („beschädigt angeliefert", „Anschluss fehlt bauseits"). Früher nur bei
    .card.part/.done sichtbar; kompakt bleibt es dadurch, dass unberührte
@@ -1017,13 +1029,15 @@ function buildPanels(){
   main.innerHTML='';
   Object.keys(POSGEW).forEach(k=>delete POSGEW[k]);   // Gewerk-Index neu aufbauen
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ POSGEW[it.pos]=it.gew||[]; })));
-  // Projektweite Restarbeiten (etagenübergreifend) – immer sichtbar über allen Etagen
-  const pra=document.createElement('div');
-  pra.className='rasec etrasec prasec';
-  pra.innerHTML='<div class="rahd">&#128203; Restarbeiten – Baustelle allgemein <span class="rai" id="RAI'+sp(PRAKEY)+'"></span></div>'+
-    '<div class="ragrp" id="RA'+sp(PRAKEY)+'"></div>'+
-    '<button class="raadd" onclick="raAddNew(\''+PRAKEY+'\')">&#65291; Restarbeit</button>';
-  main.appendChild(pra);
+  // Allgemeine Restarbeiten (ganzes Projekt + einzelne Etagen) – EIN einklappbarer
+  // Sammel-Balken statt je Etage/Projekt ein Dauerblock (der beim Scrollen zu viel
+  // Platz kostete). Beim Anlegen fragt die App den Geltungsbereich ab (raAddAllg).
+  // Inhalt wird von updAllgSection() gefüllt (nur Bereiche MIT Einträgen).
+  const allg=document.createElement('div');
+  allg.className='rasec allg-sec';
+  allg.innerHTML='<button class="cntgl allg-tgl" id="ALLGCNT" onclick="tgAllg()" title="Restarbeiten für das ganze Projekt oder eine Etage/einen Bereich">&#128203; Allgemeine Restarbeiten <span class="cnbadge" id="ALLGBADGE"></span><span class="cnchev">&#9662;</span></button>'+
+    '<div class="cnotes" id="ALLGBODY"></div>';
+  main.appendChild(allg);
   // Sanitär-Prüfprotokoll der ganzen Baustelle – eigener Abschnitt (keine Restarbeit)
   const dtp=document.createElement('div');
   dtp.className='rasec dtsec'; dtp.id='DT_'+sp(PRAKEY);
@@ -1039,14 +1053,9 @@ function buildPanels(){
       '<button class="etbtn" style="background:#5b4c2a" onclick="openEtageFotos('+secIdx+',\'bfotos\')">&#127959; Bauphase <span class="etcnt" id="ETCB'+secIdx+'"></span></button>'+
       '<span class="ethint">Anlagenfotos = Montageverlauf · Bauphase = Bauleiter (Bauzustand, Installationskontrolle, Aufmaß)</span>';
     panel.appendChild(etbar);
-    // Allgemeine (positionsübergreifende) Restarbeiten dieser Etage – gespeichert in der §E§-Etagenzeile
+    // Etagen-Restarbeiten stehen jetzt gebündelt oben im Sammel-Balken „Allgemeine
+    // Restarbeiten" (updAllgSection) – kein eigener Dauerblock je Etage mehr.
     const ekey=EKEY(sec), eid=sp(ekey);
-    const era=document.createElement('div');
-    era.className='rasec etrasec';
-    era.innerHTML='<div class="rahd">&#128203; Restarbeiten – Etage allgemein <span class="rai" id="RAI'+eid+'"></span></div>'+
-      '<div class="ragrp" id="RA'+eid+'"></div>'+
-      '<button class="raadd" onclick="raAddNew(\''+ekey+'\')">&#65291; Restarbeit</button>';
-    panel.appendChild(era);
     // Sanitär-Prüfprotokoll dieser Etage – eigener Abschnitt (keine Restarbeit)
     const dte=document.createElement('div');
     dte.className='rasec dtsec'; dte.id='DT_'+eid;
@@ -1109,6 +1118,7 @@ function buildPanels(){
     main.appendChild(panel);
   });
   updGewerkSwitcher();
+  updAllgSection();   // Sammel-Balken für allgemeine Restarbeiten füllen
 }
 
 // Gewerk-Umschalter nur zeigen, wenn die Baustelle Gewerk-Daten hat; Ansicht auf "Alle" zurücksetzen
@@ -1244,8 +1254,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 86;
+const APP_VERSION = 87;
 const CHANGELOG = [
+  { v:87, titel:'Allgemeine Restarbeiten aufgeräumt', punkte:[
+    'Die Dauer-Blöcke „Restarbeiten – Baustelle allgemein" (oben) und „Restarbeiten – Etage allgemein" (bei jeder Etage) sind verschwunden – sie kosteten beim Scrollen zu viel Platz. Restarbeiten an den einzelnen Positionen bleiben unverändert dort, wo sie sind.',
+    'Stattdessen gibt es ganz oben EINEN schlanken Balken „Allgemeine Restarbeiten". Er ist leer nur eine Zeile; sobald etwas erfasst ist, klappt er auf und zeigt die Einträge nach Bereich gruppiert (Ganzes Projekt / Etage) samt Anzahl im Badge.',
+    'Beim „＋ Restarbeit (Projekt / Etage)" fragt die App den Geltungsbereich ab: ganzes Projekt oder eine bestimmte Etage. Ist gerade eine Etage geöffnet, steht sie in der Auswahl ganz oben als Ein-Klick-Vorauswahl.',
+    'An der Ablage ändert sich nichts – Berichte und die Aufgaben-Benachrichtigung laufen unverändert weiter.' ]},
   { v:86, titel:'Übersichtlicher am Handy – und Schritte setzen sich mit', punkte:[
     'Wird ein späterer Schritt gesetzt, markiert die App die zwingenden Vorstufen automatisch mit. Beispiel: Wer den Elektro- oder Sanitäranschluss abhakt, bei dem werden „Geliefert" und „Montiert" automatisch gesetzt, falls das Montageteam sie noch nicht angehakt hatte – schließlich lässt sich nur anschließen, was geliefert und montiert ist. Das gilt für die ganze Kette (Inbetriebnahme, Einweisung, Dichtigkeitsprüfung ziehen ihre Vorstufen mit). Als „entfällt" gekennzeichnete Schritte bleiben unangetastet; im Änderungsverlauf steht „automatisch mitgesetzt".',
     'Die Statuszeile oben ist am Handy jetzt einzeilig und lässt sich seitlich schieben; „Offen" steht vorn. Das spart Platz, so ist mehr von der Liste zu sehen.',
@@ -2355,8 +2370,7 @@ function restoreUI() {
     updProg(pos);
   });
   // Allgemeine Etagen- und Projekt-Restarbeiten rendern (isEKey wird oben übersprungen)
-  DATA.forEach(sec=>updRA(EKEY(sec)));
-  updRA(PRAKEY);
+  updAllgSection();   // allgemeine Restarbeiten (Projekt + Etagen) gebündelt rendern
   upStats();
   updAllEtageBars();
 }
@@ -5476,6 +5490,7 @@ function updRA(pos){
   updRaGwVis(g);
   updRaCounts();
   cnUpdate(pos);
+  if(isEKey(pos)) updAllgBadge();   // Sammel-Balken: Zähler/Badge nachführen
 }
 // Anmerkung-/Restarbeiten-Balken je Position: Badge + „hat Inhalt"-Zustand pflegen
 // und bei vorhandenem Inhalt automatisch aufklappen (nie automatisch zuklappen –
@@ -5506,6 +5521,82 @@ function tgNotes(pos){
     const anm=box.querySelector('.anm'); if(anm) autoR(anm);
     box.querySelectorAll('textarea.radesc').forEach(raDescFit);
   }
+}
+
+// ── Allgemeine Restarbeiten (Projekt + Etagen) im Sammel-Balken ──────────────
+// Alle Bereiche, in die eine allgemeine Restarbeit gehören kann.
+function allgScopes(){
+  return [{key:PRAKEY,label:'Ganzes Projekt'}]
+    .concat(DATA.map(s=>({key:EKEY(s), label:(s.label||('Etage '+s.pos))})));
+}
+// Body neu aufbauen: nur Bereiche MIT Einträgen bekommen eine Gruppe. Strukturelle
+// Änderung (Anlegen/Löschen) – bei laufendem Tippen NICHT aufrufen (Fokusverlust).
+function updAllgSection(){
+  const body=document.getElementById('ALLGBODY'); if(!body) return;
+  const scopes=allgScopes();
+  let html='';
+  scopes.forEach(sc=>{
+    const st=ST[sc.key]; const list=(st&&st.restarbeiten)||[];
+    if(!list.length) return;
+    html+='<div class="allg-grp"><div class="allg-gh">'+escapeHtml(sc.label)+
+          ' <span class="rai" id="RAI'+sp(sc.key)+'"></span></div>'+
+          '<div class="ragrp" id="RA'+sp(sc.key)+'"></div></div>';
+  });
+  if(!html) html='<div class="allg-empty">Noch keine allgemeinen Restarbeiten erfasst.</div>';
+  html+='<button class="raadd allg-add" onclick="raAddAllg(this)">&#65291; Restarbeit (Projekt / Etage)</button>';
+  body.innerHTML=html;
+  scopes.forEach(sc=>{ if(document.getElementById('RA'+sp(sc.key))) updRA(sc.key); });
+  updAllgBadge();
+}
+// Nur Zähler/Badge + Auto-Aufklappen (kein DOM-Neubau) – günstig, aus updRA heraus.
+function updAllgBadge(){
+  let total=0;
+  allgScopes().forEach(sc=>{ const st=ST[sc.key];
+    if(st&&st.restarbeiten) total+=st.restarbeiten.filter(r=>(r.txt||'').trim()||(r.fotos&&r.fotos.length)).length; });
+  const bd=document.getElementById('ALLGBADGE'), tgl=document.getElementById('ALLGCNT'), body=document.getElementById('ALLGBODY');
+  if(bd){ if(total){ bd.textContent=total; bd.style.display='inline-block'; } else { bd.textContent=''; bd.style.display='none'; } }
+  if(tgl) tgl.classList.toggle('has', total>0);
+  if(total>0 && body && !body.classList.contains('open')){ body.classList.add('open'); if(tgl) tgl.classList.add('act'); }
+}
+function tgAllg(){
+  const body=document.getElementById('ALLGBODY'), tgl=document.getElementById('ALLGCNT'); if(!body) return;
+  const open=body.classList.toggle('open'); if(tgl) tgl.classList.toggle('act',open);
+  if(open) body.querySelectorAll('textarea.radesc').forEach(raDescFit);
+}
+// „+ Restarbeit (Projekt / Etage)" -> Geltungsbereich abfragen. Aktive Etage steht
+// oben als Ein-Klick-Vorauswahl.
+let ALLG_SCOPES=[];
+function raAddAllg(anchor){
+  let scopes=[{key:PRAKEY,label:'Ganzes Projekt',ic:'🏢'}]
+    .concat(DATA.map(s=>({key:EKEY(s), label:(s.label||('Etage '+s.pos)), ic:'🏬'})));
+  if(ACT && ACT!=='__all'){
+    const i=scopes.findIndex(s=>s.key===('§E§'+ACT));
+    if(i>0){ const a=scopes.splice(i,1)[0]; a.ic='📍'; scopes.unshift(a); }
+  }
+  ALLG_SCOPES=scopes;
+  let menu=document.getElementById('allgScopeMenu');
+  if(!menu){ menu=document.createElement('div'); menu.id='allgScopeMenu'; menu.className='ptype-menu';
+    document.body.appendChild(menu);
+    document.addEventListener('click',function(e){ if(!e.target.closest('#allgScopeMenu')&&!e.target.closest('.allg-add')) menu.classList.remove('open'); }); }
+  menu.innerHTML='<div class="ptype-h">Restarbeit f&uuml;r &hellip;</div>'+
+    scopes.map((sc,i)=>'<div class="ptype-item" onclick="raAddAllgPick('+i+')">'+sc.ic+'&nbsp; '+escapeHtml(sc.label)+'</div>').join('');
+  const r=anchor.getBoundingClientRect();
+  menu.style.top=(r.bottom+window.scrollY+4)+'px';
+  menu.style.left=Math.max(8,Math.min(r.left+window.scrollX, window.innerWidth-236))+'px';
+  menu.classList.add('open');
+}
+function raAddAllgPick(i){
+  const sc=ALLG_SCOPES[i]; if(!sc) return;
+  const menu=document.getElementById('allgScopeMenu'); if(menu) menu.classList.remove('open');
+  raAddNew(sc.key);        // leere Zeile anlegen/wiederverwenden (Ablage = §E§-Bereichszeile)
+  updAllgSection();        // Gruppe (ggf. neu) rendern
+  const body=document.getElementById('ALLGBODY');
+  if(body){ body.classList.add('open'); const t=document.getElementById('ALLGCNT'); if(t) t.classList.add('act'); }
+  setTimeout(()=>{
+    const cont=document.getElementById('RA'+sp(sc.key));
+    if(cont){ const rows=cont.querySelectorAll('.rarow .ratxt'); const last=rows[rows.length-1];
+      if(last){ last.focus(); try{ last.scrollIntoView({block:'center'}); }catch(e){} } }
+  },30);
 }
 // Beschreibung: Höhe an den Inhalt anpassen (kein Scrollen innerhalb des Feldes –
 // beim Diktieren sieht man sonst nicht, was gesprochen wurde).
@@ -5766,6 +5857,7 @@ function raDel(pos,i){
   }
   s.restarbeiten.splice(i,1);
   updRA(pos);
+  if(isEKey(pos)) updAllgSection();   // ggf. leer gewordene Bereichsgruppe entfernen
   saveFotos(pos);
 }
 function raKey(ev,pos,i){
@@ -5805,6 +5897,7 @@ function raDebouncedSave(pos){
     const id=sp(pos);
     const s=gs(pos);
     updRaCounts();
+    if(isEKey(pos)) updAllgBadge();   // Sammel-Balken-Badge nach dem Tippen nachführen
     delete RA_TIMERS[pos];
   },1000);
 }
