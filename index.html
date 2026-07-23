@@ -433,8 +433,34 @@ select.fs option{background:var(--surface);color:var(--text);}
   .fab-icon{width:42px;flex:0 0 42px;}
   .fab-label{display:none;}
   .fab-primary,.fab-secondary{width:44px;padding:0;flex:0 0 44px;}
+  /* Der einzelne „Berichte"-Knopf behält Label + Breite (genug Platz, da allein). */
+  .fab-solo{width:auto!important;padding:0 20px!important;flex:0 1 auto!important;}
+  .fab-solo .fab-label{display:inline!important;}
 }
 .nores{text-align:center;padding:40px;color:var(--accent2);font-size:14px;}
+
+/* ── Bottom-Sheet „Berichte & Dokumente" (fasst die früheren 7 FAB-Knöpfe zusammen) ── */
+.sheet-ov{position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.5);display:flex;align-items:flex-end;
+  justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;}
+.sheet-ov.on{opacity:1;pointer-events:auto;}
+.sheet{width:100%;max-width:520px;background:var(--chrome-bg);border-radius:18px 18px 0 0;
+  padding:8px 14px calc(16px + env(safe-area-inset-bottom));box-shadow:0 -8px 30px rgba(0,0,0,.35);
+  max-height:85vh;overflow-y:auto;transform:translateY(100%);transition:transform .25s cubic-bezier(.4,0,.2,1);}
+.sheet-ov.on .sheet{transform:translateY(0);}
+.sheet-grip{width:38px;height:4px;border-radius:2px;background:var(--line);margin:6px auto 12px;}
+.sheet-h{font-size:16px;font-weight:700;color:var(--text);margin:0 4px 12px;}
+.sheet-item{display:flex;align-items:center;gap:12px;width:100%;padding:12px;background:var(--surface2);
+  border:1px solid var(--line);border-radius:12px;margin-bottom:8px;cursor:pointer;font-family:inherit;
+  text-align:left;-webkit-tap-highlight-color:transparent;}
+.sheet-item:active{background:var(--chrome-bg2);}
+.sheet-ic{font-size:22px;flex:0 0 auto;width:30px;text-align:center;}
+.sheet-tx{flex:1;display:flex;flex-direction:column;gap:1px;min-width:0;}
+.sheet-t{font-size:14px;font-weight:700;color:var(--text);}
+.sheet-d{font-size:11px;color:var(--accent2);}
+.sheet-chev{color:var(--accent2);font-size:20px;flex:0 0 auto;}
+.sheet-cancel{width:100%;padding:12px;background:none;border:1px solid var(--line);color:var(--accent2);
+  border-radius:12px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;margin-top:2px;
+  -webkit-tap-highlight-color:transparent;}
 
 /* ── ANLAGENFOTOS PRO ETAGE ── */
 .etbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:9px 14px;background:var(--bhdr-bg);border-bottom:1px solid var(--line);}
@@ -637,30 +663,10 @@ select.fs option{background:var(--surface);color:var(--text);}
 </div>
 
 <div class="fab-bar">
-  <button class="fab-mini fab-primary" onclick="expKunde(false)" title="Kundenbericht ohne Fotos">
+  <button class="fab-mini fab-primary fab-solo" onclick="openBerichteSheet()" title="Berichte &amp; Dokumente erstellen">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8M16 17H8M10 9H8"/></svg>
-    <span class="fab-label">Bericht</span>
+    <span class="fab-label">Berichte</span>
   </button>
-  <button class="fab-mini fab-secondary" onclick="expKunde(true)" title="Kundenbericht mit Fotos">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
-    <span class="fab-label">+ Fotos</span>
-  </button>
-  <button class="fab-mini fab-icon" style="background:#5b4c8a;color:#fff" onclick="expOffenePunkte()" title="Offene Punkte: offene Leistungen + Restarbeiten (PDF, mit Fotos)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 0 2-2h11"/></svg>
-  </button>
-  <button class="fab-mini fab-icon" style="background:#1d6f42;color:#fff" onclick="expRestXlsx()" title="Restarbeitenliste als Excel">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M8 8l8 8M16 8l-8 8"/></svg>
-  </button>
-  <button class="fab-mini fab-icon" style="background:#b8860b;color:#fff" onclick="openTagesberichtDialog()" title="Tagesbericht (Datum wählen)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><line x1="8" y1="14" x2="8" y2="14"/><line x1="12" y1="14" x2="12" y2="14"/><line x1="16" y1="14" x2="16" y2="14"/></svg>
-  </button>
-  <button class="fab-mini fab-icon" style="background:#7a5c1d;color:#fff" onclick="openBautagebuchDialog()" title="Bautagebuch (Tag wählen)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="9" y1="7" x2="16" y2="7"/><line x1="9" y1="11" x2="16" y2="11"/></svg>
-  </button>
-  <button class="fab-mini fab-icon" style="background:#2f6b8a;color:#fff" onclick="openServiceDialog()" title="Servicebericht (kpc-Formular)">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/></svg>
-  </button>
-
 </div>
 <input type="file" id="fi" accept="image/*" style="display:none">
 <input type="file" id="pi" accept=".pdf,.doc,.docx" style="display:none">
@@ -1254,8 +1260,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 88;
+const APP_VERSION = 89;
 const CHANGELOG = [
+  { v:89, titel:'Untere Leiste aufgeräumt: ein „Berichte"-Knopf', punkte:[
+    'Statt sieben gedrängter Knöpfe unten gibt es jetzt EINEN Knopf „📄 Berichte". Ein Tipp öffnet eine Liste mit allen Berichten – jeweils mit Symbol, Klartext-Name und kurzer Erklärung, statt der bisherigen Rätsel-Icons.',
+    'Enthalten sind wie bisher: Kundenbericht (ohne/mit Fotos), Offene Punkte, Tagesbericht, Bautagebuch, Servicebericht und die Restarbeitenliste als Excel. Es geht nichts verloren – es ist nur aufgeräumter und die Positionsliste hat mehr Platz.' ]},
   { v:88, titel:'Dichtigkeitsprotokoll steht jetzt am Ende', punkte:[
     'Im Sanitär-Filter erscheint das Dichtigkeitsprotokoll nicht mehr oben, sondern – wo es hingehört – ganz unten als Abschluss, nach allen Positionen.',
     'Es gibt jetzt nur noch EINEN Einstieg „💧 Umfang wählen & Protokoll". Ein Auswahlmenü fragt den Umfang ab: ganze Baustelle oder eine bestimmte Etage. Bereits erstellte Protokolle stehen dort mit PDF zum Öffnen.',
@@ -4065,6 +4074,37 @@ async function svcBuildPdf(entry){
   doc.text('Telefon 0661/ 941 62-0 I info@kpc-project.com',W/2,PH-6,{align:'center'});
   return doc.output('blob');
 }
+
+// Berichte-Sheet: fasst die früheren 7 FAB-Knöpfe zu EINEM Einstieg zusammen.
+// Die Aktionen laufen synchron aus dem Klick (wichtig für window.open, §9) –
+// closeBerichteSheet togglet nur eine CSS-Klasse und blockiert das nicht.
+function openBerichteSheet(){
+  if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
+  let ov=document.getElementById('berichteOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='berichteOv'; ov.className='sheet-ov';
+    document.body.appendChild(ov);
+    ov.addEventListener('click',function(e){ if(e.target===ov) closeBerichteSheet(); }); }
+  const items=[
+    {ic:'📄', t:'Kundenbericht', d:'Leistungsstand, ohne Fotos', fn:'expKunde(false)'},
+    {ic:'📷', t:'Kundenbericht mit Fotos', d:'inkl. Positionsfotos', fn:'expKunde(true)'},
+    {ic:'✅', t:'Offene Punkte', d:'offene Leistungen + Restarbeiten (PDF)', fn:'expOffenePunkte()'},
+    {ic:'📅', t:'Tagesbericht', d:'Arbeiten eines Tages', fn:'openTagesberichtDialog()'},
+    {ic:'📓', t:'Bautagebuch', d:'Tageseintrag mit Wetter, Stunden …', fn:'openBautagebuchDialog()'},
+    {ic:'🔧', t:'Servicebericht', d:'kpc-Serviceformular', fn:'openServiceDialog()'},
+    {ic:'📊', t:'Restarbeitenliste', d:'als Excel-Datei', fn:'expRestXlsx()'}
+  ];
+  ov.innerHTML='<div class="sheet" onclick="event.stopPropagation()">'+
+    '<div class="sheet-grip"></div>'+
+    '<div class="sheet-h">📄 Berichte &amp; Dokumente</div>'+
+    items.map(it=>'<button class="sheet-item" onclick="closeBerichteSheet();'+it.fn+'">'+
+      '<span class="sheet-ic">'+it.ic+'</span>'+
+      '<span class="sheet-tx"><span class="sheet-t">'+escapeHtml(it.t)+'</span><span class="sheet-d">'+escapeHtml(it.d)+'</span></span>'+
+      '<span class="sheet-chev">&#8250;</span></button>').join('')+
+    '<button class="sheet-cancel" onclick="closeBerichteSheet()">Schlie&#223;en</button>'+
+  '</div>';
+  requestAnimationFrame(()=>ov.classList.add('on'));   // Slide-in
+}
+function closeBerichteSheet(){ const ov=document.getElementById('berichteOv'); if(ov) ov.classList.remove('on'); }
 
 async function expKunde(withFotos=false){
   const now=new Date();
