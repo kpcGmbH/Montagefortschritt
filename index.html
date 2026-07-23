@@ -230,8 +230,12 @@ select.fs option{background:var(--surface);color:var(--text);}
 .ck-ea.on{border-color:#b8860b;background:#b8860b;}
 .ck-ew.on{border-color:#1a6b6b;background:#1a6b6b;}
 .cki{font-size:13px;}
+/* Schritt entfällt (z. B. Montage bei reiner Lieferung): deutlich abgesetzt,
+   damit man ihn nicht mit „erledigt" oder „offen" verwechselt. */
+.ck.na{border-color:var(--line);background:transparent;color:#8f8a85;border-style:dashed;}
+.ck.na .ckn{text-decoration:line-through;}
 .ck-ts{font-size:8.5px;font-weight:400;opacity:.8;letter-spacing:0.2px;white-space:nowrap;display:none;padding-left:18px;}
-.ck.on .ck-ts{display:block;}
+.ck.on .ck-ts,.ck.na .ck-ts{display:block;}
 
 /* FOTO */
 .fsec{margin-top:8px;}
@@ -825,7 +829,7 @@ function savePos(pos) {
 }
 let ACT='__all', FPOS=null;   // Standard: „Alle" (keine Etagen-Auswahl)
 
-function gs(p){if(!ST[p])ST[p]={g:false,m:false,a:false,sa:false,dp:false,ea:false,ib:false,ew:false,fotos:[],pdfs:[],restarbeiten:[],note:'',ts:{},by:{}};if(!ST[p].pdfs)ST[p].pdfs=[];if(!ST[p].restarbeiten)ST[p].restarbeiten=[];if(!ST[p].ts)ST[p].ts={};if(!ST[p].by)ST[p].by={};return ST[p];}
+function gs(p){if(!ST[p])ST[p]={g:false,m:false,a:false,sa:false,dp:false,ea:false,ib:false,ew:false,fotos:[],pdfs:[],restarbeiten:[],note:'',ts:{},by:{},na:{}};if(!ST[p].pdfs)ST[p].pdfs=[];if(!ST[p].restarbeiten)ST[p].restarbeiten=[];if(!ST[p].ts)ST[p].ts={};if(!ST[p].by)ST[p].by={};if(!ST[p].na)ST[p].na={};return ST[p];}
 // Gewerk -> die Haken, die dieses Gewerk "vollständig erledigen":
 //   Montage (M) = Geliefert + Montiert.
 //   Sanitär (S) = Sanitär-Anschluss + Dichtheit,  Elektro (E) = Elektro-Anschluss + Inbetriebnahme + Einweisung.
@@ -865,14 +869,20 @@ function relFields(p){
 // ctx='M'/'S'/'E' -> nur die Haken dieses Gewerks (für die gefilterte Ansicht).
 function ist(p, ctx){
   const s=gs(p); ctx=ctx||'all';
-  const fields = (ctx==='all') ? relFields(p) : (GEW_FIELDS[ctx]||relFields(p));
-  if(!fields.length) return 'open';
+  const alle = (ctx==='all') ? relFields(p) : (GEW_FIELDS[ctx]||relFields(p));
+  if(!alle.length) return 'open';
+  // Als „entfällt" markierte Schritte (z. B. Montage bei reiner Lieferung) zählen
+  // nicht mit – sonst bliebe die Position für immer „teilweise".
+  const fields = alle.filter(f=>!entf(s,f));
+  if(!fields.length) return 'done';        // alles Nötige entfällt -> nichts mehr offen
   const n=fields.filter(f=>s[f]).length;
   if(n===fields.length) return 'done';
   if(n>0) return 'part';
   if(ctx==='all' && (s.note || (s.fotos&&s.fotos.length))) return 'part';
   return 'open';
 }
+// „Schritt entfällt" – Kennzeichen je Position und Feld (s.na). Fehlt es, entfällt nichts.
+function entf(s,f){ return !!(s && s.na && s.na[f]); }
 function sp(p){return p.replace(/\./g,'_');}
 
 // BUILD TABS
@@ -984,13 +994,13 @@ function buildPanels(){
     <div class="img">${item.menge} ${item.einh}</div>
   </div>
   <div class="crow">
-    <div class="ck" data-f="g" id="Kg${id}" onclick="tc('${item.pos}','g')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Geliefert</span></span><span class="ck-ts" id="Tg${id}"></span></div>
-    <div class="ck" data-f="m" id="Km${id}" onclick="tc('${item.pos}','m')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Montiert</span></span><span class="ck-ts" id="Tm${id}"></span></div>
-    <div class="ck ck-sa" data-f="sa" id="Ksa${id}" onclick="tc('${item.pos}','sa')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Sanitäranschluss</span></span><span class="ck-ts" id="Tsa${id}"></span></div>
-    <div class="ck ck-dp" data-f="dp" id="Kdp${id}" onclick="tc('${item.pos}','dp')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Dichtigkeitsprüfung</span></span><span class="ck-ts" id="Tdp${id}"></span></div>
-    <div class="ck ck-ea" data-f="ea" id="Kea${id}" onclick="tc('${item.pos}','ea')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Elektroanschluss</span></span><span class="ck-ts" id="Tea${id}"></span></div>
-    <div class="ck ck-ib" data-f="ib" id="Kib${id}" onclick="tc('${item.pos}','ib')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Inbetriebnahme</span></span><span class="ck-ts" id="Tib${id}"></span></div>
-    <div class="ck ck-ew" data-f="ew" id="Kew${id}" onclick="tc('${item.pos}','ew')"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Einweisung</span></span><span class="ck-ts" id="Tew${id}"></span></div>
+    <div class="ck" data-f="g" id="Kg${id}" onclick="tc('${item.pos}','g')" oncontextmenu="tcNA('${item.pos}','g');return false" ontouchstart="ckHoldStart(event,'${item.pos}','g')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Geliefert</span></span><span class="ck-ts" id="Tg${id}"></span></div>
+    <div class="ck" data-f="m" id="Km${id}" onclick="tc('${item.pos}','m')" oncontextmenu="tcNA('${item.pos}','m');return false" ontouchstart="ckHoldStart(event,'${item.pos}','m')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Montiert</span></span><span class="ck-ts" id="Tm${id}"></span></div>
+    <div class="ck ck-sa" data-f="sa" id="Ksa${id}" onclick="tc('${item.pos}','sa')" oncontextmenu="tcNA('${item.pos}','sa');return false" ontouchstart="ckHoldStart(event,'${item.pos}','sa')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Sanitäranschluss</span></span><span class="ck-ts" id="Tsa${id}"></span></div>
+    <div class="ck ck-dp" data-f="dp" id="Kdp${id}" onclick="tc('${item.pos}','dp')" oncontextmenu="tcNA('${item.pos}','dp');return false" ontouchstart="ckHoldStart(event,'${item.pos}','dp')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Dichtigkeitsprüfung</span></span><span class="ck-ts" id="Tdp${id}"></span></div>
+    <div class="ck ck-ea" data-f="ea" id="Kea${id}" onclick="tc('${item.pos}','ea')" oncontextmenu="tcNA('${item.pos}','ea');return false" ontouchstart="ckHoldStart(event,'${item.pos}','ea')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Elektroanschluss</span></span><span class="ck-ts" id="Tea${id}"></span></div>
+    <div class="ck ck-ib" data-f="ib" id="Kib${id}" onclick="tc('${item.pos}','ib')" oncontextmenu="tcNA('${item.pos}','ib');return false" ontouchstart="ckHoldStart(event,'${item.pos}','ib')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Inbetriebnahme</span></span><span class="ck-ts" id="Tib${id}"></span></div>
+    <div class="ck ck-ew" data-f="ew" id="Kew${id}" onclick="tc('${item.pos}','ew')" oncontextmenu="tcNA('${item.pos}','ew');return false" ontouchstart="ckHoldStart(event,'${item.pos}','ew')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Einweisung</span></span><span class="ck-ts" id="Tew${id}"></span></div>
   </div>
   <div class="fsec">
     <button class="fbtn" id="FB${id}" onclick="trf('${item.pos}')">&#128247; Foto</button>
@@ -1156,8 +1166,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 79;
+const APP_VERSION = 80;
 const CHANGELOG = [
+  { v:80, titel:'Schritte, die nicht anfallen, auf „entfällt" setzen', punkte:[
+    'Manche Positionen werden nur geliefert und nicht montiert – bisher blieben sie dadurch für immer „teilweise erledigt" und standen weiter in den offenen Punkten.',
+    'Jetzt lässt sich jeder der sieben Schritte als entfallen kennzeichnen: am Handy den Status länger gedrückt halten, am Rechner mit der rechten Maustaste anklicken. Nach einer Rückfrage erscheint der Schritt durchgestrichen mit dem Hinweis „entfällt".',
+    'Entfallene Schritte zählen nirgends mehr als offen: Die Position wird vollständig, sobald die übrigen Schritte erledigt sind, und verschwindet aus dem Bericht „Offene Punkte". Im Kundenbericht steht an der Stelle „entf." statt eines leeren Feldes.',
+    'Rückgängig machen geht mit einem normalen Klick auf den entfallenen Schritt. Jede Änderung steht im Änderungsverlauf der Position.' ]},
   { v:79, titel:'Restarbeiten: Titel + Beschreibung', punkte:[
     'Jede Restarbeit kann jetzt zusätzlich eine ausführliche Beschreibung bekommen: unter der Zeile auf „＋ Beschreibung" tippen. Das Feld wächst beim Schreiben mit, so dass auch längerer Text vollständig sichtbar bleibt.',
     'Das ist besonders für die Diktierfunktion gedacht: Mikrofon-Taste der Handy-Tastatur antippen und den Sachverhalt einfach einsprechen, statt ihn in eine enge Zeile zu tippen.',
@@ -1546,7 +1561,7 @@ function histAdd(pos,art,txt){
 }
 const HIST_TXT={set:'abgehakt',unset:'Haken entfernt',notiz:'Anmerkung geändert',
   'notiz-weg':'Anmerkung gelöscht','ra-neu':'Restarbeit erfasst','ra-erledigt':'Restarbeit erledigt',
-  'ra-offen':'Restarbeit wieder offen'};
+  'ra-offen':'Restarbeit wieder offen','na-set':'entfällt','na-unset':'entfällt aufgehoben'};
 function histFmt(t){ try{ const d=new Date(t);
   return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+d.getFullYear()+
     ' · '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }catch(e){ return ''; } }
@@ -1583,22 +1598,64 @@ function renderHist(pos){
   '</div>';
 }
 function ckLabel(s,f){const k=s.by&&s.by[f]?shortName(s.by[f])+' · ':'';return k+tsFmt(s.ts[f]);}
+// Einen Status-Chip nach dem aktuellen Stand malen (erledigt / entfällt / offen).
+// Zentral, damit Klick, Wiederherstellen und Polling nicht auseinanderlaufen.
+function ckRender(pos,f){
+  const s=gs(pos), id=sp(pos);
+  const el=document.getElementById('K'+f+id);
+  if(el){
+    const na=entf(s,f);
+    el.classList.toggle('on', !!s[f] && !na);
+    el.classList.toggle('na', na);
+    const i=el.querySelector('.cki');
+    if(i) i.innerHTML = na ? '&#8709;' : (s[f]?'&#10003;':'&#9675;');
+  }
+  const tsEl=document.getElementById('T'+f+id);
+  if(tsEl) tsEl.textContent = entf(s,f) ? 'entfällt' : (s[f]?ckLabel(s,f):'');
+}
 function tc(pos,f){
+  if(ckHoldGerade()) return;               // Klick nach langem Druck ignorieren
   const s=gs(pos);
+  // Auf einem entfallenen Schritt hebt der normale Klick das „entfällt" auf –
+  // so kommt man ohne lange Geste wieder zurück.
+  if(entf(s,f)){ tcNA(pos,f,false); return; }
   s[f]=!s[f];
   if(s[f]){ s.ts[f]=new Date().toISOString(); s.by[f]=USER; }
   else { delete s.ts[f]; delete s.by[f]; }
   histAdd(pos, s[f]?'set':'unset', FLD_LBL[f]||f);
-  const id=sp(pos);
-  const el=document.getElementById('K'+f+id);
-  if(el){el.classList.toggle('on',s[f]);el.querySelector('.cki').innerHTML=s[f]?'&#10003;':'&#9675;';}
-  const tsEl=document.getElementById('T'+f+id);
-  if(tsEl) tsEl.textContent=s[f]?ckLabel(s,f):'';
+  ckRender(pos,f);
   // upStats() führt den Feldfilter-Zähler mit. Die abgehakte Position verschwindet
   // bewusst NICHT sofort aus der gefilterten Liste (kein applyF hier) – sonst
   // springt sie unter dem Finger weg.
   rc(pos);updRA(pos);upStats();savePos(pos);
 }
+// „Schritt entfällt" setzen/aufheben. Erreichbar über langen Druck bzw. Rechtsklick
+// auf den Chip – eine seltene, bewusste Entscheidung soll das Abhaken im Alltag
+// nicht umständlicher machen.
+function tcNA(pos,f,anAus){
+  const s=gs(pos);
+  const neu=(anAus===undefined)?!entf(s,f):!!anAus;
+  if(neu){
+    if(!confirm('„'+(FLD_LBL[f]||f)+'" für diese Position als entfallen kennzeichnen?\n\nDer Schritt zählt dann nirgends mehr als offen – die Position kann ohne ihn vollständig werden.')) return;
+    s.na[f]=1;
+    if(s[f]){ s[f]=false; delete s.ts[f]; delete s.by[f]; }   // gesetzt + entfällt wäre widersprüchlich
+  } else {
+    delete s.na[f];
+  }
+  histAdd(pos, neu?'na-set':'na-unset', FLD_LBL[f]||f);
+  ckRender(pos,f);
+  rc(pos);upStats();savePos(pos);
+}
+// Langer Druck (Touch) bzw. Rechtsklick (Desktop) auf einen Status-Chip
+let _ckHoldTimer=null, _ckHoldAt=0;
+function ckHoldStart(ev,pos,f){
+  clearTimeout(_ckHoldTimer);
+  _ckHoldTimer=setTimeout(()=>{ _ckHoldTimer=null; _ckHoldAt=Date.now(); tcNA(pos,f); }, 550);
+}
+function ckHoldEnd(){ clearTimeout(_ckHoldTimer); _ckHoldTimer=null; }
+// Nach einem langen Druck feuert auf manchen Geräten trotzdem noch ein Klick –
+// der würde das gerade gesetzte „entfällt" sofort wieder aufheben.
+function ckHoldGerade(){ return (Date.now()-_ckHoldAt)<600; }
 
 function rc(pos){
   const id=sp(pos);
@@ -2111,16 +2168,9 @@ function restoreUI() {
     if(isEKey(pos)) return;             // Etagen-Fotozeilen haben keine Positions-UI
     const s = ST[pos];
     const id = sp(pos);
-    // Restore checkboxes
-    const fields = ['g','m','a','sa','dp','ea','ib','ew'];
-    fields.forEach(f => {
-      const el = document.getElementById('K'+f+id);
-      if(el && s[f]) {
-        el.classList.add('on');
-        el.querySelector('.cki').innerHTML = '&#10003;';
-        const tsEl = document.getElementById('T'+f+id);
-        if(tsEl && s.ts && s.ts[f]) tsEl.textContent = ckLabel(s,f);
-      }
+    // Restore checkboxes (inkl. „entfällt"-Kennzeichen)
+    ['g','m','a','sa','dp','ea','ib','ew'].forEach(f => {
+      if(s[f] || entf(s,f)) ckRender(pos,f);
     });
     // Restore card color
     const card = document.getElementById('C'+id);
@@ -3039,7 +3089,7 @@ function dichtCollect(umfang){
       if(!((it.gew||[]).indexOf('S')>=0)) return;
       const s=gs(it.pos), t=s.ts||{}, by=s.by||{};
       out.push({pos:it.pos, bez:(it.bez||'').trim(), etage:sec.label||sec.pos, bereich:sub.bez||'',
-                geprueft:!!s.dp, ts:t.dp||'', by:by.dp||''});
+                geprueft:!!s.dp, entfaellt:entf(s,'dp'), ts:t.dp||'', by:by.dp||''});
     }));
   });
   return out;
@@ -3142,7 +3192,7 @@ function openDichtForm(umfang){
       '<div style="max-height:220px;overflow:auto;border:1px solid #4a423a;border-radius:8px">'+
         (pos.length?pos.map(p=>'<div style="display:flex;justify-content:space-between;gap:8px;padding:8px 10px;border-bottom:1px solid #3a3530;font-size:13px">'+
           '<span style="min-width:0"><span style="color:#d7c1ae">'+escapeHtml(p.pos)+'</span> '+escapeHtml(p.bez.slice(0,42))+'</span>'+
-          '<span style="flex:0 0 auto;color:'+(p.geprueft?'#8fbf6f':'#a8a8a8')+'">'+(p.geprueft?('✓ '+dtFmt(p.ts)):'offen')+'</span>'+
+          '<span style="flex:0 0 auto;color:'+(p.geprueft?'#8fbf6f':'#a8a8a8')+'">'+(p.geprueft?('✓ '+dtFmt(p.ts)):(p.entfaellt?'entfällt':'offen'))+'</span>'+
         '</div>').join(''):'<div style="padding:10px;color:#a8a8a8;font-size:13px">Keine Sanitärpositionen im Umfang.</div>')+
       '</div>'+
       '<label style="'+lbl+'">Unterschriften</label>'+
@@ -3337,7 +3387,7 @@ async function dichtBuildPdf(entry){
     doc.text(doc.splitTextToSize(String(p.bez||''),bezW)[0]||'',bezX,y+5);
     if(showEtage) doc.text(doc.splitTextToSize(String(p.etage||''),28)[0]||'',M+108,y+5);
     // Kein Prüfer-Kürzel je Zeile – der Prüfer steht im Protokollkopf
-    const st=p.geprueft ? ('✓ '+dtFmt(p.ts)) : 'offen';
+    const st=p.geprueft ? ('✓ '+dtFmt(p.ts)) : (p.entfaellt ? 'entfällt' : 'offen');
     if(!p.geprueft) tc(grey);
     doc.text(st,R-2,y+5,{align:'right'});
     dc(line); doc.setLineWidth(0.1); doc.line(M,y+7,R,y+7); y+=7;
@@ -3857,7 +3907,7 @@ async function expKunde(withFotos=false){
           fabrikat:item.fabrikat.trim(),
           typ:item.typ.trim(),
           g:s.g,m:s.m,a:s.a,sa:s.sa,dp:s.dp,ea:s.ea,ib:s.ib,ew:s.ew,
-          ts:s.ts||{},
+          ts:s.ts||{}, na:s.na||{},
           fotos:s.fotos,note:s.note
         });
       });
@@ -3900,6 +3950,9 @@ async function expKunde(withFotos=false){
     }
     const tsShort=iso=>{if(!iso)return'';const d=new Date(iso);return d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'2-digit'});};
     const chk=(v,f)=>{
+      // Entfallene Schritte klar als solche ausweisen – ein leerer Strich läse sich
+      // beim Kunden wie „noch offen".
+      if(r.na && r.na[f]) return '<span style="color:#a8a8a8;font-size:9px;font-weight:400">entf.</span>';
       if(!v)return'<span style="color:#ccc">&#8211;</span>';
       const dt=tsShort(r.ts&&r.ts[f]);
       return '<span style="color:#3a7a3a;font-weight:700">&#10003;</span>'+(dt?'<br><span style="font-size:8.5px;color:#a8a8a8;font-weight:400">'+dt+'</span>':'');
@@ -4137,6 +4190,7 @@ function buildPosData(pos){
     restarbeiten: JSON.stringify(s.restarbeiten||[]),
     ts: JSON.stringify(s.ts||{}),
     usr: JSON.stringify(s.by||{}),
+    na: JSON.stringify(s.na||{}),
     hist: JSON.stringify(s.hist||[])
   });
 }
@@ -4253,10 +4307,13 @@ async function loadState() {
         try { byObj = row.usr ? JSON.parse(row.usr) : {}; } catch(e) {}
         let histArr = [];
         try { histArr = row.hist ? JSON.parse(row.hist) : []; } catch(e) {}
+        let naObj = {};
+        try { naObj = row.na ? JSON.parse(row.na) : {}; } catch(e) {}
         ST[row.pos] = {
           g: row.g||false, m: row.m||false, a: row.a||false,
           sa: row.sa||false, dp: row.dp||false, ea: row.ea||false, ib: row.ib||false, ew: row.ew||false,
           note: row.note||'', fotos: fotos, pdfs: pdfs, restarbeiten: rest, ts: tsObj, by: byObj,
+          na: (naObj&&typeof naObj==='object')?naObj:{},
           hist: Array.isArray(histArr)?histArr:[]
         };
         if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at;
@@ -4368,9 +4425,13 @@ setInterval(async () => {
       try { if(row.ts) newTs = JSON.parse(row.ts); } catch(e) {}
       let newBy = cur ? (cur.by||{}) : {};
       try { if(row.usr) newBy = JSON.parse(row.usr); } catch(e) {}
+      // „entfällt"-Kennzeichen mitführen – ohne das wirft das Polling es alle 30 s weg
+      let newNa = cur ? (cur.na||{}) : {};
+      try { if(row.na){ const n=JSON.parse(row.na); if(n&&typeof n==='object') newNa=n; } } catch(e) {}
       const tsChanged = JSON.stringify(cur?(cur.ts||{}):{})!==JSON.stringify(newTs);
+      const naChanged = JSON.stringify(cur?(cur.na||{}):{})!==JSON.stringify(newNa);
       if (!cur || cur.g!==row.g || cur.m!==row.m || cur.a!==row.a ||
-          cur.sa!==row.sa || cur.dp!==row.dp || cur.ea!==row.ea || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged) {
+          cur.sa!==row.sa || cur.dp!==row.dp || cur.ea!==row.ea || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged || naChanged) {
         let pdfs = cur ? cur.pdfs : [];
         try { if(row.pdfs) pdfs = JSON.parse(row.pdfs); } catch(e) {}
         // Verlauf: den längeren der beiden Stände behalten. Ohne das würde das
@@ -4381,16 +4442,10 @@ setInterval(async () => {
         ST[row.pos] = { g:row.g||false, m:row.m||false, a:row.a||false,
           sa:row.sa||false, dp:row.dp||false, ea:row.ea||false, ib:row.ib||false, ew:row.ew||false,
           note:row.note||'', fotos:cur?cur.fotos:[], pdfs:pdfs, restarbeiten:newRest, ts:newTs, by:newBy,
-          hist:newHist };
+          na:newNa, hist:newHist };
         changed = true;
         const id = row.pos.replace(/\./g,'_');
-        const fields = ['g','m','a','sa','dp','ea','ib','ew'];
-        fields.forEach(f => {
-          const el = document.getElementById('K'+f+id);
-          if(el) { el.classList.toggle('on', ST[row.pos][f]); el.querySelector('.cki').innerHTML = ST[row.pos][f]?'&#10003;':'&#9675;'; }
-          const tsEl = document.getElementById('T'+f+id);
-          if(tsEl) tsEl.textContent = (ST[row.pos][f] && ST[row.pos].ts && ST[row.pos].ts[f]) ? tsFmt(ST[row.pos].ts[f]) : '';
-        });
+        ['g','m','a','sa','dp','ea','ib','ew'].forEach(f => ckRender(row.pos,f));
         const card = document.getElementById('C'+id);
         const st = ist(row.pos, TF);
         if(card) card.className = 'card'+(st!=='open'?' '+st:'');
@@ -5665,13 +5720,14 @@ function collectOffeneLeistungen(gw){
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(item=>{
     if(!(item.gew||[]).includes(gw)) return;         // nur Positionen dieses Gewerks
     const s=gs(item.pos);
-    const offen=felder.filter(f=>!s[f]);
+    // Als „entfällt" gekennzeichnete Schritte sind keine offenen Leistungen
+    const offen=felder.filter(f=>!s[f] && !entf(s,f));
     if(!offen.length) return;                         // hier ist alles erledigt
     rows.push({
       geschoss:sec.label, bereich:sub.bez, pos:item.pos, bez:(item.bez||'').trim(),
       fabrikat:(item.fabrikat||'').trim(), typ:(item.typ||'').trim(),
       menge:item.menge||'', einh:item.einh||'',
-      offen, erledigt:felder.filter(f=>s[f]), note:(s.note||'').trim()
+      offen, erledigt:felder.filter(f=>s[f] && !entf(s,f)), note:(s.note||'').trim()
     });
   })));
   return rows;
