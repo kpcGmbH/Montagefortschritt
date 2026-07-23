@@ -272,6 +272,11 @@ select.fs option{background:var(--surface);color:var(--text);}
    .card.part/.done sichtbar; kompakt bleibt es dadurch, dass unberührte
    Positionen nur den „+ Restarbeit"-Knopf zeigen (siehe updRA). */
 .rasec{margin-top:8px;border-top:1px dashed var(--border);padding-top:6px;display:block;}
+.rahid{display:block;width:100%;margin:2px 0 0;padding:5px 6px;background:transparent;
+  border:1px dashed var(--border);border-radius:var(--r);color:var(--accent2);
+  font-family:Arial Narrow,Arial,sans-serif;font-size:10px;cursor:pointer;text-align:left;
+  -webkit-tap-highlight-color:transparent;}
+.rahid:hover{color:var(--braun);border-color:var(--braun);}
 .rahd{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--braun);
   text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;}
 .rahd .rai{margin-left:auto;font-size:10px;color:var(--accent2);font-weight:400;text-transform:none;letter-spacing:0;}
@@ -955,7 +960,7 @@ function buildPanels(){
   const pra=document.createElement('div');
   pra.className='rasec etrasec prasec';
   pra.innerHTML='<div class="rahd">&#128203; Restarbeiten – Baustelle allgemein <span class="rai" id="RAI'+sp(PRAKEY)+'"></span></div>'+
-    '<div id="RA'+sp(PRAKEY)+'"></div>'+
+    '<div class="ragrp" id="RA'+sp(PRAKEY)+'"></div>'+
     '<button class="raadd" onclick="raAddNew(\''+PRAKEY+'\')">&#65291; Restarbeit</button>';
   main.appendChild(pra);
   // Sanitär-Prüfprotokoll der ganzen Baustelle – eigener Abschnitt (keine Restarbeit)
@@ -978,7 +983,7 @@ function buildPanels(){
     const era=document.createElement('div');
     era.className='rasec etrasec';
     era.innerHTML='<div class="rahd">&#128203; Restarbeiten – Etage allgemein <span class="rai" id="RAI'+eid+'"></span></div>'+
-      '<div id="RA'+eid+'"></div>'+
+      '<div class="ragrp" id="RA'+eid+'"></div>'+
       '<button class="raadd" onclick="raAddNew(\''+ekey+'\')">&#65291; Restarbeit</button>';
     panel.appendChild(era);
     // Sanitär-Prüfprotokoll dieser Etage – eigener Abschnitt (keine Restarbeit)
@@ -1020,7 +1025,7 @@ function buildPanels(){
   <textarea class="anm" rows="1" placeholder="Anmerkung &#8230;" oninput="noteEdit('${item.pos}',this)"></textarea>
   <div class="rasec">
     <div class="rahd">&#128203; Restarbeiten <span class="rai" id="RAI${id}"></span></div>
-    <div id="RA${id}"></div>
+    <div class="ragrp" id="RA${id}"></div>
     <button class="raadd" onclick="raAddNew('${item.pos}')">&#65291; Restarbeit</button>
   </div>
 </div>`;
@@ -1174,8 +1179,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 82;
+const APP_VERSION = 83;
 const CHANGELOG = [
+  { v:83, titel:'Restarbeiten verschwinden nicht mehr scheinbar', punkte:[
+    'Ist oben ein Gewerk gefiltert (z. B. Montage) und man gibt einer Restarbeit eine andere Zuständigkeit (z. B. Büro), wurde sie ausgeblendet – sichtbar wurde das aber erst beim Hinzufügen der nächsten Restarbeit. Es sah so aus, als sei die vorherige Eingabe verloren.',
+    'Jetzt steht in solchen Fällen unter der Liste ein Hinweis wie „1 weitere Restarbeit anderer Zuständigkeit – anzeigen". Ein Tipp darauf blendet sie wieder ein; nichts geht verloren.',
+    'Außerdem ist das Feld „Erst." jetzt in jedem Fall mit dem angemeldeten Benutzer vorbelegt – auch dann, wenn die Zeile schon vor der Anmeldung offen war.' ]},
   { v:82, titel:'Restarbeiten jetzt an jeder Position erfassbar', punkte:[
     'Bisher tauchte der Bereich „Restarbeiten" an einer Position erst auf, sobald dort mindestens ein Schritt abgehakt war. An noch unberührten Positionen ließ sich also nichts erfassen – genau dann, wenn man es braucht („beschädigt angeliefert", „Anschluss fehlt bauseits").',
     'Der Bereich ist jetzt an jeder Position vorhanden. Damit die Listen dabei übersichtlich bleiben, zeigen Positionen ohne Restarbeiten nur noch den Knopf „＋ Restarbeit"; die leere Eingabezeile erscheint erst nach dem Antippen.' ]},
@@ -5175,7 +5184,29 @@ function updRaGwVis(scope){
   (scope||document).querySelectorAll('.rarow[data-gw]').forEach(r=>{
     const g=r.getAttribute('data-gw')||'-';
     const leer=r.getAttribute('data-leer')==='1';
-    r.style.display=(TF==='all'||g===TF||leer)?'':'none';
+    const zeigen=(TF==='all'||g===TF||leer||RA_ALLE_ZEIGEN.has(r.closest('.ragrp')?r.closest('.ragrp').id:''));
+    r.style.display=zeigen?'':'none';
+  });
+  updRaVersteckt(scope);
+}
+// Merkt sich Listen, in denen der Nutzer „auch andere anzeigen" gewählt hat
+const RA_ALLE_ZEIGEN=new Set();
+// Hinweis, wenn der Gewerk-Filter Restarbeiten verbirgt. Ohne ihn verschwindet eine
+// gerade erfasste Restarbeit beim nächsten Neuaufbau scheinbar spurlos – der
+// häufigste Grund für „meine Restarbeit ist weg".
+function updRaVersteckt(scope){
+  (scope&&scope.id? [scope] : [...document.querySelectorAll('.ragrp')]).forEach(g=>{
+    if(!g||!g.id) return;
+    const n=[...g.querySelectorAll('.rarow')].filter(r=>r.style.display==='none').length;
+    let hint=g.parentNode?g.parentNode.querySelector('.rahid[data-for="'+g.id+'"]'):null;
+    if(!n){ if(hint) hint.remove(); return; }
+    if(!hint){
+      hint=document.createElement('button');
+      hint.type='button'; hint.className='rahid'; hint.dataset.for=g.id;
+      hint.onclick=()=>{ RA_ALLE_ZEIGEN.add(g.id); updRaGwVis(g); };
+      g.parentNode.insertBefore(hint, g.nextSibling);
+    }
+    hint.textContent='👁 '+n+' weitere Restarbeit'+(n===1?'':'en')+' anderer Zuständigkeit – anzeigen';
   });
 }
 // „x/y erledigt“-Zähler je Restarbeiten-Liste – zählt nur, was der Gewerk-Filter zeigt
@@ -5567,7 +5598,7 @@ function raKey(ev,pos,i){
   if(ev.key!=='Enter')return;
   ev.preventDefault();
   const s=gs(pos);
-  s.restarbeiten.splice(i+1,0,{txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[]});
+  s.restarbeiten.splice(i+1,0,{txt:'',desc:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[]});
   updRA(pos);
   saveFotos(pos);
   setTimeout(()=>{
@@ -5582,7 +5613,10 @@ function raAddNew(pos){
   const s=gs(pos);
   s.restarbeiten.forEach(raEnsure);
   let idx=s.restarbeiten.findIndex(r=>!(r.txt&&r.txt.trim())&&!(r.desc&&r.desc.trim())&&!(r.fotos&&r.fotos.length));
-  if(idx<0){ s.restarbeiten.push({txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[]}); idx=s.restarbeiten.length-1; }
+  if(idx<0){ s.restarbeiten.push({txt:'',desc:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[]}); idx=s.restarbeiten.length-1; }
+  // Auch bei einer wiederverwendeten (noch leeren) Zeile den angemeldeten Benutzer
+  // eintragen – sonst bliebe „Erst." leer, wenn die Zeile vor dem Login entstand.
+  else if(!s.restarbeiten[idx].ersteller && USER) s.restarbeiten[idx].ersteller=USER;
   updRA(pos);
   setTimeout(()=>{
     const el=document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+idx+'"] .ratxt');
