@@ -327,6 +327,9 @@ select.fs option{background:var(--surface);color:var(--text);}
 /* Sanitär-Prüfprotokoll als eigene Position (eigener Abschnitt, keine Restarbeit).
    Der Haken ist abgeleitet – er wird gesetzt, sobald ein Protokoll abgelegt ist. */
 .dtsec{display:none;}
+/* Dichtigkeitsprotokoll steht als Abschluss ganz unten – Abstand nach oben zur
+   Trennung, Bodenabstand fürs Freihalten der FAB-Leiste. */
+#DT_bottom{margin-top:18px;border-top:none;padding:0 14px calc(96px + env(safe-area-inset-bottom));}
 .dtcard{border:1px solid #2f6f8f;border-radius:10px;margin-top:4px;cursor:pointer;
   background:rgba(47,111,143,.07);-webkit-tap-highlight-color:transparent;}
 .dtcard:active{background:rgba(47,111,143,.16);}
@@ -1038,10 +1041,6 @@ function buildPanels(){
   allg.innerHTML='<button class="cntgl allg-tgl" id="ALLGCNT" onclick="tgAllg()" title="Restarbeiten für das ganze Projekt oder eine Etage/einen Bereich">&#128203; Allgemeine Restarbeiten <span class="cnbadge" id="ALLGBADGE"></span><span class="cnchev">&#9662;</span></button>'+
     '<div class="cnotes" id="ALLGBODY"></div>';
   main.appendChild(allg);
-  // Sanitär-Prüfprotokoll der ganzen Baustelle – eigener Abschnitt (keine Restarbeit)
-  const dtp=document.createElement('div');
-  dtp.className='rasec dtsec'; dtp.id='DT_'+sp(PRAKEY);
-  main.appendChild(dtp);
   DATA.forEach((sec,secIdx)=>{
     const panel=document.createElement('div');
     panel.className='panel'+(sec.pos===ACT?' on':'');
@@ -1053,13 +1052,9 @@ function buildPanels(){
       '<button class="etbtn" style="background:#5b4c2a" onclick="openEtageFotos('+secIdx+',\'bfotos\')">&#127959; Bauphase <span class="etcnt" id="ETCB'+secIdx+'"></span></button>'+
       '<span class="ethint">Anlagenfotos = Montageverlauf · Bauphase = Bauleiter (Bauzustand, Installationskontrolle, Aufmaß)</span>';
     panel.appendChild(etbar);
-    // Etagen-Restarbeiten stehen jetzt gebündelt oben im Sammel-Balken „Allgemeine
-    // Restarbeiten" (updAllgSection) – kein eigener Dauerblock je Etage mehr.
-    const ekey=EKEY(sec), eid=sp(ekey);
-    // Sanitär-Prüfprotokoll dieser Etage – eigener Abschnitt (keine Restarbeit)
-    const dte=document.createElement('div');
-    dte.className='rasec dtsec'; dte.id='DT_'+eid;
-    panel.appendChild(dte);
+    // Etagen-Restarbeiten stehen gebündelt oben im Sammel-Balken „Allgemeine
+    // Restarbeiten" (updAllgSection); das Dichtigkeitsprotokoll steht als Abschluss
+    // ganz unten (updDichtTasks → #DT_bottom). Kein Dauerblock je Etage mehr.
     sec.subsections.forEach(sub=>{
       const div=document.createElement('div');
       div.className='bblock';
@@ -1117,6 +1112,11 @@ function buildPanels(){
     });
     main.appendChild(panel);
   });
+  // Dichtigkeitsprotokoll (Sanitär) = Abschluss → EIN Einstieg ganz unten,
+  // öffnet die Umfang-Auswahl (Baustelle/Etage). Gefüllt von updDichtTasks.
+  const dtb=document.createElement('div');
+  dtb.className='rasec dtsec'; dtb.id='DT_bottom';
+  main.appendChild(dtb);
   updGewerkSwitcher();
   updAllgSection();   // Sammel-Balken für allgemeine Restarbeiten füllen
 }
@@ -1254,8 +1254,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 87;
+const APP_VERSION = 88;
 const CHANGELOG = [
+  { v:88, titel:'Dichtigkeitsprotokoll steht jetzt am Ende', punkte:[
+    'Im Sanitär-Filter erscheint das Dichtigkeitsprotokoll nicht mehr oben, sondern – wo es hingehört – ganz unten als Abschluss, nach allen Positionen.',
+    'Es gibt jetzt nur noch EINEN Einstieg „💧 Umfang wählen & Protokoll". Ein Auswahlmenü fragt den Umfang ab: ganze Baustelle oder eine bestimmte Etage. Bereits erstellte Protokolle stehen dort mit PDF zum Öffnen.',
+    'Fachlich unverändert: der Haken bleibt abgeleitet (gesetzt, sobald ein Protokoll abgelegt ist), zwei Prüfarten (Betriebsdruck / Druckprüfung nach DIN), Ablage wie bisher.' ]},
   { v:87, titel:'Allgemeine Restarbeiten aufgeräumt', punkte:[
     'Die Dauer-Blöcke „Restarbeiten – Baustelle allgemein" (oben) und „Restarbeiten – Etage allgemein" (bei jeder Etage) sind verschwunden – sie kosteten beim Scrollen zu viel Platz. Restarbeiten an den einzelnen Positionen bleiben unverändert dort, wo sie sind.',
     'Stattdessen gibt es ganz oben EINEN schlanken Balken „Allgemeine Restarbeiten". Er ist leer nur eine Zeile; sobald etwas erfasst ist, klappt er auf und zeigt die Einträge nach Bereich gruppiert (Ganzes Projekt / Etage) samt Anzahl im Badge.',
@@ -3230,32 +3234,27 @@ async function saveDicht(){
 // (Baustelle allgemein + je Etage). Kein echter Restarbeiten-Datensatz – der
 // Status ergibt sich aus DICHT, kann also nicht auseinanderlaufen.
 function updDichtTasks(){
-  const render=(elId, umfang)=>{
-    const el=document.getElementById(elId); if(!el) return;
-    const pos=dichtCollect(umfang);
-    if(TF!=='S' || !pos.length){ el.innerHTML=''; el.style.display='none'; return; }   // nur als Sanitär-Aufgabe
-    el.style.display='block';   // .dtsec ist per CSS ausgeblendet -> explizit setzen
-    const p=DICHT.find(e=>e.umfang===umfang);
-    const nGepr=pos.filter(x=>x.geprueft).length;
-    // Haken ist ABGELEITET: gesetzt, sobald ein Protokoll abgelegt ist – nicht manuell abhakbar.
-    const ck='<div class="ck'+(p?' on':'')+'"><span class="ck-lbl"><span class="cki">'+(p?'&#10003;':'&#9675;')+'</span>&nbsp;<span class="ckn">Protokoll abgelegt</span></span>'+
-      (p?('<span class="ck-ts">Nr. '+p.nr+' · '+dtFmt(p.datum+'T12:00:00')+(p.ergebnis?(' · '+escapeHtml(p.ergebnis)):'')+'</span>'):'')+'</div>';
-    el.innerHTML=
-      '<div class="rahd">&#128167; Prüfprotokoll – Sanitär</div>'+
-      '<div class="card dtcard'+(p?' done':'')+'" onclick="dichtPick(\''+umfang+'\')" title="Dichtigkeitsprotokoll öffnen">'+
-        '<div class="ih">'+
-          '<span class="pb">&#128167;</span>'+
-          '<div class="ii">'+
-            '<div class="ibez">Dichtigkeitsprotokoll – '+escapeHtml(dichtUmfangLabel(umfang))+'</div>'+
-            '<div class="imet"><span class="gtag gS">Sanitär</span> '+nGepr+' von '+pos.length+' Positionen geprüft</div>'+
-          '</div>'+
+  const el=document.getElementById('DT_bottom'); if(!el) return;
+  const alle=dichtCollect('__all');
+  // Nur im Sanitär-Filter und nur wenn es überhaupt Sanitärpositionen gibt.
+  if(TF!=='S' || !alle.length){ el.innerHTML=''; el.style.display='none'; return; }
+  el.style.display='block';   // .dtsec ist per CSS ausgeblendet -> explizit setzen
+  const nGepr=alle.filter(x=>x.geprueft).length;
+  const nProt=DICHT.length;
+  const done=nProt>0;
+  el.innerHTML=
+    '<div class="rahd">&#128167; Pr&#252;fprotokoll – Sanit&#228;r &nbsp;<span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--accent2)">(Abschluss)</span></div>'+
+    '<div class="card dtcard'+(done?' done':'')+'" onclick="openDichtDialog()" title="Dichtigkeitsprotokoll – Umfang w&#228;hlen (Baustelle/Etage)">'+
+      '<div class="ih">'+
+        '<span class="pb">&#128167;</span>'+
+        '<div class="ii">'+
+          '<div class="ibez">Dichtigkeitsprotokoll</div>'+
+          '<div class="imet"><span class="gtag gS">Sanit&#228;r</span> '+nGepr+' von '+alle.length+' Pos. gepr&#252;ft'+
+            (nProt?(' &middot; '+nProt+' Protokoll'+(nProt>1?'e':'')+' abgelegt'):'')+'</div>'+
         '</div>'+
-        '<div class="crow">'+ck+'</div>'+
-        '<div class="fsec"><button class="fbtn" onclick="event.stopPropagation();dichtPick(\''+umfang+'\')">&#128167; '+(p?'Protokoll öffnen':'Protokoll erstellen')+'</button></div>'+
-      '</div>';
-  };
-  render('DT_'+sp(PRAKEY), '__all');
-  DATA.forEach(sec=>render('DT_'+sp(EKEY(sec)), sec.pos));
+      '</div>'+
+      '<div class="fsec"><button class="fbtn" onclick="event.stopPropagation();openDichtDialog()">&#128167; Umfang w&#228;hlen &amp; Protokoll</button></div>'+
+    '</div>';
 }
 function dichtUmfangLabel(u){ if(u==='__all') return 'Ganze Baustelle'; const s=DATA.find(x=>x.pos===u); return s?(s.label||s.pos):u; }
 // TT.MM.JJJJ mit führenden Nullen (toLocaleDateString liefert je nach Umgebung „6.7.2026")
