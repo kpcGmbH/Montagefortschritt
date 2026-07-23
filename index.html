@@ -290,6 +290,17 @@ select.fs option{background:var(--surface);color:var(--text);}
 .radel{background:transparent;border:none;color:#8b2222;cursor:pointer;font-size:13px;
   padding:0 4px;flex-shrink:0;-webkit-tap-highlight-color:transparent;}
 .radel:hover{color:#6b1818;}
+/* Beschreibung: optional, wächst beim Tippen/Diktieren mit (keine Scrollleiste) */
+.radesc{display:block;width:calc(100% - 24px);margin:2px 0 0 24px;box-sizing:border-box;
+  border:1px solid var(--line);background:var(--surface);border-radius:6px;
+  font-size:12px;color:var(--text);font-family:Arial Narrow,Arial,sans-serif;
+  padding:5px 7px;line-height:1.45;resize:none;overflow:hidden;outline:none;min-height:34px;}
+.radesc:focus{border-color:var(--braun);}
+.rarow.done .radesc{color:#7a7a7a;}
+.radescbtn{margin:2px 0 0 24px;background:transparent;border:none;color:var(--braun);
+  font-family:Arial Narrow,Arial,sans-serif;font-size:10px;cursor:pointer;padding:2px 0;
+  -webkit-tap-highlight-color:transparent;letter-spacing:.2px;}
+.radescbtn:hover{color:var(--anthrazit);text-decoration:underline;}
 .rameta{display:flex;align-items:center;gap:8px 10px;flex-wrap:wrap;margin-top:3px;padding-left:24px;
   font-size:9px;color:var(--accent2);font-family:Arial Narrow,Arial,sans-serif;}
 .rametacol{display:flex;align-items:center;gap:3px;flex-wrap:nowrap;min-width:0;}
@@ -456,6 +467,7 @@ select.fs option{background:var(--surface);color:var(--text);}
   .pb{font-size:10px;}
   .pdoc{font-size:12px;}
   .ratxt{font-size:14px;}                   /* Restarbeiten */
+  .radesc{font-size:14px;}                  /* 16px würde iOS zoomen lassen – 14 reicht hier */
   .raadd{font-size:13px;padding:8px 14px;}
   .rahd{font-size:12px;}
   .rakuerz{font-size:11px;}
@@ -1144,8 +1156,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 78;
+const APP_VERSION = 79;
 const CHANGELOG = [
+  { v:79, titel:'Restarbeiten: Titel + Beschreibung', punkte:[
+    'Jede Restarbeit kann jetzt zusätzlich eine ausführliche Beschreibung bekommen: unter der Zeile auf „＋ Beschreibung" tippen. Das Feld wächst beim Schreiben mit, so dass auch längerer Text vollständig sichtbar bleibt.',
+    'Das ist besonders für die Diktierfunktion gedacht: Mikrofon-Taste der Handy-Tastatur antippen und den Sachverhalt einfach einsprechen, statt ihn in eine enge Zeile zu tippen.',
+    'Die kurze Zeile bleibt der Titel und steht wie gewohnt in allen Listen und Berichten; die Beschreibung erscheint darunter im Bericht „Offene Punkte", im Tagesbericht sowie als eigene Spalte in der Excel-Liste und im Aufgaben-Eintrag für Büro, Bauleitung und Lager.',
+    'Bestehende Restarbeiten bleiben unverändert – sie haben schlicht noch keine Beschreibung.' ]},
   { v:78, titel:'Aufgaben-Liste für Büro, Bauleitung und Lager', punkte:[
     'Restarbeiten haben eine neue Zuständigkeit „📦 Lager" (fest zuständig: Wigbert ALT und Ina RUSEVA).',
     'Restarbeiten mit Zuständigkeit „Büro", „Bauleitung" oder „Lager" landen ab jetzt zusätzlich in der SharePoint-Liste „Aufgaben" – mit Baustelle, Position, Text, Erfasser und Status. Die Liste legt die App beim ersten Mal selbst an.',
@@ -2223,7 +2240,7 @@ function expTagebericht(dateStr){
     const neu=r.erstelltAm&&localDay(r.erstelltAm)===tag;
     const erl=r.done&&r.erledigtAm&&localDay(r.erledigtAm)===tag;
     if(!neu&&!erl) return;
-    raRows.push({geschoss:'Baustelle allgemein',bereich:'Etagenübergreifend',pos:'–',bez:'Baustellenweit',txt:r.txt,neu,erl,ersteller:r.ersteller||'',erledigtVon:r.erledigtVon||''});
+    raRows.push({geschoss:'Baustelle allgemein',bereich:'Etagenübergreifend',pos:'–',bez:'Baustellenweit',txt:r.txt,desc:r.desc||'',neu,erl,ersteller:r.ersteller||'',erledigtVon:r.erledigtVon||''});
   });
   DATA.forEach(sec=>{
     const e=ST[EKEY(sec)];
@@ -2232,7 +2249,7 @@ function expTagebericht(dateStr){
       const neu=r.erstelltAm&&localDay(r.erstelltAm)===tag;
       const erl=r.done&&r.erledigtAm&&localDay(r.erledigtAm)===tag;
       if(!neu&&!erl) return;
-      raRows.push({geschoss:sec.label,bereich:'Etage allgemein',pos:'–',bez:'Etagenweit',txt:r.txt,neu,erl,ersteller:r.ersteller||'',erledigtVon:r.erledigtVon||''});
+      raRows.push({geschoss:sec.label,bereich:'Etage allgemein',pos:'–',bez:'Etagenweit',txt:r.txt,desc:r.desc||'',neu,erl,ersteller:r.ersteller||'',erledigtVon:r.erledigtVon||''});
     });
     sec.subsections.forEach(sub=>sub.items.forEach(it=>{
       (gs(it.pos).restarbeiten||[]).forEach(r=>{
@@ -2240,7 +2257,7 @@ function expTagebericht(dateStr){
         const neu=r.erstelltAm&&localDay(r.erstelltAm)===tag;
         const erl=r.done&&r.erledigtAm&&localDay(r.erledigtAm)===tag;
         if(!neu&&!erl) return;
-        raRows.push({geschoss:sec.label,bereich:sub.bez,pos:it.pos,bez:it.bez.trim(),txt:r.txt,neu,erl,ersteller:r.ersteller||'',erledigtVon:r.erledigtVon||''});
+        raRows.push({geschoss:sec.label,bereich:sub.bez,pos:it.pos,bez:it.bez.trim(),txt:r.txt,desc:r.desc||'',neu,erl,ersteller:r.ersteller||'',erledigtVon:r.erledigtVon||''});
       });
     }));
   });
@@ -2314,7 +2331,7 @@ function expTagebericht(dateStr){
       raTr+=`<tr class="drow" data-mit="${escapeHtml(raMit)}" style="background:${i%2===0?'#fff':'#faf9f7'}">
         <td style="padding:5px 8px;font-size:11px;color:#a8a8a8;white-space:nowrap">${r.pos}</td>
         <td style="padding:5px 8px;font-size:12px;font-weight:700">${escapeHtml(r.bez)}</td>
-        <td style="padding:5px 8px;font-size:12px">${escapeHtml(r.txt)}</td>
+        <td style="padding:5px 8px;font-size:12px">${escapeHtml(r.txt)}${(r.desc||'').trim()?`<div style="font-size:10.5px;color:#5f5a55;margin-top:2px;white-space:pre-wrap;line-height:1.4">${escapeHtml(r.desc)}</div>`:''}</td>
         <td style="padding:5px 8px;font-size:11px;white-space:nowrap">${status}</td>
       </tr>`;
     });
@@ -5114,6 +5131,9 @@ function raDefaultGw(pos){
   return '';
 }
 function raEnsure(r){
+  // txt = Titel (Feldname bleibt, damit Altbestand + alle Auswertungen unberührt sind),
+  // desc = optionale mehrzeilige Beschreibung (ab v79).
+  if(typeof r.desc==='undefined') r.desc='';
   if(typeof r.ersteller==='undefined') r.ersteller=r.kuerzel||'';
   if(typeof r.erstelltAm==='undefined') r.erstelltAm=null;
   if(typeof r.erledigtVon==='undefined') r.erledigtVon='';
@@ -5162,6 +5182,12 @@ function updRA(pos){
     const tsErst=r.erstelltAm?raFmtTs(r.erstelltAm):'';
     const tsErl=r.done&&r.erledigtAm?raFmtTs(r.erledigtAm):'';
     const fotosHtml=r.fotos.length?`<div class="rafg" id="RAFG_${id}_${i}">${r.fotos.map((src,fi)=>`<div class="rafth" onclick="raOlb('${pos}',${i},${fi})"><img class="raimg" data-fref="${src}"><button class="rafdel" onclick="event.stopPropagation();raFotoDel('${pos}',${i},${fi})">&#10005;</button></div>`).join('')}</div>`:'';
+    // Beschreibung nur anzeigen, wenn befüllt – sonst bleibt die Liste kompakt
+    // und man klappt sie über „＋ Beschreibung" auf.
+    const descHtml=(r.desc||'').trim()
+      ? `<textarea class="radesc" rows="2" placeholder="Beschreibung (optional) – z. B. diktieren"
+           oninput="raSetDesc('${pos}',${i},this.value);raDescFit(this)">${escapeHtml(r.desc||'')}</textarea>`
+      : `<button type="button" class="radescbtn" onclick="raDescOpen('${pos}',${i})">＋ Beschreibung</button>`;
     return `<div class="rarow${r.done?' done':''}" data-i="${i}" data-gw="${r.gw||'-'}" data-leer="${(r.txt||'').trim()||(r.fotos&&r.fotos.length)?'0':'1'}">
       <div class="ramain">
         <input type="checkbox" class="rachk" ${r.done?'checked':''} onchange="raToggle('${pos}',${i},this.checked)">
@@ -5170,6 +5196,7 @@ function updRA(pos){
         <button class="rafbtn" onclick="raFoto('${pos}',${i})" title="Foto zur Restarbeit">&#128247;</button>
         <button class="radel" onclick="raDel('${pos}',${i})" title="Zeile löschen">&#10005;</button>
       </div>
+      ${descHtml}
       <div class="rameta">
         <div class="rametacol">
           <span class="rametalbl">Zust.:</span>
@@ -5200,8 +5227,37 @@ function updRA(pos){
   g.querySelectorAll('img.raimg[data-fref]').forEach(im=>{
     loadImageAsBlob(im.dataset.fref).then(b=>{ if(b) im.src=b; });
   });
+  g.querySelectorAll('textarea.radesc').forEach(raDescFit);
   updRaGwVis(g);
   updRaCounts();
+}
+// Beschreibung: Höhe an den Inhalt anpassen (kein Scrollen innerhalb des Feldes –
+// beim Diktieren sieht man sonst nicht, was gesprochen wurde).
+function raDescFit(el){
+  if(!el) return;
+  el.style.height='auto';
+  // scrollHeight ist 0, solange das Feld (bzw. ein Elternelement) ausgeblendet ist –
+  // dann NICHT auf 0 zusammenfallen lassen, sondern die CSS-Mindesthöhe behalten.
+  if(el.scrollHeight>0) el.style.height=(el.scrollHeight+2)+'px'; else el.style.height='';
+}
+function raSetDesc(pos,i,val){
+  const s=gs(pos);
+  if(!s.restarbeiten[i])return;
+  raEnsure(s.restarbeiten[i]);
+  s.restarbeiten[i].desc=val;
+  raDebouncedSave(pos);
+}
+// „＋ Beschreibung": Knopf durch das Textfeld ersetzen und hineinspringen.
+// Kein updRA – ein Neuaufbau würde den Fokus (und ein laufendes Diktat) verlieren.
+function raDescOpen(pos,i){
+  const row=document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+i+'"]'); if(!row) return;
+  const btn=row.querySelector('.radescbtn'); if(!btn) return;
+  const ta=document.createElement('textarea');
+  ta.className='radesc'; ta.rows=2;
+  ta.placeholder='Beschreibung (optional) – z. B. diktieren';
+  ta.addEventListener('input',function(){ raSetDesc(pos,i,this.value); raDescFit(this); });
+  btn.replaceWith(ta);
+  raDescFit(ta); ta.focus();
 }
 function raSetTxt(pos,i,val){
   const s=gs(pos);
@@ -5275,7 +5331,7 @@ function raSetErledigtVon(pos,i,val){
 //  dieselbe Aufgabe nicht noch einmal an.
 // ============================================================================
 let AUFG_LIST_ID=null, AUFG_COLS=null, AUFG_FLUSHING=false;
-const AUFG_FELDER=['projekt','ort','zustaendig','bauleiter','buero','lager','erfasser','status','erlediger','empfaenger','link','aufgKey'];
+const AUFG_FELDER=['projekt','ort','beschreibung','zustaendig','bauleiter','buero','lager','erfasser','status','erlediger','empfaenger','link','aufgKey'];
 // Empfänger-Mailadressen nach Namensschema vorname.nachname@… (Umlaute
 // transliteriert). Ausnahmen hier eintragen (Schlüssel = Name kleingeschrieben):
 const EMAIL_DOMAIN='kpc-project.com';
@@ -5352,7 +5408,7 @@ async function aufgExec(op){
   if(op.op==='neu'){
     const fields={Title:op.titel};
     const F=(logisch,wert)=>{ const n=AUFG_COLS[logisch]; if(n) fields[n]=wert; };   // fehlende Spalten auslassen
-    F('projekt',op.projekt); F('ort',op.ort); F('zustaendig',op.zustaendig);
+    F('projekt',op.projekt); F('ort',op.ort); F('beschreibung',op.beschreibung||''); F('zustaendig',op.zustaendig);
     F('bauleiter',op.bauleiter); F('buero',op.buero||''); F('lager',op.lager||'');
     F('erfasser',op.erfasser); F('status','offen'); F('empfaenger',op.empfaenger||'');
     F('link',op.link||''); F('aufgKey',op.key);
@@ -5397,7 +5453,8 @@ function aufgCheck(pos){
     if(!r.erstelltAm) r.erstelltAm=new Date().toISOString();
     r.aufg=PID+'|'+pos+'|'+r.erstelltAm;
     const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
-    aufgEnqueue({op:'neu', key:r.aufg, titel:r.txt.trim(), projekt:curProjName(), ort:aufgOrtLabel(pos),
+    aufgEnqueue({op:'neu', key:r.aufg, titel:r.txt.trim(), beschreibung:(r.desc||'').trim(),
+      projekt:curProjName(), ort:aufgOrtLabel(pos),
       zustaendig:RA_GW_LBL[r.gw]||r.gw, bauleiter:namesStr(proj.bauleiter), buero:namesStr(proj.buero),
       lager:namesStr(LAGER), empfaenger:aufgEmpfaenger(r.gw,proj), erfasser:r.ersteller||USER||'',
       link:location.origin+location.pathname+'#aufgabe='+encodeURIComponent(PID)+'|'+encodeURIComponent(pos)});
@@ -5428,7 +5485,7 @@ function raToggle(pos,i,done){
 }
 function raDel(pos,i){
   const s=gs(pos);
-  if(s.restarbeiten[i] && (s.restarbeiten[i].txt||s.restarbeiten[i].fotos.length)){
+  if(s.restarbeiten[i] && (s.restarbeiten[i].txt||s.restarbeiten[i].desc||s.restarbeiten[i].fotos.length)){
     if(!confirm('Restarbeit wirklich löschen?'))return;
   }
   s.restarbeiten.splice(i,1);
@@ -5453,7 +5510,7 @@ function raKey(ev,pos,i){
 function raAddNew(pos){
   const s=gs(pos);
   s.restarbeiten.forEach(raEnsure);
-  let idx=s.restarbeiten.findIndex(r=>!(r.txt&&r.txt.trim())&&!(r.fotos&&r.fotos.length));
+  let idx=s.restarbeiten.findIndex(r=>!(r.txt&&r.txt.trim())&&!(r.desc&&r.desc.trim())&&!(r.fotos&&r.fotos.length));
   if(idx<0){ s.restarbeiten.push({txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[]}); idx=s.restarbeiten.length-1; }
   updRA(pos);
   setTimeout(()=>{
@@ -5557,7 +5614,7 @@ function collectRestRows(){
       if(!r.txt)return;
       rows.push({
         geschoss:'Baustelle allgemein', bereich:'Etagenübergreifend', pos:'–', bez:'Baustellenweit',
-        txt:r.txt, done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
+        txt:r.txt, desc:r.desc||'', done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
         erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
         fotos:(r.fotos||[]).slice()
       });
@@ -5572,7 +5629,7 @@ function collectRestRows(){
         if(!r.txt)return;
         rows.push({
           geschoss:sec.label, bereich:'Etage allgemein', pos:'–', bez:'Etagenweit',
-          txt:r.txt, done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
+          txt:r.txt, desc:r.desc||'', done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
           erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
           fotos:(r.fotos||[]).slice()
         });
@@ -5587,7 +5644,7 @@ function collectRestRows(){
           if(!r.txt)return;
           rows.push({
             geschoss:sec.label, bereich:sub.bez, pos:item.pos, bez:item.bez.trim(),
-            txt:r.txt, done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
+            txt:r.txt, desc:r.desc||'', done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
             erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
             fotos:(r.fotos||[]).slice()
           });
@@ -5623,9 +5680,9 @@ function expRestXlsx(){
   if(typeof XLSX==='undefined'){ alert('Excel-Bibliothek ist nicht geladen (Internet nötig).'); return; }
   const rows=collectRestRows();
   if(rows.length===0){ alert('Keine Restarbeiten erfasst.'); return; }
-  const aoa=[['Geschoss','Bereich','Pos.','Gerät','Restarbeit','Zuständigkeit','Status','Erstellt von','Erstellt am','Erledigt von','Erledigt am','Fotos']];
+  const aoa=[['Geschoss','Bereich','Pos.','Gerät','Restarbeit','Beschreibung','Zuständigkeit','Status','Erstellt von','Erstellt am','Erledigt von','Erledigt am','Fotos']];
   rows.forEach(r=>aoa.push([
-    r.geschoss||'', r.bereich||'', r.pos||'', r.bez||'', r.txt||'',
+    r.geschoss||'', r.bereich||'', r.pos||'', r.bez||'', r.txt||'', r.desc||'',
     RA_GW_LBL[r.gw]||'',
     r.done?'Erledigt':'Offen',
     r.ersteller||'', raFmtTs(r.erstelltAm)||'',
@@ -5633,8 +5690,8 @@ function expRestXlsx(){
     (r.fotos&&r.fotos.length)?r.fotos.length:0
   ]));
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:14},{wch:20},{wch:8},{wch:26},{wch:44},{wch:13},{wch:9},{wch:16},{wch:15},{wch:16},{wch:15},{wch:6}];
-  ws['!autofilter']={ref:'A1:L1'};
+  ws['!cols']=[{wch:14},{wch:20},{wch:8},{wch:26},{wch:44},{wch:50},{wch:13},{wch:9},{wch:16},{wch:15},{wch:16},{wch:15},{wch:6}];
+  ws['!autofilter']={ref:'A1:M1'};
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Restarbeiten');
   const slug=curProjName().replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'Projekt';
@@ -5708,7 +5765,7 @@ async function expOffenePunkte(){
     raRows+=`<tr class="ra" data-done="${r.done?1:0}" data-gw="${r.gw||'-'}" style="background:${i%2===0?'#fff':'#faf9f7'}">
       <td style="padding:5px 8px;font-size:10px;color:#a8a8a8;white-space:nowrap">${escapeHtml(r.pos)}</td>
       <td style="padding:5px 8px;font-size:12px;font-weight:700">${escapeHtml(r.bez)}</td>
-      <td style="padding:5px 8px;font-size:12px">${escapeHtml(r.txt)}</td>
+      <td style="padding:5px 8px;font-size:12px">${escapeHtml(r.txt)}${(r.desc||'').trim()?`<div style="font-size:10.5px;color:#5f5a55;margin-top:2px;white-space:pre-wrap;line-height:1.4">${escapeHtml(r.desc)}</div>`:''}</td>
       <td style="padding:5px 8px;font-size:11px;text-align:center">${gwBadge(r.gw)}</td>
       <td style="padding:5px 8px;font-size:11px;text-align:center">${status}</td>
       <td style="padding:5px 8px;font-size:10px;color:#895500">${escapeHtml(r.ersteller||'')}${r.erstelltAm?' · '+raFmtTs(r.erstelltAm):''}</td>
