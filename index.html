@@ -869,7 +869,12 @@ function relFields(p){
 // ctx='M'/'S'/'E' -> nur die Haken dieses Gewerks (für die gefilterte Ansicht).
 function ist(p, ctx){
   const s=gs(p); ctx=ctx||'all';
-  const alle = (ctx==='all') ? relFields(p) : (GEW_FIELDS[ctx]||relFields(p));
+  let alle = (ctx==='all') ? relFields(p) : (GEW_FIELDS[ctx]||relFields(p));
+  // OHNE Gewerk-Zuordnung (typisch Möbel/Zubehör) ist nur die Lieferung Pflicht.
+  // „Montiert" bleibt sichtbar und setzbar (relFields ist unverändert), entscheidet
+  // hier aber nicht über „vollständig" – sonst hinge jedes gelieferte Zubehörteil
+  // dauerhaft auf „teilweise".
+  if(!(POSGEW[p]||[]).length) alle=['g'];
   if(!alle.length) return 'open';
   // Als „entfällt" markierte Schritte (z. B. Montage bei reiner Lieferung) zählen
   // nicht mit – sonst bliebe die Position für immer „teilweise".
@@ -1166,8 +1171,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 80;
+const APP_VERSION = 81;
 const CHANGELOG = [
+  { v:81, titel:'Positionen ohne Gewerk: Lieferung genügt', punkte:[
+    'Bei Positionen, denen kein Gewerk zugeordnet ist – typischerweise Möbel und Zubehör –, gilt der Haken „Geliefert" jetzt als vollständig. Bisher erwartete die App dort zusätzlich „Montiert" und die Position blieb dauerhaft auf „teilweise".',
+    'Der Haken „Montiert" bleibt vorhanden und kann weiterhin gesetzt werden, falls doch montiert wird – er entscheidet bei diesen Positionen nur nicht mehr über die Vollständigkeit.',
+    'Bei Positionen mit Gewerk ändert sich nichts: Dort gelten weiterhin alle Schritte des jeweiligen Gewerks. Fällt dort einer nicht an, lässt er sich wie gewohnt auf „entfällt" setzen.' ]},
   { v:80, titel:'Schritte, die nicht anfallen, auf „entfällt" setzen', punkte:[
     'Manche Positionen werden nur geliefert und nicht montiert – bisher blieben sie dadurch für immer „teilweise erledigt" und standen weiter in den offenen Punkten.',
     'Jetzt lässt sich jeder der sieben Schritte als entfallen kennzeichnen: am Handy den Status länger gedrückt halten, am Rechner mit der rechten Maustaste anklicken. Nach einer Rückfrage erscheint der Schritt durchgestrichen mit dem Hinweis „entfällt".',
