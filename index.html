@@ -5263,20 +5263,36 @@ function raSetErledigtVon(pos,i,val){
 //  Merker r.aufg (Schlüssel) wandert im data-Blob mit -> andere Geräte legen
 //  dieselbe Aufgabe nicht noch einmal an.
 // ============================================================================
-let AUFG_LIST_ID=null, AUFG_FLUSHING=false;
+let AUFG_LIST_ID=null, AUFG_COLS=null, AUFG_FLUSHING=false;
+const AUFG_FELDER=['projekt','ort','zustaendig','bauleiter','buero','lager','erfasser','status','erlediger','aufgKey'];
 async function aufgEnsureList(){
-  if(AUFG_LIST_ID) return AUFG_LIST_ID;
+  if(AUFG_LIST_ID && AUFG_COLS) return AUFG_LIST_ID;
   const ls=await (await graph('/sites/'+SPIDS.siteId+'/lists?$filter='+encodeURIComponent("displayName eq 'Aufgaben'"))).json();
-  if(ls.value && ls.value.length){ AUFG_LIST_ID=ls.value[0].id; return AUFG_LIST_ID; }
-  const res=await graph('/sites/'+SPIDS.siteId+'/lists', {method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ displayName:'Aufgaben', list:{template:'genericList'},
-      columns:[
-        {name:'projekt', text:{}}, {name:'ort', text:{}}, {name:'zustaendig', text:{}},
-        {name:'bauleiter', text:{}}, {name:'buero', text:{}}, {name:'lager', text:{}},
-        {name:'erfasser', text:{}}, {name:'status', text:{}}, {name:'erlediger', text:{}},
-        {name:'aufgKey', indexed:true, text:{}} ] })});
-  const created=await res.json();
-  AUFG_LIST_ID=created.id;
+  if(ls.value && ls.value.length){ AUFG_LIST_ID=ls.value[0].id; }
+  else{
+    // Anlegen klappt nur mit Sites.Manage-Rechten (403 sonst) – dann Liste
+    // einmal von Hand anlegen; die Spaltennamen sind dank Auflösung unten egal.
+    const res=await graph('/sites/'+SPIDS.siteId+'/lists', {method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ displayName:'Aufgaben', list:{template:'genericList'},
+        columns:[
+          {name:'projekt', text:{}}, {name:'ort', text:{}}, {name:'zustaendig', text:{}},
+          {name:'bauleiter', text:{}}, {name:'buero', text:{}}, {name:'lager', text:{}},
+          {name:'erfasser', text:{}}, {name:'status', text:{}}, {name:'erlediger', text:{}},
+          {name:'aufgKey', indexed:true, text:{}} ] })});
+    const created=await res.json();
+    AUFG_LIST_ID=created.id;
+  }
+  // Interne Spaltennamen auflösen: bei von Hand angelegten Spalten vergibt
+  // SharePoint teils andere interne Namen (z. B. 'projekt0') – Graph erkennt
+  // nur die internen ("Field 'projekt' is not recognized"). Deshalb wird
+  // IMMER über Anzeigename -> interner Name gemappt.
+  const cols=await (await graph('/sites/'+SPIDS.siteId+'/lists/'+AUFG_LIST_ID+'/columns')).json();
+  AUFG_COLS={};
+  AUFG_FELDER.forEach(f=>{
+    const c=(cols.value||[]).find(x=>(x.displayName||'').toLowerCase()===f.toLowerCase())
+          ||(cols.value||[]).find(x=>(x.name||'').toLowerCase()===f.toLowerCase());
+    if(c) AUFG_COLS[f]=c.name;
+  });
   return AUFG_LIST_ID;
 }
 function aufgQueue(){ try{ return JSON.parse(localStorage.getItem('kpc_aufg_queue')||'[]'); }catch(e){ return []; } }
@@ -5296,20 +5312,28 @@ async function aufgFlush(){
 async function aufgExec(op){
   const listId=await aufgEnsureList();
   if(op.op==='neu'){
+    const fields={Title:op.titel};
+    const F=(logisch,wert)=>{ const n=AUFG_COLS[logisch]; if(n) fields[n]=wert; };   // fehlende Spalten auslassen
+    F('projekt',op.projekt); F('ort',op.ort); F('zustaendig',op.zustaendig);
+    F('bauleiter',op.bauleiter); F('buero',op.buero||''); F('lager',op.lager||'');
+    F('erfasser',op.erfasser); F('status','offen'); F('aufgKey',op.key);
     await graph('/sites/'+SPIDS.siteId+'/lists/'+listId+'/items', {method:'POST', headers:{'Content-Type':'application/json'},
-      body: JSON.stringify({fields:{Title:op.titel, projekt:op.projekt, ort:op.ort, zustaendig:op.zustaendig,
-        bauleiter:op.bauleiter, buero:op.buero||'', lager:op.lager||'', erfasser:op.erfasser, status:'offen', aufgKey:op.key}})});
+      body: JSON.stringify({fields})});
     return;
   }
-  // Status-Änderung: Eintrag über den Schlüssel finden (Spalte ist indiziert)
+  // Status-Änderung: Eintrag über den Schlüssel finden
+  const keyCol=AUFG_COLS['aufgKey'];
+  if(!keyCol) return;   // ohne Schlüsselspalte kein Wiederfinden möglich
   const r=await (await graph('/sites/'+SPIDS.siteId+'/lists/'+listId+'/items?$expand=fields&$filter='+
-    encodeURIComponent("fields/aufgKey eq '"+String(op.key).replace(/'/g,"''")+"'"),
+    encodeURIComponent("fields/"+keyCol+" eq '"+String(op.key).replace(/'/g,"''")+"'"),
     {headers:{'Prefer':'HonorNonIndexedQueriesWarningMayFailRandomly'}})).json();
   const it=(r.value||[])[0];
   if(!it) return;   // nie angelegt (Altbestand) -> nichts zu tun
-  const f={status:op.status};
-  if(op.von!==undefined) f.erlediger=op.von;
-  if(op.zustaendig) f.zustaendig=op.zustaendig;
+  const f={};
+  if(AUFG_COLS.status) f[AUFG_COLS.status]=op.status;
+  if(op.von!==undefined && AUFG_COLS.erlediger) f[AUFG_COLS.erlediger]=op.von;
+  if(op.zustaendig && AUFG_COLS.zustaendig) f[AUFG_COLS.zustaendig]=op.zustaendig;
+  if(!Object.keys(f).length) return;
   await graph('/sites/'+SPIDS.siteId+'/lists/'+listId+'/items/'+it.id+'/fields',
     {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(f)});
 }
