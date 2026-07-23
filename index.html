@@ -5287,10 +5287,13 @@ async function aufgEnsureList(){
   // nur die internen ("Field 'projekt' is not recognized"). Deshalb wird
   // IMMER über Anzeigename -> interner Name gemappt.
   const cols=await (await graph('/sites/'+SPIDS.siteId+'/lists/'+AUFG_LIST_ID+'/columns')).json();
+  // Schreibgeschützte/berechnete Systemspalten (z. B. LinkTitle, wenn jemand
+  // „Titel" umbenannt hat) dürfen NIE zugeordnet werden -> 403 read-only.
+  const beschreibbar=(cols.value||[]).filter(x=>!x.readOnly && x.name!=='Title');
   AUFG_COLS={};
   AUFG_FELDER.forEach(f=>{
-    const c=(cols.value||[]).find(x=>(x.displayName||'').toLowerCase()===f.toLowerCase())
-          ||(cols.value||[]).find(x=>(x.name||'').toLowerCase()===f.toLowerCase());
+    const c=beschreibbar.find(x=>(x.displayName||'').toLowerCase()===f.toLowerCase())
+          ||beschreibbar.find(x=>(x.name||'').toLowerCase()===f.toLowerCase());
     if(c) AUFG_COLS[f]=c.name;
   });
   return AUFG_LIST_ID;
