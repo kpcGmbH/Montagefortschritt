@@ -267,8 +267,11 @@ select.fs option{background:var(--surface);color:var(--text);}
   resize:none;min-height:32px;font-family:Arial Narrow,Arial,sans-serif;}
 .anm:focus{outline:none;border-color:var(--braun);}
 
-.rasec{margin-top:8px;border-top:1px dashed var(--border);padding-top:6px;display:none;}
-.card.part .rasec,.card.done .rasec{display:block;}
+/* Restarbeiten an JEDER Position erfassbar – auch an noch nicht begonnenen
+   („beschädigt angeliefert", „Anschluss fehlt bauseits"). Früher nur bei
+   .card.part/.done sichtbar; kompakt bleibt es dadurch, dass unberührte
+   Positionen nur den „+ Restarbeit"-Knopf zeigen (siehe updRA). */
+.rasec{margin-top:8px;border-top:1px dashed var(--border);padding-top:6px;display:block;}
 .rahd{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;color:var(--braun);
   text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;}
 .rahd .rai{margin-left:auto;font-size:10px;color:var(--accent2);font-weight:400;text-transform:none;letter-spacing:0;}
@@ -1171,8 +1174,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 81;
+const APP_VERSION = 82;
 const CHANGELOG = [
+  { v:82, titel:'Restarbeiten jetzt an jeder Position erfassbar', punkte:[
+    'Bisher tauchte der Bereich „Restarbeiten" an einer Position erst auf, sobald dort mindestens ein Schritt abgehakt war. An noch unberührten Positionen ließ sich also nichts erfassen – genau dann, wenn man es braucht („beschädigt angeliefert", „Anschluss fehlt bauseits").',
+    'Der Bereich ist jetzt an jeder Position vorhanden. Damit die Listen dabei übersichtlich bleiben, zeigen Positionen ohne Restarbeiten nur noch den Knopf „＋ Restarbeit"; die leere Eingabezeile erscheint erst nach dem Antippen.' ]},
   { v:81, titel:'Positionen ohne Gewerk: Lieferung genügt', punkte:[
     'Bei Positionen, denen kein Gewerk zugeordnet ist – typischerweise Möbel und Zubehör –, gilt der Haken „Geliefert" jetzt als vollständig. Bisher erwartete die App dort zusätzlich „Montiert" und die Position blieb dauerhaft auf „teilweise".',
     'Der Haken „Montiert" bleibt vorhanden und kann weiterhin gesetzt werden, falls doch montiert wird – er entscheidet bei diesen Positionen nur nicht mehr über die Vollständigkeit.',
@@ -5239,8 +5245,9 @@ function updRA(pos){
   const s=gs(pos);
   const g=document.getElementById('RA'+id);
   if(!g)return;
-  // Etagen-Listen starten leer (nur „+ Restarbeit"-Button); Positionslisten mit leerer Eingabezeile
-  if(!s.restarbeiten.length && !isEKey(pos)) s.restarbeiten.push({txt:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[]});
+  // Listen starten leer – nur der „+ Restarbeit"-Knopf. Früher bekam jede Position
+  // automatisch eine leere Eingabezeile; seit die Sektion an ALLEN Positionen
+  // sichtbar ist (auch an unberührten), würde das die Liste massiv aufblähen.
   s.restarbeiten.forEach(raEnsure);
   g.innerHTML=s.restarbeiten.map((r,i)=>{
     const tsErst=r.erstelltAm?raFmtTs(r.erstelltAm):'';
