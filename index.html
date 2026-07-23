@@ -109,7 +109,14 @@ select.fs option{background:var(--surface);color:var(--text);}
 .sd{width:8px;height:8px;border-radius:50%;}
 .dok{background:#5cb85c;} .dop{background:#e8aa40;}
 /* Gewerk-Umschalter */
-.gwbar{display:none;gap:6px;flex-wrap:wrap;align-items:center;}
+/* Einzeilig und horizontal scrollbar – mit 8 Knöpfen würde ein Umbruch am Handy
+   zwei bis drei Zeilen Kopfleiste kosten. */
+.gwbar{display:none;gap:6px;flex-wrap:nowrap;align-items:center;overflow-x:auto;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none;padding-bottom:1px;}
+.gwbar::-webkit-scrollbar{display:none;}
+.gw{flex:0 0 auto;}
+.gwsep{flex:0 0 auto;width:1px;height:18px;background:var(--line);margin:0 2px;}
+.gw.gwz.on{background:#7a5c1d;border-color:#7a5c1d;color:#fff;}
 .gw{background:var(--chrome-bg2);color:var(--text);border:1px solid var(--line);border-radius:16px;padding:5px 12px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;-webkit-tap-highlight-color:transparent;}
 .gw:hover{border-color:var(--chrome-accent);}
 .gw.on{background:var(--chrome-accent);color:var(--surface);border-color:var(--chrome-accent);}
@@ -540,10 +547,14 @@ select.fs option{background:var(--surface);color:var(--text);}
     <button class="gw" data-t="E" onclick="setTF('E')">&#9889; Elektro</button>
     <button class="gw" data-t="S" onclick="setTF('S')">&#128703; Sanit&#228;r</button>
     <button class="gw" data-t="NU" onclick="setTF('NU')">&#127959;&#65039; Nachunternehmer</button>
+    <span class="gwsep" title="Ab hier: Zust&#228;ndigkeiten f&#252;r Restarbeiten (keine Stücklisten-Schritte)"></span>
+    <button class="gw gwz" data-t="B" onclick="setTF('B')">&#127970; B&#252;ro</button>
+    <button class="gw gwz" data-t="BL" onclick="setTF('BL')">&#128119; Bauleitung</button>
+    <button class="gw gwz" data-t="L" onclick="setTF('L')">&#128230; Lager</button>
   </div>
   <div class="tabs" id="tabs"></div>
   <div class="sbar">
-    <span class="sp sf" id="sfD" onclick="setSF('done')"><span class="sd dok"></span>Vollst&#228;ndig: <strong id="cD">0</strong></span>
+    <span class="sp sf" id="sfD" onclick="setSF('done')"><span class="sd dok"></span><span id="lblD">Vollst&#228;ndig</span>: <strong id="cD">0</strong></span>
     <span class="sp sf" id="sfP" onclick="setSF('part')"><span class="sd dop"></span>Teilweise: <strong id="cP">0</strong></span>
     <span class="sp sf" id="sfC" onclick="setSF('angeschl')"><span class="sd" style="background:#2a7fa6"></span>Angeschlossen: <strong id="cC">0</strong></span>
     <span class="sp sf" id="sfO" onclick="setSF('open')"><span class="sd" style="background:#a8a8a8"></span>Offen: <strong id="cO">0</strong></span>
@@ -853,7 +864,7 @@ const ALL_CK=['g','m','nu','sa','dp','ea','ib','ew'];
 function applyFieldVisibility(){
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
     const id=sp(it.pos);
-    const allow=(TF==='all')?relFields(it.pos):(GEW_FIELDS[TF]||relFields(it.pos));
+    const allow=(TF==='all')?relFields(it.pos):(ZUST_ONLY[TF]?[]:(GEW_FIELDS[TF]||relFields(it.pos)));
     ALL_CK.forEach(f=>{
       const el=document.getElementById('K'+f+id);
       if(el) el.style.display = allow.includes(f) ? '' : 'none';
@@ -879,6 +890,7 @@ function relFields(p){
 // ctx='M'/'S'/'E' -> nur die Haken dieses Gewerks (für die gefilterte Ansicht).
 function ist(p, ctx){
   const s=gs(p); ctx=ctx||'all';
+  if(ZUST_ONLY[ctx]) ctx='all';        // Zuständigkeiten haben keine eigenen Schritte
   let alle = (ctx==='all') ? relFields(p) : (GEW_FIELDS[ctx]||relFields(p));
   // OHNE Gewerk-Zuordnung (typisch Möbel/Zubehör) ist nur die Lieferung Pflicht.
   // „Montiert" bleibt sichtbar und setzbar (relFields ist unverändert), entscheidet
@@ -926,6 +938,19 @@ function buildTabs(){
 // „offen" = noch gar nichts erledigt – wie Filter und Zähler.
 function updTabBadges(){
   const ea=document.getElementById('TNO___all');
+  // Bei Büro/Bauleitung/Lager zählt das Badge die Restarbeiten dieser Zuständigkeit –
+  // die Positionszahl wäre dort irreführend („UG (39)" sind keine Büro-Aufgaben).
+  if(ea && ZUST_ONLY[TF]){
+    let off=0,erl=0;
+    const z=list=>(list||[]).forEach(r=>{ if(!(r.txt||'').trim()||r.gw!==TF) return; r.done?erl++:off++; });
+    if(ST[PRAKEY]) z(ST[PRAKEY].restarbeiten);
+    DATA.forEach(sec=>{ const e=ST[EKEY(sec)]; if(e) z(e.restarbeiten);
+      sec.subsections.forEach(sub=>sub.items.forEach(it=>{ const st=ST[it.pos]; if(st) z(st.restarbeiten); })); });
+    if(!off && !erl){ ea.textContent=''; ea.className='tno'; }
+    else if(!off){ ea.innerHTML='&#10003;'; ea.className='tno done'; }
+    else { ea.textContent=off+' offen'; ea.className='tno'; }
+    return;
+  }
   if(ea){ let t=0,d=0,o=0;
     DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(item=>{
       if(TF!=='all'){ const g=item.gew||[]; if(!g.includes(TF)) return; } t++;
@@ -1182,8 +1207,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 84;
+const APP_VERSION = 85;
 const CHANGELOG = [
+  { v:85, titel:'Filter für Büro, Bauleitung und Lager', punkte:[
+    'Die Leiste oben hat drei weitere Filter: 🏢 Büro, 👷 Bauleitung und 📦 Lager. Sie zeigen alle Positionen, an denen eine Restarbeit dieser Zuständigkeit hängt – zusammen mit den allgemeinen Restarbeiten der Etage und der Baustelle.',
+    'Damit sieht jeder auf einen Blick seine eigenen Aufgaben, ohne die Stückliste durchsuchen zu müssen. Die Statusfelder der Positionen werden dabei ausgeblendet, weil es für diese Zuständigkeiten keine Stücklisten-Schritte gibt.',
+    'Die Zählung stellt sich passend um: Statt „Vollständig/Teilweise" steht dort „Erledigt" und „Offen", und zwar bezogen auf die Restarbeiten dieser Zuständigkeit.',
+    'Damit die Leiste am Handy übersichtlich bleibt, ist sie jetzt einzeilig und lässt sich seitlich schieben; der gewählte Filter wird automatisch in den sichtbaren Bereich gerückt.' ]},
   { v:84, titel:'Neues Gewerk „Nachunternehmer"', punkte:[
     'Neben Montage, Elektro und Sanitär gibt es jetzt das Gewerk „🏗️ Nachunternehmer" – für Leistungen, die komplett ein Fremdunternehmen erbringt, etwa Kältetechnik oder Brandschutz.',
     'Weil solche Leistungen sehr unterschiedlich sind, hat das Gewerk bewusst nur einen allgemeinen Schritt: „Ausgeführt". Zusammen mit „Geliefert" reicht das für die meisten Fälle; fällt die Lieferung nicht an, setzt man sie mit langem Druck auf „entfällt".',
@@ -2083,6 +2113,8 @@ function olbEt(idx, oi){
 
 // STATS
 function upStats(){
+  if(ZUST_ONLY[TF]){ upStatsZust(); return; }
+  zustLabels(false);
   let tot=0,dn=0,pt=0,op=0,ang=0;
   // Zählt im Kontext der Auswahl: gewählte Etage -> nur diese, „Alle" -> ganzes Projekt
   DATA.forEach(s=>{ if(ACT!=='__all' && s.pos!==ACT) return; s.subsections.forEach(sub=>sub.items.forEach(item=>{
@@ -2099,6 +2131,30 @@ function upStats(){
   updTabBadges();
 }
 
+// Statuszeile für Büro/Bauleitung/Lager: dort gibt es keine Stücklisten-Schritte,
+// gezählt werden die Restarbeiten dieser Zuständigkeit (Position + Etage + Baustelle).
+function upStatsZust(){
+  let offen=0, erl=0;
+  const zaehl=list=>(list||[]).forEach(r=>{ if(!(r.txt||'').trim()||r.gw!==TF) return; if(r.done) erl++; else offen++; });
+  if(ST[PRAKEY]) zaehl(ST[PRAKEY].restarbeiten);
+  DATA.forEach(sec=>{
+    if(ACT!=='__all' && sec.pos!==ACT) return;
+    const e=ST[EKEY(sec)]; if(e) zaehl(e.restarbeiten);
+    sec.subsections.forEach(sub=>sub.items.forEach(it=>{ const s=ST[it.pos]; if(s) zaehl(s.restarbeiten); }));
+  });
+  const set=(id,v)=>{ const el=document.getElementById(id); if(el) el.textContent=v; };
+  set('cD',erl); set('cO',offen); set('cT',offen+erl);
+  // „Teilweise"/„Angeschlossen" gibt es bei Restarbeiten nicht – ausblenden statt
+  // mit Nullen dazustehen; „Vollständig" heißt hier „Erledigt".
+  zustLabels(true);
+  updTabBadges();
+}
+// Statuszeile zwischen Positions- und Restarbeiten-Bedeutung umschalten
+function zustLabels(an){
+  const lbl=document.getElementById('lblD'); if(lbl) lbl.textContent=an?'Erledigt':'Vollständig';
+  ['sfP','sfC'].forEach(id=>{ const el=document.getElementById(id); if(el) el.style.display=an?'none':''; });
+}
+
 // SEARCH/FILTER
 
 let SF='all';
@@ -2112,11 +2168,19 @@ function setSF(f){
   applyF();
 }
 
-let TF='all';   // Gewerk-Filter: 'all' | 'M' | 'E' | 'S'
+let TF='all';   // Filter: 'all' | Gewerk 'M'/'E'/'S'/'NU' | Zuständigkeit 'B'/'BL'/'L'
+// Zuständigkeiten OHNE Stücklisten-Schritte: hier filtert die App nach Restarbeiten
+// statt nach Positions-Gewerken (eine Position „gehört" nie dem Büro).
+const ZUST_ONLY={B:1,BL:1,L:1};
+function hatRA(pos,gw){ const s=ST[pos]; return !!(s&&(s.restarbeiten||[]).some(r=>r.gw===gw&&(r.txt||'').trim())); }
 
 function setTF(t){
   TF=t;
   document.querySelectorAll('#gwbar .gw').forEach(b=>b.classList.toggle('on', b.dataset.t===TF));
+  // Die Leiste scrollt horizontal – den gewählten Knopf sichtbar machen, sonst
+  // sieht man am Handy nicht, welcher Filter aktiv ist.
+  const akt=document.querySelector('#gwbar .gw.on');
+  if(akt&&akt.scrollIntoView) try{ akt.scrollIntoView({block:'nearest',inline:'nearest'}); }catch(e){}
   // Kartenfarben + Bereichsfortschritt für das gewählte Gewerk neu berechnen
   DATA.forEach(sec=>sec.subsections.forEach(sub=>{
     sub.items.forEach(it=>{
@@ -2167,7 +2231,7 @@ function applyF(){
     // prüfung fehlt noch), gehört sie unter „Teilweise" – sonst stehen in der
     // Offen-Liste auch längst angeschlossene Geräte.
     else if(SF==='open') stOk=!done && !part;
-    const gwOk = TF==='all' || (c.dataset.gew||'').includes(TF);
+    const gwOk = TF==='all' || (ZUST_ONLY[TF] ? hatRA(pos,TF) : (c.dataset.gew||'').includes(TF));
     const show=txtOk && stOk && gwOk;
     c.style.display=show?'':'none';
     if(show && active){
