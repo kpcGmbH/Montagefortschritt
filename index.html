@@ -5984,6 +5984,7 @@ async function aufgExec(op){
   if(op.von!==undefined && AUFG_COLS.erlediger) f[AUFG_COLS.erlediger]=op.von;
   if(op.zustaendig && AUFG_COLS.zustaendig) f[AUFG_COLS.zustaendig]=op.zustaendig;
   if(op.empfaenger!==undefined && AUFG_COLS.empfaenger) f[AUFG_COLS.empfaenger]=op.empfaenger;
+  if(op.erfasser!==undefined && AUFG_COLS.erfasser) f[AUFG_COLS.erfasser]=op.erfasser;
   if(!Object.keys(f).length) return;
   await graph('/sites/'+SPIDS.siteId+'/lists/'+listId+'/items/'+it.id+'/fields',
     {method:'PATCH', headers:{'Content-Type':'application/json'}, body: JSON.stringify(f)});
@@ -5996,22 +5997,53 @@ function aufgOrtLabel(pos){
   (DATA||[]).some(sec=>sec.subsections.some(sub=>sub.items.some(it=>{ if(it.pos===pos){ bez=(it.bez||'').trim(); return true; } return false; })));
   return pos+(bez?(' '+bez):'');
 }
+// Erfasser für die Aufgaben-Liste. „Erst." ist der AUSFÜHRER (USER) – der lässt sich
+// wechseln, und wer für einen Monteur mit dokumentiert, verschickt sonst eine Mail
+// unter dessen Namen. Für eine Benachrichtigung zählt aber, wen das Büro bei
+// Rückfragen ansprechen kann. Deshalb wird das MICROSOFT-KONTO ergänzt, sobald es
+// abweicht – dasselbe Prinzip wie `u`/`e` im Änderungsverlauf (histAdd).
+function aufgNorm(v){ return String(v||'').trim().toLowerCase().replace(/\s+/g,' '); }
+function aufgKonto(){ try{ return deriveName(msalAccount)||''; }catch(e){ return ''; } }
+function aufgErfasserText(ausf, wort){
+  const konto=aufgKonto();
+  if(!konto || aufgNorm(konto)===aufgNorm(ausf)) return ausf||konto||'';
+  if(!ausf) return konto;
+  return ausf+' ('+(wort||'eingetragen')+' von '+konto+')';
+}
 // Nach jedem Restarbeiten-Speichern: neue Büro-/BL-Restarbeiten als Aufgabe anlegen.
 // r.aufg (im data-Blob gespeichert) verhindert Doppel-Anlage – auch geräteübergreifend.
 function aufgCheck(pos){
   if(!PID) return;
   const s=gs(pos); if(!s.restarbeiten) return;
   s.restarbeiten.forEach(r=>{
-    if(!r || r.aufg) return;
+    if(!r) return;
+    if(r.aufg){
+      // „Erst." nachträglich korrigiert -> Listeneintrag nachziehen (die Mail ist raus,
+      // aber das Büro arbeitet in der Liste). r.aufgErf hält den zuletzt gemeldeten
+      // AUSFÜHRER-Namen; verglichen wird nur der, nicht der zusammengesetzte Text –
+      // sonst patcht jedes fremde Gerät den Eintrag auf sein eigenes Konto um.
+      const erf=(r.ersteller||'');
+      // Aufgaben von VOR diesem Update haben keinen Merker: den aktuellen Stand als
+      // gemeldet annehmen, statt zu raten. Erst spätere Korrekturen lösen dann aus.
+      if(r.aufgErf===undefined){ r.aufgErf=erf; return; }
+      if(r.aufgErf!==erf){
+        r.aufgErf=erf;
+        aufgEnqueue({op:'status', key:r.aufg, status:r.done?'erledigt':'offen',
+          erfasser:aufgErfasserText(erf,'korrigiert')});
+      }
+      return;
+    }
     if(r.gw!=='B' && r.gw!=='BL' && r.gw!=='L') return;
     if(!(r.txt||'').trim()) return;
     if(!r.erstelltAm) r.erstelltAm=new Date().toISOString();
     r.aufg=PID+'|'+pos+'|'+r.erstelltAm;
+    r.aufgErf=r.ersteller||'';
     const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
     aufgEnqueue({op:'neu', key:r.aufg, titel:r.txt.trim(), beschreibung:(r.desc||'').trim(),
       projekt:curProjName(), ort:aufgOrtLabel(pos),
       zustaendig:RA_GW_LBL[r.gw]||r.gw, bauleiter:namesStr(proj.bauleiter), buero:namesStr(proj.buero),
-      lager:namesStr(LAGER), empfaenger:aufgEmpfaenger(r.gw,proj), erfasser:r.ersteller||USER||'',
+      lager:namesStr(LAGER), empfaenger:aufgEmpfaenger(r.gw,proj),
+      erfasser:aufgErfasserText(r.ersteller||USER||''),
       link:location.origin+location.pathname+'#aufgabe='+encodeURIComponent(PID)+'|'+encodeURIComponent(pos)});
   });
 }
