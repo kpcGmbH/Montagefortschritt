@@ -129,7 +129,7 @@ select.fs option{background:var(--surface);color:var(--text);}
 .gw:hover{border-color:var(--chrome-accent);}
 .gw.on{background:var(--chrome-accent);color:var(--surface);border-color:var(--chrome-accent);}
 .gtag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:8px;margin-left:4px;vertical-align:middle;color:#fff;}
-.gtag.gM{background:#6b7a8a;} .gtag.gE{background:#b8860b;} .gtag.gS{background:#3f7a8a;} .gtag.gNU{background:#7a5c1d;} .gtag.gPA{background:#6d7d1f;}
+.gtag.gM{background:#6b7a8a;} .gtag.gE{background:#b8860b;} .gtag.gS{background:#3f7a8a;} .gtag.gNU{background:#7a5c1d;}   /* PA hat KEINE eigene Tag-Farbe: es ist eine Leistung des Gewerks Elektro (gewTags) */
 .gtag.gEdit{background:transparent;color:var(--accent2);border:1px dashed var(--accent2);}
 .gwedit{cursor:pointer;-webkit-tap-highlight-color:transparent;}
 .sp strong{color:var(--text);}
@@ -1296,7 +1296,7 @@ const APP_VERSION = 91;
 const CHANGELOG = [
   { v:91, titel:'Elektro: Potentialausgleich als eigener Schritt', punkte:[
     'Bisher gab es im Gewerk Elektro nur „Elektroanschluss". Der Potentialausgleich (Erdung) ist jetzt ein eigener Schritt – bei einem 400-V-Geräteanschluss sind das zwei getrennte Leistungen, die auch getrennt abgehakt und nachgewiesen werden.',
-    'Beide Leistungen lassen sich je Position einzeln zuordnen: über die Gewerk-Marke an der Position („✎ Gewerk") gibt es unter ELEKTRO die Punkte „Elektro" (Anschluss, IBN, Einweisung) und „Potentialausgleich". Eine Edelstahl-Tischanlage bekommt damit NUR den Potentialausgleich – ohne Anschluss, Inbetriebnahme und Einweisung.',
+    'Beide gehören zum Gewerk Elektro und lassen sich je Position einzeln zuordnen: über die Gewerk-Marke an der Position („✎ Gewerk") stehen unter ELEKTRO die Punkte „Elektroanschluss" (mit IBN + Einweisung) und „Potentialausgleich". Eine Edelstahl-Tischanlage bekommt damit NUR den Potentialausgleich – ohne Anschluss, Inbetriebnahme und Einweisung.',
     'Der Filter „Elektro" zeigt beides zusammen: der Elektriker sieht Anschlüsse und Erdungen in einer Ansicht. Der neue Schritt läuft in Kundenbericht, Offene Punkte, Tagesbericht und Bautagebuch mit.',
     'An bestehenden Positionen ändert sich nichts: Der Potentialausgleich erscheint nur dort, wo er zugeordnet wurde. Bereits fertige Elektro-Positionen bleiben fertig.' ]},
   { v:90, titel:'Bericht „Offene Punkte" lädt wieder zuverlässig', punkte:[
@@ -6784,14 +6784,32 @@ function parseGewerk(v){
   return out;
 }
 const GEWERK_LABEL={M:'Montage',E:'Elektro',S:'Sanitär',PA:'Potentialausgleich',NU:'Nachunternehmer'};
+// Anzeige-Marken je Position. Elektroanschluss (E) und Potentialausgleich (PA) sind
+// ZWEI Leistungen EINES Aufgabengebiets – an der Karte stehen sie deshalb als EIN
+// Tag „Elektro" (nicht als zwei gleichrangige Gewerke). Welche der beiden Leistungen
+// ansteht, zeigen die Statusfelder darunter. Nur-Erdung wird als „Elektro · PA"
+// gekennzeichnet, sonst sähe eine Tischanlage aus wie ein voller Elektro-Anschluss.
+function gewTags(gew){
+  const g=gew||[]; const out=[]; let el=false;
+  g.forEach(c=>{
+    if(c==='E'||c==='PA'){
+      if(el) return;                       // Elektro nur EINMAL ausgeben
+      el=true; out.push(['E', g.includes('E')?'Elektro':'Elektro · PA']); return;
+    }
+    out.push([c, GEWERK_LABEL[c]||c]);
+  });
+  return out;
+}
 function gewBadge(gew){
-  if(!gew||!gew.length) return '';
-  return ' '+gew.map(g=>'<span class="gtag g'+g+'">'+(GEWERK_LABEL[g]||g)+'</span>').join('');
+  const tags=gewTags(gew);
+  if(!tags.length) return '';
+  return ' '+tags.map(([c,l])=>'<span class="gtag g'+c+'">'+l+'</span>').join('');
 }
 // Klickbare Gewerk-Badge je Position (Korrektur falscher Zuordnung aus der Stückliste)
 function gewBadgeEditable(pos, gew){
-  const inner=(gew&&gew.length)
-    ? gew.map(g=>'<span class="gtag g'+g+'">'+(GEWERK_LABEL[g]||g)+'</span>').join('')
+  const tags=gewTags(gew);
+  const inner=tags.length
+    ? tags.map(([c,l])=>'<span class="gtag g'+c+'">'+l+'</span>').join('')
     : '<span class="gtag gEdit">&#9998; Gewerk</span>';
   return ' <span class="gwedit" onclick="openGewerkChooser(\''+pos+'\')" title="Gewerk korrigieren">'+inner+'</span>';
 }
@@ -6801,14 +6819,16 @@ function openGewerkChooser(pos){
   if(!ov){ ov=document.createElement('div'); ov.id='gwOv'; ov.style.cssText='position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px'; document.body.appendChild(ov); }
   // Elektro erscheint als Gruppe mit zwei einzeln wählbaren Leistungen: ein 400-V-Gerät
   // braucht Anschluss UND Erdung, eine Edelstahl-Tischanlage nur die Erdung.
-  const row=(code,hint,indent)=>'<label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;cursor:pointer;font-weight:700'+(indent?';margin-left:14px':'')+'"><input type="checkbox" value="'+code+'" '+(cur.includes(code)?'checked':'')+' style="width:18px;height:18px"> <span class="gtag g'+code+'">'+GEWERK_LABEL[code]+'</span>'+(hint?'<span style="font-weight:400;font-size:11px;color:var(--accent2)">'+hint+'</span>':'')+'</label>';
+  // Der Potentialausgleich trägt hier bewusst die Elektro-Farbe: er ist eine Leistung
+  // DES Gewerks Elektro, kein eigenes Aufgabengebiet.
+  const row=(code,label,hint,indent)=>'<label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px solid var(--line);border-radius:8px;margin-bottom:8px;cursor:pointer;font-weight:700'+(indent?';margin-left:14px':'')+'"><input type="checkbox" value="'+code+'" '+(cur.includes(code)?'checked':'')+' style="width:18px;height:18px"> <span class="gtag g'+(code==='PA'?'E':code)+'">'+(label||GEWERK_LABEL[code])+'</span>'+(hint?'<span style="font-weight:400;font-size:11px;color:var(--accent2)">'+hint+'</span>':'')+'</label>';
   ov.innerHTML='<div style="background:var(--surface);color:var(--text);border-radius:12px;max-width:380px;width:100%;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.45)">'
     +'<div style="font-size:16px;font-weight:700;margin-bottom:4px">Gewerk korrigieren</div>'
     +'<div style="font-size:12px;color:var(--accent2);margin-bottom:14px">Position '+pos+' · bestimmt, welche Status-Felder gelten.</div>'
     +row('M')+row('S')
-    +'<div style="font-size:11px;color:var(--accent2);font-weight:700;letter-spacing:.5px;margin:2px 0 6px">ELEKTRO</div>'
-    +row('E','Anschluss, IBN, Einweisung',true)
-    +row('PA','Erdung – auch ohne Anschluss',true)
+    +'<div style="font-size:11px;color:var(--accent2);font-weight:700;letter-spacing:.5px;margin:2px 0 6px">ELEKTRO – beide Leistungen einzeln wählbar</div>'
+    +row('E','Elektroanschluss','mit IBN + Einweisung',true)
+    +row('PA','Potentialausgleich','Erdung – auch ohne Anschluss',true)
     +row('NU')
     +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">'
     +'<button onclick="(document.getElementById(\'gwOv\')||{}).remove&&document.getElementById(\'gwOv\').remove()" style="padding:9px 16px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-family:inherit">Abbrechen</button>'
