@@ -220,6 +220,12 @@ select.fs option{background:var(--surface);color:var(--text);}
 /* ITEM CARD */
 .card{border-bottom:1px solid var(--border);padding:10px 14px;}
 .card:last-child{border-bottom:none;}
+/* Ziel-Karte beim Ziehen einer Bilddatei (nur Desktop – auf Touch gibt es kein Drag&Drop) */
+.card.dragover{position:relative;outline:2px dashed var(--accent);outline-offset:-3px;}
+/* Dunkler Schleier + heller Text: eindeutig lesbar in hell UND dunkel, ohne zweite Farbregel */
+.card.dragover::after{content:'\1F4F7  Foto hier ablegen';position:absolute;inset:0;display:flex;
+  align-items:center;justify-content:center;background:rgba(43,43,43,.62);color:#f3ece5;
+  font-weight:700;font-size:16px;letter-spacing:.3px;pointer-events:none;}
 .card.done{background:var(--done-bg);}
 .card.part{background:var(--part-bg);}
 .ih{display:flex;align-items:flex-start;gap:9px;margin-bottom:8px;}
@@ -1292,8 +1298,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 91;
+const APP_VERSION = 92;
 const CHANGELOG = [
+  { v:92, titel:'Am Rechner: Fotos per Drag & Drop', punkte:[
+    'Am Rechner lassen sich Bilder jetzt direkt aus dem Explorer bzw. Finder auf eine Position ziehen – die Karte hebt sich hervor und zeigt „Foto hier ablegen". Der Umweg über den Dateidialog entfällt.',
+    'Mehrere Bilder auf einmal sind möglich; sie werden nacheinander abgelegt. Auch Screenshots funktionieren (PNG wird beim Ablegen in JPG umgewandelt).',
+    'Die Bilder laufen über denselben Weg wie Kamera und Dateidialog: verkleinert, in der Warteschlange gesichert und damit auch ohne Netz sicher. Wird eine Datei versehentlich neben einer Position abgelegt, passiert nichts – die App bleibt offen.',
+    'Am Handy ändert sich nichts; dort gibt es die Kamera-Taste wie bisher.' ]},
   { v:91, titel:'Elektro: Potentialausgleich als eigener Schritt', punkte:[
     'Bisher gab es im Gewerk Elektro nur „Elektroanschluss". Der Potentialausgleich (Erdung) ist jetzt ein eigener Schritt – bei einem 400-V-Geräteanschluss sind das zwei getrennte Leistungen, die auch getrennt abgehakt und nachgewiesen werden.',
     'Beide gehören zum Gewerk Elektro und lassen sich je Position einzeln zuordnen: über die Gewerk-Marke an der Position („✎ Gewerk") stehen unter ELEKTRO die Punkte „Elektroanschluss" (mit IBN + Einweisung) und „Potentialausgleich". Eine Edelstahl-Tischanlage bekommt damit NUR den Potentialausgleich – ohne Anschluss, Inbetriebnahme und Einweisung.',
@@ -1907,7 +1918,11 @@ function selectFotoSrc(src){
 async function tryCompressImage(file){
   if(file.type.includes('heic')||file.type.includes('heif')) return file;
   if(!file.type.startsWith('image/')) return file;
-  if(file.size < 500*1024) return file;
+  const istJpeg = file.type==='image/jpeg' || file.type==='image/jpg';
+  // Kleine JPEGs bleiben unangetastet. PNG/WebP laufen auch klein durch die Umwandlung:
+  // abgelegt wird IMMER unter „…_<ts>.jpg", sonst läge unter dieser Endung ein PNG
+  // (mit Drag & Drop sind Screenshots der Regelfall geworden).
+  if(file.size < 500*1024 && istJpeg) return file;
   return new Promise((resolve)=>{
     const timeout=setTimeout(()=>resolve(file),5000);
     try{
@@ -1924,8 +1939,12 @@ async function tryCompressImage(file){
             if(h>max){w=w*max/h;h=max;}
             const canvas=document.createElement('canvas');
             canvas.width=w;canvas.height=h;
-            canvas.getContext('2d').drawImage(img,0,0,w,h);
-            canvas.toBlob(blob=>resolve(blob&&blob.size<file.size?blob:file),'image/jpeg',0.75);
+            const ctx=canvas.getContext('2d');
+            ctx.fillStyle='#fff'; ctx.fillRect(0,0,w,h);   // JPEG kennt keine Transparenz -> sonst schwarze Flächen
+            ctx.drawImage(img,0,0,w,h);
+            // Bei Nicht-JPEG das Ergebnis IMMER nehmen, auch wenn es größer ausfällt:
+            // sonst läge unter der Endung .jpg wieder das PNG.
+            canvas.toBlob(blob=>resolve(blob&&(!istJpeg||blob.size<file.size)?blob:file),'image/jpeg',0.75);
           }catch(err){resolve(file);}
         };
         img.src=e.target.result;
@@ -1956,6 +1975,44 @@ async function doFotoUpload(file){
 }
 // Fallback: das statische Eingabefeld nutzt dieselbe Logik.
 document.getElementById('fi').addEventListener('change',function(e){ doFotoUpload(e.target.files[0]); });
+
+// ── Fotos per Drag & Drop auf die Position (Desktop) ──────────────────────────
+// Am Rechner liegen die Bilder meist schon im Finder/Explorer oder als Screenshot vor;
+// der Umweg über den Dateidialog ist dort der langsamste Teil der Ablage. Gezogene
+// Dateien laufen über GENAU DENSELBEN Weg wie Kamera und Dateidialog
+// (doFotoUpload -> tryCompressImage -> queueUpload/Outbox) – kein zweiter Upload-Pfad,
+// damit Offline-Verhalten und Dateinamen identisch bleiben.
+let DRAG_CARD=null;
+function dragHatDateien(e){ const dt=e.dataTransfer; return !!dt && [...(dt.types||[])].includes('Files'); }
+function dragZielKarte(e){ return (e.target instanceof Element) ? e.target.closest('.card:not(.dtcard)') : null; }
+function dragMarkiere(card){
+  if(DRAG_CARD===card) return;
+  if(DRAG_CARD) DRAG_CARD.classList.remove('dragover');
+  DRAG_CARD=card;
+  if(card) card.classList.add('dragover');
+}
+// Ohne preventDefault öffnet der Browser die abgelegte Datei im Tab und die
+// Baustelle ist weg – deshalb wird der Drop AUCH neben den Karten abgefangen.
+document.addEventListener('dragover',e=>{
+  if(!dragHatDateien(e)) return;             // eigene Thumbnails ziehen -> kein Datei-Transfer
+  e.preventDefault();
+  const card=dragZielKarte(e);
+  if(e.dataTransfer) e.dataTransfer.dropEffect = card ? 'copy' : 'none';
+  dragMarkiere(card);
+});
+document.addEventListener('dragleave',e=>{ if(!e.relatedTarget) dragMarkiere(null); });   // Fenster verlassen
+document.addEventListener('drop',async e=>{
+  if(!dragHatDateien(e)) return;
+  e.preventDefault();
+  const card=dragZielKarte(e);
+  dragMarkiere(null);
+  if(!card) return;                          // daneben abgelegt: nichts tun (Datei aber auch nicht öffnen)
+  const pos=card.id.slice(1).replace(/_/g,'.');
+  const bilder=[...(e.dataTransfer.files||[])].filter(f=>f.type.startsWith('image/'));
+  if(!bilder.length){ alert('Hierher lassen sich nur Bilddateien ziehen.\n\nPDF-Protokolle bitte über den Knopf „Protokoll" hinzufügen.'); return; }
+  FPOS=pos;
+  for(const f of bilder) await doFotoUpload(f);   // nacheinander: jede Datei einzeln in die Outbox
+});
 function fotoTimestamp(src){
   // Aus URL/Filename Date.now() extrahieren -> formatiertes Datum
   const m = src.match(/_(\d{12,14})\./);
