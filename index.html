@@ -220,6 +220,10 @@ select.fs option{background:var(--surface);color:var(--text);}
 /* ITEM CARD */
 .card{border-bottom:1px solid var(--border);padding:10px 14px;}
 .card:last-child{border-bottom:none;}
+/* Album-Knopf der Etagenleiste + geöffnetes Album als Ablageziel */
+/* !important: der Bauphase-Knopf trägt seine Farbe inline */
+.etbtn.dragover{background:var(--accent)!important;color:#2b2b2b;outline:2px dashed #f3ece5;outline-offset:3px;transform:scale(1.05);}
+#etOv.dragover{outline:3px dashed var(--accent);outline-offset:-10px;}
 /* Ziel-Karte beim Ziehen einer Bilddatei (nur Desktop – auf Touch gibt es kein Drag&Drop) */
 .card.dragover{position:relative;outline:2px dashed var(--accent);outline-offset:-3px;}
 /* Dunkler Schleier + heller Text: eindeutig lesbar in hell UND dunkel, ohne zweite Farbregel */
@@ -1091,8 +1095,9 @@ function buildPanels(){
     // Anlagen-/Übersichtsfotos dieser Etage (mit Kategorie + Verlauf)
     const etbar=document.createElement('div');
     etbar.className='etbar';
-    etbar.innerHTML='<button class="etbtn" onclick="openEtageFotos('+secIdx+',\'efotos\')">&#128248; Anlagenfotos <span class="etcnt" id="ETC'+secIdx+'"></span></button>'+
-      '<button class="etbtn" style="background:#5b4c2a" onclick="openEtageFotos('+secIdx+',\'bfotos\')">&#127959; Bauphase <span class="etcnt" id="ETCB'+secIdx+'"></span></button>'+
+    // data-etidx/-etalbum: Ziel für Fotos, die am Rechner auf den Knopf gezogen werden (dragZiel)
+    etbar.innerHTML='<button class="etbtn" data-etidx="'+secIdx+'" data-etalbum="efotos" onclick="openEtageFotos('+secIdx+',\'efotos\')">&#128248; Anlagenfotos <span class="etcnt" id="ETC'+secIdx+'"></span></button>'+
+      '<button class="etbtn" style="background:#5b4c2a" data-etidx="'+secIdx+'" data-etalbum="bfotos" onclick="openEtageFotos('+secIdx+',\'bfotos\')">&#127959; Bauphase <span class="etcnt" id="ETCB'+secIdx+'"></span></button>'+
       '<span class="ethint">Anlagenfotos = Montageverlauf · Bauphase = Bauleiter (Bauzustand, Installationskontrolle, Aufmaß)</span>';
     panel.appendChild(etbar);
     // Etagen-Restarbeiten stehen gebündelt oben im Sammel-Balken „Allgemeine
@@ -1302,6 +1307,7 @@ const APP_VERSION = 92;
 const CHANGELOG = [
   { v:92, titel:'Am Rechner: Fotos per Drag & Drop', punkte:[
     'Am Rechner lassen sich Bilder jetzt direkt aus dem Explorer bzw. Finder auf eine Position ziehen – die Karte hebt sich hervor und zeigt „Foto hier ablegen". Der Umweg über den Dateidialog entfällt.',
+    'Das gilt auch für die Etagen-Alben: Bilder lassen sich auf die Knöpfe „Anlagenfotos" bzw. „Bauphase" ziehen oder direkt in ein geöffnetes Album. Anschließend wird wie gewohnt die Kategorie abgefragt – ist im Album gerade nach einer Kategorie gefiltert, ist sie schon vorausgewählt.',
     'Mehrere Bilder auf einmal sind möglich; sie werden nacheinander abgelegt. Auch Screenshots funktionieren (PNG wird beim Ablegen in JPG umgewandelt).',
     'Die Bilder laufen über denselben Weg wie Kamera und Dateidialog: verkleinert, in der Warteschlange gesichert und damit auch ohne Netz sicher. Wird eine Datei versehentlich neben einer Position abgelegt, passiert nichts – die App bleibt offen.',
     'Am Handy ändert sich nichts; dort gibt es die Kamera-Taste wie bisher.' ]},
@@ -1984,33 +1990,46 @@ document.getElementById('fi').addEventListener('change',function(e){ doFotoUploa
 // damit Offline-Verhalten und Dateinamen identisch bleiben.
 let DRAG_CARD=null;
 function dragHatDateien(e){ const dt=e.dataTransfer; return !!dt && [...(dt.types||[])].includes('Files'); }
-function dragZielKarte(e){ return (e.target instanceof Element) ? e.target.closest('.card:not(.dtcard)') : null; }
-function dragMarkiere(card){
-  if(DRAG_CARD===card) return;
+// Ablageziel unter dem Zeiger: geöffnetes Etagen-Album, ein Album-Knopf der Etagenleiste
+// oder eine Positionskarte. Reihenfolge zählt – das Album-Overlay liegt über allem.
+function dragZiel(e){
+  const el=(e.target instanceof Element)?e.target:null;
+  if(!el) return null;
+  const ov=el.closest('#etOv');
+  if(ov && ov.style.display!=='none' && EF_IDX!==null) return {el:ov, art:'etage', idx:EF_IDX, album:EF_ALBUM};
+  const btn=el.closest('.etbtn[data-etidx]');
+  if(btn) return {el:btn, art:'etage', idx:parseInt(btn.dataset.etidx,10), album:btn.dataset.etalbum};
+  const card=el.closest('.card:not(.dtcard)');
+  if(card) return {el:card, art:'pos', pos:card.id.slice(1).replace(/_/g,'.')};
+  return null;
+}
+function dragMarkiere(el){
+  if(DRAG_CARD===el) return;
   if(DRAG_CARD) DRAG_CARD.classList.remove('dragover');
-  DRAG_CARD=card;
-  if(card) card.classList.add('dragover');
+  DRAG_CARD=el;
+  if(el) el.classList.add('dragover');
 }
 // Ohne preventDefault öffnet der Browser die abgelegte Datei im Tab und die
 // Baustelle ist weg – deshalb wird der Drop AUCH neben den Karten abgefangen.
 document.addEventListener('dragover',e=>{
   if(!dragHatDateien(e)) return;             // eigene Thumbnails ziehen -> kein Datei-Transfer
   e.preventDefault();
-  const card=dragZielKarte(e);
-  if(e.dataTransfer) e.dataTransfer.dropEffect = card ? 'copy' : 'none';
-  dragMarkiere(card);
+  const ziel=dragZiel(e);
+  if(e.dataTransfer) e.dataTransfer.dropEffect = ziel ? 'copy' : 'none';
+  dragMarkiere(ziel?ziel.el:null);
 });
 document.addEventListener('dragleave',e=>{ if(!e.relatedTarget) dragMarkiere(null); });   // Fenster verlassen
 document.addEventListener('drop',async e=>{
   if(!dragHatDateien(e)) return;
   e.preventDefault();
-  const card=dragZielKarte(e);
+  const ziel=dragZiel(e);
   dragMarkiere(null);
-  if(!card) return;                          // daneben abgelegt: nichts tun (Datei aber auch nicht öffnen)
-  const pos=card.id.slice(1).replace(/_/g,'.');
+  if(!ziel) return;                          // daneben abgelegt: nichts tun (Datei aber auch nicht öffnen)
   const bilder=[...(e.dataTransfer.files||[])].filter(f=>f.type.startsWith('image/'));
   if(!bilder.length){ alert('Hierher lassen sich nur Bilddateien ziehen.\n\nPDF-Protokolle bitte über den Knopf „Protokoll" hinzufügen.'); return; }
-  FPOS=pos;
+  // Etagen-Album: erst Kategorie abfragen (Pflicht), dann ablegen.
+  if(ziel.art==='etage'){ etDropStart(ziel.idx, ziel.album, bilder); return; }
+  FPOS=ziel.pos;
   for(const f of bilder) await doFotoUpload(f);   // nacheinander: jede Datei einzeln in die Outbox
 });
 function fotoTimestamp(src){
@@ -2225,23 +2244,50 @@ function renderEtageOverlay(idx){
 }
 function etSetFilter(idx,fi){ ETF_FILTER=ETF_VALS[fi]||''; renderEtageOverlay(idx); }
 
-// Kategorie-Auswahl (feste Liste + Freitext), dann Quelle (Kamera/Galerie)
-function etAddStart(idx){
-  EF_IDX=idx; EF_KAT='';
+// Kategorie-Sheet – gemeinsam für „+ Foto" (Kamera/Galerie) und für Dateien, die am
+// Rechner auf die Etage gezogen wurden. Die Kategorie ist bei Etagenfotos Pflicht
+// (Filter + Verlauf hängen daran), deshalb führt AUCH der Drop-Weg hier durch.
+function etKatSheet(titel, aktionen){
   let ov=document.getElementById('etKatOv');
   if(!ov){ ov=document.createElement('div'); ov.id='etKatOv'; document.body.appendChild(ov); }
   ov.style.cssText='position:fixed;inset:0;z-index:1900;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center;';
   ov.innerHTML=
     '<div class="etkat-sheet">'+
-      '<div class="etkat-h">Kategorie wählen</div>'+
-      '<div class="etkat-chips">'+((ET_ALBUMS[EF_ALBUM]||ET_ALBUMS.efotos).kats).map((k,i)=>'<button class="etkat-chip" onclick="etKatPick(this,'+i+')">'+escapeHtml(k)+'</button>').join('')+'</div>'+
+      '<div class="etkat-h">'+titel+'</div>'+
+      '<div class="etkat-chips">'+((ET_ALBUMS[EF_ALBUM]||ET_ALBUMS.efotos).kats).map((k,i)=>'<button class="etkat-chip'+(EF_KAT===k?' on':'')+'" onclick="etKatPick(this,'+i+')">'+escapeHtml(k)+'</button>').join('')+'</div>'+
       '<input id="etKatFree" type="text" placeholder="oder eigene Kategorie …" oninput="etKatFree(this.value)" style="width:100%;box-sizing:border-box;padding:11px 13px;border-radius:10px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin:4px 0 12px">'+
-      '<div class="etkat-src">'+
-        '<button class="etsrc" onclick="etPickFile(\'cam\')">&#128247; Kamera</button>'+
-        '<button class="etsrc" onclick="etPickFile(\'gal\')">&#128444;&#65039; Galerie <span style="opacity:.7;font-weight:400">(mehrere)</span></button>'+
-      '</div>'+
-      '<button class="etkat-cancel" onclick="document.getElementById(\'etKatOv\').remove()">Abbrechen</button>'+
+      '<div class="etkat-src">'+aktionen+'</div>'+
+      '<button class="etkat-cancel" onclick="etKatSheetClose()">Abbrechen</button>'+
     '</div>';
+}
+function etKatSheetClose(){ const ov=document.getElementById('etKatOv'); if(ov) ov.remove(); ET_DROP_FILES=null; }
+// Kategorie-Auswahl (feste Liste + Freitext), dann Quelle (Kamera/Galerie)
+function etAddStart(idx){
+  EF_IDX=idx; EF_KAT='';
+  etKatSheet('Kategorie wählen',
+    '<button class="etsrc" onclick="etPickFile(\'cam\')">&#128247; Kamera</button>'+
+    '<button class="etsrc" onclick="etPickFile(\'gal\')">&#128444;&#65039; Galerie <span style="opacity:.7;font-weight:400">(mehrere)</span></button>');
+}
+// Gezogene Dateien: erst Kategorie, dann ablegen. Ist im Album gerade nach einer
+// Kategorie gefiltert, ist sie vorausgewählt – dann genügt ein Klick.
+let ET_DROP_FILES=null;
+function etDropStart(idx, album, files){
+  const sec=DATA[idx]; if(!sec) return;
+  const bilder=(files||[]).filter(f=>f.type.startsWith('image/'));
+  if(!bilder.length){ alert('Hierher lassen sich nur Bilddateien ziehen.'); return; }
+  EF_IDX=idx; EF_ALBUM=(album==='bfotos')?'bfotos':'efotos';
+  ET_DROP_FILES=bilder;
+  EF_KAT=ETF_FILTER||'';
+  const n=bilder.length;
+  etKatSheet((sec.label||sec.pos)+' · '+(ET_ALBUMS[EF_ALBUM]||ET_ALBUMS.efotos).title+': '+n+' Bild'+(n>1?'er':'')+' – Kategorie wählen',
+    '<button class="etsrc" onclick="etDropConfirm()">&#10003; '+n+' Bild'+(n>1?'er':'')+' ablegen</button>');
+}
+function etDropConfirm(){
+  if(!EF_KAT){ alert('Bitte zuerst eine Kategorie wählen oder eingeben.'); return; }
+  const files=ET_DROP_FILES||[]; const idx=EF_IDX, kat=EF_KAT;
+  ET_DROP_FILES=null;
+  const ov=document.getElementById('etKatOv'); if(ov) ov.remove();
+  etDoUpload(idx, kat, files);
 }
 function etKatPick(btn,i){ EF_KAT=((ET_ALBUMS[EF_ALBUM]||ET_ALBUMS.efotos).kats)[i]; const f=document.getElementById('etKatFree'); if(f)f.value=''; document.querySelectorAll('.etkat-chip').forEach(c=>c.classList.remove('on')); btn.classList.add('on'); }
 function etKatFree(v){ EF_KAT=(v||'').trim(); document.querySelectorAll('.etkat-chip').forEach(c=>c.classList.remove('on')); }
@@ -2277,7 +2323,9 @@ async function etDoUpload(idx, kat, files){
   }
   if(ok) saveEtage(key);
   hideLoader();
-  renderEtageOverlay(idx);
+  updEtageBar(idx);                                           // Zähler in der Etagenleiste (Album ggf. gar nicht offen)
+  const eov=document.getElementById('etOv');
+  if(eov && eov.style.display!=='none') renderEtageOverlay(idx);
   if(ok<n) alert((n-ok)+' von '+n+' Foto(s) konnten nicht gespeichert werden.');
 }
 function etDel(idx, oi){
