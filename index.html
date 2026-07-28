@@ -4966,7 +4966,22 @@ async function ibnReceive(p){
 }
 // Springt die Position an, an der das Protokoll gelandet ist, und hebt sie kurz hervor –
 // sonst steht der Monteur nach dem Speichern irgendwo in der Liste.
+// Positions-Key robust auf eine vorhandene Karte abbilden. Beim Klick aus der
+// Aufgaben-Mail schluckt Outlook den Satz-abschließenden Punkt der URL – aus
+// „05.02.00.00.03." wird „05.02.00.00.03", und die Karte C…03_ wird nicht gefunden.
+// Deshalb zusätzlich mit/ohne End-Punkt und über einen DATA-Abgleich suchen.
+function resolvePos(pos){
+  if(!pos) return pos;
+  if(document.getElementById('C'+sp(pos))) return pos;
+  const alt = pos.endsWith('.') ? pos.slice(0,-1) : pos+'.';
+  if(document.getElementById('C'+sp(alt))) return alt;
+  let treffer=pos;
+  try{ DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+    if(it.pos===pos || it.pos.replace(/\.$/,'')===pos.replace(/\.$/,'')) treffer=it.pos; }))); }catch(e){}
+  return treffer;
+}
 function ibnGoToPos(pos){
+  pos=resolvePos(pos);
   const el=document.getElementById('C'+sp(pos));
   if(!el) return;
   // Die Karte kann in einem anderen Etagen-Tab liegen oder von Status-/Gewerk-/
@@ -6035,6 +6050,13 @@ function aufgCheck(pos){
     }
     if(r.gw!=='B' && r.gw!=='BL' && r.gw!=='L') return;
     if(!(r.txt||'').trim()) return;
+    // Bereits erledigt, aber noch KEIN Aufgaben-Eintrag: das ist eine Restarbeit
+    // aus der Zeit VOR der Aufgaben-Funktion (die Liste kam am 23.07.) oder eine, deren
+    // Merker verloren ging. Sie jetzt anzulegen würde eine „Neue Aufgabe"-Mail für etwas
+    // längst Abgeschlossenes verschicken (gemeldet 28.07.: erledigt abgehakt → neue Mail).
+    // Deshalb NICHT anlegen. Kein Merker setzen: wird sie je wieder geöffnet, entsteht
+    // dann ein frischer Eintrag samt Benachrichtigung – das ist dann korrekt.
+    if(r.done) return;
     if(!r.erstelltAm) r.erstelltAm=new Date().toISOString();
     r.aufg=PID+'|'+pos+'|'+r.erstelltAm;
     r.aufgErf=r.ersteller||'';
