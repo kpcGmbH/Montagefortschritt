@@ -354,6 +354,20 @@ select.fs option{background:var(--surface);color:var(--text);}
 .ratxt{flex:1;border:none;background:transparent;font-size:12px;color:var(--text);
   font-family:Arial Narrow,Arial,sans-serif;outline:none;padding:2px 0;min-width:0;}
 .rarow.done .ratxt{text-decoration:line-through;color:#7a7a7a;}
+/* Erledigte Restarbeiten sind standardmäßig eingeklappt (nur Titel + Kurzinfo),
+   damit die offenen Punkte in der Übersicht nicht untergehen. Pfeil klappt auf. */
+.rarow.done:not(.expanded) .radesc,
+.rarow.done:not(.expanded) .radescbtn,
+.rarow.done:not(.expanded) .rameta,
+.rarow.done:not(.expanded) .rafg,
+.rarow.done:not(.expanded) .rafbtn{display:none;}
+.raexp{display:none;background:transparent;border:none;color:var(--braun);cursor:pointer;
+  font-size:11px;padding:0 4px;flex-shrink:0;line-height:1;transition:transform .15s;}
+.rarow.done .raexp{display:inline-block;}
+.rarow.done.expanded .raexp{transform:rotate(90deg);}
+.radonesum{display:none;font-size:10.5px;color:#8a8a8a;white-space:nowrap;flex-shrink:0;cursor:pointer;}
+.rarow.done:not(.expanded) .radonesum{display:inline-block;}
+@media (max-width:480px){ .radonesum{font-size:11px;} }
 .rafbtn{background:transparent;border:none;color:var(--braun);cursor:pointer;font-size:15px;
   padding:0 4px;flex-shrink:0;-webkit-tap-highlight-color:transparent;line-height:1;}
 .rafbtn:hover{color:var(--anthrazit);}
@@ -1303,8 +1317,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 92;
+const APP_VERSION = 93;
 const CHANGELOG = [
+  { v:93, titel:'Erledigte Restarbeiten werden eingeklappt', punkte:[
+    'Erledigte Restarbeiten (auch die allgemeinen Aufgaben für Büro, Bauleitung und Lager) zeigen jetzt nur noch eine schmale Zeile mit Titel und einem kurzen „✓ erledigt · Datum · Name". So gehen die offenen Punkte in der Übersicht nicht mehr unter.',
+    'Zum Nachsehen der Details (Zuständigkeit, Beschreibung, Fotos) auf den kleinen Pfeil ▸ am Zeilenende tippen – dann klappt die Zeile wieder auf.' ]},
   { v:92, titel:'Am Rechner: Fotos per Drag & Drop', punkte:[
     'Am Rechner lassen sich Bilder jetzt direkt aus dem Explorer bzw. Finder auf eine Position ziehen – die Karte hebt sich hervor und zeigt „Foto hier ablegen". Der Umweg über den Dateidialog entfällt.',
     'Das gilt auch für die Etagen-Alben: Bilder lassen sich auf die Knöpfe „Anlagenfotos" bzw. „Bauphase" ziehen oder direkt in ein geöffnetes Album. Anschließend wird wie gewohnt die Kategorie abgefragt – ist im Album gerade nach einer Kategorie gefiltert, ist sie schon vorausgewählt.',
@@ -5655,6 +5672,8 @@ function updRA(pos){
         <input type="checkbox" class="rachk" ${r.done?'checked':''} onchange="raToggle('${pos}',${i},this.checked)">
         <input type="text" class="ratxt" value="${(r.txt||'').replace(/"/g,'&quot;')}" placeholder="Restarbeit ${i+1}…"
           oninput="raSetTxt('${pos}',${i},this.value)" onkeydown="raKey(event,'${pos}',${i})">
+        <span class="radonesum" onclick="raToggleExp(this)" title="Details ein-/ausblenden">${r.done?('&#10003; erledigt'+(tsErl?' '+tsErl:'')+(r.erledigtVon?' · '+escapeHtml(r.erledigtVon):'')):''}</span>
+        <button type="button" class="raexp" onclick="raToggleExp(this)" title="Details ein-/ausblenden">&#9656;</button>
         <button class="rafbtn" onclick="raFoto('${pos}',${i})" title="Foto zur Restarbeit">&#128247;</button>
         <button class="radel" onclick="raDel('${pos}',${i})" title="Zeile löschen">&#10005;</button>
       </div>
@@ -5846,6 +5865,9 @@ function raSetTxt(pos,i,val){
   }
   raDebouncedSave(pos);
 }
+// Erledigte Restarbeit auf-/zuklappen (nur Anzeige, kein Datenzustand – beim nächsten
+// updRA startet sie wieder eingeklappt, was der Übersicht dient).
+function raToggleExp(el){ const row=el.closest('.rarow'); if(row) row.classList.toggle('expanded'); }
 function raSetErsteller(pos,i,val){
   const s=gs(pos);
   if(!s.restarbeiten[i])return;
