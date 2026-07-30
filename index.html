@@ -344,6 +344,16 @@ select.fs option{background:var(--surface);color:var(--text);}
 /* Dichtigkeitsprotokoll steht als Abschluss ganz unten – Abstand nach oben zur
    Trennung, Bodenabstand fürs Freihalten der FAB-Leiste. */
 #DT_bottom{margin-top:18px;border-top:none;padding:0 14px calc(96px + env(safe-area-inset-bottom));}
+/* Hinweis „Neue Version verfügbar" – unten, über der Berichte-Leiste */
+#swUpd{position:fixed;left:50%;transform:translate(-50%,140%);bottom:calc(84px + env(safe-area-inset-bottom));
+  z-index:2400;display:flex;align-items:center;gap:10px;background:#2b2b2b;color:#fff;
+  padding:10px 12px 10px 16px;border-radius:24px;box-shadow:0 6px 24px rgba(0,0,0,.4);
+  font-size:13px;font-weight:700;max-width:calc(100vw - 24px);transition:transform .25s;}
+#swUpd>span{white-space:nowrap;}   /* sonst bricht „Neue Version" am Handy auf drei Zeilen um */
+#swUpd.on{transform:translate(-50%,0);}
+#swUpd button{background:var(--accent);color:#2b2b2b;border:none;border-radius:16px;
+  padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
+#swUpd button.x{background:transparent;color:#a8a8a8;padding:4px 6px;font-size:14px;}
 /* Sammel-Erfassung mehrerer Restarbeiten (Mängelliste einfügen) */
 .rabulk{background:var(--surface);color:var(--text);border-radius:12px;max-width:620px;width:100%;
   padding:20px;box-shadow:0 10px 40px rgba(0,0,0,.45);max-height:92vh;overflow-y:auto;}
@@ -571,6 +581,7 @@ select.fs option{background:var(--surface);color:var(--text);}
 .clog-t{font-size:14px;font-weight:700;color:var(--braun);margin-bottom:6px;}
 .clog-ul{margin:0;padding-left:20px;}
 .clog-ul li{font-size:13.5px;color:var(--text);line-height:1.5;margin-bottom:5px;}
+.clog-ver{text-align:center;font-size:11px;color:var(--accent2);margin:2px 0 6px;}
 .clog-ok{margin:4px 18px 18px;padding:13px;background:var(--braun);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;}
 
 /* ── Smartphones: gezielt größere Schrift & Touch-Ziele (KEINE globale Skalierung, siehe Übergabe §8) ── */
@@ -952,8 +963,58 @@ async function updSyncBadge(){
 
 window.addEventListener('online', ()=>{ updSyncBadge(); flushOutbox(); });
 window.addEventListener('offline', ()=>{ updSyncBadge(); });
+// ── Service Worker + Update-Erkennung ───────────────────────────────────────
+// Android (und die installierte PWA) BEENDEN die App beim Wegwischen nicht, sie
+// pausieren sie nur. Beim Zurückkehren läuft weiter das ALTE JavaScript, auch wenn
+// längst eine neue Version ausgeliefert wird – „Tab schließen und neu öffnen" half
+// dort nicht zuverlässig. Deshalb: bei jedem Start und jedes Mal, wenn die App in den
+// Vordergrund kommt, auf Updates prüfen und einen Hinweis einblenden.
+// Bewusst KEIN automatisches Neuladen: das würde mitten im Tippen Eingaben verwerfen.
+let SW_REG=null, _swHintDa=false;
+function swUpdateHinweis(){
+  if(_swHintDa || document.getElementById('swUpd')) return;
+  _swHintDa=true;
+  const b=document.createElement('div');
+  b.id='swUpd';
+  b.innerHTML='<span>&#8635; Neue Version</span><button onclick="swJetztLaden()">Jetzt laden</button>'+
+              '<button class="x" onclick="this.parentElement.remove()" title="Sp&auml;ter">&#10005;</button>';
+  document.body.appendChild(b);
+  // setTimeout statt requestAnimationFrame: rAF feuert in einem Hintergrund-Tab NICHT –
+  // und genau dann entsteht dieser Hinweis (App lag im Hintergrund, Update kam an).
+  // Der Balken bliebe sonst unsichtbar außerhalb des Bildes stehen.
+  setTimeout(()=>b.classList.add('on'), 30);
+}
+function swJetztLaden(){
+  try{ const w=SW_REG&&SW_REG.waiting; if(w) w.postMessage('skipWaiting'); }catch(e){}
+  setTimeout(()=>location.reload(), 120);
+}
 if('serviceWorker' in navigator){
-  window.addEventListener('load', ()=>{ navigator.serviceWorker.register('./sw.js').catch(e=>console.warn('SW-Registrierung fehlgeschlagen:', e)); });
+  // Beim Laden schon ein Controller da? Dann lief hier bereits eine Version – ein
+  // späterer Controller-Wechsel ist also ein echtes Update und keine Erstinstallation.
+  const HATTE_SW = !!navigator.serviceWorker.controller;
+  // sw.js ruft skipWaiting() -> es gibt NIE einen wartenden Worker, der neue übernimmt
+  // sofort. Die bereits geladene Seite läuft dabei mit ALTEM Code weiter. Der
+  // Übernahme-Moment ist deshalb das verlässliche Signal, nicht reg.waiting.
+  navigator.serviceWorker.addEventListener('controllerchange', ()=>{
+    if(HATTE_SW) swUpdateHinweis();
+  });
+  window.addEventListener('load', ()=>{
+    navigator.serviceWorker.register('./sw.js').then(reg=>{
+      SW_REG=reg;
+      if(reg.waiting && navigator.serviceWorker.controller) swUpdateHinweis();   // falls doch einer wartet
+      reg.addEventListener('updatefound', ()=>{
+        const neu=reg.installing; if(!neu) return;
+        neu.addEventListener('statechange', ()=>{
+          if(neu.state==='installed' && navigator.serviceWorker.controller) swUpdateHinweis();
+        });
+      });
+    }).catch(e=>console.warn('SW-Registrierung fehlgeschlagen:', e));
+    // Vordergrund = guter Zeitpunkt für die Update-Prüfung (Android hält die App am Leben)
+    document.addEventListener('visibilitychange', ()=>{
+      if(!document.hidden && SW_REG) SW_REG.update().catch(()=>{});
+    });
+    window.addEventListener('focus', ()=>{ if(SW_REG) SW_REG.update().catch(()=>{}); });
+  });
 }
 // ============================================================================
 
@@ -1630,6 +1691,9 @@ function showChangelogModal(list){
         list.map(c=>'<div class="clog-sec"><div class="clog-t">'+escapeHtml(c.titel)+'</div><ul class="clog-ul">'+
           c.punkte.map(p=>'<li>'+escapeHtml(p)+'</li>').join('')+'</ul></div>').join('')+
       '</div>'+
+      // Versionsnummer sichtbar: bei „bei mir sieht es anders aus" sofort prüfbar,
+      // ob das Gerät wirklich die neue Fassung geladen hat.
+      '<div class="clog-ver">Version '+APP_VERSION+'</div>'+
       '<button class="clog-ok" onclick="closeChangelog()">Verstanden</button>'+
     '</div>';
   document.body.appendChild(ov);
