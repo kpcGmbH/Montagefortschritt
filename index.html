@@ -350,6 +350,16 @@ select.fs option{background:var(--surface);color:var(--text);}
   padding:10px 12px 10px 16px;border-radius:24px;box-shadow:0 6px 24px rgba(0,0,0,.4);
   font-size:13px;font-weight:700;max-width:calc(100vw - 24px);transition:transform .25s;}
 #swUpd>span{white-space:nowrap;}   /* sonst bricht „Neue Version" am Handy auf drei Zeilen um */
+/* „Restarbeit gelöscht – Rückgängig". Etwas höher als der Update-Balken, damit sich
+   beide nicht überdecken, falls sie zusammentreffen. */
+#raUndo{position:fixed;left:50%;transform:translate(-50%,160%);bottom:calc(150px + env(safe-area-inset-bottom));
+  z-index:2400;display:flex;align-items:center;gap:12px;background:#2b2b2b;color:#fff;
+  padding:10px 12px 10px 18px;border-radius:24px;box-shadow:0 6px 24px rgba(0,0,0,.4);
+  font-size:13px;font-weight:700;max-width:calc(100vw - 24px);transition:transform .25s;}
+#raUndo.on{transform:translate(-50%,0);}
+#raUndo>span{white-space:nowrap;}
+#raUndo button{background:var(--accent);color:#2b2b2b;border:none;border-radius:16px;
+  padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
 #swUpd.on{transform:translate(-50%,0);}
 #swUpd button{background:var(--accent);color:#2b2b2b;border:none;border-radius:16px;
   padding:7px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
@@ -419,11 +429,20 @@ select.fs option{background:var(--surface);color:var(--text);}
 .rarow.done:not(.expanded) .radonesum{display:inline-block;}
 @media (max-width:480px){ .radonesum{font-size:11px;} }
 .rafbtn{background:transparent;border:none;color:var(--braun);cursor:pointer;font-size:15px;
-  padding:0 4px;flex-shrink:0;-webkit-tap-highlight-color:transparent;line-height:1;}
+  padding:6px 8px;flex-shrink:0;-webkit-tap-highlight-color:transparent;line-height:1;}
 .rafbtn:hover{color:var(--anthrazit);}
+/* Löschen sitzt bewusst ABGESETZT: direkt neben dem Foto-Knopf wurde am Handy
+   regelmäßig versehentlich gelöscht statt ein Foto hinzugefügt (gemeldet 30.07.).
+   Trennlinie + Abstand + eigene Trefferfläche. */
 .radel{background:transparent;border:none;color:#8b2222;cursor:pointer;font-size:13px;
-  padding:0 4px;flex-shrink:0;-webkit-tap-highlight-color:transparent;}
+  padding:6px 6px 6px 10px;margin-left:6px;border-left:1px solid var(--line);
+  flex-shrink:0;-webkit-tap-highlight-color:transparent;}
 .radel:hover{color:#6b1818;}
+@media (max-width:480px){
+  /* Am Finger brauchen beide mehr Fläche – und mehr Luft dazwischen */
+  .rafbtn{padding:8px 10px;font-size:17px;}
+  .radel{padding:8px 8px 8px 12px;margin-left:8px;font-size:15px;}
+}
 /* Beschreibung: optional, wächst beim Tippen/Diktieren mit (keine Scrollleiste) */
 .radesc{display:block;width:calc(100% - 24px);margin:2px 0 0 24px;box-sizing:border-box;
   border:1px solid var(--line);background:var(--surface);border-radius:6px;
@@ -1432,8 +1451,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 94;
+const APP_VERSION = 95;
 const CHANGELOG = [
+  { v:95, titel:'Versehentliches Löschen rückgängig machen', punkte:[
+    'Das rote ✕ saß direkt neben der Foto-Taste – am Handy war damit schnell eine Restarbeit gelöscht statt ein Foto hinzugefügt. Beide Tasten sind jetzt größer, weiter auseinander und durch einen Strich getrennt.',
+    'Die Sicherheitsabfrage zeigt jetzt, WELCHE Restarbeit es trifft, und weist auf zugehörige Fotos hin.',
+    'Neu: Nach dem Löschen erscheint unten „Restarbeit gelöscht – Rückgängig". Ein Tipp darauf holt den Eintrag samt Fotos an seine alte Stelle zurück. Der Hinweis bleibt rund 12 Sekunden stehen.',
+    'War die Restarbeit eine Aufgabe für Büro, Bauleitung oder Lager, wird sie beim Löschen jetzt auch in der Aufgabenliste zurückgezogen – und beim Rückgängigmachen wieder geöffnet. Bisher blieb dort eine Aufgabe für etwas offen, das es nicht mehr gab.',
+    'Außerdem meldet sich die App jetzt selbst, wenn eine neue Version bereitsteht („Neue Version – Jetzt laden"). Auf Android kam ein Update bisher oft erst verspätet an.' ]},
   { v:94, titel:'Mängellisten übernehmen statt abtippen', punkte:[
     'Neu bei „Allgemeine Restarbeiten" → „＋ Restarbeit (Projekt / Etage)": unter „Mehrere auf einmal" lässt sich eine ganze Liste einfügen – eine Zeile wird eine Restarbeit. Gedacht für die Mängelliste aus einem Abnahmeprotokoll: Text aus dem PDF kopieren, einfügen, fertig.',
     'Laufende Nummern werden erkannt und als M01, M02 … vorangestellt (abschaltbar) – so lässt sich mit dem Auftraggeber über dieselben Nummern sprechen. Zeilen, die im PDF mitten im Satz umbrechen, werden wieder zusammengefügt; Kopf- und Unterschriftenblöcke fallen weg. Vor dem Übernehmen zeigt eine Vorschau, was erkannt wurde.',
@@ -6403,15 +6428,58 @@ function raToggle(pos,i,done){
   updRA(pos);
   saveFotos(pos);
 }
+// Gelöschte Restarbeit für „Rückgängig" vorhalten. Ohne das ist ein Fehlgriff neben
+// dem Foto-Knopf endgültig – die Zeile verschwindet samt Fotos und Verlauf.
+let RA_UNDO=null, _raUndoTimer=null;
 function raDel(pos,i){
   const s=gs(pos);
-  if(s.restarbeiten[i] && (s.restarbeiten[i].txt||s.restarbeiten[i].desc||s.restarbeiten[i].fotos.length)){
-    if(!confirm('Restarbeit wirklich löschen?'))return;
+  const r=s.restarbeiten[i];
+  if(!r) return;
+  const befuellt = (r.txt||'').trim() || (r.desc||'').trim() || (r.fotos&&r.fotos.length);
+  if(befuellt){
+    // Klartext in die Rückfrage: sonst weiß man bei 24 Zeilen nicht, welche es trifft.
+    const titel=(r.txt||'').trim() || '(ohne Titel)';
+    const zusatz=(r.fotos&&r.fotos.length) ? ('\n\nDazu gehören '+r.fotos.length+' Foto(s).') : '';
+    if(!confirm('Diese Restarbeit löschen?\n\n„'+titel.slice(0,120)+'"'+zusatz)) return;
   }
+  // Aufgaben-Eintrag zurückziehen – sonst bleibt im Büro eine Aufgabe für etwas
+  // offen, das es nicht mehr gibt.
+  if(r.aufg){ try{ aufgEnqueue({op:'status', key:r.aufg, status:'zurückgezogen'}); }catch(e){} }
+  RA_UNDO={pos:pos, idx:i, eintrag:JSON.parse(JSON.stringify(r))};
   s.restarbeiten.splice(i,1);
   updRA(pos);
   if(isEKey(pos)) updAllgSection();   // ggf. leer gewordene Bereichsgruppe entfernen
   saveFotos(pos);
+  if(befuellt) raUndoToast();
+}
+function raUndoToast(){
+  const alt=document.getElementById('raUndo'); if(alt) alt.remove();
+  clearTimeout(_raUndoTimer);
+  const b=document.createElement('div');
+  b.id='raUndo';
+  b.innerHTML='<span>Restarbeit gel&ouml;scht</span><button onclick="raUndo()">R&uuml;ckg&auml;ngig</button>';
+  document.body.appendChild(b);
+  setTimeout(()=>b.classList.add('on'), 30);   // nicht rAF: greift im Hintergrund nicht
+  _raUndoTimer=setTimeout(()=>{ const e=document.getElementById('raUndo'); if(e) e.remove(); RA_UNDO=null; }, 12000);
+}
+function raUndo(){
+  const u=RA_UNDO; RA_UNDO=null;
+  clearTimeout(_raUndoTimer);
+  const e=document.getElementById('raUndo'); if(e) e.remove();
+  if(!u) return;
+  const s=gs(u.pos);
+  const idx=Math.min(u.idx, s.restarbeiten.length);      // an die alte Stelle zurück
+  s.restarbeiten.splice(idx, 0, u.eintrag);
+  // War eine Aufgabe daran gekoppelt, wieder öffnen (beim Löschen zurückgezogen).
+  const r=s.restarbeiten[idx];
+  if(r.aufg && (r.gw==='B'||r.gw==='BL'||r.gw==='L')){
+    const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
+    try{ aufgEnqueue({op:'status', key:r.aufg, status:r.done?'erledigt':'offen',
+      zustaendig:RA_GW_LBL[r.gw]||r.gw, empfaenger:aufgEmpfaenger(r.gw,proj)}); }catch(x){}
+  }
+  updRA(u.pos);
+  if(isEKey(u.pos)) updAllgSection();
+  saveFotos(u.pos);
 }
 function raKey(ev,pos,i){
   if(ev.key!=='Enter')return;
