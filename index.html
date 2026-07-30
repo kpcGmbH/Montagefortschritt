@@ -385,8 +385,14 @@ select.fs option{background:var(--surface);color:var(--text);}
 .rarow.done{background:var(--done-bg);border-color:var(--line);}
 .ramain{display:flex;align-items:center;gap:6px;}
 .rachk{width:18px;height:18px;flex-shrink:0;accent-color:var(--green);cursor:pointer;}
+/* Titel als textarea, damit lange Restarbeiten VOLLSTÄNDIG sichtbar sind (aus einer
+   Mängelliste sind sie oft ein ganzer Satz). Ein einzeiliges <input> schnitt sie ab.
+   Höhe wächst über raTxtFit mit; Enter legt weiter die nächste Zeile an (raKey). */
 .ratxt{flex:1;border:none;background:transparent;font-size:12px;color:var(--text);
-  font-family:Arial Narrow,Arial,sans-serif;outline:none;padding:2px 0;min-width:0;}
+  font-family:Arial Narrow,Arial,sans-serif;outline:none;padding:2px 0;min-width:0;
+  resize:none;overflow:hidden;line-height:1.35;display:block;}
+/* Eingeklappte erledigte Zeile bleibt einzeilig – sonst wäre der Platzgewinn wieder weg */
+.rarow.done:not(.expanded) .ratxt{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;height:auto!important;}
 .rarow.done .ratxt{text-decoration:line-through;color:#7a7a7a;}
 /* Erledigte Restarbeiten sind standardmäßig eingeklappt (nur Titel + Kurzinfo),
    damit die offenen Punkte in der Übersicht nicht untergehen. Pfeil klappt auf. */
@@ -5735,8 +5741,8 @@ function updRA(pos){
     return `<div class="rarow${r.done?' done':''}" data-i="${i}" data-pos="${escapeHtml(pos)}" data-gw="${r.gw||'-'}" data-leer="${(r.txt||'').trim()||(r.fotos&&r.fotos.length)?'0':'1'}">
       <div class="ramain">
         <input type="checkbox" class="rachk" ${r.done?'checked':''} onchange="raToggle('${pos}',${i},this.checked)">
-        <input type="text" class="ratxt" value="${(r.txt||'').replace(/"/g,'&quot;')}" placeholder="Restarbeit ${i+1}…"
-          oninput="raSetTxt('${pos}',${i},this.value)" onkeydown="raKey(event,'${pos}',${i})">
+        <textarea class="ratxt" rows="1" placeholder="Restarbeit ${i+1}…"
+          oninput="raSetTxt('${pos}',${i},this.value);raTxtFit(this)" onkeydown="raKey(event,'${pos}',${i})">${escapeHtml(r.txt||'')}</textarea>
         <span class="radonesum" onclick="raToggleExp(this)" title="Details ein-/ausblenden">${r.done?('&#10003; erledigt'+(tsErl?' '+tsErl:'')+(r.erledigtVon?' · '+escapeHtml(r.erledigtVon):'')):''}</span>
         <button type="button" class="raexp" onclick="raToggleExp(this)" title="Details ein-/ausblenden">&#9656;</button>
         <button class="rafbtn" onclick="raFoto('${pos}',${i})" title="Foto zur Restarbeit">&#128247;</button>
@@ -5774,6 +5780,7 @@ function updRA(pos){
     loadImageAsBlob(im.dataset.fref).then(b=>{ if(b) im.src=b; });
   });
   g.querySelectorAll('textarea.radesc').forEach(raDescFit);
+  g.querySelectorAll('textarea.ratxt').forEach(raTxtFit);
   updRaGwVis(g);
   updRaCounts();
   cnUpdate(pos);
@@ -6022,6 +6029,15 @@ async function raBulkUebernehmen(){
   flushOutbox();
   updRaCounts();
 }
+// Titel: Höhe an den Inhalt anpassen. Bei eingeklappten erledigten Zeilen NICHT –
+// die bleiben bewusst einzeilig (dort erzwingt CSS height:auto).
+function raTxtFit(el){
+  if(!el) return;
+  const row=el.closest('.rarow');
+  if(row && row.classList.contains('done') && !row.classList.contains('expanded')){ el.style.height=''; return; }
+  el.style.height='auto';
+  if(el.scrollHeight>0) el.style.height=(el.scrollHeight+2)+'px';
+}
 // Beschreibung: Höhe an den Inhalt anpassen (kein Scrollen innerhalb des Feldes –
 // beim Diktieren sieht man sonst nicht, was gesprochen wurde).
 function raDescFit(el){
@@ -6055,6 +6071,9 @@ function raSetTxt(pos,i,val){
   if(!s.restarbeiten[i])return;
   raEnsure(s.restarbeiten[i]);
   const warLeer=!(s.restarbeiten[i].txt||'').trim();
+  // Der Titel bleibt einzeilig – beim Einfügen mitgekommene Umbrüche entfernen
+  // (die Anzeige bricht ohnehin um, siehe raTxtFit).
+  val=String(val==null?'':val).replace(/[\r\n]+/g,' ');
   s.restarbeiten[i].txt=val;
   // Nur beim ERSTEN Text protokollieren, nicht bei jedem Tastendruck
   if(warLeer && val.trim()) histAdd(pos,'ra-neu',val.trim());
@@ -6069,7 +6088,11 @@ function raSetTxt(pos,i,val){
 }
 // Erledigte Restarbeit auf-/zuklappen (nur Anzeige, kein Datenzustand – beim nächsten
 // updRA startet sie wieder eingeklappt, was der Übersicht dient).
-function raToggleExp(el){ const row=el.closest('.rarow'); if(row) row.classList.toggle('expanded'); }
+function raToggleExp(el){
+  const row=el.closest('.rarow'); if(!row) return;
+  row.classList.toggle('expanded');
+  const t=row.querySelector('textarea.ratxt'); if(t) raTxtFit(t);   // Titelhöhe mitziehen
+}
 function raSetErsteller(pos,i,val){
   const s=gs(pos);
   if(!s.restarbeiten[i])return;
