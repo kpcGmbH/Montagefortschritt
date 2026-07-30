@@ -220,6 +220,9 @@ select.fs option{background:var(--surface);color:var(--text);}
 /* ITEM CARD */
 .card{border-bottom:1px solid var(--border);padding:10px 14px;}
 .card:last-child{border-bottom:none;}
+/* Restarbeiten-Zeile als Ablageziel (kompakter als die Karten-Überlagerung) */
+.rarow.dragover{outline:2px dashed var(--accent);outline-offset:2px;background:rgba(215,193,174,.22);}
+.rarow.dragover .ratxt{color:var(--text);}
 /* Album-Knopf der Etagenleiste + geöffnetes Album als Ablageziel */
 /* !important: der Bauphase-Knopf trägt seine Farbe inline */
 .etbtn.dragover{background:var(--accent)!important;color:#2b2b2b;outline:2px dashed #f3ece5;outline-offset:3px;transform:scale(1.05);}
@@ -341,6 +344,37 @@ select.fs option{background:var(--surface);color:var(--text);}
 /* Dichtigkeitsprotokoll steht als Abschluss ganz unten – Abstand nach oben zur
    Trennung, Bodenabstand fürs Freihalten der FAB-Leiste. */
 #DT_bottom{margin-top:18px;border-top:none;padding:0 14px calc(96px + env(safe-area-inset-bottom));}
+/* Sammel-Erfassung mehrerer Restarbeiten (Mängelliste einfügen) */
+.rabulk{background:var(--surface);color:var(--text);border-radius:12px;max-width:620px;width:100%;
+  padding:20px;box-shadow:0 10px 40px rgba(0,0,0,.45);max-height:92vh;overflow-y:auto;}
+.rabulk-h{font-size:17px;font-weight:700;margin-bottom:4px;}
+.rabulk-s{font-size:12px;color:var(--accent2);line-height:1.5;margin-bottom:12px;}
+.rabulk textarea{width:100%;box-sizing:border-box;min-height:150px;padding:10px 12px;border-radius:8px;
+  border:1px solid var(--line);background:var(--surface2);color:var(--text);font-size:13px;
+  font-family:Arial Narrow,Arial,sans-serif;line-height:1.5;resize:vertical;}
+.rabulk-row{display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;}
+.rabulk-row label{flex:1;min-width:180px;font-size:11px;color:var(--accent2);display:flex;flex-direction:column;gap:4px;}
+.rabulk-row select,.rabulk-row input{padding:8px 10px;border-radius:8px;border:1px solid var(--line);
+  background:var(--surface2);color:var(--text);font-size:13px;font-family:inherit;}
+.rabulk-chk{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text);margin-top:12px;cursor:pointer;}
+.rabulk-prev{margin-top:12px;border:1px solid var(--line);border-radius:8px;padding:8px 10px;
+  max-height:190px;overflow-y:auto;background:var(--surface2);}
+.rabulk-pn{font-size:12px;font-weight:700;color:var(--braun);margin-bottom:5px;}
+.rabulk-pi{font-size:12px;padding:2px 0;border-top:1px solid var(--line);}
+.rabulk-pi:first-of-type{border-top:none;}
+.rabulk-act{display:flex;gap:10px;justify-content:flex-end;margin-top:14px;}
+.rabulk-c{padding:9px 16px;border:1px solid var(--line);background:transparent;color:var(--text);
+  border-radius:8px;cursor:pointer;font-family:inherit;}
+.rabulk-o{padding:9px 20px;border:none;background:var(--accent);color:#2b2b2b;border-radius:8px;
+  font-weight:700;cursor:pointer;font-family:inherit;}
+.rabulk-o:disabled{opacity:.45;cursor:default;}
+@media (max-width:480px){ .rabulk textarea{font-size:14px;} .rabulk-row input,.rabulk-row select{font-size:14px;} }
+/* Hinweis + Nachtrag-Knopf bei einer Baustelle ohne Stückliste */
+.lvhint{margin:14px;padding:16px 18px;border:1px dashed var(--line);border-radius:10px;background:var(--surface2);text-align:center;}
+.lvhint-t{font-size:14px;font-weight:700;color:var(--text);margin-bottom:5px;}
+.lvhint-s{font-size:12px;color:var(--accent2);line-height:1.5;max-width:460px;margin:0 auto 12px;}
+.lvhint-b{background:var(--braun);color:#fff;border:none;border-radius:20px;padding:9px 18px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;}
+.lvhint-m{font-size:12px;margin-top:10px;min-height:16px;}
 .dtcard{border:1px solid #2f6f8f;border-radius:10px;margin-top:4px;cursor:pointer;
   background:rgba(47,111,143,.07);-webkit-tap-highlight-color:transparent;}
 .dtcard:active{background:rgba(47,111,143,.16);}
@@ -1102,6 +1136,20 @@ function buildPanels(){
   allg.innerHTML='<button class="cntgl allg-tgl" id="ALLGCNT" onclick="tgAllg()" title="Restarbeiten für das ganze Projekt oder eine Etage/einen Bereich">&#128203; Allgemeine Restarbeiten <span class="cnbadge" id="ALLGBADGE"></span><span class="cnchev">&#9662;</span></button>'+
     '<div class="cnotes" id="ALLGBODY"></div>';
   main.appendChild(allg);
+  // Baustelle ohne Positionen (angelegt ohne Stückliste, z. B. für ein Abnahme-
+  // protokoll): Stückliste hier nachtragbar. Der Anlage-Assistent legt IMMER eine
+  // NEUE Baustelle an – ohne diesen Weg entstünde sonst ein zweites Projekt.
+  if(!DATA.length){
+    const hint=document.createElement('div');
+    hint.className='lvhint';
+    hint.innerHTML='<div class="lvhint-t">Diese Baustelle hat noch keine Stückliste.</div>'+
+      '<div class="lvhint-s">Allgemeine Restarbeiten lassen sich oben trotzdem erfassen. '+
+      'Für Positionen (Geräte, Status, Fotos je Gerät) die Stückliste nachtragen.</div>'+
+      '<input id="lvNachInp" type="file" accept=".xlsx,.xls,.csv,.pdf" style="display:none" onchange="lvNachtragen(this.files[0])">'+
+      '<button class="lvhint-b" onclick="document.getElementById(\'lvNachInp\').click()">&#128193; St&uuml;ckliste nachtragen</button>'+
+      '<div class="lvhint-m" id="lvNachStat"></div>';
+    main.appendChild(hint);
+  }
   DATA.forEach((sec,secIdx)=>{
     const panel=document.createElement('div');
     panel.className='panel'+(sec.pos===ACT?' on':'');
@@ -1317,8 +1365,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 93;
+const APP_VERSION = 94;
 const CHANGELOG = [
+  { v:94, titel:'Mängellisten übernehmen statt abtippen', punkte:[
+    'Neu bei „Allgemeine Restarbeiten" → „＋ Restarbeit (Projekt / Etage)": unter „Mehrere auf einmal" lässt sich eine ganze Liste einfügen – eine Zeile wird eine Restarbeit. Gedacht für die Mängelliste aus einem Abnahmeprotokoll: Text aus dem PDF kopieren, einfügen, fertig.',
+    'Laufende Nummern werden erkannt und als M01, M02 … vorangestellt (abschaltbar) – so lässt sich mit dem Auftraggeber über dieselben Nummern sprechen. Zeilen, die im PDF mitten im Satz umbrechen, werden wieder zusammengefügt; Kopf- und Unterschriftenblöcke fallen weg. Vor dem Übernehmen zeigt eine Vorschau, was erkannt wurde.',
+    'Zuständigkeit, Erfasser und ein Herkunftstext (z. B. „Abnahmeprotokoll vom 03.07.2026") lassen sich für alle Einträge auf einmal setzen.',
+    'Eine Baustelle kann jetzt auch OHNE Stückliste angelegt werden – praktisch, wenn zunächst nur Mängel erfasst werden. Die Stückliste lässt sich später in derselben Baustelle nachtragen (Knopf erscheint in der leeren Baustelle), statt dass ein zweites Projekt entsteht.',
+    'Fotos lassen sich am Rechner jetzt auch direkt auf eine Restarbeit ziehen – wie schon auf Positionen und Etagen-Alben.' ]},
   { v:93, titel:'Erledigte Restarbeiten werden eingeklappt', punkte:[
     'Erledigte Restarbeiten (auch die allgemeinen Aufgaben für Büro, Bauleitung und Lager) zeigen jetzt nur noch eine schmale Zeile mit Titel und einem kurzen „✓ erledigt · Datum · Name". So gehen die offenen Punkte in der Übersicht nicht mehr unter.',
     'Zum Nachsehen der Details (Zuständigkeit, Beschreibung, Fotos) auf den kleinen Pfeil ▸ am Zeilenende tippen – dann klappt die Zeile wieder auf.' ]},
@@ -1983,7 +2037,7 @@ async function doFotoUpload(file){
   showLoader('Foto wird gespeichert...');
   try {
     const uploadFile = await tryCompressImage(file);
-    const fname = folderFor(FPOS) + '/' + FPOS.replace(/\./g,'_') + '_' + Date.now() + '.jpg';
+    const fname = folderFor(FPOS) + '/' + FPOS.replace(/\./g,'_') + '_' + uniqTs() + '.jpg';
     // Lokal ablegen + in die Warteschlange legen (funktioniert auch offline, kein Warten auf Upload)
     await queueUpload(fname, uploadFile, 'image/jpeg', FPOS);
     gs(FPOS).fotos.push(fname);
@@ -2016,6 +2070,10 @@ function dragZiel(e){
   if(ov && ov.style.display!=='none' && EF_IDX!==null) return {el:ov, art:'etage', idx:EF_IDX, album:EF_ALBUM};
   const btn=el.closest('.etbtn[data-etidx]');
   if(btn) return {el:btn, art:'etage', idx:parseInt(btn.dataset.etidx,10), album:btn.dataset.etalbum};
+  // Restarbeiten-Zeile VOR der Karte prüfen: sie liegt innerhalb der Karte, sonst
+  // landete das Foto immer an der Position statt an der Restarbeit.
+  const row=el.closest('.rarow[data-pos]');
+  if(row) return {el:row, art:'ra', pos:row.dataset.pos, idx:parseInt(row.dataset.i,10)};
   const card=el.closest('.card:not(.dtcard)');
   if(card) return {el:card, art:'pos', pos:card.id.slice(1).replace(/_/g,'.')};
   return null;
@@ -2046,6 +2104,7 @@ document.addEventListener('drop',async e=>{
   if(!bilder.length){ alert('Hierher lassen sich nur Bilddateien ziehen.\n\nPDF-Protokolle bitte über den Knopf „Protokoll" hinzufügen.'); return; }
   // Etagen-Album: erst Kategorie abfragen (Pflicht), dann ablegen.
   if(ziel.art==='etage'){ etDropStart(ziel.idx, ziel.album, bilder); return; }
+  if(ziel.art==='ra'){ await raDropFotos(ziel.pos, ziel.idx, bilder); return; }
   FPOS=ziel.pos;
   for(const f of bilder) await doFotoUpload(f);   // nacheinander: jede Datei einzeln in die Outbox
 });
@@ -2331,7 +2390,7 @@ async function etDoUpload(idx, kat, files){
     showLoader(n>1 ? ('Foto '+(i+1)+' von '+n+' wird gespeichert …') : 'Foto wird gespeichert...');
     try{
       const uf=await tryCompressImage(files[i]);
-      const ts=Date.now()+i;                                  // eindeutiger Zeitstempel je Bild
+      const ts=uniqTs();                                      // eindeutiger Zeitstempel je Bild
       const fname=etageFolder(sec, album)+'/'+safeName(kat)+'_'+ts+'.jpg';
       await queueUpload(fname, uf, 'image/jpeg', key);
       gsE(key)[album].push({fname:fname, kat:kat, ts:ts, by:USER||''});
@@ -4604,6 +4663,12 @@ async function spListWrite(pos){
 function encPath(p){ return String(p).split('/').map(encodeURIComponent).join('/'); }
 // Ordnernamen säubern (SharePoint-unzulässige Zeichen entfernen)
 function safeName(s){ return String(s==null?'':s).replace(/[\\/:*?"<>|#%]/g,'-').replace(/\s+/g,' ').trim().replace(/[. ]+$/,'').slice(0,80) || '_'; }
+// Zeitstempel für Dateinamen, garantiert aufsteigend. Date.now() allein reicht NICHT:
+// werden mehrere Bilder auf einmal abgelegt (Drag & Drop, Mehrfachauswahl), fallen
+// zwei Uploads in dieselbe Millisekunde -> gleicher Dateiname -> das zweite Foto
+// überschreibt das erste in SharePoint.
+let _tsLast=0;
+function uniqTs(){ const t=Math.max(Date.now(), _tsLast+1); _tsLast=t; return t; }
 // Zielordner für eine Position: Baustelle / Etage / Anlage
 function folderFor(pos){
   for(const sec of DATA){ for(const sub of sec.subsections){ if(sub.items.some(i=>i.pos===pos)){
@@ -5667,7 +5732,7 @@ function updRA(pos){
       ? `<textarea class="radesc" rows="2" placeholder="Beschreibung (optional) – z. B. diktieren"
            oninput="raSetDesc('${pos}',${i},this.value);raDescFit(this)">${escapeHtml(r.desc||'')}</textarea>`
       : `<button type="button" class="radescbtn" onclick="raDescOpen('${pos}',${i})">＋ Beschreibung</button>`;
-    return `<div class="rarow${r.done?' done':''}" data-i="${i}" data-gw="${r.gw||'-'}" data-leer="${(r.txt||'').trim()||(r.fotos&&r.fotos.length)?'0':'1'}">
+    return `<div class="rarow${r.done?' done':''}" data-i="${i}" data-pos="${escapeHtml(pos)}" data-gw="${r.gw||'-'}" data-leer="${(r.txt||'').trim()||(r.fotos&&r.fotos.length)?'0':'1'}">
       <div class="ramain">
         <input type="checkbox" class="rachk" ${r.done?'checked':''} onchange="raToggle('${pos}',${i},this.checked)">
         <input type="text" class="ratxt" value="${(r.txt||'').replace(/"/g,'&quot;')}" placeholder="Restarbeit ${i+1}…"
@@ -5801,11 +5866,18 @@ function raAddAllg(anchor){
     document.body.appendChild(menu);
     document.addEventListener('click',function(e){ if(!e.target.closest('#allgScopeMenu')&&!e.target.closest('.allg-add')) menu.classList.remove('open'); }); }
   menu.innerHTML='<div class="ptype-h">Restarbeit f&uuml;r &hellip;</div>'+
-    scopes.map((sc,i)=>'<div class="ptype-item" onclick="raAddAllgPick('+i+')">'+sc.ic+'&nbsp; '+escapeHtml(sc.label)+'</div>').join('');
+    scopes.map((sc,i)=>'<div class="ptype-item" onclick="raAddAllgPick('+i+')">'+sc.ic+'&nbsp; '+escapeHtml(sc.label)+'</div>').join('')+
+    '<div class="ptype-h" style="margin-top:4px">Mehrere auf einmal</div>'+
+    scopes.map((sc,i)=>'<div class="ptype-item" onclick="raBulkPick('+i+')">&#128203;&nbsp; Liste f&uuml;r '+escapeHtml(sc.label)+'</div>').join('');
   const r=anchor.getBoundingClientRect();
   menu.style.top=(r.bottom+window.scrollY+4)+'px';
   menu.style.left=Math.max(8,Math.min(r.left+window.scrollX, window.innerWidth-236))+'px';
   menu.classList.add('open');
+}
+function raBulkPick(i){
+  const sc=ALLG_SCOPES[i]; if(!sc) return;
+  const menu=document.getElementById('allgScopeMenu'); if(menu) menu.classList.remove('open');
+  raBulkOpen(sc.key);
 }
 function raAddAllgPick(i){
   const sc=ALLG_SCOPES[i]; if(!sc) return;
@@ -5819,6 +5891,136 @@ function raAddAllgPick(i){
     if(cont){ const rows=cont.querySelectorAll('.rarow .ratxt'); const last=rows[rows.length-1];
       if(last){ last.focus(); try{ last.scrollIntoView({block:'center'}); }catch(e){} } }
   },30);
+}
+// ── Sammel-Erfassung: mehrere Restarbeiten aus einer Textliste ───────────────
+// Für Mängellisten aus Abnahmeprotokollen: die Liste einfach hineinkopieren.
+// Der Parser ist bewusst tolerant, weil solche Listen aus PDFs kommen:
+//   • „1  Text" / „1. Text" / „1) Text"  -> Nummer wird erkannt und abgetrennt
+//   • Folgezeilen OHNE Nummer gehören zur vorherigen (PDF bricht lange Zeilen um)
+//   • Silbentrennung am Zeilenende („Berei-" + „che") wird zusammengeführt
+//   • Leerzeilen und wiederkehrende Kopfzeilen (MÄNGELLISTE …) fallen weg
+function raParseListe(text){
+  const zeilen=String(text||'').replace(/\r/g,'').split('\n');
+  const out=[]; let cur=null, offeneNr=null;
+  // Kopf-/Fußzeilen, die sich in kopierten PDF-Listen je Seite wiederholen.
+  // Einzeln geprüft, weil sie beim Kopieren oft auf eigenen Zeilen landen.
+  const kopf=/^(mängelliste|maengelliste|lfd\.?|nr\.?|beschreibung des mangels|seite\s+\d+( von \d+)?|anlage zum abnahmeprotokoll.*|bauvorhaben:?|gewerk:?|vertrag vom:?|datum der|abnahme)$/i;
+  // Schlussformel des Protokolls – ab hier gehört nichts mehr zur Mängelliste.
+  // Ohne das hängt der ganze Unterschriftenblock an der letzten Restarbeit.
+  const schluss=/^(diese mängelliste|die mängelliste besteht|der auftraggeber \(|rechtsverbindliche unterschrift|ort, datum|auftraggeber$|auftragnehmer$|_{5,})/i;
+  const push=()=>{ if(cur && cur.txt) out.push(cur); cur=null; };
+  let fertig=false;
+  zeilen.forEach(z=>{
+    if(fertig) return;
+    const t=z.trim();
+    if(!t || kopf.test(t)) return;
+    if(schluss.test(t)){ fertig=true; return; }
+    // Zeile mit NUR einer Nummer: im PDF steht die laufende Nummer in einer eigenen
+    // Tabellenzelle und landet beim Kopieren auf einer eigenen Zeile.
+    if(/^\d{1,3}[.)\]]?$/.test(t)){ push(); offeneNr=parseInt(t,10); return; }
+    // Direkt nach einer solchen Nummer ist die GANZE Zeile der Text – auch wenn sie
+    // selbst mit einer Zahl beginnt („13" + „24 Stege für Kühlschubladen …").
+    if(offeneNr!==null){ push(); cur={nr:offeneNr, txt:t}; offeneNr=null; return; }
+    const m=/^(\d{1,3})\s*[.)\]]?\s+(.*)$/.exec(t);       // „1  Text" auf einer Zeile
+    if(m && m[2].trim()){ push(); cur={nr:parseInt(m[1],10), txt:m[2].trim()}; return; }
+    // Fortsetzung NUR in nummerierten Listen: dort bricht das PDF lange Sätze um.
+    // Ohne Nummern gilt „eine Zeile = eine Restarbeit", sonst klebte alles zusammen.
+    if(cur && cur.nr!=null){
+      if(/[-–]$/.test(cur.txt)) cur.txt=cur.txt.replace(/[-–]$/,'')+t;   // Silbentrennung
+      else cur.txt+=' '+t;
+    } else {
+      push(); cur={nr:null, txt:t};
+    }
+  });
+  push();
+  // Text VOR der ersten Nummer ist bei nummerierten Listen immer Kopfmaterial
+  // (Bauvorhaben, Gewerk, Datum …) und keine Restarbeit. Bei Listen ganz ohne
+  // Nummern bleibt dagegen alles stehen.
+  const hatNummern=out.some(r=>r.nr!=null);
+  return out.filter(r=>r.txt && (!hatNummern || r.nr!=null));
+}
+let RA_BULK_SCOPE=null;
+function raBulkOpen(key){
+  RA_BULK_SCOPE=key||PRAKEY;
+  const sc=(key===PRAKEY||!key)?'Ganzes Projekt':((secByEKey(key)||{}).label||'Bereich');
+  let ov=document.getElementById('raBulkOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='raBulkOv'; document.body.appendChild(ov); }
+  ov.style.cssText='position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.62);display:flex;'+
+    'align-items:center;justify-content:center;padding:16px;';
+  ov.innerHTML='<div class="rabulk">'+
+    '<div class="rabulk-h">Mehrere Restarbeiten erfassen</div>'+
+    '<div class="rabulk-s">Für '+escapeHtml(sc)+' · Liste einfügen – <b>eine Zeile = eine Restarbeit</b>. '+
+      'Führende Nummern (1, 2, 3 …) werden erkannt; umgebrochene Zeilen aus PDFs werden zusammengefügt.</div>'+
+    '<textarea id="raBulkTxt" placeholder="z. B. aus der Mängelliste des Abnahmeprotokolls:&#10;&#10;1  Umkleidespinde und Sitzbänke ausrichten&#10;2  Kühlzelle – Türkontaktschalter fehlt&#10;3  …" oninput="raBulkPreview()"></textarea>'+
+    '<div class="rabulk-row">'+
+      '<label>Zuständigkeit für alle:'+
+        '<select id="raBulkGw"><option value="">– offen (später zuordnen) –</option>'+
+        RA_GW.map(([v,l])=>'<option value="'+v+'">'+l+'</option>').join('')+'</select></label>'+
+      '<label>Erfasser:<input id="raBulkErf" type="text" maxlength="30" value="'+escapeHtml(USER||'')+'"></label>'+
+    '</div>'+
+    '<div class="rabulk-row">'+
+      '<label style="flex:1">Herkunft / Beschreibung für alle (optional):'+
+        '<input id="raBulkDesc" type="text" placeholder="z. B. Abnahmeprotokoll vom 03.07.2026, Frist 31.07.2026"></label>'+
+    '</div>'+
+    '<label class="rabulk-chk"><input type="checkbox" id="raBulkNr" checked onchange="raBulkPreview()"> Nummern voranstellen (M01, M02 …) – hilft beim Abgleich mit dem Auftraggeber</label>'+
+    '<div class="rabulk-prev" id="raBulkPrev"></div>'+
+    '<div class="rabulk-act">'+
+      '<button class="rabulk-c" onclick="raBulkClose()">Abbrechen</button>'+
+      '<button class="rabulk-o" id="raBulkOk" onclick="raBulkUebernehmen()">Übernehmen</button>'+
+    '</div></div>';
+  raBulkPreview();
+  setTimeout(()=>{ const t=document.getElementById('raBulkTxt'); if(t) t.focus(); },40);
+}
+function raBulkClose(){ const o=document.getElementById('raBulkOv'); if(o) o.remove(); RA_BULK_SCOPE=null; }
+function raBulkPreview(){
+  const t=document.getElementById('raBulkTxt'); const p=document.getElementById('raBulkPrev');
+  const ok=document.getElementById('raBulkOk'); if(!t||!p) return;
+  const mitNr=(document.getElementById('raBulkNr')||{}).checked;
+  const liste=raParseListe(t.value);
+  if(ok) ok.disabled=!liste.length;
+  if(!liste.length){ p.innerHTML='<span style="color:var(--accent2)">Noch nichts erkannt.</span>'; return; }
+  p.innerHTML='<div class="rabulk-pn">'+liste.length+' Restarbeit'+(liste.length>1?'en':'')+' erkannt:</div>'+
+    liste.slice(0,60).map((r,i)=>'<div class="rabulk-pi">'+escapeHtml(raBulkTitel(r,i,mitNr))+'</div>').join('')+
+    (liste.length>60?'<div class="rabulk-pi" style="color:var(--accent2)">… und '+(liste.length-60)+' weitere</div>':'');
+}
+function raBulkTitel(r,i,mitNr){
+  if(!mitNr) return r.txt;
+  const n=(r.nr!=null?r.nr:(i+1));
+  return 'M'+String(n).padStart(2,'0')+' '+r.txt;
+}
+async function raBulkUebernehmen(){
+  const t=document.getElementById('raBulkTxt'); if(!t) return;
+  const liste=raParseListe(t.value);
+  if(!liste.length){ alert('Es wurde keine Restarbeit erkannt.'); return; }
+  const key=RA_BULK_SCOPE||PRAKEY;
+  const mitNr=(document.getElementById('raBulkNr')||{}).checked;
+  const gw=(document.getElementById('raBulkGw')||{}).value||'';
+  const erf=((document.getElementById('raBulkErf')||{}).value||'').trim();
+  const desc=((document.getElementById('raBulkDesc')||{}).value||'').trim();
+  // Zuständigkeit Büro/Bauleitung/Lager löst je Eintrag eine Aufgaben-Mail aus –
+  // bei einer ganzen Mängelliste sind das schnell sehr viele. Deshalb nachfragen.
+  if(gw==='B'||gw==='BL'||gw==='L'){
+    if(!confirm('Zuständigkeit „'+(RA_GW_LBL[gw]||gw)+'" verschickt für JEDE dieser '+liste.length+
+      ' Restarbeiten eine Aufgaben-Benachrichtigung.\n\nWirklich so übernehmen?\n\n'+
+      'Tipp: „offen" wählen und die Zuständigkeit anschließend je Zeile setzen.')) return;
+  }
+  const s=gsE(key);
+  const jetzt=new Date().toISOString();
+  liste.forEach((r,i)=>{
+    s.restarbeiten.push({txt:raBulkTitel(r,i,mitNr), desc:desc, done:false,
+      ersteller:erf, erstelltAm:jetzt, erledigtVon:'', erledigtAm:null, gw:gw, fotos:[]});
+  });
+  raBulkClose();
+  updAllgSection();
+  const body=document.getElementById('ALLGBODY');
+  if(body){ body.classList.add('open'); const c=document.getElementById('ALLGCNT'); if(c) c.classList.add('act'); }
+  if(!isEKey(key)) updRA(key);
+  aufgCheck(key);                       // erst NACH dem Anlegen: setzt r.aufg in den Blob
+  await persistCurrentState();
+  touchProject(PID);
+  await enqueuePos(key);
+  flushOutbox();
+  updRaCounts();
 }
 // Beschreibung: Höhe an den Inhalt anpassen (kein Scrollen innerhalb des Feldes –
 // beim Diktieren sieht man sonst nicht, was gesprochen wurde).
@@ -6196,6 +6398,35 @@ function raSelectFsrc(src){
   inp.addEventListener('change',raHandleFotoUpload);
   inp.click();
 }
+// Ablagename einer Restarbeiten-Datei – EINE Stelle für Dateidialog und Drag & Drop,
+// damit beide Wege nicht auseinanderlaufen.
+function raFotoName(pos, idx){
+  if(pos===PRAKEY) return safeName(curProjName())+'/_Restarbeiten/RA_Baustelle_'+idx+'_'+uniqTs()+'.jpg';
+  if(isEKey(pos)){ const sec=secByEKey(pos);
+    return safeName(curProjName())+'/'+safeName(sec?sec.label:'Etage')+'/_Restarbeiten/RA_Etage_'+idx+'_'+uniqTs()+'.jpg'; }
+  return folderFor(pos)+'/RA_'+pos.replace(/\./g,'_')+'_'+idx+'_'+uniqTs()+'.jpg';
+}
+// Fotos, die am Rechner auf eine Restarbeiten-Zeile gezogen wurden. Läuft über
+// denselben Weg wie der Dateidialog (Komprimierung + Outbox), mehrere nacheinander.
+async function raDropFotos(pos, idx, files){
+  const s=gs(pos);
+  if(!s.restarbeiten || !s.restarbeiten[idx]) return;
+  const n=files.length; let ok=0;
+  for(let i=0;i<n;i++){
+    showLoader(n>1 ? ('Foto '+(i+1)+' von '+n+' wird gespeichert …') : 'Foto wird gespeichert...');
+    try{
+      const uf=await tryCompressImage(files[i]);
+      const fname=raFotoName(pos, idx);
+      await queueUpload(fname, uf, 'image/jpeg', pos);
+      raEnsure(s.restarbeiten[idx]);
+      s.restarbeiten[idx].fotos.push(fname);
+      ok++;
+    }catch(err){ console.warn('RA-Foto übersprungen:', err&&err.message); }
+  }
+  hideLoader();
+  if(ok){ updRA(pos); saveFotos(pos); }
+  if(ok<n) alert((n-ok)+' von '+n+' Foto(s) konnten nicht gespeichert werden.');
+}
 async function raHandleFotoUpload(e){
   const file=e.target.files[0];
   e.target.remove();
@@ -6204,10 +6435,7 @@ async function raHandleFotoUpload(e){
   showLoader('Foto wird gespeichert...');
   try{
     const uploadFile=await tryCompressImage(file);
-    let fname;
-    if(pos===PRAKEY){ fname=safeName(curProjName())+'/_Restarbeiten/RA_Baustelle_'+idx+'_'+Date.now()+'.jpg'; }
-    else if(isEKey(pos)){ const sec=secByEKey(pos); fname=safeName(curProjName())+'/'+safeName(sec?sec.label:'Etage')+'/_Restarbeiten/RA_Etage_'+idx+'_'+Date.now()+'.jpg'; }
-    else fname=folderFor(pos)+'/RA_'+pos.replace(/\./g,'_')+'_'+idx+'_'+Date.now()+'.jpg';
+    const fname=raFotoName(pos, idx);
     await queueUpload(fname, uploadFile, 'image/jpeg', pos);   // lokal + Warteschlange (offline-fähig)
     const s=gs(pos);
     if(s.restarbeiten[idx]){
@@ -6884,9 +7112,12 @@ function openImportWizard(){
     '<div style="font-size:11px;color:#a8a8a8;margin-bottom:16px">Anzeigename wird als „Nummer Ort Objekt" gebildet. Kunde wird in die Einweisungsprotokolle übernommen.</div>'+
     '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Stückliste (Excel .xlsx/.csv oder PDF)</label>'+
     '<input id="impFile" type="file" accept=".xlsx,.xls,.csv,.pdf" onchange="handleImportFile(this.files[0])" style="width:100%;color:#fff;font-size:13px;margin-bottom:8px">'+
-    '<div style="font-size:11px;color:#a8a8a8;margin-bottom:14px">Empfohlen: Excel-Vorlage (saubere Spalten). PDF wird grob ausgelesen – bitte Vorschau prüfen.</div>'+
+    '<div style="font-size:11px;color:#a8a8a8;margin-bottom:14px">Empfohlen: Excel-Vorlage (saubere Spalten). PDF wird grob ausgelesen – bitte Vorschau prüfen.<br>'+
+      '<b>Optional:</b> ohne Stückliste anlegen – z. B. wenn zunächst nur Mängel aus einem Abnahmeprotokoll erfasst werden. Die Stückliste lässt sich später nachtragen.</div>'+
     '<div id="impPreview"></div>'+
-    '<div id="impActions" style="margin-top:16px;display:none">'+
+    // Der Knopf ist von Anfang an sichtbar – ohne Datei entsteht eine Baustelle ohne
+    // Positionen (Rückfrage in confirmCreateProject).
+    '<div id="impActions" style="margin-top:16px">'+
       '<button onclick="confirmCreateProject()" style="background:#3a7a3a;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Baustelle anlegen</button>'+
     '</div></div>';
   PENDING_LV=null;
@@ -6941,11 +7172,16 @@ async function confirmCreateProject(){
   if(!ort){ alert('Bitte den Ort eingeben (Pflichtfeld).'); document.getElementById('impOrt').focus(); return; }
   if(!objekt){ alert('Bitte den Projektnamen / das Objekt eingeben (Pflichtfeld).'); document.getElementById('impObjekt').focus(); return; }
   if(!auftraggeber){ alert('Bitte den Kunden / Auftraggeber eingeben (Pflichtfeld).'); document.getElementById('impAuftraggeber').focus(); return; }
-  if(!PENDING_LV){ alert('Bitte zuerst eine gültige Stückliste hochladen.'); return; }
+  // Stückliste ist optional: für Abnahme-/Servicefälle wird zunächst nur die Baustelle
+  // gebraucht (Mängel hängen als allgemeine Restarbeiten an ihr, nicht an Positionen).
+  const lv = PENDING_LV || [];
+  if(!PENDING_LV && !confirm('Es ist keine Stückliste hochgeladen.\n\nBaustelle OHNE Positionen anlegen?\n\n'
+    + 'Sinnvoll, wenn zunächst nur Mängel oder Restarbeiten erfasst werden.\n'
+    + 'Die Stückliste lässt sich später über „Stückliste nachtragen" ergänzen.')) return;
   const name=(nummer+' '+ort+' '+objekt).replace(/\s+/g,' ').trim();
   const act=document.getElementById('impActions');
   act.innerHTML='<div style="color:#d7c1ae">Baustelle wird angelegt …</div>';
-  try{ const pid=await createProject(name, PENDING_LV, auftraggeber, {nummer,ort,objekt}); await selectProject(pid); }
+  try{ const pid=await createProject(name, lv, auftraggeber, {nummer,ort,objekt}); await selectProject(pid); }
   catch(e){ alert('Anlegen fehlgeschlagen: '+(e.message||e)); openImportWizard(); }
 }
 
@@ -7041,6 +7277,28 @@ function setPosGewerk(pos, gewArr){
   const bar=document.getElementById('gwbar');
   if(bar && bar.style.display==='none' && DATA.some(s=>s.subsections.some(sub=>sub.items.some(it=>it.gew&&it.gew.length)))) bar.style.display='flex';
   saveLV();
+}
+// Stückliste in eine BESTEHENDE Baustelle nachtragen (der Anlage-Assistent legt immer
+// eine neue an). Nur erlaubt, solange es noch keine Positionen gibt – ein Ersetzen
+// würde erfasste Status/Fotos von ihren Positionen abhängen lassen.
+async function lvNachtragen(file){
+  const stat=document.getElementById('lvNachStat');
+  const sag=(t,farbe)=>{ if(stat){ stat.style.color=farbe||'var(--accent2)'; stat.textContent=t; } };
+  if(!file) return;
+  if(DATA.length){ sag('Diese Baustelle hat bereits Positionen – Nachtragen ist hier nicht vorgesehen.','#8b2222'); return; }
+  sag('Datei wird gelesen …');
+  try{
+    const lv = file.name.toLowerCase().endsWith('.pdf') ? await parsePdfToLV(file) : await parseExcelToLV(file);
+    let n=0; lv.forEach(s=>s.subsections.forEach(su=>n+=su.items.length));
+    if(!n) throw new Error('Keine Positionen erkannt. Stimmt das Format/die Spalten?');
+    if(!confirm(n+' Positionen erkannt.\n\nJetzt in diese Baustelle übernehmen?')){ sag(''); return; }
+    DATA.length=0; lv.forEach(s=>DATA.push(s));
+    await saveLV();
+    // Die allgemeinen Restarbeiten (§E§-Zeilen) bleiben unberührt – sie hängen an der
+    // Baustelle, nicht an Positionen. buildPanels baut sie über updAllgSection neu auf.
+    buildTabs(); buildPanels(); restoreUI(); applyF();
+    alert(n+' Positionen übernommen.');
+  }catch(e){ sag('Konnte nicht eingelesen werden: '+(e.message||e),'#8b2222'); console.warn(e); }
 }
 // Aktualisiertes Leistungsverzeichnis (Stückliste) der Baustelle nach SharePoint speichern
 async function saveLV(){
