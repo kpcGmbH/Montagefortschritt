@@ -576,6 +576,14 @@ function initMySigPad(){var cv=$('cv_mysig'),wrap=$('wrap_mysig');if(!cv)return;
 function clearMySig(){var cv=$('cv_mysig');if(cv){var ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);cv.__ink=false;}var ph=$('ph_mysig');if(ph)ph.style.display='';}
 function saveMySig(){var cv=$('cv_mysig');MYSIG=(cv&&cv.__ink)?cv.toDataURL('image/png'):'';try{localStorage.setItem('ibn:mysig',MYSIG);}catch(e){}toast(MYSIG?'Eigene Signatur gespeichert':'Signatur entfernt');renderSigBtn();closeMySig();if(CUR.dev){applyPrefills();openForm(CUR.dev,true);}}
 function projLabel(){return PROJECT.name?(PROJECT.ort?PROJECT.name+' · '+PROJECT.ort:PROJECT.name):PROJECT.ort;}
+// Zuordnung des Protokolls zu Baustelle/Kunde/Position – siehe header() in exportPDF.
+// Leere Angaben fallen weg; ohne jede Angabe (Protokoll ohne Baustellenkontext)
+// bleibt der Kopf unverändert wie bisher.
+function identLine(){var p=[];
+  var pl=projLabel();if(pl)p.push('Baustelle: '+pl);
+  if(PROJECT.kunde)p.push('Kunde: '+PROJECT.kunde);
+  if(IBNCTX&&IBNCTX.pos)p.push('Position: '+IBNCTX.pos);
+  return p.join('   ·   ');}
 function loadProject(){try{var j=JSON.parse(localStorage.getItem('ibn:project')||'{}');PROJECT.name=j.name||'';PROJECT.ort=j.ort||'';PROJECT.kunde=j.kunde||'';}catch(e){}}
 function saveProject(){try{localStorage.setItem('ibn:project',JSON.stringify({name:PROJECT.name,ort:PROJECT.ort,kunde:PROJECT.kunde}));}catch(e){}}
 function initProjectBar(){var a=$('bsProj'),b=$('bsOrt');
@@ -590,15 +598,28 @@ function isKunde(role){return /kunde/i.test(role);}
 // Kundenunterschrift plötzlich als Technikerunterschrift.
 function sigAus(role){return isKunde(role);}
 function isTech(role,mode){if(mode==='ausgefuehrt')return true;if(/Kunde/i.test(role))return false;if(/Vertriebspartner/i.test(role))return false;return true;}
+// Jedes Hersteller-Formular beschriftet dieselbe Angabe anders ("Name des Kunden",
+// "Unternehmen (Kunde)", "Aufstelladresse – Name"). Vorher wurde NUR auf ^Kunde$
+// geprüft – damit bekamen 2 von 55 Protokollen den Auftraggeber, der Rest nichts.
+// BEWUSST eine explizite Liste statt eines breiten /kunde/i: "Kundennummer bei
+// Winterhalter" ist eine Nummer und "Ansprechpartner (Kunde)" eine Person BEIM
+// Kunden – beide dürfen den Auftraggeber NICHT bekommen. (Dieselbe Lehre wie bei
+// der IBN-Vorauswahl, §3.1: ein breiter Treffer schreibt falsche Daten ins
+// Protokoll, und das füllt jemand ahnungslos weiter aus.)
+// Adressfelder ("Anschrift", "Straße, Hausnummer") bleiben absichtlich leer – wir
+// kennen nur den Ort der Baustelle, nicht die Anschrift des Auftraggebers.
+const KOPF_KUNDE=/^(kunde|kundenname|name des kunden|unternehmen \(kunde\)|auftraggeber|betreiber|aufstelladresse\s*[–-]\s*name)$/i;
+const KOPF_ORT=/^(ort|plz\s*[\/,]\s*ort|plz\s*,\s*ort)$/i;
+const KOPF_BAUSTELLE=/^(baustelle|objekt|bauvorhaben)$/i;
 function applyPrefills(){if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev];const today=todayDE();
   STATE.__auto=STATE.__auto||{};
   function setAuto(key,val,getter,setter){if(!val)return;var cur=getter();if(!cur||STATE.__auto[key]){setter(val);STATE.__auto[key]=true;}}
   o.kopf.forEach(function(f,i){var key='k'+i,val=null;
     if(/Unternehmen \(Techniker\)|Inbetriebnahme durch Firma/.test(f.l))val=KPC_FIRMA;
     else if(/Name \(Techniker\)|Name des Mitarbeiters/.test(f.l))val=TECH.name;
-    else if(/^Baustelle$/.test(f.l))val=projLabel();
-    else if(/^Ort$/.test(f.l))val=PROJECT.ort;
-    else if(/^Kunde$/i.test(f.l))val=PROJECT.kunde;
+    else if(KOPF_BAUSTELLE.test(f.l))val=projLabel();
+    else if(KOPF_ORT.test(f.l))val=PROJECT.ort;
+    else if(KOPF_KUNDE.test(f.l))val=PROJECT.kunde;
     else if(/Datum/i.test(f.l))val=today;
     setAuto(key,val,function(){return STATE[key];},function(v){STATE[key]=v;});});
   o.sections.forEach(function(s,si){s.items.forEach(function(it,ii){var key='s'+si+'i'+ii;
@@ -802,8 +823,22 @@ function exportPDF(){
     var __sl=ibnStueckLabel();
     doc.setFontSize(9.5);doc.setTextColor(...gray);doc.text(CUR.mfr+'  ·  '+CUR.dev+(__sl?('  ·  '+__sl):''),W-mR,21.5,{align:'right'});
     doc.setFontSize(8);doc.text(o.pdfSub||'Leistungsfeststellung',W-mR,25.5,{align:'right'});
-    doc.setDrawColor(...copper);doc.setLineWidth(0.5);doc.line(mL,32,W-mR,32);
-    y=40;
+    // Zuordnungszeile – auf JEDER Seite, unabhängig vom Hersteller-Formular.
+    // Ohne sie trägt das fertige PDF nichts, was es einer Baustelle zuordnet: nur
+    // 2 von 55 Protokollen haben überhaupt ein Kundenfeld, drei (Meiko, Hobart
+    // CHEF'S COMBI, Winterhalter) gar keinen Projektbezug. Genau der ist aber der
+    // Zweck des Protokolls – Nachweis der ordnungsgemäßen Installation gegenüber
+    // Kunde UND Lieferant. Deshalb im Kopf und nicht in einem Kopffeld.
+    var __idy=32,__id=identLine();
+    if(__id){
+      doc.setFont('RC');doc.setFontSize(8);doc.setTextColor(...gray);
+      var __idl=doc.splitTextToSize(__id,cw);
+      if(__idl.length>2)__idl=__idl.slice(0,2);   // Kopf darf nicht in den Inhalt wachsen
+      doc.text(__idl,mL,31);
+      __idy=31+(__idl.length-1)*3.6+1.8;
+    }
+    doc.setDrawColor(...copper);doc.setLineWidth(0.5);doc.line(mL,__idy,W-mR,__idy);
+    y=__idy+8;
   }
   function footer(){
     doc.setDrawColor(...copper);doc.setLineWidth(0.3);doc.line(mL,282,W-mR,282);
@@ -1108,11 +1143,11 @@ function ctxPrefill(p){if(!CUR.dev)return;var o=DB[CUR.mfr].devices[CUR.dev];var
     // Wo es ein Standortfeld gibt, kommt die Gerätenummer zusätzlich mit hinein.
     // Verlassen darf man sich darauf nicht – etliche Protokolle haben kein solches Feld,
     // deshalb steht der Zähler zusätzlich im PDF-Kopf (siehe header() in exportPDF).
-    else if(p.pos&&!STATE[key]&&/Position|Standort/i.test(f.l)){var __sl=ibnStueckLabel();STATE[key]=p.pos+(__sl?(' · '+__sl):'');ch=true;}
+    else if(p.pos&&!STATE[key]&&/Position|Standort|Stellplatz/i.test(f.l)){var __sl=ibnStueckLabel();STATE[key]=p.pos+(__sl?(' · '+__sl):'');ch=true;}
     else if(p.sn&&!STATE[key]&&/Seriennummer|Serien-?Nr/i.test(f.l)){STATE[key]=p.sn;ch=true;}
     else if(p.bez&&!STATE[key]&&/Gerät|Bezeichnung/i.test(f.l)){STATE[key]=p.bez;ch=true;}
     else if(p.hersteller&&!STATE[key]&&/Fabrikat|^Hersteller$/i.test(f.l)){STATE[key]=p.hersteller;ch=true;}
-    else if(p.kunde&&!STATE[key]&&/^Kunde$/i.test(f.l)){STATE[key]=p.kunde;ch=true;}});
+    else if(p.kunde&&!STATE[key]&&KOPF_KUNDE.test(f.l)){STATE[key]=p.kunde;ch=true;}});
   if(ch){saveState();openForm(CUR.dev,true);}}
 let IBNCTX=null;
 function ibnSendBack(durl,name){if(!IBNCTX||!IBNCTX.pos)return false;

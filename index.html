@@ -1451,8 +1451,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 95;
+const APP_VERSION = 96;
 const CHANGELOG = [
+  { v:96, titel:'Inbetriebnahmeprotokolle: Baustelle und Kunde stehen drin', punkte:[
+    'Jedes Protokoll trägt jetzt im Kopf – auf jeder Seite – die Zeile „Baustelle · Kunde · Position". Bisher stand das nur in den Protokollen, deren Hersteller-Formular zufällig ein passendes Feld hatte; die Protokolle von Meiko, Winterhalter und Hobart (CHEF’S COMBI) enthielten gar keinen Hinweis auf die Baustelle. Als Nachweis der ordnungsgemäßen Installation – gegenüber dem Kunden wie gegenüber dem Lieferanten – muss ein Protokoll für sich allein zuordenbar sein.',
+    'Zusätzlich werden die Kundenfelder der Hersteller-Formulare selbst ausgefüllt, auch wenn sie anders heißen („Name des Kunden" bei Meiko, „Unternehmen (Kunde)" bei Rational, „Aufstelladresse" bei Winterhalter). Der Auftraggeber kommt aus den Stammdaten der Baustelle (🏢 in der Baustellen-Auswahl) – fehlt er dort, bleiben die Felder leer.',
+    'Kundenunterschriften bleiben in den Inbetriebnahmeprotokollen wie bisher ausgeblendet: die Bestätigung durch den Kunden gehört zur Einweisung.' ]},
   { v:95, titel:'Versehentliches Löschen rückgängig machen', punkte:[
     'Das rote ✕ saß direkt neben der Foto-Taste – am Handy war damit schnell eine Restarbeit gelöscht statt ein Foto hinzugefügt. Beide Tasten sind jetzt größer, weiter auseinander und durch einen Strich getrennt.',
     'Die Sicherheitsabfrage zeigt jetzt, WELCHE Restarbeit es trifft, und weist auf zugehörige Fotos hin.',
