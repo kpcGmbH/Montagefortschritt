@@ -1277,8 +1277,15 @@ function ctxMatchDevBez(mfr,text){ if(!text||!DB[mfr])return null;
     if(score>bs){bs=score;best=d;}});
   return bs>0?best:null; }
 function applyLoadState(){var raw;try{raw=localStorage.getItem('ibn:load');}catch(e){return false;}if(!raw)return false;try{localStorage.removeItem('ibn:load');}catch(e){}
-  var o;try{o=JSON.parse(raw);}catch(e){return false;}
-  if(!o||!o.mfr||!o.dev||!DB[o.mfr]||!DB[o.mfr].devices[o.dev])return false;
+  var o;try{o=JSON.parse(raw);}catch(e){alert('Der gespeicherte Stand dieses Protokolls ist beschädigt und lässt sich nicht öffnen.');return false;}
+  // Fehlte hier etwas, landete der Nutzer WORTLOS auf der Hersteller-Startseite –
+  // vom „geht nicht" nicht zu unterscheiden. Der häufigste Fall: das Protokoll
+  // wurde mit einem Gerätetyp angelegt, den es unter diesem Namen nicht mehr gibt.
+  if(!o||!o.mfr||!o.dev){alert('Zu diesem Protokoll fehlen Hersteller oder Gerätetyp – es lässt sich nicht digital weiterbearbeiten.');return false;}
+  if(!DB[o.mfr]||!DB[o.mfr].devices[o.dev]){
+    alert('Dieses Protokoll wurde mit „'+o.mfr+' · '+o.dev+'" angelegt. Dieser Gerätetyp ist in der Protokoll-Datenbank nicht (mehr) vorhanden, '
+      +'deshalb lässt sich das Protokoll nicht weiterbearbeiten.\n\nDas abgelegte PDF bleibt unverändert erhalten.');
+    return false;}
   CUR.mfr=o.mfr;CUR.pos=o.pos||null;IBNCTX=o.pos?{pos:o.pos,projekt:o.projekt||'',replaceFname:o.editFname||''}:null;
   if(o.projekt!==undefined){PROJECT.name=o.projekt||PROJECT.name;}
   try{localStorage.setItem('ibn:'+o.mfr+':'+o.dev+(o.pos?(':'+o.pos):''),JSON.stringify(o.state||{}));}catch(e){}

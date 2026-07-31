@@ -1451,8 +1451,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 96;
+const APP_VERSION = 97;
 const CHANGELOG = [
+  { v:97, titel:'Inbetriebnahmeprotokolle wieder nachträglich bearbeitbar', punkte:[
+    'Der Stift ✏️ an einem abgelegten IBN-Protokoll öffnet es wieder zum Weiterbearbeiten. Am Handy und Tablet passierte bisher oft gar nichts: das neue Fenster wurde vom Popup-Blocker abgefangen, weil es erst nach dem Laden der Daten geöffnet wurde. Es geht jetzt sofort beim Antippen auf und zeigt „Protokoll wird geladen …".',
+    'Protokolle, die mit einer älteren App-Version abgelegt wurden, zeigten gar keinen Stift. Die App findet den gespeicherten Stand jetzt auch dann, wenn er woanders liegt als vermerkt, und merkt sich den richtigen Ort für das nächste Mal.',
+    'Lässt sich ein Protokoll wirklich nicht öffnen (kein Datenstand vorhanden, Gerätetyp nicht mehr in der Datenbank), sagt die App das jetzt im Klartext samt Grund – statt still auf der Startseite zu landen. Das PDF bleibt in jedem Fall erhalten.' ]},
   { v:96, titel:'Inbetriebnahmeprotokolle: Baustelle und Kunde stehen drin', punkte:[
     'Jedes Protokoll trägt jetzt im Kopf – auf jeder Seite – die Zeile „Baustelle · Kunde · Position". Bisher stand das nur in den Protokollen, deren Hersteller-Formular zufällig ein passendes Feld hatte; die Protokolle von Meiko, Winterhalter und Hobart (CHEF’S COMBI) enthielten gar keinen Hinweis auf die Baustelle. Als Nachweis der ordnungsgemäßen Installation – gegenüber dem Kunden wie gegenüber dem Lieferanten – muss ein Protokoll für sich allein zuordenbar sein.',
     'Zusätzlich werden die Kundenfelder der Hersteller-Formulare selbst ausgefüllt, auch wenn sie anders heißen („Name des Kunden" bei Meiko, „Unternehmen (Kunde)" bei Rational, „Aufstelladresse" bei Winterhalter). Der Auftraggeber kommt aus den Stammdaten der Baustelle (🏢 in der Baustellen-Auswahl) – fehlt er dort, bleiben die Felder leer.',
@@ -1796,7 +1800,10 @@ async function bilderEinordnen(dry, limit){
   for(const sec of DATA){ for(const sub of sec.subsections){ for(const it of sub.items){
     const pos=it.pos, s=ST[pos]; if(!s) continue; const folder=folderFor(pos);
     (s.fotos||[]).forEach((ref,i)=>{ if(ref && ref.indexOf('/')<0) moves.push({pos,kind:'foto',i,old:ref,neu:folder+'/'+ref}); });
-    (s.pdfs||[]).forEach((p,i)=>{ if(p && p.fname && p.fname.indexOf('/')<0) moves.push({pos,kind:'pdf',i,old:p.fname,neu:folder+'/'+p.fname}); });
+    (s.pdfs||[]).forEach((p,i)=>{ if(p && p.fname && p.fname.indexOf('/')<0) moves.push({pos,kind:'pdf',i,old:p.fname,neu:folder+'/'+p.fname});
+      // Der Datenstand des IBN-Protokolls muss MIT umziehen – bleibt er zurück,
+      // zeigt `dataFname` ins Leere und das Protokoll ist nicht mehr bearbeitbar.
+      if(p && p.dataFname && p.dataFname.indexOf('/')<0) moves.push({pos,kind:'pdfdata',i,old:p.dataFname,neu:folder+'/'+p.dataFname}); });
     (s.restarbeiten||[]).forEach((r,ri)=>{ (r.fotos||[]).forEach((ref,fi)=>{ if(ref && ref.indexOf('/')<0) moves.push({pos,kind:'ra',ri,fi,old:ref,neu:folder+'/'+ref}); }); });
   }}}
   if(dry){
@@ -1814,6 +1821,7 @@ async function bilderEinordnen(dry, limit){
       const s=ST[m.pos];
       if(m.kind==='foto'){ if(s.fotos[m.i]===m.old) s.fotos[m.i]=m.neu; }
       else if(m.kind==='pdf'){ if(s.pdfs[m.i] && s.pdfs[m.i].fname===m.old) s.pdfs[m.i].fname=m.neu; }
+      else if(m.kind==='pdfdata'){ if(s.pdfs[m.i] && s.pdfs[m.i].dataFname===m.old) s.pdfs[m.i].dataFname=m.neu; }
       else if(m.kind==='ra'){ const r=s.restarbeiten[m.ri]; if(r && r.fotos[m.fi]===m.old) r.fotos[m.fi]=m.neu; }
       changed.add(m.pos); ok++;
     }catch(e){ console.warn('Verschieben fehlgeschlagen:', m.old, (e&&e.message)||e); fail++; }
@@ -1840,7 +1848,7 @@ function konsolMoveCount(){
   for(const sec of DATA){ for(const sub of sec.subsections){ for(const it of sub.items){
     const s=ST[it.pos]; if(!s) continue;
     (s.fotos||[]).forEach(r=>{ if(konsolReroot(r,root)) n++; });
-    (s.pdfs||[]).forEach(p=>{ if(konsolReroot(p&&p.fname,root)) n++; });
+    (s.pdfs||[]).forEach(p=>{ if(konsolReroot(p&&p.fname,root)) n++; if(konsolReroot(p&&p.dataFname,root)) n++; });
     (s.restarbeiten||[]).forEach(r=>{ (r.fotos||[]).forEach(f=>{ if(konsolReroot(f,root)) n++; }); });
   }}}
   return n;
@@ -1852,7 +1860,8 @@ async function ordnerKonsolidieren(dry){
   for(const sec of DATA){ for(const sub of sec.subsections){ for(const it of sub.items){
     const pos=it.pos, s=ST[pos]; if(!s) continue;
     (s.fotos||[]).forEach((ref,i)=>{ const neu=konsolReroot(ref,root); if(neu) moves.push({pos,kind:'foto',i,old:ref,neu}); });
-    (s.pdfs||[]).forEach((p,i)=>{ const neu=konsolReroot(p&&p.fname,root); if(neu) moves.push({pos,kind:'pdf',i,old:p.fname,neu}); });
+    (s.pdfs||[]).forEach((p,i)=>{ const neu=konsolReroot(p&&p.fname,root); if(neu) moves.push({pos,kind:'pdf',i,old:p.fname,neu});
+      const neuD=konsolReroot(p&&p.dataFname,root); if(neuD) moves.push({pos,kind:'pdfdata',i,old:p.dataFname,neu:neuD}); });
     (s.restarbeiten||[]).forEach((r,ri)=>{ (r.fotos||[]).forEach((ref,fi)=>{ const neu=konsolReroot(ref,root); if(neu) moves.push({pos,kind:'ra',ri,fi,old:ref,neu}); }); });
   }}}
   if(dry){
@@ -1869,6 +1878,7 @@ async function ordnerKonsolidieren(dry){
       const s=ST[m.pos];
       if(m.kind==='foto'){ if(s.fotos[m.i]===m.old) s.fotos[m.i]=m.neu; }
       else if(m.kind==='pdf'){ if(s.pdfs[m.i] && s.pdfs[m.i].fname===m.old) s.pdfs[m.i].fname=m.neu; }
+      else if(m.kind==='pdfdata'){ if(s.pdfs[m.i] && s.pdfs[m.i].dataFname===m.old) s.pdfs[m.i].dataFname=m.neu; }
       else if(m.kind==='ra'){ const r=s.restarbeiten[m.ri]; if(r && r.fotos[m.fi]===m.old) r.fotos[m.fi]=m.neu; }
       changed.add(m.pos); ok++;
     }catch(e){ console.warn('Verschieben fehlgeschlagen:', m.old, (e&&e.message)||e); fail++; }
@@ -5102,17 +5112,60 @@ let _aufgJump=(function(){
     return t[0]?{pid:t[0], pos:t.slice(1).join('|')}:null; }catch(e){ return null; }
 })();
 function _dataURLtoBlob(d){const a=d.split(',');const mime=((a[0].match(/:(.*?);/))||[])[1]||'application/pdf';const bin=atob(a[1]);const n=bin.length;const u=new Uint8Array(n);for(let i=0;i<n;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime});}
+// Wo liegt der Datenstand zu einem Protokoll? Regel von `ibnReceive`: derselbe Pfad
+// wie das PDF, nur `_data.json` statt `.pdf`. Der Merker `dataFname` im Eintrag ist
+// nur eine Abkürzung – fehlt er oder zeigt er ins Leere, wird der Pfad hergeleitet,
+// statt aufzugeben. Zwei Fälle aus dem Einsatz:
+//  · Protokolle von einem Gerät mit ÄLTERER App-Version tragen keinen Merker.
+//  · Bis 02.07.2026 (`68f3121`) lagen die Protokolle im POSITIONSORDNER, seitdem
+//    unter <Baustelle>/_Inbetriebnahme bzw. _DGUV – deshalb beide Ablagen prüfen.
+// Dieselbe Idee wie `reconcilePdfs` in der Einweisungs-App: heilen statt melden.
+function ibnDataKandidaten(p,pos){
+  const k=[], add=x=>{ if(x && k.indexOf(x)<0) k.push(x); };
+  add(p.dataFname);
+  const f=p.fname||'';
+  if(!/\.pdf$/i.test(f)) return k;
+  const abg=f.replace(/\.pdf$/i,'_data.json');
+  add(abg);
+  const datei=abg.slice(abg.lastIndexOf('/')+1);
+  try{ add(protoDir(p.type||'IBN Protokoll',pos)+'/'+datei); }catch(e){}
+  try{ add(folderFor(pos)+'/'+datei); }catch(e){}
+  return k;
+}
 async function editIbnProto(pos,i){
-  const p=gs(pos).pdfs[i]; if(!p||!p.dataFname){alert('Für dieses Protokoll sind keine bearbeitbaren Daten gespeichert.');return;}
+  const p=gs(pos).pdfs[i];
+  if(!p){ alert('Protokoll nicht gefunden.'); return; }
+  const kand=ibnDataKandidaten(p,pos);
+  // Das Fenster MUSS synchron im Klick aufgehen (§ mobiler Popup-Blocker) – der
+  // Datenstand wird erst danach geladen. Vorher lag das `window.open` hinter dem
+  // `await`; am Handy blockte der Browser es, und es passierte scheinbar nichts.
+  const win = kand.length ? window.open('','_blank') : null;   // ohne noopener – siehe openIbnDigital
+  if(win){ try{ win.document.write('<!doctype html><meta charset="utf-8"><title>Protokoll wird geladen …</title>'
+    +'<body style="font:16px/1.5 system-ui,sans-serif;padding:28px;color:#333">Protokoll wird geladen …</body>'); win.document.close(); }catch(e){} }
+  if(!kand.length){ alert('Für dieses Protokoll sind keine bearbeitbaren Daten gespeichert.'); return; }
   showLoader('IBN-Protokoll wird geladen...');
+  let blob=null, gefunden='';
+  for(const fn of kand){ try{ blob=await getFileBlob(fn); gefunden=fn; break; }catch(e){} }
+  if(!blob){
+    hideLoader(); if(win) try{ win.close(); }catch(e){}
+    alert('Zu diesem Protokoll ist kein Datenstand hinterlegt – es lässt sich deshalb nicht digital weiterbearbeiten.\n\n'
+      +'Das betrifft Protokolle, die mit einer älteren App-Version abgelegt wurden. Das PDF selbst bleibt vorhanden und lässt sich öffnen.\n\n'
+      +'Für eine Korrektur: Protokoll über „📝 IBN digital ausfüllen" neu anlegen und das alte danach löschen.');
+    return;
+  }
   try{
-    const blob=await getFileBlob(p.dataFname);
     const o=JSON.parse(await blob.text());
     o.pos=pos; o.editFname=p.fname;
     localStorage.setItem('ibn:load', JSON.stringify(o));
+    // Gefundenen Pfad zurückschreiben: heilt fehlende/veraltete Merker dauerhaft,
+    // beim nächsten Mal wird nicht wieder gesucht.
+    if(gefunden && p.dataFname!==gefunden){ p.dataFname=gefunden; saveFotos(pos); updPG(pos); }
     hideLoader();
-    window.open(IBN_URL,'_blank');   // ohne noopener – siehe openIbnDigital
-  }catch(e){hideLoader();alert('Konnte IBN-Protokoll nicht laden: '+((e&&e.message)||e));}
+    if(win) win.location=IBN_URL; else window.open(IBN_URL,'_blank');
+  }catch(e){
+    hideLoader(); if(win) try{ win.close(); }catch(e2){}
+    alert('Konnte IBN-Protokoll nicht laden: '+((e&&e.message)||e));
+  }
 }
 // Gibt true zurück, wenn das Protokoll wirklich abgelegt wurde. NUR dann darf der
 // Aufrufer die Übergabe aus dem localStorage löschen – sonst ist das PDF weg.
@@ -5266,8 +5319,13 @@ function updPG(pos){
   if(!s.pdfs||!s.pdfs.length){g.innerHTML='';return;}
   g.innerHTML=s.pdfs.map((p,i)=>{
     const isPdf=(p.fname||p.name||'').toLowerCase().endsWith('.pdf');
-    const ibnBtn=p.dataFname?`<button class="pdoc-btn pdoc-edit" onclick="editIbnProto('${pos}',${i})" title="IBN digital bearbeiten">&#9999;&#65039;</button>`:'';
-    const editBtn=(isPdf&&!p.dataFname)?`<button class="pdoc-btn pdoc-edit" onclick="pdfOpen('${pos}',${i})" title="Ausfüllen">&#9999;&#65039;</button>`:'';
+    // Auch OHNE `dataFname` anbieten, sobald der Eintrag aus der IBN-App stammt
+    // (`ibn:true`): der Datenstand liegt dann neben dem PDF und wird hergeleitet
+    // (`ibnDataKandidaten`). Vorher fehlte der Knopf einfach – für den Monteur
+    // nicht von „geht nicht" zu unterscheiden.
+    const istIbn=!!(p.dataFname||p.ibn);
+    const ibnBtn=istIbn?`<button class="pdoc-btn pdoc-edit" onclick="editIbnProto('${pos}',${i})" title="IBN digital bearbeiten">&#9999;&#65039;</button>`:'';
+    const editBtn=(isPdf&&!istIbn)?`<button class="pdoc-btn pdoc-edit" onclick="pdfOpen('${pos}',${i})" title="Ausfüllen">&#9999;&#65039;</button>`:'';
     // Bei Stückzahl > 1 den Gerätezähler zeigen – sonst heissen alle Einträge gleich
     const nrTag=(p.nr&&p.von>1)?` <span class="pdoc-nr">Gerät ${p.nr}/${p.von}</span>`:'';
     return `<div class="pdoc">&#128196; <span class="pdoc-name" onclick="pdfView('${pos}',${i})">${p.type}: ${p.name}</span>${nrTag}${ibnBtn}${editBtn}<button class="pdoc-btn pdoc-del" onclick="delProto('${pos}',${i})" title="Löschen">&#10005;</button></div>`;
