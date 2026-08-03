@@ -1464,8 +1464,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 100;
+const APP_VERSION = 101;
 const CHANGELOG = [
+  { v:101, titel:'Mängelfreimeldung – erledigte Mängel dem Auftraggeber melden', punkte:[
+    'Neu unter „Berichte & Dokumente": 📤 Mängelfreimeldung. Bisher ließ sich das nur behelfsmäßig über „Offene Punkte" mit dem Filter „Nur erledigte" ausdrucken – ein Schreiben, das oben „Offene Punkte" heißt, ist beim Auftraggeber aber genau die falsche Botschaft.',
+    'Ausgewählt wird gezielt: Es erscheinen alle als erledigt abgehakten Restarbeiten, vorangehakt sind die noch nicht gemeldeten. So lässt sich in Chargen freimelden, statt immer die ganze Liste zu schicken.',
+    'Das Schreiben nennt zu jedem Mangel Ort und Position sowie wer ihn wann erledigt hat – auf Wunsch mit den Fotos als Nachweis. Empfänger, Bezug (z. B. „Abnahmeprotokoll vom 03.07.2026") und ein freier Zusatztext lassen sich eintragen.',
+    'Jeder gemeldete Mangel bekommt einen Vermerk „freigemeldet Nr. … vom …". Beim nächsten Mal ist damit auf einen Blick klar, was schon raus ist. Das PDF im kpc-Design landet in der Baustelle unter „_Freimeldungen".' ]},
   { v:100, titel:'Schlüsselübergabe – Protokoll zum Unterschreiben', punkte:[
     'Neu unter „Berichte & Dokumente": 🔑 Schlüsselübergabe. Damit lässt sich vor Ort festhalten, welche Schlüssel an den Kunden gegangen sind – und der Kunde quittiert den Empfang direkt auf dem Gerät.',
     'Die Geräte kommen aus der Stückliste der Baustelle: ankreuzen, Anzahl und Schlüssel-Nr. eintragen, fertig. Was nicht in der Stückliste steht – Türen, Zylinder, Räume, Transponder – lässt sich unter „Weitere Übergaben" frei ergänzen.',
@@ -4475,6 +4480,7 @@ function openBerichteSheet(){
     {ic:'📄', t:'Kundenbericht', d:'Leistungsstand, ohne Fotos', fn:'expKunde(false)'},
     {ic:'📷', t:'Kundenbericht mit Fotos', d:'inkl. Positionsfotos', fn:'expKunde(true)'},
     {ic:'✅', t:'Offene Punkte', d:'offene Leistungen + Restarbeiten (PDF)', fn:'expOffenePunkte()'},
+    {ic:'📤', t:'Mängelfreimeldung', d:'erledigte Mängel dem Auftraggeber melden', fn:'openFreimeldung()'},
     {ic:'📅', t:'Tagesbericht', d:'Arbeiten eines Tages', fn:'openTagesberichtDialog()'},
     {ic:'📓', t:'Bautagebuch', d:'Tageseintrag mit Wetter, Stunden …', fn:'openBautagebuchDialog()'},
     {ic:'🔧', t:'Servicebericht', d:'kpc-Serviceformular', fn:'openServiceDialog()'},
@@ -7061,6 +7067,337 @@ opGw('${preGw}');
 </body></html>`;
   if(w.closed){return;}
   w.document.open(); w.document.write(html); w.document.close();
+}
+
+// ================= MÄNGELFREIMELDUNG =================
+// Nachweis an den Auftraggeber, dass gemeldete Mängel beseitigt sind. Quelle sind die
+// als ERLEDIGT abgehakten Restarbeiten aller drei Ebenen (Position / Etage / Baustelle).
+// Freigemeldet wird in CHARGEN – in der Praxis meldet niemand 24 Mängel auf einmal frei,
+// sondern das, was seit der letzten Meldung fertig geworden ist.
+// Der Vermerk hängt an der Restarbeit selbst (`r.fm={nr,datum,von}`) und reist damit im
+// data-Blob mit (restarbeiten wird als Ganzes serialisiert) – keine eigene Datei nötig.
+// „Offene Punkte" bleibt daneben bestehen: das ist die Arbeitsliste, dies hier das
+// Schreiben an den Auftraggeber.
+const FM_TEXT='die nachstehend aufgeführten Mängel wurden beseitigt. Wir melden die Arbeiten hiermit frei '
+  +'und bitten um Abnahme bzw. Bestätigung der Mängelfreiheit. Für Rückfragen stehen wir gerne zur Verfügung.';
+let FM_SEL=null;    // Set der angehakten Zeilen ("keyidx")
+
+// Alle Restarbeiten mit Rückbezug auf ihren Speicherort – nur so lässt sich der
+// Freimelde-Vermerk anschließend an der richtigen Zeile hinterlegen.
+function fmAlleZeilen(){
+  const out=[];
+  const add=(key,geschoss,bereich,pos,bez,arr)=>{
+    (arr||[]).forEach((r,i)=>{ raEnsure(r); if(!(r.txt||'').trim()) return;
+      out.push({key, idx:i, r, geschoss, bereich, pos, bez}); });
+  };
+  const pr=ST[PRAKEY]; if(pr) add(PRAKEY,'Baustelle allgemein','','–','Baustellenweit',pr.restarbeiten);
+  DATA.forEach(sec=>{
+    const e=ST[EKEY(sec)]; if(e) add(EKEY(sec), sec.label||sec.pos, 'Etage allgemein','–','Etagenweit', e.restarbeiten);
+    sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+      const s=ST[it.pos]; if(s) add(it.pos, sec.label||sec.pos, sub.bez||sub.pos, it.pos, (it.bez||'').trim(), s.restarbeiten);
+    }));
+  });
+  return out;
+}
+function fmErledigte(){ return fmAlleZeilen().filter(x=>x.r.done); }
+function fmKey(x){ return x.key+''+x.idx; }
+function fmNextNr(){ let m=0; fmAlleZeilen().forEach(x=>{ const n=(x.r.fm&&x.r.fm.nr)||0; if(n>m) m=n; }); return m+1; }
+// Bisherige Freimeldungen aus den Vermerken rekonstruieren (Nr. -> Datum + Anzahl)
+function fmBisher(){
+  const map={};
+  fmAlleZeilen().forEach(x=>{ const f=x.r.fm; if(!f||!f.nr) return;
+    const e=map[f.nr]||(map[f.nr]={nr:f.nr, datum:f.datum||'', n:0, von:f.von||''}); e.n++; });
+  return Object.keys(map).map(k=>map[k]).sort((a,b)=>b.nr-a.nr);
+}
+function fmOrt(x){
+  if(x.pos==='–') return x.geschoss+(x.bereich?' · '+x.bereich:'');
+  return x.geschoss+' · '+x.bereich+' · '+x.pos;
+}
+
+function openFreimeldung(){
+  if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
+  const zeilen=fmErledigte();
+  if(!zeilen.length){
+    alert('Es ist noch keine Restarbeit als erledigt abgehakt.\n\n'
+      +'Freigemeldet werden kann nur, was in der App als erledigt vermerkt ist – '
+      +'das ist zugleich der Nachweis (wer, wann) im Schreiben.');
+    return;
+  }
+  // Vorauswahl: alles, was noch NICHT freigemeldet wurde. Bereits gemeldete bleiben
+  // sichtbar (mit Vermerk) und lassen sich für eine Zweitschrift wieder anhaken.
+  FM_SEL=new Set(zeilen.filter(x=>!(x.r.fm&&x.r.fm.nr)).map(fmKey));
+  fmRender();
+}
+function fmClose(){ const o=document.getElementById('fmOv'); if(o) o.remove(); FM_SEL=null; }
+function fmToggle(k){ if(!FM_SEL) return; if(FM_SEL.has(k)) FM_SEL.delete(k); else FM_SEL.add(k); fmRender(true); }
+function fmAlle(neu){
+  if(!FM_SEL) return;
+  FM_SEL.clear();
+  if(neu) fmErledigte().forEach(x=>FM_SEL.add(fmKey(x)));
+  fmRender(true);
+}
+// erhalten=true: Eingabefelder nicht überschreiben (Rendern nach einem Häkchen)
+function fmRender(erhalten){
+  const zeilen=fmErledigte();
+  const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
+  const alt=erhalten? {
+    emp:(document.getElementById('fmEmp')||{}).value,
+    bez:(document.getElementById('fmBezug')||{}).value,
+    dat:(document.getElementById('fmDatum')||{}).value,
+    unt:(document.getElementById('fmUnter')||{}).value,
+    zus:(document.getElementById('fmZusatz')||{}).value,
+    fot:(document.getElementById('fmFotos')||{}).checked
+  } : null;
+  // Bezug vorbelegen: häufigster Herkunftstext der gewählten Mängel (raBulk legt ihn
+  // als Beschreibung ab, z. B. „Abnahmeprotokoll vom 03.07.2026").
+  let bezug='';
+  if(!alt){
+    const z={}; zeilen.forEach(x=>{ const d=(x.r.desc||'').trim(); if(d) z[d]=(z[d]||0)+1; });
+    bezug=Object.keys(z).sort((a,b)=>z[b]-z[a])[0]||'';
+  }
+  let ov=document.getElementById('fmOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='fmOv';
+    ov.style.cssText='position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:16px';
+    ov.addEventListener('click',e=>{ if(e.target===ov) fmClose(); });
+    document.body.appendChild(ov); }
+  const inp='width:100%;box-sizing:border-box;background:#332f2b;border:1px solid #4a423a;color:#fff;border-radius:8px;padding:9px 11px;font-size:16px;font-family:inherit';
+  const lab='display:block;font-size:11px;font-weight:700;letter-spacing:.4px;color:#a8a8a8;margin:0 0 4px';
+  const feld=(id,label,val,ph,typ)=>'<label style="display:block;margin-bottom:11px"><span style="'+lab+'">'+label+'</span>'+
+    '<input id="'+id+'" type="'+(typ||'text')+'" value="'+escapeHtml(val||'')+'" placeholder="'+escapeHtml(ph||'')+'" style="'+inp+'"></label>';
+
+  let liste='', lastG='';
+  zeilen.forEach(x=>{
+    const k=fmKey(x), sel=FM_SEL.has(k), fm=x.r.fm;
+    if(x.geschoss!==lastG){ liste+='<div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:#d7c1ae;margin:12px 0 5px">'+escapeHtml(x.geschoss)+'</div>'; lastG=x.geschoss; }
+    liste+='<div onclick="fmToggle('+escapeHtml(JSON.stringify(k))+')" style="display:flex;gap:10px;align-items:flex-start;padding:8px 9px;margin-bottom:5px;border:1px solid '+(sel?'#895500':'#3d3833')+';background:'+(sel?'#3a3128':'#241f1c')+';border-radius:8px;cursor:pointer">'+
+      '<div style="width:20px;height:20px;flex-shrink:0;border:2px solid '+(sel?'#895500':'#5a534c')+';background:'+(sel?'#895500':'transparent')+';border-radius:5px;color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;margin-top:1px">'+(sel?'&#10003;':'')+'</div>'+
+      '<div style="flex:1;min-width:0">'+
+        '<div style="font-size:13.5px;font-weight:700;color:#fff">'+escapeHtml(x.r.txt)+'</div>'+
+        '<div style="font-size:11px;color:#a8a8a8;margin-top:2px">'+escapeHtml(fmOrt(x))+
+          (x.r.erledigtVon||x.r.erledigtAm? ' · erledigt '+escapeHtml(x.r.erledigtVon||'')+(x.r.erledigtAm?' am '+raFmtTs(x.r.erledigtAm).slice(0,8):'') : '')+
+          ((x.r.fotos&&x.r.fotos.length)? ' · '+x.r.fotos.length+' Foto(s)' : '')+'</div>'+
+        (fm&&fm.nr? '<div style="font-size:11px;color:#b8860b;margin-top:2px">bereits freigemeldet: Nr. '+fm.nr+(fm.datum?' vom '+fmDatDE(fm.datum):'')+'</div>' : '')+
+      '</div></div>';
+  });
+  const bisher=fmBisher();
+  const anz=FM_SEL.size;
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:22px;max-width:560px;width:100%;max-height:92vh;overflow-y:auto;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:17px;font-weight:700;margin-bottom:4px">&#128228; M&auml;ngelfreimeldung</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:16px">Schreiben an den Auftraggeber &uuml;ber beseitigte M&auml;ngel. Es lassen sich einzelne M&auml;ngel ausw&auml;hlen &ndash; freigemeldet wird in der Regel in mehreren Chargen. Das PDF wird in der Baustelle unter &bdquo;_Freimeldungen&ldquo; abgelegt.</div>'+
+    (bisher.length? '<div style="font-size:11px;color:#a8a8a8;margin-bottom:14px;border-left:3px solid #4a423a;padding-left:9px">Bisher freigemeldet: '+
+      bisher.slice(0,4).map(b=>'Nr. '+b.nr+(b.datum?' ('+fmDatDE(b.datum)+')':'')+' &middot; '+b.n+' M&auml;ngel').join('<br>')+
+      (bisher.length>4?'<br>… und '+(bisher.length-4)+' weitere':'')+'</div>' : '')+
+    feld('fmEmp','Empfänger / Auftraggeber', alt?alt.emp:(proj.auftraggeber||''), 'z. B. Marktgemeinde Nüsttal')+
+    feld('fmBezug','Bezug', alt?alt.bez:bezug, 'z. B. Abnahmeprotokoll vom 03.07.2026')+
+    '<div style="display:flex;gap:10px"><div style="flex:1">'+feld('fmDatum','Datum', alt?alt.dat:localDay(new Date().toISOString()), '', 'date')+'</div>'+
+    '<div style="flex:1">'+feld('fmUnter','Unterzeichner (kpc)', alt?alt.unt:(USER||''), 'Vorname Nachname')+'</div></div>'+
+    '<label style="display:block;margin-bottom:11px"><span style="'+lab+'">Zusatz zum Anschreiben (optional)</span>'+
+      '<textarea id="fmZusatz" rows="2" placeholder="z. B. Hinweis auf Restpunkte, Terminvorschlag für die Nachschau …" style="'+inp+';resize:vertical">'+escapeHtml(alt?alt.zus:'')+'</textarea></label>'+
+    '<label style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid #4a423a;border-radius:8px;margin-bottom:16px;cursor:pointer;font-size:13px;font-weight:700">'+
+      '<input type="checkbox" id="fmFotos" '+((alt? alt.fot : true)?'checked':'')+' style="width:17px;height:17px"> Fotos als Nachweis anh&auml;ngen'+
+      '<span style="font-weight:400;font-size:11px;color:#a8a8a8">max. 4 je Mangel</span></label>'+
+    '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
+      '<span style="font-size:11px;font-weight:700;letter-spacing:.4px;color:#a8a8a8;flex:1">ERLEDIGTE M&Auml;NGEL &ndash; '+anz+' von '+zeilen.length+' gew&auml;hlt</span>'+
+      '<button type="button" onclick="fmAlle(true)" style="background:none;border:1px solid #555;color:#ccc;border-radius:14px;padding:5px 11px;font-size:12px;cursor:pointer;font-family:inherit">Alle</button>'+
+      '<button type="button" onclick="fmAlle(false)" style="background:none;border:1px solid #555;color:#ccc;border-radius:14px;padding:5px 11px;font-size:12px;cursor:pointer;font-family:inherit">Keine</button>'+
+    '</div>'+
+    '<div style="max-height:38vh;overflow-y:auto;padding-right:2px">'+liste+'</div>'+
+    '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">'+
+      '<button type="button" onclick="fmClose()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:11px 16px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
+      '<button type="button" onclick="fmErstellen()" style="background:#3a7a3a;border:none;color:#fff;border-radius:8px;padding:11px 20px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Freimeldung erstellen</button>'+
+    '</div></div>';
+}
+function fmDatDE(iso){ const p=String(iso||'').slice(0,10).split('-'); return p.length===3? p[2]+'.'+p[1]+'.'+p[0] : String(iso||''); }
+
+async function fmErstellen(){
+  if(!FM_SEL || !FM_SEL.size){ alert('Bitte mindestens einen Mangel auswählen.'); return; }
+  const emp=((document.getElementById('fmEmp')||{}).value||'').trim();
+  const bezug=((document.getElementById('fmBezug')||{}).value||'').trim();
+  const datum=((document.getElementById('fmDatum')||{}).value||'').trim()||localDay(new Date().toISOString());
+  const unter=((document.getElementById('fmUnter')||{}).value||'').trim();
+  const zusatz=((document.getElementById('fmZusatz')||{}).value||'').trim();
+  const mitFotos=!!(document.getElementById('fmFotos')||{}).checked;
+  if(!unter){ alert('Bitte den Unterzeichner eintragen – er steht unter dem Schreiben.'); return; }
+  const gewaehlt=fmErledigte().filter(x=>FM_SEL.has(fmKey(x)));
+  if(!gewaehlt.length){ alert('Bitte mindestens einen Mangel auswählen.'); return; }
+  const schon=gewaehlt.filter(x=>x.r.fm&&x.r.fm.nr).length;
+  if(schon && !confirm(schon+' der gewählten Mängel '+(schon===1?'wurde':'wurden')+' bereits freigemeldet.\n\n'
+    +'Sie erscheinen erneut im Schreiben und bekommen die neue Freimeldungs-Nummer.\n\nFortfahren?')) return;
+  // Fenster SYNCHRON aus dem Klick öffnen – nach den awaits blockt der mobile Popup-Blocker (§9)
+  const win=window.open('','_blank');
+  if(win){ try{ win.document.write('<title>Mängelfreimeldung</title><body style="font-family:Arial,sans-serif;padding:24px;color:#666">PDF wird erstellt …</body>'); }catch(e){} }
+  const nr=fmNextNr();
+  try{
+    // Fotos vorladen – gleiches Muster wie „Offene Punkte": parallel, mit Zeitlimit,
+    // damit ein hängendes Bild nicht das ganze Schreiben blockiert.
+    const fotoData={};
+    if(mitFotos){
+      const src=[...new Set(gewaehlt.flatMap(x=>(x.r.fotos||[]).slice(0,4)))];
+      if(src.length){
+        const DEADLINE=performance.now()+45000;
+        const mitZeit=(p,ms)=>new Promise((res,rej)=>{ const t=setTimeout(()=>rej(new Error('timeout')),ms);
+          p.then(v=>{clearTimeout(t);res(v);},e=>{clearTimeout(t);rej(e);}); });
+        let fertig=0;
+        const eins=async s=>{
+          try{ const rest=DEADLINE-performance.now();
+            if(rest<=0) fotoData[s]='';
+            else { const b=await mitZeit(getFileBlob(s), Math.min(15000,rest)); fotoData[s]=b? await blobToDataURL(b):''; }
+          }catch(e){ fotoData[s]=''; }
+          fertig++; showLoader('Fotos werden geladen … '+fertig+'/'+src.length);
+        };
+        showLoader('Fotos werden geladen … 0/'+src.length);
+        for(let i=0;i<src.length;i+=6) await Promise.all(src.slice(i,i+6).map(eins));
+      }
+    }
+    showLoader('Freimeldung wird erstellt …');
+    const blob=await fmBuildPdf({nr, datum, emp, bezug, unter, zusatz, mitFotos, zeilen:gewaehlt, fotoData});
+    const url=URL.createObjectURL(blob);
+    if(win) win.location=url; else window.open(url,'_blank');
+    const fname=safeName(curProjName())+'/_Freimeldungen/Freimeldung_'+String(nr).padStart(3,'0')+'_'+datum+'.pdf';
+    let hoch=true;
+    try{ await spUpload(fname, blob, 'application/pdf'); }catch(e){ hoch=false; console.warn('Freimeldung-Upload:',(e&&e.message)||e); }
+    // Vermerk an den Restarbeiten – erst NACH dem PDF, damit bei einem Abbruch
+    // nichts als freigemeldet markiert ist, wofür es kein Schreiben gibt.
+    const keys=new Set();
+    gewaehlt.forEach(x=>{ x.r.fm={nr, datum, von:unter}; keys.add(x.key); });
+    keys.forEach(k=>{ try{ saveFotos(k); }catch(e){} });
+    hideLoader();
+    fmClose();
+    showToast(hoch? 'Freimeldung Nr. '+nr+' erstellt & in _Freimeldungen abgelegt'
+                  : 'Freimeldung Nr. '+nr+' erstellt – Ablage fehlgeschlagen (offline?)',
+              hoch? undefined : {bg:'#8b6d22'});
+  }catch(e){
+    hideLoader();
+    if(win) try{ win.close(); }catch(_){}
+    console.error(e);
+    alert('Freimeldung fehlgeschlagen: '+((e&&e.message)||e));
+  }
+}
+
+// ── PDF im kpc-CD (jsPDF), gleiche Bausteine wie Bautagebuch/Servicebericht ──
+async function fmBuildPdf(o){
+  if(!window.jspdf) throw new Error('PDF-Bibliothek nicht geladen (Seite neu laden)');
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'p',unit:'mm',format:'a4'});
+  const M=16, W=210, R=W-M, PH=297;
+  const copper=[137,86,0], dark=[43,43,43], grey=[120,120,120], line=[214,209,203], gruen=[58,122,58];
+  const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
+  const tc=c=>doc.setTextColor(c[0],c[1],c[2]);
+  const dc=c=>doc.setDrawColor(c[0],c[1],c[2]);
+  let FF='helvetica';
+  try{ if(typeof BTB_FONT_B64!=='undefined' && BTB_FONT_B64){ doc.addFileToVFS('RC.ttf',BTB_FONT_B64); doc.addFont('RC.ttf','RobotoCondensed','normal'); FF='RobotoCondensed'; } }catch(e){ FF='helvetica'; }
+  const bold=()=>doc.setFont(FF, FF==='helvetica'?'bold':'normal');
+  const reg=()=>doc.setFont(FF,'normal');
+  reg();
+  let y=M;
+
+  // Kopf: Logo links, Titel rechts, Kupferlinie UNTER dem Logo (§1.7)
+  let logoBottom=y+14;
+  const logo=await btbSvgToPng(repLogo(),300);
+  if(logo){ const lw=28, lh=lw*logo.h/logo.w; doc.addImage(logo.png,'PNG',M,y,lw,lh); logoBottom=y+lh; }
+  bold(); tc(dark); doc.setFontSize(19); doc.text('Mängelfreimeldung',R,y+7,{align:'right'});
+  reg(); doc.setFontSize(10); tc(grey); doc.text('Nr. '+String(o.nr).padStart(3,'0'),R,y+13,{align:'right'});
+  y=Math.max(logoBottom, y+15)+3; dc(copper); doc.setLineWidth(0.8); doc.line(M,y,R,y); y+=7;
+
+  const kv=(x,label,val,w)=>{
+    reg(); doc.setFontSize(7.5); tc(grey); doc.text(String(label).toUpperCase(),x,y);
+    bold(); doc.setFontSize(11); tc(dark);
+    const t=doc.splitTextToSize((val||'—')+'', (w||(R-x))-2);
+    doc.text(t[0],x,y+5);
+  };
+  const half=(R-M-6)/2;
+  kv(M,'Objekt / Baustelle',curProjName(),R-M); y+=11;
+  kv(M,'Empfänger / Auftraggeber',o.emp||proj.auftraggeber||'',half);
+  kv(M+half+6,'Datum',fmDatDE(o.datum),half); y+=11;
+  if(o.bezug){ kv(M,'Bezug',o.bezug,R-M); y+=11; }
+  y+=2;
+
+  // Anschreiben
+  reg(); doc.setFontSize(10.5); tc(dark);
+  doc.text('Sehr geehrte Damen und Herren,',M,y); y+=6;
+  doc.splitTextToSize(FM_TEXT, R-M).forEach(ln=>{ doc.text(ln,M,y); y+=5; });
+  if(o.zusatz){ y+=2; doc.splitTextToSize(o.zusatz, R-M).forEach(ln=>{ if(y>PH-40){ doc.addPage(); y=M; } doc.text(ln,M,y); y+=5; }); }
+  y+=8;
+
+  // Tabelle
+  const cx={nr:M, txt:M+11, ort:M+107, erl:M+148};
+  const wTxt=cx.ort-cx.txt-3, wOrt=cx.erl-cx.ort-3, wErl=R-cx.erl;
+  const kopf=()=>{
+    doc.setFillColor(43,43,43); doc.rect(M,y,R-M,7,'F');
+    bold(); doc.setFontSize(8.5); doc.setTextColor(215,193,174);
+    doc.text('Nr.',cx.nr+1,y+4.8); doc.text('Beseitigter Mangel',cx.txt,y+4.8);
+    doc.text('Ort / Position',cx.ort,y+4.8); doc.text('Erledigt',cx.erl,y+4.8);
+    y+=7; reg();
+  };
+  // Folgeseiten bekommen Logo + Kupferlinie: das Schreiben geht an den Auftraggeber,
+  // eine Seite 2 ohne Briefkopf sieht aus wie ein loses Blatt.
+  const platz=h=>{
+    if(y+(h||0)<=PH-34) return;
+    doc.addPage(); y=M;
+    if(logo){ const lw=22, lh=lw*logo.h/logo.w; try{ doc.addImage(logo.png,'PNG',M,y,lw,lh); }catch(e){}
+      reg(); doc.setFontSize(8); tc(grey); doc.text('Mängelfreimeldung Nr. '+String(o.nr).padStart(3,'0'),R,y+5,{align:'right'});
+      y+=lh+2; dc(copper); doc.setLineWidth(0.6); doc.line(M,y,R,y); y+=6; }
+    kopf();
+  };
+  bold(); doc.setFontSize(9); tc(copper);
+  doc.text('BESEITIGTE MÄNGEL ('+o.zeilen.length+')',M,y); y+=3.5;
+  kopf();
+  // Die Herkunft steht bei Sammel-Erfassungen in JEDER Beschreibung („Abnahmeprotokoll
+  // vom …"). Sie steht oben schon als Bezug – in jeder Zeile wiederholt wäre sie Lärm.
+  const bezugNorm=(o.bezug||'').trim().toLowerCase();
+  o.zeilen.forEach((x,i)=>{
+    const desc=(x.r.desc||'').trim();
+    const txt=(x.r.txt||'').trim()+((desc && desc.toLowerCase()!==bezugNorm)? '\n'+desc : '');
+    // Umbruch IN DER SCHRIFTGRÖSSE messen, in der später gezeichnet wird – sonst
+    // rechnet splitTextToSize mit der zuletzt gesetzten Größe und die Zeile läuft
+    // in die Nachbarspalte (hier: gemessen mit 8,5, gezeichnet mit 9).
+    reg(); doc.setFontSize(9);
+    const tL=doc.splitTextToSize(txt, wTxt);
+    doc.setFontSize(8.5);
+    const oL=doc.splitTextToSize(fmOrt(x), wOrt);
+    const erl=(x.r.erledigtVon||'')+(x.r.erledigtAm? '\n'+fmDatDE(x.r.erledigtAm) : '');
+    const eL=doc.splitTextToSize(erl||'—', wErl);
+    const rows=Math.max(tL.length,oL.length,eL.length,1);
+    const h=rows*4.3+3;
+    platz(h);
+    reg(); doc.setFontSize(9); tc(dark);
+    doc.text(String(i+1),cx.nr+1,y+4);
+    doc.text(tL,cx.txt,y+4);
+    doc.setFontSize(8.5); tc(grey); doc.text(oL,cx.ort,y+4);
+    tc(gruen); doc.text(eL,cx.erl,y+4);
+    y+=h;
+    // Nachweisfotos
+    if(o.mitFotos && x.r.fotos && x.r.fotos.length){
+      const bilder=x.r.fotos.slice(0,4).map(s=>o.fotoData[s]).filter(Boolean);
+      if(bilder.length){
+        const bw=32, bh=24;
+        platz(bh+4);
+        let bx=cx.txt;
+        bilder.forEach(d=>{ try{ doc.addImage(d,'JPEG',bx,y,bw,bh); }catch(e){ try{ doc.addImage(d,'PNG',bx,y,bw,bh); }catch(_){} } bx+=bw+3; });
+        y+=bh+3;
+      }
+    }
+    dc(line); doc.setLineWidth(0.1); doc.line(M,y,R,y); y+=1.5;
+  });
+  y+=8;
+
+  // Unterschriften – die Freimeldung ist ein Schreiben; die rechte Spalte quittiert
+  // der Auftraggeber bei der Nachschau (auch als reine Kenntnisnahme brauchbar).
+  let sy=Math.max(y+22, PH-30);
+  if(sy>PH-30) sy=PH-30;
+  if(y>sy-14){ doc.addPage(); y=M; sy=PH-30; }
+  dc(dark); doc.setLineWidth(0.3);
+  doc.line(M,sy,M+72,sy); doc.line(R-72,sy,R,sy);
+  const ortName=(proj.ort||'').trim() || ((proj.name||'').replace(/^\s*\d[\d.\-\/]*\s+/,'').trim().split(/\s+/)[0]||'');
+  const ortDatum=(ortName?ortName+', ':'')+'den '+fmDatDE(o.datum);
+  bold(); doc.setFontSize(9); tc(dark); doc.text(o.unter||'',M,sy-2);
+  reg(); doc.setFontSize(8); tc(grey);
+  doc.text(ortDatum,M,sy+4);      doc.text('kpc GmbH – ausführende Firma',M,sy+8);
+  doc.text(ortDatum,R-72,sy+4);   doc.text('Auftraggeber – Kenntnisnahme / Abnahme',R-72,sy+8);
+  doc.setFontSize(7.5); tc(grey);
+  doc.text('Dok.-Nr.: FM-'+curProjCode()+'-'+String(o.nr).padStart(3,'0')+' · erstellt am '
+    +fmDatDE(new Date().toISOString())+' · Für diese Unterlage behalten wir uns alle Rechte vor.',M,PH-10);
+  return doc.output('blob');
 }
 
 // ================= MEHRPROJEKT + STÜCKLISTEN-IMPORT =================
