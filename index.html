@@ -1486,8 +1486,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 105;
+const APP_VERSION = 106;
 const CHANGELOG = [
+  { v:106, titel:'Beim Abhaken springt die Ansicht nicht mehr weg', punkte:[
+    'Eine abgehakte Restarbeit klappte sofort zusammen. Dadurch wurde die Seite über 100 Pixel kürzer – stand man weiter unten in der Liste, rutschte alles nach oben und die gerade angetippte Aufgabe war weg. Beim Abarbeiten einer Mängelliste passierte das bei jedem Haken.',
+    'Die abgehakte Zeile bleibt jetzt stehen, wo sie ist, und zeigt direkt „✓ erledigt" mit Zeitpunkt und Namen. Zusammengeklappt wird sie über das ▸ am Zeilenende oder beim nächsten Öffnen der Baustelle.',
+    'Das gilt auch, wenn man mehrere nacheinander abhakt: bereits erledigte Zeilen klappen nicht mehr hinter dem Rücken zusammen.' ]},
   { v:105, titel:'Foto einordnen: jetzt mit Abfrage statt Pfeil-Symbol', punkte:[
     'Unter jedem Foto steht jetzt „einordnen". Ein Tipp darauf fragt im Klartext: <b>Zeigt dieses Foto den Mangel</b> (Zustand bei der Erfassung) <b>oder die Erledigung</b> (Nachweis für die Mängelfreimeldung)? Die aktuelle Einordnung ist gekennzeichnet.',
     'Bisher standen dort nur kleine Pfeile, und ein Tipp verschob das Bild sofort – ohne dass erkennbar war, wohin und warum.' ]},
@@ -5993,6 +5997,11 @@ function updRA(pos){
   const s=gs(pos);
   const g=document.getElementById('RA'+id);
   if(!g)return;
+  // Aufgeklappte erledigte Zeilen bleiben aufgeklappt (ab v106). Sonst klappt jeder
+  // Neuaufbau sie zusammen, die Seite verliert Höhe und die Ansicht springt – genau
+  // das passierte beim Abhaken der nächsten Aufgabe. Indizes reichen als Merkmal;
+  // verschieben sie sich (Löschen/Enter), ist die falsche Zeile offen – rein kosmetisch.
+  const warOffen=new Set([...g.querySelectorAll('.rarow.expanded')].map(r=>r.dataset.i));
   // Listen starten leer – nur der „+ Restarbeit"-Knopf. Früher bekam jede Position
   // automatisch eine leere Eingabezeile; seit die Sektion an ALLEN Positionen
   // sichtbar ist (auch an unberührten), würde das die Liste massiv aufblähen.
@@ -6064,6 +6073,8 @@ function updRA(pos){
       ${fotosHtml}
     </div>`;
   }).join('');
+  // vorher aufgeklappte erledigte Zeilen wieder öffnen (siehe oben)
+  if(warOffen.size) g.querySelectorAll('.rarow').forEach(r=>{ if(warOffen.has(r.dataset.i)) r.classList.add('expanded'); });
   g.querySelectorAll('img.raimg[data-fref]').forEach(im=>{
     loadImageAsBlob(im.dataset.fref).then(b=>{ if(b) im.src=b; });
   });
@@ -6632,6 +6643,22 @@ function namesArr(v){
 function namesStr(v){ return namesArr(v).join(', '); }
 window.addEventListener('online', ()=>{ aufgFlush(); });
 setInterval(()=>{ aufgFlush(); }, 60000);
+// Beim Abhaken klappt die Zeile zusammen (CSS `.rarow.done`, ab v93) – sie verliert
+// Beschreibung, Meta-Zeile und Fotos und schrumpft um über 100 px. Alles darunter
+// rutscht nach oben, und die gerade angetippte Aufgabe springt aus dem Blick.
+// Deshalb: die Zeile vor dem Neuaufbau im Fenster einmessen und danach an dieselbe
+// Stelle zurückscrollen. Gilt für jede Aktion, die die Liste neu baut.
+function raRowEl(pos,i){ return document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+i+'"]'); }
+function raBlickHalten(pos,i,fn){
+  const el=raRowEl(pos,i);
+  const vor = el ? el.getBoundingClientRect().top : null;
+  fn();
+  if(vor==null) return;
+  const neu=raRowEl(pos,i);
+  if(!neu) return;
+  const diff=neu.getBoundingClientRect().top-vor;
+  if(Math.abs(diff)>1) window.scrollBy(0, diff);
+}
 function raToggle(pos,i,done){
   const s=gs(pos);
   if(!s.restarbeiten[i])return;
@@ -6643,7 +6670,17 @@ function raToggle(pos,i,done){
   histAdd(pos, done?'ra-erledigt':'ra-offen', (s.restarbeiten[i].txt||'').trim());
   if(s.restarbeiten[i].aufg) aufgEnqueue({op:'status', key:s.restarbeiten[i].aufg,
     status:done?'erledigt':'offen', von:done?(s.restarbeiten[i].erledigtVon||''):''});
-  updRA(pos);
+  raBlickHalten(pos,i,()=>{
+    updRA(pos);
+    // Die gerade abgehakte Zeile bleibt AUFGEKLAPPT stehen. Klappte sie sofort
+    // zusammen, verlöre die Seite über 100 px Höhe; steht man am Ende einer Liste,
+    // klemmt der Browser die Scrollposition auf das kürzere Dokument – und die
+    // Aufgabe, die man gerade angetippt hat, springt aus dem Blick. Zurückscrollen
+    // hilft dort nicht, weil es die Höhe schlicht nicht mehr gibt.
+    // Eingeklappt startet sie beim nächsten vollständigen Neuaufbau (wie raToggleExp).
+    const el=raRowEl(pos,i);
+    if(el){ el.classList.add('expanded'); const t=el.querySelector('textarea.ratxt'); if(t) raTxtFit(t); }
+  });
   saveFotos(pos);
 }
 // Gelöschte Restarbeit für „Rückgängig" vorhalten. Ohne das ist ein Fehlgriff neben
