@@ -1464,8 +1464,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 99;
+const APP_VERSION = 100;
 const CHANGELOG = [
+  { v:100, titel:'Schlüsselübergabe – Protokoll zum Unterschreiben', punkte:[
+    'Neu unter „Berichte & Dokumente": 🔑 Schlüsselübergabe. Damit lässt sich vor Ort festhalten, welche Schlüssel an den Kunden gegangen sind – und der Kunde quittiert den Empfang direkt auf dem Gerät.',
+    'Die Geräte kommen aus der Stückliste der Baustelle: ankreuzen, Anzahl und Schlüssel-Nr. eintragen, fertig. Was nicht in der Stückliste steht – Türen, Zylinder, Räume, Transponder – lässt sich unter „Weitere Übergaben" frei ergänzen.',
+    'Unterschrieben wird von beiden Seiten (Übergeber kpc und Übernehmer). Das PDF im kpc-Design landet automatisch in der Baustelle unter „_Schluesselprotokolle" und steht in der Protokoll-Historie der Einweisung – dort auch korrigierbar.',
+    'Der Einweisungsstand bleibt davon unberührt: ein übergebener Schlüssel ist kein Nachweis dafür, dass jemand am Gerät eingewiesen wurde.' ]},
   { v:99, titel:'Positionen ergänzen und löschen (Bauleitung + Innendienst)', punkte:[
     'Eine Stückliste war bisher nach dem Einlesen unveränderlich. Ein Nachtrag ließ sich nicht aufnehmen, und eine Zeile, die beim Einlesen fälschlich als Position gelandet ist – in Nüsttal die „Pläne" – blieb für immer stehen.',
     'Neu an jeder Position: „✎ Position". Dahinter lassen sich Bezeichnung, Menge, Fabrikat und Typ berichtigen und die Position aus der Stückliste löschen. Die Positionsnummer bleibt fest – an ihr hängen Häkchen, Fotos und Protokolle.',
@@ -4473,6 +4478,9 @@ function openBerichteSheet(){
     {ic:'📅', t:'Tagesbericht', d:'Arbeiten eines Tages', fn:'openTagesberichtDialog()'},
     {ic:'📓', t:'Bautagebuch', d:'Tageseintrag mit Wetter, Stunden …', fn:'openBautagebuchDialog()'},
     {ic:'🔧', t:'Servicebericht', d:'kpc-Serviceformular', fn:'openServiceDialog()'},
+    // Liegt im Modul Einweisung (gleiches Backend, beide Unterschriften dort schon da) –
+    // von hier aus nur der Direkteinstieg, damit der Weg über „Berichte" auffindbar ist.
+    {ic:'🔑', t:'Schlüsselübergabe', d:'Schlüsselprotokoll zum Unterschreiben', fn:'openSchluesselprotokoll()'},
     {ic:'📊', t:'Restarbeitenliste', d:'als Excel-Datei', fn:'expRestXlsx()'}
   ];
   ov.innerHTML='<div class="sheet" onclick="event.stopPropagation()">'+
@@ -5089,6 +5097,13 @@ const EINWEISUNG_URL='einweisung.html';
 function openEinweisung(){
   if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
   const url=EINWEISUNG_URL+'#pid='+encodeURIComponent(PID)+'&projekt='+encodeURIComponent(curProjName());
+  window.open(url,'_blank','noopener');
+}
+// Schlüsselübergabeprotokoll: dieselbe App, aber direkt in der Protokollart
+// „Schlüsselübergabe" (`neu=schluessel` wird dort in onLoggedIn ausgewertet).
+function openSchluesselprotokoll(){
+  if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
+  const url=EINWEISUNG_URL+'#pid='+encodeURIComponent(PID)+'&projekt='+encodeURIComponent(curProjName())+'&neu=schluessel';
   window.open(url,'_blank','noopener');
 }
 

@@ -559,6 +559,9 @@ async function onLoggedIn(){
   if(pid){ await openProject(pid, pname||''); }
   else { await showProjectPicker(); }
   hideLoader();
+  // Direkteinstieg aus der Hauptapp („🔑 Schlüsselübergabe" in Berichte & Dokumente):
+  // Protokollart überspringen und gleich die Auswahl zeigen.
+  if(pid && h.get('neu')==='schluessel'){ startSession(); sessionType('schluessel'); }
 }
 
 // ══════════════════ Projektauswahl ══════════════════
