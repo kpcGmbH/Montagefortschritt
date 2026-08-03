@@ -487,6 +487,11 @@ body.lvadm .lvonly.blk{display:block !important;}
 .rafglbl{display:block;font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding-left:24px;}
 .rafgrp .rafg{margin-top:2px;}
 .rafok{color:var(--green);}                 /* Nachweisfoto-Knopf */
+/* Foto in die andere Gruppe schieben – sitzt unten, das Löschen-✕ oben rechts;
+   die beiden dürfen sich am Handy nicht ins Gehege kommen. */
+.rafum{position:absolute;left:0;right:0;bottom:0;background:rgba(43,41,38,.72);color:#fff;
+  border:none;font-size:9px;line-height:1;padding:3px 0;cursor:pointer;letter-spacing:.3px;}
+.rafum:active{background:var(--braun);}
 .rarow.done:not(.expanded) .rafgrp{display:none;}
 /* Vom Auftraggeber gemeldeter Mangel – ohne Aufklappen erkennbar */
 .rarow.mangel{border-left:3px solid var(--braun);}
@@ -1475,8 +1480,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 102;
+const APP_VERSION = 103;
 const CHANGELOG = [
+  { v:103, titel:'Foto nachträglich als Mangel- oder Nachweisbild einordnen', punkte:[
+    'Unter jedem Foto einer Restarbeit sitzt jetzt eine kleine Leiste: „↓✓" schiebt ein Mangelfoto zum Nachweis der Erledigung, „↑📷" wieder zurück. Ein Fehlgriff beim Foto-Knopf heißt damit nicht mehr, dass jemand nochmal hinfahren und neu fotografieren muss.',
+    'Die Datei in SharePoint wird dabei passend umbenannt, damit auch der Ordner die richtige Zuordnung zeigt. Ist das Foto noch nicht hochgeladen (unterwegs ohne Netz), bleibt der Dateiname stehen – in der App stimmt die Zuordnung trotzdem.' ]},
   { v:102, titel:'Mangel oder Restarbeit – und Fotos vorher/nachher', punkte:[
     'Jede Zeile hat jetzt ein Feld „Art": <b>Mangel (AG)</b> für das, was der Auftraggeber gemeldet hat, <b>Restarbeit</b> für unsere eigenen Nacharbeiten. Beim Übernehmen einer Mängelliste wird das automatisch gesetzt. Mängel sind an der Liste am kupferfarbenen Rand erkennbar.',
     'Die Mängelfreimeldung schlägt dadurch nur noch die Mängel des Auftraggebers vor – eigene Nacharbeiten, die er nie gemeldet hat, müssen nicht mehr von Hand abgewählt werden.',
@@ -5985,7 +5993,10 @@ function updRA(pos){
       const arr=raFotoArr(r,art);
       if(!arr.length) return '';
       return `<div class="rafgrp"><span class="rafglbl" style="color:${farbe}">${lbl}</span>`+
-        `<div class="rafg">${arr.map((src,fi)=>`<div class="rafth" onclick="raOlb('${pos}',${i},${fi},'${art}')"><img class="raimg" data-fref="${src}"><button class="rafdel" onclick="event.stopPropagation();raFotoDel('${pos}',${i},${fi},'${art}')">&#10005;</button></div>`).join('')}</div></div>`;
+        `<div class="rafg">${arr.map((src,fi)=>`<div class="rafth" onclick="raOlb('${pos}',${i},${fi},'${art}')"><img class="raimg" data-fref="${src}">`+
+          `<button class="rafdel" onclick="event.stopPropagation();raFotoDel('${pos}',${i},${fi},'${art}')">&#10005;</button>`+
+          `<button class="rafum" title="${art==='ok'?'Doch ein Mangelfoto – nach oben verschieben':'Doch ein Nachweisfoto – nach unten verschieben'}" onclick="event.stopPropagation();raFotoUm('${pos}',${i},${fi},'${art}')">${art==='ok'?'&#8593;&#128247;':'&#8595;&#10003;'}</button>`+
+          `</div>`).join('')}</div></div>`;
     };
     const fotosHtml=grp('mangel','Mangel / Erfassung','var(--accent2)')+grp('ok','Nachweis Erledigung','#3a7a3a');
     // Beschreibung nur anzeigen, wenn befüllt – sonst bleibt die Liste kompakt
@@ -6805,6 +6816,37 @@ async function raHandleFotoUpload(e){
     alert('Foto-Upload fehlgeschlagen.');
   }
   RA_FOTO_TARGET=null;
+}
+// Foto zwischen „Mangel/Erfassung" und „Nachweis der Erledigung" umhängen. Ein
+// Fehlgriff beim Knopf (oder ein Bild, das per Drag & Drop automatisch einsortiert
+// wurde) soll nicht bedeuten, dass jemand nochmal hinfahren und neu fotografieren muss.
+async function raFotoUm(pos,idx,fi,art){
+  const r=gs(pos).restarbeiten[idx]; if(!r) return;
+  const nach = (art==='ok') ? 'mangel' : 'ok';
+  const von=raFotoArr(r,art), ziel=raFotoArr(r,nach);
+  const alt=von[fi]; if(!alt) return;
+  von.splice(fi,1);
+  ziel.push(alt);
+  updRA(pos); saveFotos(pos);
+  showToast(nach==='ok' ? 'Als Nachweis der Erledigung übernommen' : 'Als Mangelfoto übernommen');
+  // Dateinamen nachziehen (RA_ ⇄ RA_OK_), sonst behauptet der SharePoint-Ordner
+  // weiter das Gegenteil. Maßgeblich ist aber die Zuordnung in der App: schlägt das
+  // Umbenennen fehl (offline, keine Rechte), bleibt der alte Name einfach stehen.
+  const i=alt.lastIndexOf('/');
+  const dir=i>0?alt.slice(0,i+1):'', name=alt.slice(i+1);
+  const neuName = nach==='ok' ? name.replace(/^RA_(?!OK_)/,'RA_OK_') : name.replace(/^RA_OK_/,'RA_');
+  if(neuName===name) return;
+  // Liegt die Datei noch in der Warteschlange, wäre sie in SharePoint gar nicht da –
+  // und ein Umbenennen dort würde später eine zweite Datei unter dem alten Namen
+  // hinterlassen. Dann bleibt es beim alten Namen.
+  try{ if(await idbGet('outbox','file|'+alt)) return; }catch(e){ return; }
+  const neu=dir+neuName;
+  try{
+    await spMove(alt, neu);
+    const p=ziel.indexOf(alt); if(p>=0) ziel[p]=neu;
+    try{ const b=await idbGet('photos',alt); if(b){ await idbSet('photos',neu,b); await idbDel('photos',alt); } }catch(e){}
+    updRA(pos); saveFotos(pos);
+  }catch(e){ console.warn('Foto umbenennen übersprungen:',(e&&e.message)||e); }
 }
 function raFotoDel(pos,idx,fi,art){
   const s=gs(pos);
