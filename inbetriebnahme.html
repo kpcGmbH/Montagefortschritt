@@ -230,6 +230,12 @@ document.getElementById('logo').src="data:image/png;base64,"+LOGO_B64;
 /* ---------- Schema-Helfer ---------- */
 const chk=(l,comment=true)=>({k:'check',l,comment});
 const txt=(l)=>({k:'text',l});
+// Ausgeblendetes Kopffeld: steht NICHT im Formular und NICHT im PDF, bleibt aber
+// im Array stehen. Die Feldwerte liegen als k0..kn nach INDEX im gespeicherten
+// Stand (<pdf>_data.json) – ein wirklich entferntes Feld verschiebt alle
+// folgenden, und ein bereits abgelegtes Protokoll zeigt danach durchgerutschte
+// Werte. Gleiche Lehre wie bei sign.roles/sigAus.
+const txtAus=(l)=>({k:'text',l,aus:true});
 const mea=(l,u)=>({k:'measure',l,u});
 const area=(l)=>({k:'area',l});
 const opt=(l,options)=>({k:'opts',l,options});
@@ -468,7 +474,7 @@ Meiko:{label:'Meiko',desc:'Spül- & Reinigungstechnik · Übergabeprotokoll',ico
 Hobart:{label:'Hobart',desc:'Spülmaschinen & CHEF’S COMBI',icon:'🍽️',
   devices:{
    'Geschirr-/Universalspülmaschine':{tags:['Wasser','Elektro','Abluft'],
-     kopf:[txt('Kunde'),txt('Straße / Nr.'),txt('PLZ / Ort'),txt('Name des Inhabers'),txt('Name / Funktion des Eingewiesenen'),txt('Maschinenstandort'),txt('Maschinentyp'),txt('Serial-Nummer'),txt('Order-Nummer')],
+     kopf:[txt('Kunde'),txt('Straße / Nr.'),txt('PLZ / Ort'),txtAus('Name des Inhabers'),txt('Name / Funktion des Eingewiesenen'),txt('Maschinenstandort'),txt('Maschinentyp'),txt('Serial-Nummer'),txtAus('Order-Nummer')],   // Inhaber + Order-Nummer sind Hobart-interne Angaben – ausgeblendet, NICHT entfernt (siehe txtAus)
      sections:[
        sec('Bauseitige Installation',[
          chk('Maschine waagerecht ausgerichtet / Gewicht auf Füße verteilt'),
@@ -638,9 +644,10 @@ function isTech(role,mode){if(mode==='ausgefuehrt')return true;if(/Kunde/i.test(
 // steht für ein real vorhandenes Feld:
 //   Anschrift (Hobart) · Straße / Nr. + PLZ / Ort (Meiko)
 //   Straße, Hausnummer + PLZ, Ort (Winterhalter) · Straße + Postleitzahl + Ort (Rational)
-// NICHT belegt werden "Auftragsnummer" (Hobart), "Order-Nummer" (Meiko),
-// "Jobnummer" (Rational) und "Kundennummer bei Winterhalter": das sind Nummern
-// DES HERSTELLERS, nicht die kpc-Kommission. Die steht im PDF-Kopf.
+// NICHT belegt werden "Auftragsnummer" (Meiko), "Jobnummer" (Rational) und
+// "Kundennummer bei Winterhalter": das sind Nummern DES HERSTELLERS, nicht die
+// kpc-Kommission. Die steht im PDF-Kopf. (Hobarts "Order-Nummer" ist aus
+// demselben Grund ganz ausgeblendet, siehe txtAus.)
 const KOPF_KUNDE=/^(kunde|kundenname|name des kunden|unternehmen \(kunde\)|auftraggeber|betreiber|aufstelladresse\s*[–-]\s*name)$/i;
 // ZWEI Fälle, die man nicht zusammenwerfen darf:
 // "Anschrift"/"Adresse" ist das EINZIGE Adressfeld des Formulars (Hobart, und so
@@ -657,7 +664,7 @@ const KOPF_BAUSTELLE=/^(baustelle|objekt|bauvorhaben)$/i;
 function applyPrefills(){if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev];const today=todayDE();
   STATE.__auto=STATE.__auto||{};
   function setAuto(key,val,getter,setter){if(!val)return;var cur=getter();if(!cur||STATE.__auto[key]){setter(val);STATE.__auto[key]=true;}}
-  o.kopf.forEach(function(f,i){var key='k'+i,val=null;
+  o.kopf.forEach(function(f,i){if(f.aus)return;var key='k'+i,val=null;
     if(/Unternehmen \(Techniker\)|Inbetriebnahme durch Firma/.test(f.l))val=KPC_FIRMA;
     else if(/Name \(Techniker\)|Name des Mitarbeiters/.test(f.l))val=TECH.name;
     else if(KOPF_BAUSTELLE.test(f.l))val=projLabel();
@@ -747,7 +754,7 @@ function openForm(dev,keepScroll){
         '<div class="progress"><i id="prog"></i></div></div>'+((CUR.fresh&&!CUR.pos&&DRAFTAVAIL)?'<div class="draftbar">📝 Für dieses Gerät existiert ein früherer Entwurf. <button class="btn ghost small" onclick="continueDraft()">Letzten Entwurf fortsetzen</button></div>':'');
   // Kopfdaten
   h+='<div class="section"><div class="sh"><span class="bar"></span><h3>Allgemeine Angaben</h3></div><div class="body"><div class="grid2">';
-  o.kopf.forEach((f,i)=>{h+=fieldHTML('k'+i,f);});
+  o.kopf.forEach((f,i)=>{if(f.aus)return;h+=fieldHTML('k'+i,f);});
   h+='</div></div></div>';
   // Abschnitte
   o.sections.forEach((s,si)=>{
@@ -964,7 +971,7 @@ function exportPDF(){
   newpage();
   // Kopfdaten
   secHead('Allgemeine Angaben');
-  o.kopf.forEach((f,i)=>{const v=STATE['k'+i]||'';kvLine(f.l,(f.k==='measure'&&v)?(v+' '+f.u):v);});
+  o.kopf.forEach((f,i)=>{if(f.aus)return;const v=STATE['k'+i]||'';kvLine(f.l,(f.k==='measure'&&v)?(v+' '+f.u):v);});
   y+=2;
   // Abschnitte
   o.sections.forEach((s,si)=>{
@@ -1030,7 +1037,7 @@ function typeOpts(cur,kopf){var t=kopf?[['text','Text'],['measure','Messwert'],[
 function openEditor(mfr){EDIT=blankEdit();var m=mfr||CUR.mfr;if(m&&DB[m])EDIT.mfrSel=m;renderEditor();}
 function editDevice(dev){var o=DB[CUR.mfr].devices[dev];
   EDIT={mfrSel:CUR.mfr,mfrNew:'',dev:dev,tags:(o.tags||[]).slice(),
-    kopf:(o.kopf||[]).map(function(f){return {k:f.k,l:f.l,u:f.u||''};}),
+    kopf:(o.kopf||[]).filter(function(f){return !f.aus;}).map(function(f){return {k:f.k,l:f.l,u:f.u||''};}),   // ein NEUES Protokoll hat keine Index-Altlast
     sections:(o.sections||[]).map(function(s){return {title:s.title,colsName:colsName(s.cols),comment:s.comment!==false,items:(s.items||[]).map(function(it){return {k:it.k,l:it.l,u:it.u||'',options:(it.options||[]).slice()};})};}),
     signMode:(o.sign&&o.sign.mode)||'ausgefuehrt',signRoles:((o.sign&&o.sign.roles)||[]).slice(),ref:{mfr:CUR.mfr,dev:dev}};
   renderEditor();}
@@ -1188,7 +1195,7 @@ function ctxMatchDev(mfr,typ){if(!typ||!DB[mfr])return null;var devs=Object.keys
     if(score>bs){bs=score;best=d;}});
   return bs>0?best:null;}
 function ctxPrefill(p){if(!CUR.dev)return;var o=DB[CUR.mfr].devices[CUR.dev];var ch=false;
-  o.kopf.forEach(function(f,i){var key='k'+i;
+  o.kopf.forEach(function(f,i){if(f.aus)return;var key='k'+i;
     if(p.typ&&!STATE[key]&&/Typ|Modell/i.test(f.l)){STATE[key]=p.typ;ch=true;}
     // Wo es ein Standortfeld gibt, kommt die Gerätenummer zusätzlich mit hinein.
     // Verlassen darf man sich darauf nicht – etliche Protokolle haben kein solches Feld,
