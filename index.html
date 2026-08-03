@@ -334,8 +334,12 @@ body.lvadm .lvonly.blk{display:block !important;}
 .allg-add{margin-top:2px;}
 .ptype-h{padding:9px 14px 7px;color:var(--accent);font-size:11px;font-weight:700;text-transform:uppercase;
   letter-spacing:.4px;border-bottom:1px solid var(--braun);opacity:.85;}
-/* Erklärzeile unter einem Menüeintrag (Art-Abfrage Restarbeit/Mangel) */
+/* Erklärzeile unter einem Menüeintrag (Art-Abfrage Restarbeit/Mangel, Foto einordnen) */
 .ptype-item small{display:block;font-weight:400;font-size:10px;color:#a8a8a8;letter-spacing:0;margin-top:2px;}
+/* aktuelle Einordnung eines Fotos – sichtbar, aber nicht als Aktion missverständlich */
+.ptype-item.akt{color:var(--accent);}
+.ptype-akt{font-size:9px;font-weight:400;letter-spacing:.3px;border:1px solid var(--accent);
+  border-radius:8px;padding:0 5px;margin-left:4px;opacity:.8;}
 
 /* Restarbeiten an JEDER Position erfassbar – auch an noch nicht begonnenen
    („beschädigt angeliefert", „Anschluss fehlt bauseits"). Früher nur bei
@@ -492,7 +496,7 @@ body.lvadm .lvonly.blk{display:block !important;}
 /* Foto in die andere Gruppe schieben – sitzt unten, das Löschen-✕ oben rechts;
    die beiden dürfen sich am Handy nicht ins Gehege kommen. */
 .rafum{position:absolute;left:0;right:0;bottom:0;background:rgba(43,41,38,.72);color:#fff;
-  border:none;font-size:9px;line-height:1;padding:3px 0;cursor:pointer;letter-spacing:.3px;}
+  border:none;font-size:9px;line-height:1;padding:4px 0;cursor:pointer;letter-spacing:.2px;font-family:inherit;}
 .rafum:active{background:var(--braun);}
 .rarow.done:not(.expanded) .rafgrp{display:none;}
 /* Vom Auftraggeber gemeldeter Mangel – ohne Aufklappen erkennbar */
@@ -1482,8 +1486,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 104;
+const APP_VERSION = 105;
 const CHANGELOG = [
+  { v:105, titel:'Foto einordnen: jetzt mit Abfrage statt Pfeil-Symbol', punkte:[
+    'Unter jedem Foto steht jetzt „einordnen". Ein Tipp darauf fragt im Klartext: <b>Zeigt dieses Foto den Mangel</b> (Zustand bei der Erfassung) <b>oder die Erledigung</b> (Nachweis für die Mängelfreimeldung)? Die aktuelle Einordnung ist gekennzeichnet.',
+    'Bisher standen dort nur kleine Pfeile, und ein Tipp verschob das Bild sofort – ohne dass erkennbar war, wohin und warum.' ]},
   { v:104, titel:'Beim Anlegen wird gefragt: Restarbeit oder Mangel?', punkte:[
     'Der Knopf heißt jetzt „＋ Restarbeit / Mangel" und fragt beim Antippen nach, was erfasst wird – mit einem Satz Erklärung je Auswahl. Bisher stand das Auswahlfeld stillschweigend auf „Restarbeit"; wer es übersah, hatte einen Mangel des Auftraggebers erfasst, den die Freimeldung nie vorschlägt.',
     'Beim Weg über „Projekt / Etage" kommt die Frage nach dem Geltungsbereich – also erst wofür, dann was.',
@@ -6001,7 +6008,7 @@ function updRA(pos){
       return `<div class="rafgrp"><span class="rafglbl" style="color:${farbe}">${lbl}</span>`+
         `<div class="rafg">${arr.map((src,fi)=>`<div class="rafth" onclick="raOlb('${pos}',${i},${fi},'${art}')"><img class="raimg" data-fref="${src}">`+
           `<button class="rafdel" onclick="event.stopPropagation();raFotoDel('${pos}',${i},${fi},'${art}')">&#10005;</button>`+
-          `<button class="rafum" title="${art==='ok'?'Doch ein Mangelfoto – nach oben verschieben':'Doch ein Nachweisfoto – nach unten verschieben'}" onclick="event.stopPropagation();raFotoUm('${pos}',${i},${fi},'${art}')">${art==='ok'?'&#8593;&#128247;':'&#8595;&#10003;'}</button>`+
+          `<button class="rafum" title="Foto einordnen: Mangel oder Nachweis" onclick="event.stopPropagation();raFotoZuordnen('${pos}',${i},${fi},'${art}',this)">einordnen</button>`+
           `</div>`).join('')}</div></div>`;
     };
     const fotosHtml=grp('mangel','Mangel / Erfassung','var(--accent2)')+grp('ok','Nachweis Erledigung','#3a7a3a');
@@ -6865,6 +6872,36 @@ async function raHandleFotoUpload(e){
     alert('Foto-Upload fehlgeschlagen.');
   }
   RA_FOTO_TARGET=null;
+}
+// „einordnen" am Bild -> Abfrage, wofür das Foto steht. Ein Pfeil-Symbol allein war
+// zu kryptisch, und ein Tipp verschob das Bild sofort. Jetzt stehen beide Möglichkeiten
+// im Klartext da, die aktuelle ist gekennzeichnet.
+let RA_FZ=null;
+function raFotoZuordnen(pos,idx,fi,art,btn){
+  RA_FZ={pos,idx,fi,art};
+  let menu=document.getElementById('raFzMenu');
+  if(!menu){
+    menu=document.createElement('div'); menu.id='raFzMenu'; menu.className='ptype-menu';
+    document.body.appendChild(menu);
+    document.addEventListener('click',function(e){
+      if(!e.target.closest('#raFzMenu')&&!e.target.closest('.rafum')) menu.classList.remove('open');
+    });
+  }
+  const zeile=(k,ic,lbl,hint)=>'<div class="ptype-item'+(art===k?' akt':'')+'" onclick="raFotoZuWahl(\''+k+'\')">'+
+    ic+'&nbsp; '+lbl+(art===k?' <span class="ptype-akt">aktuell</span>':'')+'<small>'+hint+'</small></div>';
+  menu.innerHTML='<div class="ptype-h">Dieses Foto zeigt &hellip;</div>'+
+    zeile('mangel','&#128247;','den Mangel','Zustand bei der Erfassung')+
+    zeile('ok','&#10003;','die Erledigung','Nachweis – geht in die M&auml;ngelfreimeldung');
+  const r=btn.getBoundingClientRect();
+  menu.style.top=(r.bottom+window.scrollY+4)+'px';
+  menu.style.left=Math.max(8,Math.min(r.left+window.scrollX-40, window.innerWidth-244))+'px';
+  menu.classList.add('open');
+}
+function raFotoZuWahl(ziel){
+  const t=RA_FZ; RA_FZ=null;
+  const menu=document.getElementById('raFzMenu'); if(menu) menu.classList.remove('open');
+  if(!t || ziel===t.art) return;          // unverändert -> nichts tun
+  raFotoUm(t.pos,t.idx,t.fi,t.art);
 }
 // Foto zwischen „Mangel/Erfassung" und „Nachweis der Erledigung" umhängen. Ein
 // Fehlgriff beim Knopf (oder ein Bild, das per Drag & Drop automatisch einsortiert
