@@ -1486,8 +1486,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 107;
+const APP_VERSION = 108;
 const CHANGELOG = [
+  { v:108, titel:'Bautagebuch: später Abgehaktes lässt sich nachtragen', punkte:[
+    'Wird ein Bautagesbericht geschrieben und danach auf der Baustelle weitergearbeitet, fehlten die später gesetzten Haken im Bericht – beim erneuten Öffnen stand nur der gespeicherte Text da, alles Weitere musste von Hand abgetippt werden.',
+    'Jetzt steht beim Öffnen eines bestehenden Berichts oben: <b>„Nach dem Speichern wurde weitergearbeitet: N Punkte sind noch nicht im Bericht"</b> – ein Tipp auf <b>„＋ Punkte nachtragen"</b> hängt genau das Fehlende an. Der vorhandene Text bleibt unverändert, nichts landet doppelt.',
+    'Wurde an einer Position vormittags montiert und nachmittags der Elektroanschluss gesetzt, wird nur der Elektroanschluss nachgetragen. Monteure, die erst später dazukamen, werden bei den Beschäftigten ergänzt – die Stunden müssen noch eingetragen werden.',
+    'In der Bautagebuch-Übersicht ist ein solcher Tag mit „＋N offen" gekennzeichnet. Nach dem Nachtragen einfach erneut „Speichern & PDF" – das abgelegte PDF wird ersetzt.' ]},
   { v:107, titel:'Kunde und Anschrift stehen jetzt in jedem Protokoll', punkte:[
     'Zu jeder Baustelle gehören jetzt <b>Auftraggeber, Anschrift (Straße, PLZ, Ort) und Auftrags-/Kommissionsnummer</b>. Gepflegt wird das an einer einzigen Stelle: 🏢 in der Baustellen-Auswahl. Beim Anlegen einer neuen Baustelle werden Straße und PLZ mit abgefragt.',
     'Diese Angaben werden automatisch übernommen in <b>Inbetriebnahme- und DGUV-Protokolle, Einweisung, Schlüsselübergabe, Servicebericht, Bautagebuch, Dichtigkeitsprotokoll und Mängelfreimeldung</b>. Im Servicebericht musste die Straße bisher bei jedem Einsatz von Hand getippt werden.',
@@ -3136,29 +3141,70 @@ function btbActivityDays(){
   return counts;
 }
 
-// Aus den Tagesdaten Entwurfstext (Leistung) + Monteur-Kürzel sammeln
+// Aus den Tagesdaten Entwurfstext (Leistung) + Monteur-Kürzel sammeln.
+// Liefert zusätzlich `eintraege` – dieselben Punkte EINZELN und strukturiert.
+// Nur damit lässt sich später feststellen, was seit dem Speichern dazugekommen
+// ist (btbNachtrag); aus dem fertigen Text ginge das nur durch Zurückparsen.
 function btbCollectPrefill(tag){
   const FELDER=[['g','Geliefert'],['m','Montiert'],['sa','Sanitäranschluss'],['dp','Dichtigkeitsprüfung'],['ea','Elektroanschluss'],['pa','Potentialausgleich'],['ib','Inbetriebnahme'],['ew','Einweisung']];
-  const zeilen=[]; const kuerzel=new Set();
+  const eintraege=[];
   DATA.forEach(sec=>{ sec.subsections.forEach(sub=>{ sub.items.forEach(it=>{
     const s=gs(it.pos), t=s.ts||{}, by=s.by||{};
     const tf=FELDER.filter(([f])=>t[f]&&localDay(t[f])===tag);
     if(!tf.length) return;
-    tf.forEach(([f])=>{ if(by[f]) kuerzel.add(by[f]); });
-    const schritte=tf.map(([f,lbl])=>lbl).join(', ');
-    zeilen.push('• '+it.pos+' '+it.bez.trim()+' – '+schritte);
+    const k=[]; tf.forEach(([f])=>{ if(by[f]&&k.indexOf(by[f])<0) k.push(by[f]); });
+    const schritte=tf.map(([f,lbl])=>lbl);
+    const bez=it.bez.trim();
+    eintraege.push({ art:'pos', pos:it.pos, bez, schritte, kuerzel:k,
+      zeile:'• '+it.pos+' '+bez+' – '+schritte.join(', ') });
   }); }); });
   // Erledigte Restarbeiten des Tages. NUR erledigte: eine neu erfasste Restarbeit ist
   // ein offener Mangel und keine an diesem Tag erbrachte Leistung.
   const raSammeln=(list,ort)=>{(list||[]).forEach(r=>{ if(!r.txt) return;
     if(!(r.done&&r.erledigtAm&&localDay(r.erledigtAm)===tag)) return;
-    if(r.erledigtVon) kuerzel.add(r.erledigtVon);
-    zeilen.push('• Restarbeit'+(ort?(' ('+ort+')'):'')+' erledigt: '+r.txt);
+    eintraege.push({ art:'ra', suche:r.txt, kuerzel:r.erledigtVon?[r.erledigtVon]:[],
+      zeile:'• Restarbeit'+(ort?(' ('+ort+')'):'')+' erledigt: '+r.txt });
   });};
   if(ST[PRAKEY]) raSammeln(ST[PRAKEY].restarbeiten,'Baustelle allg.');
   DATA.forEach(sec=>{ const e=ST[EKEY(sec)]; if(e) raSammeln(e.restarbeiten, (sec.label||'')+' allg.');
     sec.subsections.forEach(sub=>sub.items.forEach(it=>raSammeln(gs(it.pos).restarbeiten, it.pos))); });
-  return { leistung: zeilen.join('\n'), kuerzel:[...kuerzel] };
+  const kuerzel=[]; eintraege.forEach(e=>e.kuerzel.forEach(k=>{ if(kuerzel.indexOf(k)<0) kuerzel.push(k); }));
+  return { leistung: eintraege.map(e=>e.zeile).join('\n'), kuerzel, eintraege };
+}
+
+// Was ist seit dem Speichern dazugekommen?
+// Der Bericht wird oft am Vormittag geschrieben, abgehakt wird bis Feierabend –
+// beim erneuten Öffnen stand bisher nur der GESPEICHERTE Text da, die später
+// gesetzten Haken fehlten ersatzlos und mussten von Hand abgetippt werden.
+// Verglichen wird gegen den Text im Feld, nicht gegen den Prefill: der Text ist
+// frei editierbar, und nichts darf doppelt landen.
+// - Positionen über die Positionsnummer (die bleibt stehen, auch wenn jemand die
+//   Zeile umformuliert). Ist die Position schon genannt, werden nur die noch
+//   NICHT erwähnten Schritte nachgetragen – der typische Fall „vormittags
+//   montiert, nachmittags elektrisch angeschlossen".
+// - Restarbeiten über ihren Wortlaut, damit ein geänderter Zeilenanfang nichts
+//   doppelt einträgt.
+function btbNachtrag(tag, text){
+  const t=String(text||''), zeilen=t.split('\n');
+  const neu=[], kuerzel=[];
+  btbCollectPrefill(tag).eintraege.forEach(e=>{
+    if(e.art==='ra'){
+      if(t.indexOf(e.suche)>=0) return;
+      neu.push(e.zeile);
+    }else{
+      const rx=new RegExp('(^|[^\\d.])'+e.pos.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+'(?![\\d.])');
+      const rel=zeilen.filter(z=>rx.test(z));
+      if(!rel.length){ neu.push(e.zeile); }
+      else{
+        const genannt=rel.join(' ').toLowerCase();
+        const fehlt=e.schritte.filter(x=>genannt.indexOf(x.toLowerCase())<0);
+        if(!fehlt.length) return;
+        neu.push('• '+e.pos+' '+e.bez+' – '+fehlt.join(', '));
+      }
+    }
+    e.kuerzel.forEach(k=>{ if(kuerzel.indexOf(k)<0) kuerzel.push(k); });
+  });
+  return { zeilen:neu, kuerzel };
 }
 
 // ---- Datumsauswahl + Übersicht bestehender Einträge ----
@@ -3178,12 +3224,16 @@ function openBautagebuchDialog(){
   const liste=BTB.length
     ? '<div style="font-size:12px;color:#a8a8a8;margin:16px 0 6px">Bereits erfasste Bautagebücher:</div>'+
       '<div style="max-height:150px;overflow:auto;display:flex;flex-direction:column;gap:5px">'+
-      BTB.slice().sort((a,b)=>(b.datum||'').localeCompare(a.datum||'')).map(en=>
-        '<div style="display:flex;gap:6px;align-items:stretch">'+
-          '<button type="button" onclick="btbPickDay(\''+en.datum+'\')" title="Bearbeiten" style="flex:1;display:flex;justify-content:space-between;align-items:center;gap:10px;background:#332f2b;border:1px solid #4a423a;color:#fff;border-radius:8px;padding:8px 11px;font-size:13px;cursor:pointer;font-family:inherit;text-align:left">'+
-            '<span>Nr. '+en.nr+' · '+btbDeShort(en.datum)+'</span><span style="color:#8a8f92;font-size:11px">'+((en.arbeiter||[]).length)+' Pers.</span></button>'+
+      BTB.slice().sort((a,b)=>(b.datum||'').localeCompare(a.datum||'')).map(en=>{
+        // Seit dem Speichern weitergearbeitet? Sonst fällt es niemandem auf –
+        // der Bericht sieht fertig aus, und die späteren Haken fehlen darin.
+        const _n=btbNachtrag(en.datum, en.leistung||'').zeilen.length;
+        return '<div style="display:flex;gap:6px;align-items:stretch">'+
+          '<button type="button" onclick="btbPickDay(\''+en.datum+'\')" title="'+(_n?('Bearbeiten – '+_n+' Punkt(e) noch nicht im Bericht'):'Bearbeiten')+'" style="flex:1;display:flex;justify-content:space-between;align-items:center;gap:10px;background:#332f2b;border:1px solid '+(_n?'#8b6d22':'#4a423a')+';color:#fff;border-radius:8px;padding:8px 11px;font-size:13px;cursor:pointer;font-family:inherit;text-align:left">'+
+            '<span>Nr. '+en.nr+' · '+btbDeShort(en.datum)+(_n?('<span style="color:#e0a060"> · ＋'+_n+' offen</span>'):'')+'</span><span style="color:#8a8f92;font-size:11px">'+((en.arbeiter||[]).length)+' Pers.</span></button>'+
           '<button type="button" onclick="btbOpenPdf(\''+en.datum+'\')" title="PDF öffnen" style="flex:0 0 auto;background:#3a3530;border:1px solid #895500;color:#d7c1ae;border-radius:8px;padding:8px 12px;font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap">📄 PDF</button>'+
-        '</div>').join('')+'</div>'
+        '</div>';
+      }).join('')+'</div>'
     : '';
   ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:22px;max-width:460px;width:100%;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
     '<div style="font-size:17px;font-weight:700;margin-bottom:4px">📓 Bautagebuch</div>'+
@@ -3271,6 +3321,8 @@ function openBtbForm(datum){
       '<div id="btbArb"></div>'+
       '<button type="button" onclick="btbAddArbeiter()" style="margin-top:8px;background:#3a3530;border:1px dashed #895500;color:#d7c1ae;border-radius:8px;padding:9px 14px;font-size:14px;cursor:pointer;font-family:inherit;width:100%">＋ Person hinzufügen</button>'+
       '<label style="'+lbl+'">Leistungsergebnisse / Änderungen</label>'+
+      // Nur beim erneuten Öffnen: was nach dem Speichern noch abgehakt wurde.
+      '<div id="btbNachtragBox">'+btbNachtragBoxHtml(datum, leistung, !!vorhanden)+'</div>'+
       '<textarea id="btbLeist" rows="8" style="'+fld+';resize:vertical;line-height:1.5">'+escapeHtml(leistung)+'</textarea>'+
       '<div style="font-size:11px;color:#8a8f92;margin-top:4px">Vorbelegt aus den Statusänderungen und Restarbeiten dieses Tages – frei änderbar und ergänzbar.</div>'+
       '<label style="'+lbl+'">Behinderungen / Störungen / besondere Vorkommnisse</label>'+
@@ -3491,6 +3543,41 @@ function btbNameOpen(inp,i){
   btbOpenMenu(inp, btbNameList(), function(name){ if(BTB_FORM&&BTB_FORM.arbeiter[i]) BTB_FORM.arbeiter[i].name=name; }, loginPresent);
 }
 function btbBaufOpen(inp){ btbOpenMenu(inp, BTB_BAULEITER, null, false); }
+// Hinweisbox „seit dem Speichern dazugekommen". Nur bei einem BESTEHENDEN
+// Eintrag – bei einem neuen ist der Text ja gerade erst daraus entstanden.
+function btbNachtragBoxHtml(datum, text, vorhanden){
+  if(!vorhanden) return '';
+  const n=btbNachtrag(datum, text);
+  if(!n.zeilen.length) return '';
+  return '<div style="background:#3a3226;border:1px solid #8b6d22;border-radius:8px;padding:11px 12px;margin:0 0 8px">'+
+    '<div style="font-size:13px;color:#e8d9c4;margin-bottom:4px">Nach dem Speichern wurde weitergearbeitet: '+
+      '<b>'+n.zeilen.length+' Punkt'+(n.zeilen.length===1?'':'e')+'</b> '+(n.zeilen.length===1?'ist':'sind')+' noch nicht im Bericht.</div>'+
+    '<div style="font-size:11px;color:#bdae99;margin-bottom:8px">'+escapeHtml(n.zeilen.slice(0,3).join(' · ').replace(/•\s*/g,''))+
+      (n.zeilen.length>3?(' … und '+(n.zeilen.length-3)+' weitere'):'')+'</div>'+
+    '<button type="button" onclick="btbNachtragUebernehmen()" style="background:#b8860b;border:none;color:#fff;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit">＋ Punkte nachtragen</button>'+
+    '</div>';
+}
+// Nachtragen: hängt NUR das Fehlende an, der vorhandene Text bleibt unangetastet.
+// Bewusst ein Knopf und keine Automatik – der Bericht ist womöglich schon
+// unterschrieben, das Ergänzen ist eine Entscheidung des Bauleiters.
+function btbNachtragUebernehmen(){
+  if(!BTB_FORM) return;
+  const ta=document.getElementById('btbLeist'); if(!ta) return;
+  const n=btbNachtrag(BTB_FORM.datum, ta.value);
+  const box=document.getElementById('btbNachtragBox'); if(box) box.innerHTML='';
+  if(!n.zeilen.length){ showToast('Nichts nachzutragen'); return; }
+  ta.value=(ta.value.replace(/\s+$/,'')+'\n'+n.zeilen.join('\n')).replace(/^\n+/,'');
+  // Monteure der nachgetragenen Punkte ergänzen – Stunden bleiben leer und
+  // müssen eingetragen werden (die Zeit kennt nur der Bauleiter).
+  btbSyncArbeiter();
+  let neueP=0;
+  n.kuerzel.forEach(k=>{
+    if(BTB_FORM.arbeiter.some(a=>(a.name||'').trim().toLowerCase()===k.trim().toLowerCase())) return;
+    BTB_FORM.arbeiter.push({name:k, rolle:BTB_ROLLEN[0], stunden:''}); neueP++;
+  });
+  if(neueP) btbRenderArbeiter();
+  showToast(n.zeilen.length+' Punkt'+(n.zeilen.length===1?'':'e')+' nachgetragen'+(neueP?(' · '+neueP+' Person'+(neueP===1?'':'en')+' ergänzt (Stunden fehlen)'):'')+' – prüfen, dann speichern');
+}
 function btbAddArbeiter(){ if(!BTB_FORM) return; btbSyncArbeiter(); BTB_FORM.arbeiter.push({name:'',rolle:BTB_ROLLEN[0],stunden:''}); btbRenderArbeiter(); }
 function btbDelArbeiter(i){ if(!BTB_FORM) return; btbSyncArbeiter(); BTB_FORM.arbeiter.splice(i,1); if(!BTB_FORM.arbeiter.length) BTB_FORM.arbeiter.push({name:'',rolle:BTB_ROLLEN[0],stunden:''}); btbRenderArbeiter(); }
 
