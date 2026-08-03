@@ -131,6 +131,7 @@ select.fs option{background:var(--surface);color:var(--text);}
 .gtag{display:inline-block;font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:8px;margin-left:4px;vertical-align:middle;color:#fff;}
 .gtag.gM{background:#6b7a8a;} .gtag.gE{background:#b8860b;} .gtag.gS{background:#3f7a8a;} .gtag.gNU{background:#7a5c1d;}   /* PA hat KEINE eigene Tag-Farbe: es ist eine Leistung des Gewerks Elektro (gewTags) */
 .gtag.gEdit{background:transparent;color:var(--accent2);border:1px dashed var(--accent2);}
+.gtag.gNT{background:#7a4a2a;}   /* nachträglich ergänzte Position (Nachtrag) */
 .gwedit{cursor:pointer;-webkit-tap-highlight-color:transparent;}
 .sp strong{color:var(--text);}
 
@@ -276,6 +277,15 @@ select.fs option{background:var(--surface);color:var(--text);}
 .fbtn:active{background:var(--braun);}
 .raadd{background:transparent;border:1px dashed var(--line);border-radius:8px;color:var(--braun);font-size:12px;font-weight:700;padding:6px 12px;margin:5px 0 2px;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;}
 .raadd:active{background:var(--chrome-bg2);}
+/* Stückliste ändern (Position ergänzen/bearbeiten/löschen) – nur Bauleitung +
+   Innendienst (darfLVAendern). Alle anderen sehen die Knöpfe gar nicht erst. */
+.lvonly{display:none !important;}
+body.lvadm .lvonly{display:inline-flex !important;}
+body.lvadm .lvonly.blk{display:block !important;}
+.lvadd{background:transparent;border:1px dashed var(--line);border-radius:8px;color:var(--braun);font-size:12px;font-weight:700;padding:7px 13px;margin:8px 14px 12px;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;}
+.lvadd:active{background:var(--chrome-bg2);}
+/* frisch ergänzte Position kurz hervorheben, damit sie in 30 Karten auffindbar ist */
+.card.lvnew{outline:2px solid var(--accent);outline-offset:-3px;}
 .rasec.etrasec{display:block;margin-top:0;border-top:none;background:var(--bhdr-bg);border-bottom:1px solid var(--line);padding:8px 14px 10px;}
 .rasec.etrasec .rahd{margin-bottom:2px;}
 .fcnt{background:var(--accent);color:var(--anthrazit);font-size:10px;padding:0 5px;border-radius:10px;font-weight:700;}
@@ -352,13 +362,13 @@ select.fs option{background:var(--surface);color:var(--text);}
 #swUpd>span{white-space:nowrap;}   /* sonst bricht „Neue Version" am Handy auf drei Zeilen um */
 /* „Restarbeit gelöscht – Rückgängig". Etwas höher als der Update-Balken, damit sich
    beide nicht überdecken, falls sie zusammentreffen. */
-#raUndo{position:fixed;left:50%;transform:translate(-50%,160%);bottom:calc(150px + env(safe-area-inset-bottom));
+#raUndo,#posUndo{position:fixed;left:50%;transform:translate(-50%,160%);bottom:calc(150px + env(safe-area-inset-bottom));
   z-index:2400;display:flex;align-items:center;gap:12px;background:#2b2b2b;color:#fff;
   padding:10px 12px 10px 18px;border-radius:24px;box-shadow:0 6px 24px rgba(0,0,0,.4);
   font-size:13px;font-weight:700;max-width:calc(100vw - 24px);transition:transform .25s;}
-#raUndo.on{transform:translate(-50%,0);}
-#raUndo>span{white-space:nowrap;}
-#raUndo button{background:var(--accent);color:#2b2b2b;border:none;border-radius:16px;
+#raUndo.on,#posUndo.on{transform:translate(-50%,0);}
+#raUndo>span,#posUndo>span{white-space:nowrap;}
+#raUndo button,#posUndo button{background:var(--accent);color:#2b2b2b;border:none;border-radius:16px;
   padding:8px 16px;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;white-space:nowrap;}
 #swUpd.on{transform:translate(-50%,0);}
 #swUpd button{background:var(--accent);color:#2b2b2b;border:none;border-radius:16px;
@@ -1211,6 +1221,7 @@ function swTab(p){
 function buildPanels(){
   const main=document.getElementById('main');
   main.innerHTML='';
+  applyLvRechte();   // „✎ Position" / „＋ Position ergänzen" nur für Bauleitung + Innendienst
   Object.keys(POSGEW).forEach(k=>delete POSGEW[k]);   // Gewerk-Index neu aufbauen
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ POSGEW[it.pos]=it.gew||[]; })));
   // Allgemeine Restarbeiten (ganzes Projekt + einzelne Etagen) – EIN einklappbarer
@@ -1263,7 +1274,7 @@ function buildPanels(){
     <span class="pb">${item.pos}</span>
     <div class="ii">
       <div class="ibez">${item.bez.trim()}</div>
-      <div class="imet">${item.fabrikat?'&#127981; '+item.fabrikat.trim():''}${item.typ?' &nbsp;&#128203; '+item.typ.trim():''}${gewBadgeEditable(item.pos,item.gew)}</div>
+      <div class="imet">${item.fabrikat?'&#127981; '+item.fabrikat.trim():''}${item.typ?' &nbsp;&#128203; '+item.typ.trim():''}${ntBadge(item)}${gewBadgeEditable(item.pos,item.gew)}</div>
     </div>
     <div class="img">${item.menge} ${item.einh}</div>
   </div>
@@ -1282,6 +1293,7 @@ function buildPanels(){
     <button class="fbtn" id="FB${id}" onclick="trf('${item.pos}')">&#128247; Foto</button>
     <button class="fbtn" style="background:#4a3a28;margin-left:6px" onclick="trpdf('${item.pos}',this)">&#128196; Protokoll</button>
     <button class="fbtn histbtn" style="background:transparent;border:1px solid var(--line);color:var(--accent2);margin-left:6px" onclick="openHist('${item.pos}')" title="Änderungsverlauf dieser Position">&#128338; Verlauf</button>
+    <button class="fbtn lvonly" style="background:transparent;border:1px solid var(--line);color:var(--accent2);margin-left:6px" onclick="openPosEdit('${item.pos}')" title="Position bearbeiten oder aus der Stückliste löschen">&#9998; Position</button>
     <div class="fgrid" id="FG${id}"></div>
     <div class="pgrid" id="PG${id}"></div>
   </div>
@@ -1304,7 +1316,7 @@ function buildPanels(){
   <span class="btog cl">&#9660;</span>
 </div>
 <div class="bprog-bar" id="PB${sid}"><div class="bprog-fill" id="PF${sid}" style="width:0%"></div></div>
-<div class="ilist hid" id="L${sid}">${cards}</div>`;
+<div class="ilist hid" id="L${sid}">${cards}<div class="lvonly blk"><button class="lvadd" onclick="openPosNeu('${sec.pos}','${sub.pos}')" title="Nachtrag / fehlende Position in dieser Anlage ergänzen">&#65291; Position erg&auml;nzen</button></div></div>`;
       panel.appendChild(div);
     });
     main.appendChild(panel);
@@ -1365,6 +1377,7 @@ function applyUserBadge(){
   b.style.cursor = darf? 'pointer' : 'default';
   b.style.textDecoration = darf? 'underline' : 'none';
   b.title = darf? 'Ausf\u00fchrer wechseln' : (USER||'');
+  applyLvRechte();   // gleiche Rollen, gleicher Ausl\u00f6ser: St\u00fccklisten-Kn\u00f6pfe mitschalten
   if(!USER){ b.textContent='Ausf\u00fchrer'; return; }
   b.textContent = (istFirma(USER)?'\ud83c\udfe2 ':'\u270e ')+USER;
 }
@@ -1451,8 +1464,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 98;
+const APP_VERSION = 99;
 const CHANGELOG = [
+  { v:99, titel:'Positionen ergänzen und löschen (Bauleitung + Innendienst)', punkte:[
+    'Eine Stückliste war bisher nach dem Einlesen unveränderlich. Ein Nachtrag ließ sich nicht aufnehmen, und eine Zeile, die beim Einlesen fälschlich als Position gelandet ist – in Nüsttal die „Pläne" – blieb für immer stehen.',
+    'Neu an jeder Position: „✎ Position". Dahinter lassen sich Bezeichnung, Menge, Fabrikat und Typ berichtigen und die Position aus der Stückliste löschen. Die Positionsnummer bleibt fest – an ihr hängen Häkchen, Fotos und Protokolle.',
+    'Neu unter jeder Anlage: „＋ Position ergänzen" – für Nachträge. Nummer, Bezeichnung und Gewerk werden abgefragt, die Nummer wird vorgeschlagen. Auf Wunsch trägt die neue Karte die Marke „Nachtrag".',
+    'Löschen fragt im Klartext nach und nennt, was daran hängt (Häkchen, Fotos, Protokolle, Restarbeiten). Steckt Arbeit drin, muss zusätzlich LÖSCHEN eingetippt werden. Danach steht 20 Sekunden lang „Position gelöscht – Rückgängig" bereit; die Fotodateien bleiben in jedem Fall in SharePoint erhalten.',
+    'Beides ändert die Baustelle für alle – deshalb sehen die beiden Knöpfe nur Bauleitung und Innendienst, wie schon beim Wechseln des Ausführers.' ]},
   { v:98, titel:'Gesetzte Schritte lassen sich nicht mehr aus Versehen zurücknehmen', punkte:[
     'Ein Tipp auf einen bereits gesetzten Schritt – etwa „Montiert" – hat ihn bisher sofort wieder entfernt, samt Zeitstempel und Namen dessen, der ihn eingetragen hat. Am Handy passierte das schnell beim Scrollen.',
     'Jetzt kommt eine Rückfrage, die zeigt, um welchen Schritt und welche Position es geht und wer ihn wann eingetragen hat. Das Setzen bleibt wie bisher ein einfacher Tipp.',
@@ -7517,7 +7536,7 @@ function setPosGewerk(pos, gewArr){
   if(card){
     card.dataset.gew=gewAttr(item.gew);
     const imet=card.querySelector('.imet');
-    if(imet) imet.innerHTML=(item.fabrikat?'&#127981; '+item.fabrikat.trim():'')+(item.typ?' &nbsp;&#128203; '+item.typ.trim():'')+gewBadgeEditable(item.pos,item.gew);
+    if(imet) imet.innerHTML=(item.fabrikat?'&#127981; '+item.fabrikat.trim():'')+(item.typ?' &nbsp;&#128203; '+item.typ.trim():'')+ntBadge(item)+gewBadgeEditable(item.pos,item.gew);
   }
   applyFieldVisibility(); rc(pos); updProg(pos); upStats(); applyF();
   // Gewerk-Umschalter einblenden, falls die Baustelle dadurch erstmals Gewerke bekommt
@@ -7552,6 +7571,311 @@ async function saveLV(){
   if(!PID) return;
   try{ await spUploadText('LV_'+PID+'.json', JSON.stringify(DATA)); }
   catch(e){ console.warn('Stückliste speichern fehlgeschlagen:', e); }
+}
+
+// ══ Stückliste ändern: Position ergänzen / bearbeiten / löschen ══════════════
+// Bis v98 war die Stückliste nach dem Import unveränderlich: ein Nachtrag ließ sich
+// nicht aufnehmen, und eine falsch eingelesene Zeile blieb stehen (in Nüsttal war
+// „Pläne" als Position in die Stückliste geraten). Der einzige Ausweg wäre eine
+// zweite Baustelle gewesen – mit ihr wären die erfassten Stände auseinandergelaufen.
+//
+// RECHTE: Das ändert `LV_<pid>.json` und damit die Baustelle FÜR ALLE, deshalb wie
+// beim Ausführer-Wechsel auf Bauleitung + Innendienst begrenzt. Geprüft wird das
+// MICROSOFT-KONTO (darfBenutzerWechseln), NIEMALS `USER` – der ist umstellbar.
+// Leitplanke gegen versehentliche Eingriffe, KEINE Sicherheitsgrenze: clientseitig
+// umgehbar, und in SharePoint haben alle Angemeldeten dieselben Rechte.
+function darfLVAendern(){ return darfBenutzerWechseln(); }
+function applyLvRechte(){ try{ document.body.classList.toggle('lvadm', darfLVAendern()); }catch(e){} }
+function lvGesperrt(){
+  alert('Die Stückliste dürfen nur Bauleitung und Innendienst ändern.\n\n'
+    + 'Positionen ergänzen oder löschen wirkt sich auf die ganze Baustelle aus – '
+    + 'bitte an die Bauleitung oder den Innendienst wenden.');
+}
+// Stücklisten-Änderungen brauchen SharePoint (LV-Datei + Listen-Item). Offline gäbe
+// es keinen Weg, sie in die Outbox zu legen – die kennt nur Positionsdaten.
+function lvOnline(){
+  if(!navigator.onLine || !SPIDS.listId || !PID){
+    alert('Dafür muss die App online sein.\n\nDie Stückliste liegt in SharePoint – Änderungen daran lassen sich nicht offline zwischenspeichern.');
+    return false;
+  }
+  return true;
+}
+// Marke für nachträglich ergänzte Positionen (Nachtrag)
+function ntBadge(it){ return (it && it.nt) ? ' <span class="gtag gNT" title="Nachtrag – nachträglich zur Stückliste ergänzt">Nachtrag</span>' : ''; }
+// Position samt Umgebung finden (Etage, Anlage, Platz in der Liste)
+function lvFind(pos){
+  for(const sec of DATA){ for(const sub of sec.subsections){
+    const ii=sub.items.findIndex(it=>it.pos===pos);
+    if(ii>=0) return {sec:sec, sub:sub, item:sub.items[ii], idx:ii};
+  }}
+  return null;
+}
+// Natürliche Sortierung von Positionsnummern („…03." vor „…10.")
+function lvPosCmp(a,b){
+  const ta=String(a).split(/[^0-9A-Za-z]+/).filter(Boolean), tb=String(b).split(/[^0-9A-Za-z]+/).filter(Boolean);
+  for(let i=0;i<Math.max(ta.length,tb.length);i++){
+    const x=ta[i], y=tb[i];
+    if(x===undefined) return -1;
+    if(y===undefined) return 1;
+    if(/^\d+$/.test(x) && /^\d+$/.test(y)){ const d=parseInt(x,10)-parseInt(y,10); if(d) return d<0?-1:1; }
+    else if(x!==y) return x<y?-1:1;
+  }
+  return 0;
+}
+// Vorschlag für die nächste Nummer: letzte Nummer der Anlage hochzählen, Stellenzahl
+// und Endpunkt beibehalten („05.02.00.00.03." -> „05.02.00.00.04.").
+function lvNextPos(sub, sec){
+  let quelle = sub.items.length ? String(sub.items[sub.items.length-1].pos) : '';
+  // Leere Anlage (alles gelöscht): Muster von einer Nachbaranlage derselben Etage
+  // übernehmen, sonst käme „01.02.01." heraus statt „01.02.00.00.01.".
+  if(!quelle && sec){
+    const nb=(sec.subsections||[]).find(x=>x!==sub && x.items.length);
+    if(nb){
+      const p=String(nb.items[0].pos), pre=String(nb.pos);
+      if(p.indexOf(pre)===0){
+        const kand=String(sub.pos)+p.slice(pre.length);
+        const m0=kand.match(/^(.*?)(\d+)(\D*)$/);
+        if(m0) quelle=m0[1]+String(0).padStart(m0[2].length,'0')+m0[3];   // -> nächste Nummer ist 01
+      }
+    }
+  }
+  const m = quelle.match(/^(.*?)(\d+)(\D*)$/);
+  if(m){
+    let n=parseInt(m[2],10)+1, kand='';
+    for(let i=0;i<999;i++){
+      kand=m[1]+String(n).padStart(m[2].length,'0')+m[3];
+      if(!lvFind(kand)) return kand;
+      n++;
+    }
+  }
+  return String(sub.pos||'')+'01.';
+}
+// Was hängt an dieser Position? Klartext für die Rückfrage vor dem Löschen.
+function lvBestand(pos){
+  const s=ST[pos]; const teile=[];
+  if(!s) return teile;
+  const hk=['g','m','nu','a','sa','dp','ea','pa','ib','ew'].filter(f=>s[f]).length;
+  const ra=(s.restarbeiten||[]).filter(r=>(r.txt||'').trim()||(r.desc||'').trim()||(r.fotos&&r.fotos.length)).length;
+  if(hk) teile.push(hk+(hk===1?' gesetzter Schritt':' gesetzte Schritte'));
+  if((s.fotos||[]).length) teile.push((s.fotos||[]).length+(s.fotos.length===1?' Foto':' Fotos'));
+  if((s.pdfs||[]).length) teile.push((s.pdfs||[]).length+(s.pdfs.length===1?' Protokoll':' Protokolle'));
+  if(ra) teile.push(ra+(ra===1?' Restarbeit':' Restarbeiten'));
+  if((s.note||'').trim()) teile.push('eine Anmerkung');
+  return teile;
+}
+// Nach einer Stücklisten-Änderung neu aufbauen, ohne den Nutzer zu verlieren:
+// buildPanels() klappt alle Anlagen wieder zu – die vorher offenen werden gemerkt.
+function lvRebuild(focusPos){
+  const offen=[...document.querySelectorAll('.ilist')].filter(l=>!l.classList.contains('hid')).map(l=>l.id);
+  const y=window.scrollY;
+  buildPanels(); restoreUI(); applyF();
+  const aufklappen=l=>{ if(!l) return; l.classList.remove('hid');
+    const blk=l.parentElement, t=blk&&blk.querySelector('.btog'); if(t) t.classList.remove('cl'); };
+  offen.forEach(id=>aufklappen(document.getElementById(id)));
+  const card = focusPos ? document.getElementById('C'+sp(focusPos)) : null;
+  if(card){
+    aufklappen(card.closest('.ilist'));
+    card.classList.add('lvnew');
+    setTimeout(()=>{ card.scrollIntoView({block:'center'}); }, 30);
+    setTimeout(()=>card.classList.remove('lvnew'), 3000);
+  } else window.scrollTo(0,y);
+}
+// ---- Dialog-Gerüst (wie openGewerkChooser: eigenes Overlay, kein Framework) ----
+function lvOv(html){
+  let ov=document.getElementById('lvOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='lvOv';
+    ov.style.cssText='position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px';
+    document.body.appendChild(ov); }
+  ov.innerHTML='<div style="background:var(--surface);color:var(--text);border-radius:12px;max-width:440px;width:100%;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.45);max-height:92vh;overflow-y:auto">'+html+'</div>';
+  ov.style.display='flex';
+  return ov;
+}
+function lvOvClose(){ const o=document.getElementById('lvOv'); if(o) o.remove(); }
+// Eingabefeld. 16px Schriftgröße: alles darunter lässt iOS beim Tippen hineinzoomen.
+function lvFeld(id,label,val,ph,hint){
+  return '<label style="display:block;margin-bottom:11px">'
+    +'<span style="display:block;font-size:11px;font-weight:700;letter-spacing:.4px;color:var(--accent2);margin-bottom:4px">'+label+'</span>'
+    +'<input id="'+id+'" value="'+escapeHtml(val||'')+'" placeholder="'+escapeHtml(ph||'')+'" '
+    +'style="width:100%;box-sizing:border-box;padding:9px 10px;font-size:16px;border:1px solid var(--line);border-radius:8px;background:var(--surface2);color:var(--text);font-family:inherit">'
+    +(hint?'<span style="display:block;font-size:11px;color:var(--accent2);margin-top:3px">'+hint+'</span>':'')
+    +'</label>';
+}
+function lvBtn(label,onclick,art){
+  const stil = art==='rot' ? 'background:#8b2222;color:#fff;border:none'
+    : art==='ok' ? 'background:var(--accent);color:#2b2b2b;border:none'
+    : 'background:transparent;color:var(--text);border:1px solid var(--line)';
+  return '<button onclick="'+onclick+'" style="'+stil+';padding:10px 18px;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit;font-size:14px">'+label+'</button>';
+}
+function lvGewerkFelder(gew){
+  const cur=gew||[];
+  const row=(code,label,hint)=>'<label style="display:inline-flex;align-items:center;gap:7px;padding:7px 10px;border:1px solid var(--line);border-radius:8px;margin:0 6px 6px 0;cursor:pointer;font-weight:700;font-size:13px">'
+    +'<input type="checkbox" class="lvgw" value="'+code+'" '+(cur.includes(code)?'checked':'')+' style="width:17px;height:17px">'
+    +'<span class="gtag g'+(code==='PA'?'E':code)+'">'+(label||GEWERK_LABEL[code])+'</span>'
+    +(hint?'<span style="font-weight:400;font-size:10px;color:var(--accent2)">'+hint+'</span>':'')+'</label>';
+  return '<div style="font-size:11px;font-weight:700;letter-spacing:.4px;color:var(--accent2);margin-bottom:5px">GEWERK – bestimmt, welche Schritte gelten</div>'
+    +'<div style="margin-bottom:6px">'+row('M')+row('S')+row('E','Elektro')+row('PA','Potentialausgleich')+row('NU')+'</div>';
+}
+
+// ---- Position bearbeiten / löschen ----
+function openPosEdit(pos){
+  if(!darfLVAendern()) return lvGesperrt();
+  const f=lvFind(pos);
+  if(!f){ alert('Diese Position steht nicht (mehr) in der Stückliste.'); return; }
+  const it=f.item;
+  lvOv(
+     '<div style="font-size:16px;font-weight:700;margin-bottom:2px">Position bearbeiten</div>'
+    +'<div style="font-size:12px;color:var(--accent2);margin-bottom:14px">'+escapeHtml(f.sec.label||f.sec.pos)+' · '+escapeHtml(f.sub.bez||f.sub.pos)+' · Nr. '+escapeHtml(pos)+'</div>'
+    +lvFeld('lvBez','Bezeichnung', it.bez)
+    +'<div style="display:flex;gap:10px"><div style="flex:1">'+lvFeld('lvMenge','Menge', it.menge)+'</div><div style="flex:1">'+lvFeld('lvEinh','Einheit', it.einh)+'</div></div>'
+    +lvFeld('lvFab','Fabrikat', it.fabrikat)
+    +lvFeld('lvTyp','Typ', it.typ)
+    +'<div style="font-size:11px;color:var(--accent2);margin:-2px 0 14px">Die Positionsnummer lässt sich nicht ändern – an ihr hängen Häkchen, Fotos und Protokolle.</div>'
+    +'<div style="display:flex;gap:10px;justify-content:flex-end">'+lvBtn('Abbrechen','lvOvClose()')+lvBtn('Speichern','posEditSpeichern(\''+pos+'\')','ok')+'</div>'
+    +'<div style="border-top:1px solid var(--line);margin-top:18px;padding-top:14px">'
+    +lvBtn('&#128465; Position l&ouml;schen','posLoeschen(\''+pos+'\')','rot')
+    +'<div style="font-size:11px;color:var(--accent2);margin-top:7px;line-height:1.5">Nimmt die Position aus der Stückliste – für alle. Für Zeilen, die beim Einlesen fälschlich als Position gelandet sind (z. B. „Pläne").</div>'
+    +'</div>');
+}
+async function posEditSpeichern(pos){
+  if(!darfLVAendern()) return lvGesperrt();
+  if(!lvOnline()) return;
+  const f=lvFind(pos); if(!f) return;
+  const g=id=>String(((document.getElementById(id)||{}).value)||'').trim();
+  const bez=g('lvBez');
+  if(!bez){ alert('Bitte eine Bezeichnung angeben.'); return; }
+  f.item.bez=bez; f.item.menge=g('lvMenge'); f.item.einh=g('lvEinh');
+  f.item.fabrikat=g('lvFab'); f.item.typ=g('lvTyp');
+  lvOvClose();
+  await saveLV();
+  lvRebuild(pos);
+}
+
+// ---- Position ergänzen (Nachtrag) ----
+function openPosNeu(secPos, subPos){
+  if(!darfLVAendern()) return lvGesperrt();
+  const sec=DATA.find(s=>s.pos===secPos);
+  const sub=sec && sec.subsections.find(x=>x.pos===subPos);
+  if(!sub){ alert('Diese Anlage steht nicht mehr in der Stückliste.'); return; }
+  lvOv(
+     '<div style="font-size:16px;font-weight:700;margin-bottom:2px">Position ergänzen</div>'
+    +'<div style="font-size:12px;color:var(--accent2);margin-bottom:14px">'+escapeHtml(sec.label||sec.pos)+' · '+escapeHtml(sub.bez||sub.pos)+'</div>'
+    +lvFeld('lvNr','Positionsnummer', lvNextPos(sub, sec), '', 'Vorschlag – frei änderbar. Muss in dieser Baustelle einmalig sein.')
+    +lvFeld('lvBez','Bezeichnung', '', 'z. B. Kühlschrank')
+    +'<div style="display:flex;gap:10px"><div style="flex:1">'+lvFeld('lvMenge','Menge','1')+'</div><div style="flex:1">'+lvFeld('lvEinh','Einheit','St')+'</div></div>'
+    +lvFeld('lvFab','Fabrikat','')
+    +lvFeld('lvTyp','Typ','')
+    +lvGewerkFelder([])
+    +'<label style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;margin:4px 0 14px;cursor:pointer;font-weight:700;font-size:13px">'
+    +'<input type="checkbox" id="lvNt" checked style="width:17px;height:17px"> Als Nachtrag kennzeichnen'
+    +'<span style="font-weight:400;font-size:11px;color:var(--accent2)">Marke an der Karte</span></label>'
+    +'<div style="display:flex;gap:10px;justify-content:flex-end">'+lvBtn('Abbrechen','lvOvClose()')
+    +lvBtn('Übernehmen','posNeuSpeichern(\''+secPos+'\',\''+subPos+'\')','ok')+'</div>');
+  setTimeout(()=>{ const el=document.getElementById('lvBez'); if(el) el.focus(); }, 40);
+}
+async function posNeuSpeichern(secPos, subPos){
+  if(!darfLVAendern()) return lvGesperrt();
+  if(!lvOnline()) return;
+  const sec=DATA.find(s=>s.pos===secPos);
+  const sub=sec && sec.subsections.find(x=>x.pos===subPos);
+  if(!sub){ alert('Diese Anlage steht nicht mehr in der Stückliste.'); return; }
+  const g=id=>String(((document.getElementById(id)||{}).value)||'').trim();
+  const pos=g('lvNr'), bez=g('lvBez');
+  if(!pos){ alert('Bitte eine Positionsnummer angeben.'); return; }
+  // Die Nummer wird zu DOM-IDs (sp()), Datei- und Ordnernamen und steckt in
+  // onclick-Attributen – deshalb bewusst eng gefasst.
+  if(!/^[A-Za-z0-9][A-Za-z0-9 ._-]*$/.test(pos)){
+    alert('In der Positionsnummer sind nur Ziffern, Buchstaben, Punkt, Bindestrich, Unterstrich und Leerzeichen erlaubt.'); return;
+  }
+  if(!bez){ alert('Bitte eine Bezeichnung angeben.'); return; }
+  if(lvFind(pos)){ alert('Die Nummer '+pos+' gibt es in dieser Baustelle schon.'); return; }
+  if(ST[pos] && !confirm('Zu der Nummer '+pos+' liegen noch Daten (Häkchen/Fotos) einer früher gelöschten Position.\n\nSie würden mit der neuen Position wieder auftauchen. Trotzdem verwenden?')) return;
+  const gew=[...document.querySelectorAll('#lvOv input.lvgw:checked')].map(c=>c.value);
+  const item={pos:pos, menge:g('lvMenge'), einh:g('lvEinh'), bez:bez, fabrikat:g('lvFab'), typ:g('lvTyp'), gew:gew};
+  if((document.getElementById('lvNt')||{}).checked) item.nt=1;
+  // An die passende Stelle einsortieren, ohne die vorhandene Reihenfolge anzufassen.
+  let i=sub.items.findIndex(x=>lvPosCmp(x.pos,pos)>0);
+  if(i<0) i=sub.items.length;
+  sub.items.splice(i,0,item);
+  lvOvClose();
+  await saveLV();
+  lvRebuild(pos);
+}
+
+// ---- Position löschen (mit „Rückgängig") ----
+// Gelöschte Position vorhalten: ein Fehlgriff wäre sonst endgültig – samt Häkchen,
+// Fotos und Restarbeiten. Die Dateien in SharePoint werden BEWUSST nicht gelöscht,
+// dadurch holt „Rückgängig" die Position vollständig zurück.
+let POS_UNDO=null, _posUndoTimer=null;
+async function posLoeschen(pos){
+  if(!darfLVAendern()) return lvGesperrt();
+  if(!lvOnline()) return;
+  const f=lvFind(pos);
+  if(!f){ alert('Diese Position steht nicht (mehr) in der Stückliste.'); return; }
+  const teile=lvBestand(pos);
+  let frage='Position aus der Stückliste löschen?\n\n„'+posLabel(pos)+'"\n\nDie Stückliste gilt für die ganze Baustelle – die Position verschwindet für alle.';
+  if(teile.length) frage+='\n\nDaran hängen: '+teile.join(', ')+'.\nDiese Einträge gehen mit. Die Fotodateien selbst bleiben in SharePoint erhalten.';
+  if(!confirm(frage)) return;
+  // Steckt echte Arbeit drin, reicht ein versehentliches „OK" nicht.
+  if(teile.length){
+    const a=String(prompt('Zur Sicherheit bitte LÖSCHEN eingeben.\n\n'+posLabel(pos)+'\n'+teile.join(', '))||'').trim().toUpperCase();
+    if(a!=='LÖSCHEN' && a!=='LOESCHEN' && a!=='LOSCHEN'){ alert('Abgebrochen – die Position bleibt stehen.'); return; }
+  }
+  lvOvClose();
+  const snapshot={pos:pos, secPos:f.sec.pos, subPos:f.sub.pos, idx:f.idx,
+    item:JSON.parse(JSON.stringify(f.item)),
+    state: ST[pos] ? JSON.parse(JSON.stringify(ST[pos])) : null};
+  f.sub.items.splice(f.idx,1);
+  delete ST[pos];
+  delete POSGEW[pos];
+  DIRTY.delete(pos);
+  try{ await idbDel('outbox','pos|'+PID+'|'+pos); }catch(e){}
+  // Listen-Item entfernen – sonst holt das 30-s-Polling die Daten zurück und die
+  // Position stünde als Leiche in SharePoint.
+  // ACHTUNG zwei Schlüsselformen: spListWrite/spListLoadRows legen unter itemKey()
+  // ab (PID\x01pos), die Sync-Engine (spListWriteFields) unter PID+pos OHNE Trenner.
+  // Wird hier nur eine geräumt, bliebe das Item in SharePoint stehen und das
+  // 30-s-Polling schriebe die Daten der gelöschten Position wieder in ST.
+  const keys=[itemKey(pos), (PID||'')+pos];
+  const ids=[];
+  keys.forEach(k=>{ if(ITEMID[k] && ids.indexOf(ITEMID[k])<0) ids.push(ITEMID[k]); delete ITEMID[k]; });
+  for(const id of ids){
+    try{ await graph('/sites/'+SPIDS.siteId+'/lists/'+SPIDS.listId+'/items/'+id, {method:'DELETE'}); }
+    catch(e){ console.warn('Listen-Item löschen fehlgeschlagen:', (e&&e.message)||e); }
+  }
+  await saveLV();
+  try{ await persistCurrentState(); await persistItemIds(); }catch(e){}
+  updSyncBadge();
+  buildTabs();
+  lvRebuild(null);
+  POS_UNDO=snapshot;
+  posUndoToast();
+}
+function posUndoToast(){
+  const alt=document.getElementById('posUndo'); if(alt) alt.remove();
+  clearTimeout(_posUndoTimer);
+  const b=document.createElement('div');
+  b.id='posUndo';
+  b.innerHTML='<span>Position gel&ouml;scht</span><button onclick="posUndo()">R&uuml;ckg&auml;ngig</button>';
+  document.body.appendChild(b);
+  setTimeout(()=>b.classList.add('on'), 30);   // nicht rAF: greift im Hintergrund nicht
+  _posUndoTimer=setTimeout(()=>{ const e=document.getElementById('posUndo'); if(e) e.remove(); POS_UNDO=null; }, 20000);
+}
+async function posUndo(){
+  const u=POS_UNDO; POS_UNDO=null;
+  clearTimeout(_posUndoTimer);
+  const e=document.getElementById('posUndo'); if(e) e.remove();
+  if(!u) return;
+  const sec=DATA.find(s=>s.pos===u.secPos);
+  const sub=sec && sec.subsections.find(x=>x.pos===u.subPos);
+  if(!sub){ alert('Den Bereich gibt es nicht mehr – die Position lässt sich nicht zurückholen.'); return; }
+  if(lvFind(u.pos)) return;                       // schon wieder da
+  sub.items.splice(Math.min(u.idx, sub.items.length), 0, u.item);
+  if(u.state) ST[u.pos]=u.state;
+  await saveLV();
+  buildTabs();
+  lvRebuild(u.pos);
+  // Listen-Item neu anlegen (ITEMID ist weg -> enqueuePos legt beim Sync ein neues an)
+  if(u.state){ try{ await enqueuePos(u.pos); flushOutbox(); }catch(x){} }
 }
 
 // ---- Parser: Zeilen -> LV-Struktur (Hierarchie aus Positionsnummer) ----
