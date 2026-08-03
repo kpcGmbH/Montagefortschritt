@@ -255,7 +255,7 @@ const SPIDS={ siteId:null, listId:null, driveId:null };
 // localStorage 'kpc_user' (gleiche Origin), damit ein dort gewählter Ausführer
 // mitwandert. Über das Badge im Kopf jederzeit wechselbar (z. B. auf die
 // Bauleitung, wenn sie die Einweisung übernimmt).
-let PID=null, PROJNAME='', USER=(()=>{ try{ return localStorage.getItem('kpc_user')||''; }catch(e){ return ''; } })(), PROJ_AG='', PROJ_ORT='';   // aus Projekt-Stammdaten (__projects.json)
+let PID=null, PROJNAME='', USER=(()=>{ try{ return localStorage.getItem('kpc_user')||''; }catch(e){ return ''; } })(), PROJ_AG='', PROJ_ORT='', PROJ_ADR='', PROJ_AUFTRAG='';   // aus Projekt-Stammdaten (__projects.json)
 let LV=[];                 // Etagen/Bereiche/Geräte aus LV_<pid>.json
 let EW={ v:1, devices:{}, std:{}, protokolle:[] };  // Einweisungs-Status (EINWEISUNG_<pid>.json)
 
@@ -361,7 +361,7 @@ async function loadEW(pid){
   let ew={ v:1, devices:{}, std:{}, protokolle:[] };
   if(txt){ try{ ew=JSON.parse(txt); }catch(e){} }
   ew.devices=ew.devices||{}; ew.std=ew.std||{}; ew.protokolle=ew.protokolle||[];
-  if(ew.auftraggeber==null) ew.auftraggeber=''; if(ew.ort==null) ew.ort='';
+  if(ew.auftraggeber==null) ew.auftraggeber=''; if(ew.ort==null) ew.ort=''; if(ew.adresse==null) ew.adresse='';
   return ew;
 }
 async function saveEW(){ await spUploadText('EINWEISUNG_'+PID+'.json', JSON.stringify(EW)); }
@@ -582,7 +582,16 @@ async function openProject(pid, pname){
     const lv=await loadLV(pid); LV=buildTreeFromLV(lv);
     EW=await loadEW(pid);
     // Stammdaten (Name + Auftraggeber) aus __projects.json
-    try{ const projs=await loadProjectsList(); const p=projs.find(x=>x.pid===pid); if(p){ if(!PROJNAME||PROJNAME===pid) PROJNAME=p.name||pid; PROJ_AG=(p.auftraggeber||''); PROJ_ORT=(p.ort||''); } }catch(e){}
+    // Stammdaten der Baustelle – dieselben Felder wie in der Montagefortschritt-App
+    // (projStamm dort). Die Anschrift steht im Protokollkopf, damit das Blatt beim
+    // Kunden auch ohne Rückfrage zuzuordnen ist.
+    try{ const projs=await loadProjectsList(); const p=projs.find(x=>x.pid===pid); if(p){
+      if(!PROJNAME||PROJNAME===pid) PROJNAME=p.name||pid;
+      PROJ_AG=(p.auftraggeber||''); PROJ_ORT=(p.ort||'');
+      const _plzOrt=[(p.plz||'').trim(),(p.ort||'').trim()].filter(Boolean).join(' ');
+      PROJ_ADR=[(p.strasse||'').trim(),_plzOrt].filter(Boolean).join(', ');
+      PROJ_AUFTRAG=(p.auftragsnr||'').trim()||(p.nummer||'').trim();
+    } }catch(e){}
     // Historie gegen den Ablageordner abgleichen (heilt umbenannte, markiert fehlende Dateien)
     if(EW.protokolle.length){ showLoader('Protokolle werden geprüft …'); try{ await reconcilePdfs(); }catch(e){ console.warn('Abgleich:',e&&e.message); } }
   }catch(e){ hideLoader(); document.getElementById('main').innerHTML='<div class="empty">'+esc((e&&e.message)||e)+'</div>'; return; }
@@ -793,6 +802,7 @@ function editProt(id){
   });
   SESSION={ editId:id, typ:p.typ, selected, sonder, std, keys, frei, collapsed:{},
     teilnehmer:p.teilnehmer||'', auftraggeber:p.auftraggeber||'', ort:p.ort||'',
+    adresse:(p.adresse!=null?p.adresse:PROJ_ADR), auftrag:(p.auftrag!=null?p.auftrag:PROJ_AUFTRAG),
     datum:(p.datum||'').slice(0,10)||todayISO(), einweiser:p.einweiser||'',
     kommentar:p.kommentar||'', sig:'', sigKpc:'' };
   mkOverlay('Protokoll korrigieren');
@@ -812,7 +822,7 @@ function startSession(){
 // Ort aus dem Projektnamen ableiten (Schema "Nummer Ort Objekt")
 function deriveOrt(){ const p=(PROJNAME||'').trim().split(/\s+/); return p.length>=2? p[1] : ''; }
 function sessionType(typ){
-  SESSION={ typ, selected:{}, sonder:{}, std:{}, keys:{}, frei:[], collapsed:{}, teilnehmer:'', auftraggeber:(PROJ_AG||EW.auftraggeber||''), ort:(EW.ort||PROJ_ORT||deriveOrt()), datum:todayISO(), einweiser:USER||'', kommentar:'', sig:'', sigKpc:'' };
+  SESSION={ typ, selected:{}, sonder:{}, std:{}, keys:{}, frei:[], collapsed:{}, teilnehmer:'', auftraggeber:(PROJ_AG||EW.auftraggeber||''), ort:(EW.ort||PROJ_ORT||deriveOrt()), adresse:(PROJ_ADR||EW.adresse||''), auftrag:PROJ_AUFTRAG, datum:todayISO(), einweiser:USER||'', kommentar:'', sig:'', sigKpc:'' };
   renderSession();
 }
 // Ein Einstieg für alle drei Protokollarten – die Geräteauswahl teilen sich
@@ -952,6 +962,7 @@ function footerFields(){
   const isK=istSchluessel();
   return '<div class="step-title" style="margin-top:16px">2. '+(isK?'Übergabe':'Teilnehmer')+' & Unterschrift</div>'+
     '<div class="fld"><label>Auftraggeber</label><input id="f_ag" value="'+esc(SESSION.auftraggeber)+'" oninput="SESSION.auftraggeber=this.value" placeholder="z.B. Goetze KG Armaturen"></div>'+
+    '<div class="fld"><label>Anschrift der Baustelle</label><input id="f_adr" value="'+esc(SESSION.adresse||'')+'" oninput="SESSION.adresse=this.value" placeholder="Straße Hausnr., PLZ Ort"><small class="hint" style="display:block;margin-top:4px">Aus den Stammdaten der Baustelle (🏢 in der Montagefortschritt-App). Steht im Protokollkopf.</small></div>'+
     '<div class="fld"><label>'+(isK?'Übernehmer (Kunde) *':'Bedienungsperson / eingewiesene Person *')+'</label><input id="f_teil" value="'+esc(SESSION.teilnehmer)+'" oninput="SESSION.teilnehmer=this.value" placeholder="'+(isK?'Name der übernehmenden Person':'Name (Techniker, Hausmeister, Küchenpersonal …)')+'"></div>'+
     '<div class="fld"><label>'+(isK?'Übergeber (KPC) *':'Einweiser (KPC)')+'</label><input id="f_einw" value="'+esc(SESSION.einweiser)+'" oninput="SESSION.einweiser=this.value" placeholder="Vorname Nachname"><small class="hint" style="display:block;margin-top:4px">'+(isK?'Steht als Übergeber im Protokoll.':'Steht im Protokoll und wird an den eingewiesenen Geräten vermerkt.')+'</small></div>'+
     '<div class="fld"><label>Ort (für „Anerkannt")</label><input id="f_ort" value="'+esc(SESSION.ort)+'" oninput="SESSION.ort=this.value" placeholder="Ort"></div>'+
@@ -1078,10 +1089,10 @@ async function finishSession(){
     // Schlüsselübergabe ändert BEWUSST nichts am Einweisungsstand: ein übergebener
     // Schlüssel ist kein Nachweis dafür, dass jemand am Gerät eingewiesen wurde.
     // Auftraggeber + Ort projektweit merken (nachträglich editierbar)
-    EW.auftraggeber=SESSION.auftraggeber.trim(); EW.ort=SESSION.ort.trim();
+    EW.auftraggeber=SESSION.auftraggeber.trim(); EW.ort=SESSION.ort.trim(); EW.adresse=(SESSION.adresse||'').trim();
     // "vollständig" = alle einweisungspflichtigen Geräte des Projekts jetzt eingewiesen
     let complete=false; if(SESSION.typ==='geraete'){ const c=counts(); complete = c.tot>0 && c.ein>=c.tot; }
-    const daten={ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), einweiser:einw, kommentar:(SESSION.kommentar||'').trim(), positions, bereiche, etagen, titel, complete, pdf:fname, pdfId:(up&&up.id)||(alt&&alt.pdfId)||'', ts:Date.now() };
+    const daten={ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), adresse:(SESSION.adresse||'').trim(), auftrag:(SESSION.auftrag||'').trim(), einweiser:einw, kommentar:(SESSION.kommentar||'').trim(), positions, bereiche, etagen, titel, complete, pdf:fname, pdfId:(up&&up.id)||(alt&&alt.pdfId)||'', ts:Date.now() };
     // Schlüsselzeilen mitspeichern – nur so lässt sich das Protokoll später korrigieren.
     if(isK){ daten.zeilen=zeilen.map(z=>({pos:z.pos,bez:z.bez,anz:z.anz,nr:z.nr})); daten.schluessel=anzSchl; }
     if(alt){ Object.assign(alt, daten, { korrigiertAm:new Date().toISOString(), korrigiertVon:USER||einw }); MISSING.delete(id); }
@@ -1121,7 +1132,10 @@ function buildKeyPdf(zeilen){
 
   doc.setFontSize(10.5);
   lab('Bauvorhaben:',M,y); val(PROJNAME,M+30,y); lab('Datum:',W-M-46,y); val(datumDE,W-M-30,y); y+=6.5;
-  lab('Gewerk:',M,y); val('Küchentechnik',M+30,y); y+=6.5;
+  if(SESSION.adresse){ lab('Anschrift:',M,y); val(SESSION.adresse,M+30,y); y+=6.5; }
+  lab('Gewerk:',M,y); val('Küchentechnik',M+30,y);
+  if(SESSION.auftrag){ lab('Auftrag:',W-M-46,y); val(SESSION.auftrag,W-M-30,y); }   // gleiche Spalte wie "Datum:" darüber
+  y+=6.5;
   lab('Auftragnehmer (ausführende Firma):',M,y); val('KPC GmbH',M+62,y); y+=9;
 
   // Beteiligte
@@ -1242,7 +1256,10 @@ function buildPdf(titel, positions){
   // Allgemein: kompaktere Zeilenabstände, damit alles möglichst auf eine Seite passt
   const lh=isAllg?6:7;
   lab('Bauvorhaben:',M,y); val(PROJNAME,M+30,y); lab('Datum:',W-M-42,y); val(datumDE,W-M-30,y); y+=lh;
-  lab('Gewerk:',M,y); val('Küchentechnik',M+30,y); y+=lh;
+  if(SESSION.adresse){ lab('Anschrift:',M,y); val(SESSION.adresse,M+30,y); y+=lh; }
+  lab('Gewerk:',M,y); val('Küchentechnik',M+30,y);
+  if(SESSION.auftrag){ lab('Auftrag:',W-M-46,y); val(SESSION.auftrag,W-M-30,y); }   // gleiche Spalte wie "Datum:" darüber
+  y+=lh;
   lab('Bereich:',M,y); val(isAllg? 'bereichsübergreifend' : bereichStr,M+30,y); y+=lh;
   if(!isAllg){ lab('Gerät:',M,y); val('gemäß beigefügter Aufstellung',M+30,y); y+=7; }
   y+=(isAllg?1:2); lab('Auftragnehmer (ausführende Firma):',M,y); val('KPC GmbH',M+62,y); y+=(isAllg?8:10);

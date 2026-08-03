@@ -186,8 +186,10 @@ textarea{border:1.4px solid var(--line);border-radius:8px;min-height:64px;resize
 <div class="bsbar"><div class="bsbar-in">
   <span class="bslabel">📍 Baustelle</span>
   <input id="bsProj" type="text" placeholder="Projekt – z. B. Berlin Upbeat" autocomplete="off">
+  <input id="bsStr" type="text" placeholder="Straße, Hausnr." autocomplete="off">
+  <input id="bsPlz" type="text" placeholder="PLZ" inputmode="numeric" autocomplete="off" style="flex:0 1 90px;min-width:70px">
   <input id="bsOrt" type="text" placeholder="Ort – z. B. Berlin" autocomplete="off">
-  <span class="bshint">wird später automatisch aus der Montagefortschritt-App übernommen</span>
+  <span class="bshint">wird automatisch aus der Montagefortschritt-App übernommen (Stammdaten der Baustelle) – steht auf jeder Seite des Protokolls</span>
 </div></div>
 
 <div class="wrap">
@@ -270,7 +272,10 @@ const mAbluft=()=>sec('Abluftanschluss',[
 ]);
 const mFunc=(extra=[])=>sec('Funktionsprüfung',[chk('Regeleinrichtung funktioniert?'),...extra]);
 const mAbschluss=()=>sec('Abschließend',[chk('Wurde das Gerät in Betrieb genommen?'),area('Anmerkungen'),chk('Betreiber eingewiesen?')]);
-const mKopf=()=>[txt('Seriennummer (SN)'),txt('Typ'),txt('Bezeichnung'),txt('Item-Nr. (wenn vorhanden)'),txt('Baustelle'),txt('Position'),txt('Datum')];
+// Auftraggeber + Anschrift stehen BEWUSST am ENDE der Liste: die Feldwerte
+// liegen als k0..kn nach INDEX im gespeicherten Stand. Wer mittendrin einfügt,
+// verschiebt sie – ein altes Protokoll zeigte dann das Datum als Auftraggeber.
+const mKopf=()=>[txt('Seriennummer (SN)'),txt('Typ'),txt('Bezeichnung'),txt('Item-Nr. (wenn vorhanden)'),txt('Baustelle'),txt('Position'),txt('Datum'),txt('Auftraggeber'),txt('Anschrift')];
 const mSig=(roles)=>({mode:'ausgefuehrt',roles});
 
 /* ---------- Rational Bausteine ---------- */
@@ -279,7 +284,7 @@ const rKopf=(extra)=>[txt('Unternehmen (Kunde)'),txt('Ansprechpartner (Kunde)'),
   txt('Datum Installation'),txt('Datum Inbetriebnahme')].filter(Boolean);
 
 /* ---------- Allgemeine (herstellerneutrale) Bausteine ---------- */
-function genKopf(){return [txt('Gerät / Bezeichnung'),txt('Hersteller'),txt('Typ / Modell'),txt('Seriennummer'),txt('Standort / Position'),txt('Baustelle'),txt('Datum')];}
+function genKopf(){return [txt('Gerät / Bezeichnung'),txt('Hersteller'),txt('Typ / Modell'),txt('Seriennummer'),txt('Standort / Position'),txt('Baustelle'),txt('Datum'),txt('Auftraggeber'),txt('Anschrift')];}   // Auftraggeber/Anschrift ans ENDE – siehe mKopf
 function genSig(f){f=f||{};var r=['Elektroinstallation'];
   if(f.wasser&&f.abwasser)r.push('Wasser- und Abwasserinstallation');
   else if(f.wasser)r.push('Wasserinstallation');
@@ -525,7 +530,7 @@ Winterhalter:{label:'Winterhalter',desc:'Spülmaschinen · Inbetriebnahmekarte &
   devices:{
    'Prüfprotokoll elektrische Geräte':{tags:['Elektro','Wiederholungsprüfung'],
      pdfTitle:'PRÜFPROTOKOLL',pdfSub:'BetrSichV / DGUV Vorschrift 3 · DIN VDE 0701-0702',ptype:'DGUV Protokoll',
-     kopf:[txt('Kunde'),txt('Gerät / Bezeichnung'),txt('Fabrikat'),txt('Typ / Modell'),txt('Seriennummer (S-Nr.)'),txt('Standort / Position'),txt('Baustelle'),txt('Datum')],
+     kopf:[txt('Kunde'),txt('Gerät / Bezeichnung'),txt('Fabrikat'),txt('Typ / Modell'),txt('Seriennummer (S-Nr.)'),txt('Standort / Position'),txt('Baustelle'),txt('Datum'),txt('Anschrift')],   // Anschrift ans ENDE – siehe mKopf
      sections:[
        sec('01 · Sichtprüfung',[
          chk('Typenschild vorhanden und leserlich'),
@@ -559,7 +564,9 @@ const TECH={name:'',email:''};
 function todayDE(){var d=new Date(),p=function(n){return String(n).padStart(2,'0');};return p(d.getDate())+'.'+p(d.getMonth()+1)+'.'+d.getFullYear();}
 // kunde = Auftraggeber aus den Projekt-Stammdaten der Hauptapp (__projects.json).
 // Die IBN-App kann ihn nirgends selbst herleiten – er kommt nur über den Hash herein.
-const PROJECT={name:'',ort:'',kunde:''};
+// Stammdaten der Baustelle. Kommen aus der Montagefortschritt-App (Hash) oder
+// werden in der Baustellenleiste von Hand gepflegt (App auch allein nutzbar).
+const PROJECT={name:'',ort:'',kunde:'',strasse:'',plz:'',auftrag:''};
 let MYSIG='';
 function loadMySig(){try{MYSIG=localStorage.getItem('ibn:mysig')||'';}catch(e){MYSIG='';}}
 function renderSigBtn(){var b=$('sigBtn');if(b){b.classList.toggle('on',!!MYSIG);b.innerHTML=MYSIG?'✍ Signatur ✓':'✍ Meine Signatur';}}
@@ -576,19 +583,36 @@ function initMySigPad(){var cv=$('cv_mysig'),wrap=$('wrap_mysig');if(!cv)return;
 function clearMySig(){var cv=$('cv_mysig');if(cv){var ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);cv.__ink=false;}var ph=$('ph_mysig');if(ph)ph.style.display='';}
 function saveMySig(){var cv=$('cv_mysig');MYSIG=(cv&&cv.__ink)?cv.toDataURL('image/png'):'';try{localStorage.setItem('ibn:mysig',MYSIG);}catch(e){}toast(MYSIG?'Eigene Signatur gespeichert':'Signatur entfernt');renderSigBtn();closeMySig();if(CUR.dev){applyPrefills();openForm(CUR.dev,true);}}
 function projLabel(){return PROJECT.name?(PROJECT.ort?PROJECT.name+' · '+PROJECT.ort:PROJECT.name):PROJECT.ort;}
-// Zuordnung des Protokolls zu Baustelle/Kunde/Position – siehe header() in exportPDF.
-// Leere Angaben fallen weg; ohne jede Angabe (Protokoll ohne Baustellenkontext)
-// bleibt der Kopf unverändert wie bisher.
+// Anschrift der Baustelle, einzeilig. NUR wenn wirklich eine gepflegt ist:
+// der Ort allein steht schon in projLabel() und wäre bei Altbaustellen ohnehin
+// nur aus dem Projektnamen geraten – als Anschrift im Kopf wäre das irreführend.
+function projPlzOrt(){return [PROJECT.plz,PROJECT.ort].filter(Boolean).join(' ');}
+function projAdresse(){return PROJECT.strasse?[PROJECT.strasse,projPlzOrt()].filter(Boolean).join(', '):(PROJECT.plz?projPlzOrt():'');}
+// Zuordnung des Protokolls zu Baustelle/Anschrift/Kunde/Position – siehe header()
+// in exportPDF. Leere Angaben fallen weg; ohne jede Angabe (Protokoll ohne
+// Baustellenkontext) bleibt der Kopf unverändert wie bisher.
+// Die Anschrift steht hier, weil vier der fünf Hersteller-Formulare gar kein
+// Adressfeld haben – im PDF-Kopf trägt sie JEDES Protokoll.
 function identLine(){var p=[];
   var pl=projLabel();if(pl)p.push('Baustelle: '+pl);
+  var ad=projAdresse();if(ad)p.push(ad);
   if(PROJECT.kunde)p.push('Kunde: '+PROJECT.kunde);
+  // Auftragsnummer nur, wenn sie nicht ohnehin vorn im Projektnamen steht
+  // ("1090.20 Nüsttal Grundschule") – sonst steht sie zweimal in derselben Zeile.
+  if(PROJECT.auftrag&&PROJECT.name.indexOf(PROJECT.auftrag)!==0)p.push('Auftrag: '+PROJECT.auftrag);
   if(IBNCTX&&IBNCTX.pos)p.push('Position: '+IBNCTX.pos);
   return p.join('   ·   ');}
-function loadProject(){try{var j=JSON.parse(localStorage.getItem('ibn:project')||'{}');PROJECT.name=j.name||'';PROJECT.ort=j.ort||'';PROJECT.kunde=j.kunde||'';}catch(e){}}
-function saveProject(){try{localStorage.setItem('ibn:project',JSON.stringify({name:PROJECT.name,ort:PROJECT.ort,kunde:PROJECT.kunde}));}catch(e){}}
-function initProjectBar(){var a=$('bsProj'),b=$('bsOrt');
-  if(a){a.value=PROJECT.name;a.oninput=function(){PROJECT.name=a.value;saveProject();};a.onchange=function(){if(CUR.dev){applyPrefills();openForm(CUR.dev,true);}};}
-  if(b){b.value=PROJECT.ort;b.oninput=function(){PROJECT.ort=b.value;saveProject();};b.onchange=function(){if(CUR.dev){applyPrefills();openForm(CUR.dev,true);}};}}
+function loadProject(){try{var j=JSON.parse(localStorage.getItem('ibn:project')||'{}');PROJECT.name=j.name||'';PROJECT.ort=j.ort||'';PROJECT.kunde=j.kunde||'';PROJECT.strasse=j.strasse||'';PROJECT.plz=j.plz||'';PROJECT.auftrag=j.auftrag||'';}catch(e){}}
+function saveProject(){try{localStorage.setItem('ibn:project',JSON.stringify({name:PROJECT.name,ort:PROJECT.ort,kunde:PROJECT.kunde,strasse:PROJECT.strasse,plz:PROJECT.plz,auftrag:PROJECT.auftrag}));}catch(e){}}
+function initProjectBar(){
+  // Alle Felder derselbe Ablauf: tippen speichert, Verlassen belegt ein offenes
+  // Formular neu vor (die Vorbelegung hängt an genau diesen Werten).
+  [['bsProj','name'],['bsStr','strasse'],['bsPlz','plz'],['bsOrt','ort']].forEach(function(f){
+    var el=$(f[0]);if(!el)return;
+    el.value=PROJECT[f[1]];
+    el.oninput=function(){PROJECT[f[1]]=el.value;saveProject();};
+    el.onchange=function(){if(CUR.dev){applyPrefills();openForm(CUR.dev,true);}};
+  });}
 function isKunde(role){return /kunde/i.test(role);}
 // Kundenunterschriften entfallen in den IBN-Protokollen: die Bestätigung durch den
 // Kunden gehört zur Einweisung (eigene App, mit Bestätigungstext). Zwei Unterschriften
@@ -606,10 +630,29 @@ function isTech(role,mode){if(mode==='ausgefuehrt')return true;if(/Kunde/i.test(
 // Kunden – beide dürfen den Auftraggeber NICHT bekommen. (Dieselbe Lehre wie bei
 // der IBN-Vorauswahl, §3.1: ein breiter Treffer schreibt falsche Daten ins
 // Protokoll, und das füllt jemand ahnungslos weiter aus.)
-// Adressfelder ("Anschrift", "Straße, Hausnummer") bleiben absichtlich leer – wir
-// kennen nur den Ort der Baustelle, nicht die Anschrift des Auftraggebers.
+// Adressfelder werden mit der ANSCHRIFT DER BAUSTELLE belegt (seit die in den
+// Stammdaten gepflegt wird). Das ist bei einem Inbetriebnahmeprotokoll auch die
+// fachlich richtige Angabe: Winterhalter nennt den Block "Aufstelladresse", es
+// geht um den Standort der Maschine, nicht um den Firmensitz des Auftraggebers.
+// Die Beschriftungen sind an allen 55 Protokollen ausgezählt – jede Zeile hier
+// steht für ein real vorhandenes Feld:
+//   Anschrift (Hobart) · Straße / Nr. + PLZ / Ort (Meiko)
+//   Straße, Hausnummer + PLZ, Ort (Winterhalter) · Straße + Postleitzahl + Ort (Rational)
+// NICHT belegt werden "Auftragsnummer" (Hobart), "Order-Nummer" (Meiko),
+// "Jobnummer" (Rational) und "Kundennummer bei Winterhalter": das sind Nummern
+// DES HERSTELLERS, nicht die kpc-Kommission. Die steht im PDF-Kopf.
 const KOPF_KUNDE=/^(kunde|kundenname|name des kunden|unternehmen \(kunde\)|auftraggeber|betreiber|aufstelladresse\s*[–-]\s*name)$/i;
-const KOPF_ORT=/^(ort|plz\s*[\/,]\s*ort|plz\s*,\s*ort)$/i;
+// ZWEI Fälle, die man nicht zusammenwerfen darf:
+// "Anschrift"/"Adresse" ist das EINZIGE Adressfeld des Formulars (Hobart, und so
+// heißt auch das Feld, das die kpc-eigenen Protokolle jetzt haben) -> dort muss
+// die VOLLE Anschrift stehen, sonst fehlen PLZ und Ort ersatzlos.
+// "Straße …" steht dagegen immer neben einem eigenen PLZ-/Ort-Feld (Meiko,
+// Winterhalter, Rational) -> dort nur die Straße.
+const KOPF_ANSCHRIFT=/^(anschrift|adresse)$/i;
+const KOPF_STRASSE=/^(stra(?:ß|ss)e|stra(?:ß|ss)e\s*\/\s*nr\.?|stra(?:ß|ss)e\s*,\s*hausnummer|stra(?:ß|ss)e und hausnummer|aufstelladresse\s*[–-]\s*stra(?:ß|ss)e)$/i;
+const KOPF_PLZORT=/^(plz\s*[\/,]\s*ort|plz\s+ort)$/i;
+const KOPF_PLZ=/^(plz|postleitzahl)$/i;
+const KOPF_ORT=/^ort$/i;
 const KOPF_BAUSTELLE=/^(baustelle|objekt|bauvorhaben)$/i;
 function applyPrefills(){if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev];const today=todayDE();
   STATE.__auto=STATE.__auto||{};
@@ -618,6 +661,10 @@ function applyPrefills(){if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev]
     if(/Unternehmen \(Techniker\)|Inbetriebnahme durch Firma/.test(f.l))val=KPC_FIRMA;
     else if(/Name \(Techniker\)|Name des Mitarbeiters/.test(f.l))val=TECH.name;
     else if(KOPF_BAUSTELLE.test(f.l))val=projLabel();
+    else if(KOPF_ANSCHRIFT.test(f.l))val=projAdresse();
+    else if(KOPF_STRASSE.test(f.l))val=PROJECT.strasse;
+    else if(KOPF_PLZORT.test(f.l))val=projPlzOrt();
+    else if(KOPF_PLZ.test(f.l))val=PROJECT.plz;
     else if(KOPF_ORT.test(f.l))val=PROJECT.ort;
     else if(KOPF_KUNDE.test(f.l))val=PROJECT.kunde;
     else if(/Datum/i.test(f.l))val=today;
@@ -833,7 +880,10 @@ function exportPDF(){
     if(__id){
       doc.setFont('RC');doc.setFontSize(8);doc.setTextColor(...gray);
       var __idl=doc.splitTextToSize(__id,cw);
-      if(__idl.length>2)__idl=__idl.slice(0,2);   // Kopf darf nicht in den Inhalt wachsen
+      // Kopf darf nicht in den Inhalt wachsen. 3 Zeilen, seit die Anschrift der
+      // Baustelle mitläuft – bei 2 wäre die Position stillschweigend abgeschnitten
+      // worden, und genau die ordnet das Protokoll dem Gerät zu.
+      if(__idl.length>3)__idl=__idl.slice(0,3);
       doc.text(__idl,mL,31);
       __idy=31+(__idl.length-1)*3.6+1.8;
     }
@@ -975,7 +1025,7 @@ function saveCustom(){try{localStorage.setItem('ibn:custom',JSON.stringify(CUSTO
 function mergeCustom(){for(var mk in CUSTOM){var m=CUSTOM[mk];
   if(!DB[mk])DB[mk]={label:m.label||mk,desc:m.desc||'Eigene Protokolle',icon:m.icon||'\U0001F4DD',devices:{}};
   for(var dv in m.devices){var d=JSON.parse(JSON.stringify(m.devices[dv]));d.__custom=true;DB[mk].devices[dv]=d;}}}
-function blankEdit(){return {mfrSel:'',mfrNew:'',dev:'',tags:[],kopf:[{k:'text',l:'Seriennummer'},{k:'text',l:'Typ / Modell'},{k:'text',l:'Standort / Position'},{k:'text',l:'Baustelle'},{k:'text',l:'Datum'}],sections:[{title:'Allgemein',colsName:'Ja/Nein',comment:true,items:[{k:'check',l:'Gerät fachgerecht aufgestellt?'}]}],signMode:'ausgefuehrt',signRoles:['Elektroinstallation','Funktionsprüfung','Einweisung des Betreibers'],ref:null};}
+function blankEdit(){return {mfrSel:'',mfrNew:'',dev:'',tags:[],kopf:[{k:'text',l:'Seriennummer'},{k:'text',l:'Typ / Modell'},{k:'text',l:'Standort / Position'},{k:'text',l:'Baustelle'},{k:'text',l:'Datum'},{k:'text',l:'Auftraggeber'},{k:'text',l:'Anschrift'}],sections:[{title:'Allgemein',colsName:'Ja/Nein',comment:true,items:[{k:'check',l:'Gerät fachgerecht aufgestellt?'}]}],signMode:'ausgefuehrt',signRoles:['Elektroinstallation','Funktionsprüfung','Einweisung des Betreibers'],ref:null};}
 function typeOpts(cur,kopf){var t=kopf?[['text','Text'],['measure','Messwert'],['area','Mehrzeilig']]:[['check','Ja/Nein-Prüfpunkt'],['text','Text'],['measure','Messwert'],['area','Mehrzeilig'],['opts','Auswahl']];return t.map(function(o){return '<option value="'+o[0]+'"'+(cur===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('');}
 function openEditor(mfr){EDIT=blankEdit();var m=mfr||CUR.mfr;if(m&&DB[m])EDIT.mfrSel=m;renderEditor();}
 function editDevice(dev){var o=DB[CUR.mfr].devices[dev];
@@ -1147,7 +1197,11 @@ function ctxPrefill(p){if(!CUR.dev)return;var o=DB[CUR.mfr].devices[CUR.dev];var
     else if(p.sn&&!STATE[key]&&/Seriennummer|Serien-?Nr/i.test(f.l)){STATE[key]=p.sn;ch=true;}
     else if(p.bez&&!STATE[key]&&/Gerät|Bezeichnung/i.test(f.l)){STATE[key]=p.bez;ch=true;}
     else if(p.hersteller&&!STATE[key]&&/Fabrikat|^Hersteller$/i.test(f.l)){STATE[key]=p.hersteller;ch=true;}
-    else if(p.kunde&&!STATE[key]&&KOPF_KUNDE.test(f.l)){STATE[key]=p.kunde;ch=true;}});
+    else if(p.kunde&&!STATE[key]&&KOPF_KUNDE.test(f.l)){STATE[key]=p.kunde;ch=true;}
+    else if(!STATE[key]&&KOPF_ANSCHRIFT.test(f.l)&&projAdresse()){STATE[key]=projAdresse();ch=true;}
+    else if(p.strasse&&!STATE[key]&&KOPF_STRASSE.test(f.l)){STATE[key]=p.strasse;ch=true;}
+    else if(!STATE[key]&&KOPF_PLZORT.test(f.l)&&projPlzOrt()){STATE[key]=projPlzOrt();ch=true;}
+    else if(p.plz&&!STATE[key]&&KOPF_PLZ.test(f.l)){STATE[key]=p.plz;ch=true;}});
   if(ch){saveState();openForm(CUR.dev,true);}}
 let IBNCTX=null;
 function ibnSendBack(durl,name){if(!IBNCTX||!IBNCTX.pos)return false;
@@ -1160,11 +1214,15 @@ function applyUrlContext(){var hash=(location.hash||'').replace(/^#/,'');if(!has
   var p={};hash.split('&').forEach(function(kv){var i=kv.indexOf('=');if(i>0)try{p[decodeURIComponent(kv.slice(0,i))]=decodeURIComponent(kv.slice(i+1));}catch(e){}});
   if(!p.projekt&&!p.ort&&!p.hersteller&&!p.typ&&!p.proto)return false;
   if(p.projekt!==undefined)PROJECT.name=p.projekt;if(p.ort!==undefined&&p.ort!=='')PROJECT.ort=p.ort;
-  // Der Kunde der aufrufenden Baustelle gilt – AUCH wenn er leer ist. PROJECT.kunde
-  // überlebt im localStorage; ohne das Leeren stünde bei einer Baustelle ohne
-  // Auftraggeber der Kunde der zuletzt geöffneten Baustelle im Protokoll.
+  // Kunde, Anschrift und Auftragsnummer der aufrufenden Baustelle gelten – AUCH
+  // wenn sie leer sind. PROJECT überlebt im localStorage; ohne das Leeren stünde
+  // bei einer Baustelle ohne diese Stammdaten die Angabe der ZULETZT geöffneten
+  // Baustelle im Protokoll. (Ein falscher Kunde ist schlimmer als ein leeres Feld.)
   if(p.kunde!==undefined)PROJECT.kunde=p.kunde;
-  saveProject();
+  if(p.strasse!==undefined)PROJECT.strasse=p.strasse;
+  if(p.plz!==undefined)PROJECT.plz=p.plz;
+  if(p.auftrag!==undefined)PROJECT.auftrag=p.auftrag;
+  saveProject();   // initProjectBar() folgt im Boot direkt danach (siehe Ende der Datei)
   // nr/von = "Gerät n von m" bei Positionen mit Stückzahl > 1. Ohne diese Kennung
   // teilten sich alle Geräte einer Position denselben Entwurf – das nächste Gerät
   // startete dann mit der Seriennummer des vorherigen.

@@ -1486,8 +1486,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 106;
+const APP_VERSION = 107;
 const CHANGELOG = [
+  { v:107, titel:'Kunde und Anschrift stehen jetzt in jedem Protokoll', punkte:[
+    'Zu jeder Baustelle gehören jetzt <b>Auftraggeber, Anschrift (Straße, PLZ, Ort) und Auftrags-/Kommissionsnummer</b>. Gepflegt wird das an einer einzigen Stelle: 🏢 in der Baustellen-Auswahl. Beim Anlegen einer neuen Baustelle werden Straße und PLZ mit abgefragt.',
+    'Diese Angaben werden automatisch übernommen in <b>Inbetriebnahme- und DGUV-Protokolle, Einweisung, Schlüsselübergabe, Servicebericht, Bautagebuch, Dichtigkeitsprotokoll und Mängelfreimeldung</b>. Im Servicebericht musste die Straße bisher bei jedem Einsatz von Hand getippt werden.',
+    'In den Inbetriebnahmeprotokollen füllen sich auch die Adressfelder der Hersteller (Meiko, Winterhalter, Rational, Hobart), die bisher leer blieben. Die kpc-eigenen Protokolle haben dafür neue Felder „Auftraggeber" und „Anschrift" bekommen. Im PDF-Kopf steht die Zuordnung auf jeder Seite.',
+    'Wo Stammdaten fehlen, steht das jetzt in der Baustellen-Liste („⚠ Stammdaten fehlen: Straße, PLZ"). Bei den bestehenden Baustellen sind Anschrift und teils Auftraggeber noch nachzutragen – bis dahin bleiben die Felder leer statt falsch gefüllt.' ]},
   { v:106, titel:'Beim Abhaken springt die Ansicht nicht mehr weg', punkte:[
     'Eine abgehakte Restarbeit klappte sofort zusammen. Dadurch wurde die Seite über 100 Pixel kürzer – stand man weiter unten in der Liste, rutschte alles nach oben und die gerade angetippte Aufgabe war weg. Beim Abarbeiten einer Mängelliste passierte das bei jedem Haken.',
     'Die abgehakte Zeile bleibt jetzt stehen, wo sie ist, und zeigt direkt „✓ erledigt" mit Zeitpunkt und Namen. Zusammengeklappt wird sie über das ▸ am Zeilenende oder beim nächsten Öffnen der Baustelle.',
@@ -3244,7 +3249,7 @@ function openBtbForm(datum){
     '</div>'+
     '<div style="max-width:640px;width:100%;margin:0 auto;padding:8px 16px 40px;box-sizing:border-box">'+
       '<div style="background:#332f2b;border-radius:8px;padding:10px 12px;font-size:13px;color:#c9c2ba;margin-top:8px">'+
-        '<strong style="color:#fff">'+escapeHtml(curProjName())+'</strong>'+(proj.auftraggeber?('<br>Auftraggeber: '+escapeHtml(proj.auftraggeber)):'')+'</div>'+
+        stammInfoHtml(proj)+'</div>'+
       '<label style="'+lbl+'">Verantwortlicher Bauleiter</label>'+
       '<div style="display:flex">'+
         '<input id="btbBauf" class="btbMenuAnchor" type="text" value="'+escapeHtml(v.bauführer||'')+'" placeholder="Name wählen oder eintragen" onfocus="btbBaufOpen(this)" autocomplete="off" style="'+fld+';flex:1;min-width:0;border-radius:8px 0 0 8px">'+
@@ -3340,6 +3345,9 @@ async function btbGeocode(name){
 function btbLocCandidates(proj){
   const out=[]; const add=s=>{ s=(s||'').trim(); if(s && out.indexOf(s)<0) out.push(s); };
   if(proj){
+    // PLZ + Ort zuerst: die Geokodierung trifft damit auch bei mehrdeutigen
+    // Ortsnamen (Neustadt, Bergen …) die richtige Gemeinde.
+    if(proj.plz && proj.ort) add(proj.plz+' '+proj.ort);
     if(proj.ort){ add(proj.ort); add(proj.ort.split(/[-,/]/)[0]); add(proj.ort.split(/\s+/)[0]); }
     const rest=(proj.name||'').replace(/^\s*\d[\d.\-\/]*\s+/,'').trim();   // führende Projektnr. weg
     const w=rest.split(/\s+/).filter(Boolean);
@@ -3577,9 +3585,13 @@ async function btbBuildPdf(entry){
     const t=doc.splitTextToSize((val||'—')+'', (w||(R-x))-2);
     doc.text(t[0],x,y+5);
   };
-  kv(M,'Objekt / Baustelle',curProjName(),R-M); y+=11;
-  kv(M,'Auftraggeber',proj.auftraggeber||'',R-M); y+=11;
+  const st=projStamm(proj);
   const half=(R-M-6)/2;
+  kv(M,'Objekt / Baustelle',curProjName(),R-M); y+=11;
+  if(st.adresse){ kv(M,'Anschrift der Baustelle',st.adresse,R-M); y+=11; }
+  kv(M,'Auftraggeber',st.auftraggeber,half);
+  if(st.auftrag) kv(M+half+6,'Auftrags-/Kommissions-Nr.',st.auftrag,half);
+  y+=11;
   kv(M,'Datum',btbDeLong(entry.datum),half); kv(M+half+6,'Verantwortlicher Bauleiter',entry.bauführer,half); y+=11;
   const zeit=(entry.zeitVon||entry.zeitBis)?((entry.zeitVon||'?')+' – '+(entry.zeitBis||'?')+' Uhr'):'';
   const wtext=(entry.witterungText&&entry.witterungText.trim())?entry.witterungText.trim():(entry.witterung||[]).join(', ');
@@ -3622,8 +3634,8 @@ async function btbBuildPdf(entry){
   drawSig(entry.sigAg, R-72);
   dc(dark); doc.setLineWidth(0.3);
   doc.line(M,sy,M+72,sy); doc.line(R-72,sy,R,sy);
-  // Ort + Datum vorausgefüllt (Ort aus proj.ort, sonst 1. Wort des Projektnamens)
-  const ortName=(proj.ort||'').trim() || ((proj.name||'').replace(/^\s*\d[\d.\-\/]*\s+/,'').trim().split(/\s+/)[0]||'');
+  // Ort + Datum vorausgefüllt (Ort aus den Stammdaten, siehe projStamm)
+  const ortName=st.ort;
   const _d=(entry.datum||'').split('-');   // YYYY-MM-DD -> DD.MM.YYYY (führende Nullen)
   const dShort=_d.length===3?(_d[2]+'.'+_d[1]+'.'+_d[0]):(entry.datum||'');
   const ortDatum=(ortName?ortName+', ':'')+'den '+dShort;
@@ -3778,7 +3790,7 @@ function openDichtForm(umfang){
     '</div>'+
     '<div style="max-width:640px;width:100%;margin:0 auto;padding:8px 16px 40px;box-sizing:border-box">'+
       '<div style="background:#332f2b;border-radius:8px;padding:10px 12px;font-size:13px;color:#c9c2ba;margin-top:8px">'+
-        '<strong style="color:#fff">'+escapeHtml(curProjName())+'</strong>'+(proj.auftraggeber?('<br>Auftraggeber: '+escapeHtml(proj.auftraggeber)):'')+
+        stammInfoHtml(proj)+
         '<br>Umfang: '+escapeHtml(dichtUmfangLabel(umfang))+' · <strong style="color:#fff">'+nGepr+' von '+pos.length+'</strong> Sanitärpositionen geprüft</div>'+
       '<label style="'+lbl+'">Prüfdatum</label>'+
       '<input id="dtDatum" type="date" value="'+escapeHtml(v.datum||heute)+'" style="'+fld+'">'+
@@ -3946,8 +3958,12 @@ async function dichtBuildPdf(entry){
     doc.text(t[0],x,y+5);
   };
   const half=(R-M-6)/2, third=(R-M-12)/3;
+  const st=projStamm(proj);
   kv(M,'Objekt / Baustelle',curProjName(),R-M); y+=11;
-  kv(M,'Auftraggeber',proj.auftraggeber||'',R-M); y+=11;
+  if(st.adresse){ kv(M,'Anschrift der Baustelle',st.adresse,R-M); y+=11; }
+  kv(M,'Auftraggeber',st.auftraggeber,half);
+  if(st.auftrag) kv(M+half+6,'Auftrags-/Kommissions-Nr.',st.auftrag,half);
+  y+=11;
   const _d=(entry.datum||'').split('-');
   const dShort=_d.length===3?(_d[2]+'.'+_d[1]+'.'+_d[0]):(entry.datum||'');
   const art=DICHT_ARTEN[entry.art||'betrieb']||DICHT_ARTEN.betrieb;
@@ -4031,7 +4047,7 @@ async function dichtBuildPdf(entry){
   drawSig(entry.sigKpc, M); drawSig(entry.sigAg, R-72);
   dc(dark); doc.setLineWidth(0.3);
   doc.line(M,sy,M+72,sy); doc.line(R-72,sy,R,sy);
-  const ortName=(proj.ort||'').trim() || ((proj.name||'').replace(/^\s*\d[\d.\-\/]*\s+/,'').trim().split(/\s+/)[0]||'');
+  const ortName=st.ort;
   const ortDatum=(ortName?ortName+', ':'')+'den '+dShort;
   doc.setFontSize(8); tc(grey);
   doc.text(ortDatum,M,sy+4);     doc.text('Unterschrift Prüfer KPC',M,sy+8);
@@ -4103,10 +4119,13 @@ function openSvcForm(nr){
   const vorhanden=nr?SVC.find(e=>e.nr===nr):null;
   const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
   const today=localDay(new Date().toISOString());
-  // Ort aus den Stammdaten, sonst 1. Wort des Projektnamens (7 von 9 Altprojekten haben kein ort-Feld)
-  const ortName=(proj.ort||'').trim() || ((proj.name||'').replace(/^\s*\d[\d.\-\/]*\s+/,'').trim().split(/\s+/)[0]||'');
-  // D = Anzeige-Werte: bestehender Eintrag oder Vorbelegung aus den Stammdaten
-  const D=vorhanden||{ kunde:(proj.auftraggeber||''), strasse:'', ort:ortName, telefon:'',
+  const st=projStamm(proj);
+  const ortName=st.ort;
+  // D = Anzeige-Werte: bestehender Eintrag oder Vorbelegung aus den Stammdaten.
+  // Straße/Ort sind die Anschrift der BAUSTELLE – das Serviceformular fragt die
+  // Adresse des Einsatzortes ab, nicht den Firmensitz des Auftraggebers.
+  // "Ort" bekommt PLZ + Ort (Postanschrift), die Unterschriftszeile nur den Ort.
+  const D=vorhanden||{ kunde:st.auftraggeber, strasse:st.strasse, ort:(st.plzOrt||ortName), telefon:'',
     auftragErteilt:'', auftragDatum:'', lieferadresse:'', arbeitsauftrag:'', geraetedaten:'',
     bericht:'', sigOrt:ortName, sigDatum:today };
   SVC_FORM={
@@ -5189,12 +5208,19 @@ function ibnStart(pos,type,starten){
 }
 function openIbnDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.classList.remove('open');
   ibnStart(pos,'IBN Protokoll',function(nr,menge){ _openIbnDigital(pos,nr,menge); });}
+// Stammdaten-Teil des Aufrufs an die IBN-App – EINE Stelle für IBN und DGUV.
+// Die IBN-App hat keinen eigenen Zugriff auf __projects.json; alles, was im
+// Protokoll stehen soll, muss durch diesen Hash. Leere Werte werden bewusst
+// MITGESCHICKT: die IBN-App merkt sich das Projekt im localStorage, ohne das
+// Leeren stünde bei einer Baustelle ohne Anschrift die der zuletzt geöffneten
+// im Protokoll (dieselbe Falle wie früher beim Kunden).
+function ibnStammHash(){
+  const s=projStamm(); const q=function(v){return encodeURIComponent(v||'');};
+  return 'projekt='+q(s.name||curProjName())+'&ort='+q(s.ort)+'&plz='+q(s.plz)+
+         '&strasse='+q(s.strasse)+'&kunde='+q(s.auftraggeber)+'&auftrag='+q(s.auftrag);
+}
 function _openIbnDigital(pos,nr,menge){const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
-  // Auftraggeber + Ort aus den Projekt-Stammdaten mitgeben – wie openDguvDigital.
-  // Ohne das blieben "Kunde" und "Ort" im Protokoll leer (ort ging bisher als '' raus,
-  // kunde gar nicht) – die IBN-App kann sie sonst nirgends herholen.
-  const proj=(typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS.find(x=>x.pid===PID):null;
-  const url=IBN_URL+'#projekt='+q(curProjName())+'&ort='+q(proj&&proj.ort)+'&kunde='+q(proj&&proj.auftraggeber)+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez)+'&nr='+q(nr)+'&von='+q(menge);
+  const url=IBN_URL+'#'+ibnStammHash()+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez)+'&nr='+q(nr)+'&von='+q(menge);
   // BEWUSST OHNE 'noopener': die IBN-App ist unsere eigene Seite auf derselben Origin
   // und braucht window.opener, um das Protokoll direkt zurückzureichen und nach dem
   // Speichern hierher zurückzuspringen. Mit noopener war beides tot.
@@ -5203,8 +5229,7 @@ function _openIbnDigital(pos,nr,menge){const it=itemByPos(pos)||{};const q=funct
 function openDguvDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.classList.remove('open');
   ibnStart(pos,'DGUV Protokoll',function(nr,menge){ _openDguvDigital(pos,nr,menge); });}
 function _openDguvDigital(pos,nr,menge){const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
-  const proj=(typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS.find(x=>x.pid===PID):null;
-  const url=IBN_URL+'#proto=dguv&projekt='+q(curProjName())+'&ort='+q(proj&&proj.ort)+'&kunde='+q(proj&&proj.auftraggeber)+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez)+'&nr='+q(nr)+'&von='+q(menge);
+  const url=IBN_URL+'#proto=dguv&'+ibnStammHash()+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez)+'&nr='+q(nr)+'&von='+q(menge);
   window.open(url,'_blank');}   // ohne noopener – siehe openIbnDigital
 // ── Empfang des fertigen IBN-PDFs aus der IBN-App und Ablage bei der Position ──
 const _ibnSeen=new Set();
@@ -7440,7 +7465,7 @@ function fmRender(erhalten){
     (bisher.length? '<div style="font-size:11px;color:#a8a8a8;margin-bottom:14px;border-left:3px solid #4a423a;padding-left:9px">Bisher freigemeldet: '+
       bisher.slice(0,4).map(b=>'Nr. '+b.nr+(b.datum?' ('+fmDatDE(b.datum)+')':'')+' &middot; '+b.n+' M&auml;ngel').join('<br>')+
       (bisher.length>4?'<br>… und '+(bisher.length-4)+' weitere':'')+'</div>' : '')+
-    feld('fmEmp','Empfänger / Auftraggeber', alt?alt.emp:(proj.auftraggeber||''), 'z. B. Marktgemeinde Nüsttal')+
+    feld('fmEmp','Empfänger / Auftraggeber', alt?alt.emp:projStamm(proj).auftraggeber, 'z. B. Marktgemeinde Nüsttal')+
     feld('fmBezug','Bezug', alt?alt.bez:bezug, 'z. B. Abnahmeprotokoll vom 03.07.2026')+
     '<div style="display:flex;gap:10px"><div style="flex:1">'+feld('fmDatum','Datum', alt?alt.dat:localDay(new Date().toISOString()), '', 'date')+'</div>'+
     '<div style="flex:1">'+feld('fmUnter','Unterzeichner (kpc)', alt?alt.unt:(USER||''), 'Vorname Nachname')+'</div></div>'+
@@ -7564,9 +7589,12 @@ async function fmBuildPdf(o){
     doc.text(t[0],x,y+5);
   };
   const half=(R-M-6)/2;
+  const st=projStamm(proj);
   kv(M,'Objekt / Baustelle',curProjName(),R-M); y+=11;
-  kv(M,'Empfänger / Auftraggeber',o.emp||proj.auftraggeber||'',half);
+  if(st.adresse){ kv(M,'Anschrift der Baustelle',st.adresse,R-M); y+=11; }
+  kv(M,'Empfänger / Auftraggeber',o.emp||st.auftraggeber,half);
   kv(M+half+6,'Datum',fmDatDE(o.datum),half); y+=11;
+  if(st.auftrag){ kv(M,'Auftrags-/Kommissions-Nr.',st.auftrag,half); y+=11; }
   if(o.bezug){ kv(M,'Bezug',o.bezug,R-M); y+=11; }
   y+=2;
 
@@ -7649,7 +7677,7 @@ async function fmBuildPdf(o){
   if(y>sy-14){ doc.addPage(); y=M; sy=PH-30; }
   dc(dark); doc.setLineWidth(0.3);
   doc.line(M,sy,M+72,sy); doc.line(R-72,sy,R,sy);
-  const ortName=(proj.ort||'').trim() || ((proj.name||'').replace(/^\s*\d[\d.\-\/]*\s+/,'').trim().split(/\s+/)[0]||'');
+  const ortName=st.ort;
   const ortDatum=(ortName?ortName+', ':'')+'den '+fmDatDE(o.datum);
   bold(); doc.setFontSize(9); tc(dark); doc.text(o.unter||'',M,sy-2);
   reg(); doc.setFontSize(8); tc(grey);
@@ -7674,6 +7702,60 @@ function curProjName(){
   const p=(typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS.find(x=>x.pid===PID):null;
   const el=document.getElementById('projName');
   return (p&&p.name) || (el&&el.textContent&&el.textContent.trim()) || 'Projekt';
+}
+// ---------------------------------------------------------------------------
+// STAMMDATEN EINER BAUSTELLE – EINE Quelle für alle Protokolle.
+// Vorher rechnete jedes Dokument den Ort-Fallback selbst aus (fünf gleiche
+// Kopien) und eine Anschrift gab es überhaupt nicht: im Servicebericht wurde
+// die Straße bei JEDEM Einsatz von Hand getippt, in allen anderen Protokollen
+// fehlte sie ganz. Wer eine Vorbelegung ändern will, fasst ab jetzt NUR diese
+// Funktion an.
+// Rückgabe ist immer vollständig (leere Strings statt undefined), damit die
+// Aufrufer nicht jedes Feld einzeln absichern müssen.
+function projStamm(p){
+  const proj = p || ((typeof PROJECTS!=='undefined'&&PROJECTS)?PROJECTS.find(x=>x.pid===PID):null) || {};
+  const name = (proj.name||'').trim();
+  // Ort: aus den Stammdaten, sonst 1. Wort des Projektnamens ohne führende
+  // Nummer ("1090.20 Nüsttal Grundschule" -> "Nüsttal"). Der Fallback bleibt,
+  // solange Altprojekte ohne ort-Feld existieren.
+  const ort = (proj.ort||'').trim() || (name.replace(/^\s*\d[\d.\-\/]*\s+/,'').trim().split(/\s+/)[0]||'');
+  const strasse = (proj.strasse||'').trim();
+  const plz = (proj.plz||'').trim();
+  const plzOrt = [plz,ort].filter(Boolean).join(' ');
+  return {
+    pid: proj.pid||'',
+    name,
+    nummer: (proj.nummer||'').trim(),
+    objekt: (proj.objekt||'').trim(),
+    auftraggeber: (proj.auftraggeber||'').trim(),
+    // Auftrags-/Kommissionsnummer: eigenes Feld, sonst die Projektnummer.
+    // (Beide getrennt zu pflegen wäre doppelte Arbeit, solange sie gleich sind.)
+    auftrag: (proj.auftragsnr||'').trim() || (proj.nummer||'').trim(),
+    strasse, plz, ort, plzOrt,
+    // Einzeilige Anschrift für die Protokollköpfe. NUR wenn wirklich eine
+    // Anschrift gepflegt ist: der Ort allein wäre bei Altbaustellen der aus dem
+    // Projektnamen GERATENE Ort – als „Anschrift der Baustelle" im PDF sähe das
+    // nach einer belastbaren Angabe aus und wäre keine.
+    adresse: strasse ? [strasse, plzOrt].filter(Boolean).join(', ') : (plz ? plzOrt : '')
+  };
+}
+// Kopfzeile „wer / wo" für die Formular-Overlays (Bautagebuch, Dichtigkeit …):
+// zeigt VOR dem Ausfüllen, was später im PDF-Kopf steht.
+function stammInfoHtml(p){
+  const s=projStamm(p);
+  return '<strong style="color:#fff">'+escapeHtml(s.name||curProjName())+'</strong>'+
+    (s.adresse?('<br>'+escapeHtml(s.adresse)):'')+
+    (s.auftraggeber?('<br>Auftraggeber: '+escapeHtml(s.auftraggeber)):'')+
+    (s.auftrag?('<br>Auftrag / Kommission: '+escapeHtml(s.auftrag)):'');
+}
+// Welche Stammdaten fehlen? Für die Warnung in der Baustellenauswahl.
+function projStammLuecken(p){
+  const s=projStamm(p), f=[];
+  if(!s.auftraggeber) f.push('Auftraggeber');
+  if(!s.strasse) f.push('Straße');
+  if(!s.plz) f.push('PLZ');
+  if(!(p&&(p.ort||'').trim())) f.push('Ort');
+  return f;
 }
 // Kurzcode aus dem Projektnamen (z.B. "Berlin Upbeat" -> "BU") für Dok.-Nummern
 function curProjCode(){
@@ -7771,7 +7853,9 @@ async function createProject(name, lv, auftraggeber, meta){
   const pid = slugify(name)+'-'+Date.now();
   await spUploadText('LV_'+pid+'.json', JSON.stringify(lv));
   const _now=new Date().toISOString();
-  PROJECTS.push({pid, name, nummer:(meta.nummer||'').trim(), ort:(meta.ort||'').trim(), objekt:(meta.objekt||'').trim(), auftraggeber:(auftraggeber||'').trim(), created:_now, lastEdit:_now, by:USER||''});
+  PROJECTS.push({pid, name, nummer:(meta.nummer||'').trim(), ort:(meta.ort||'').trim(), objekt:(meta.objekt||'').trim(),
+    strasse:(meta.strasse||'').trim(), plz:(meta.plz||'').trim(), auftragsnr:(meta.auftragsnr||'').trim(),
+    auftraggeber:(auftraggeber||'').trim(), created:_now, lastEdit:_now, by:USER||''});
   await saveProjects();
   return pid;
 }
@@ -7815,18 +7899,22 @@ function renderProjectPicker(){
       '<input id="projSearch" type="text" inputmode="search" autocomplete="off" placeholder="🔍 Baustelle suchen … (Nummer, Ort, Objekt)" oninput="filterProjects(this.value)" style="width:100%;padding:11px 13px;border-radius:10px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;box-sizing:border-box;">'+
     '</div>'+
     '<div id="projList" style="width:100%;max-width:520px;display:flex;flex-direction:column;gap:10px;max-height:52vh;overflow-y:auto;">'+
-      items.map(p=>
-        '<div class="projRow" data-name="'+escapeHtml(String(p.name||'').toLowerCase())+'" onclick="selectProject(\''+p.pid+'\')" style="text-align:left;background:#3a3530;border:1px solid #895500;border-radius:10px;padding:14px 16px;cursor:pointer;color:#fff;font-family:inherit;display:flex;align-items:center;gap:12px;">'+
+      items.map(p=>{
+        // Fehlende Stammdaten stehen in der Zeile, nicht erst im Dialog: sie
+        // schlagen in jedem Protokoll durch und fallen sonst niemandem auf.
+        const _l=projStammLuecken(p);
+        return '<div class="projRow" data-name="'+escapeHtml(String(p.name||'').toLowerCase())+'" onclick="selectProject(\''+p.pid+'\')" style="text-align:left;background:#3a3530;border:1px solid #895500;border-radius:10px;padding:14px 16px;cursor:pointer;color:#fff;font-family:inherit;display:flex;align-items:center;gap:12px;">'+
           '<span style="font-size:20px">🏗️</span>'+
           '<span style="flex:1"><span style="display:block;font-size:15px;font-weight:700;color:#fff">'+escapeHtml(p.name)+'</span>'+
           '<span style="display:block;font-size:11px;color:'+(p.auftraggeber?'#c0a780':'#e0a060')+';margin-top:2px">'+(p.auftraggeber?('👤 '+escapeHtml(p.auftraggeber)):'⚠ Auftraggeber fehlt')+'</span>'+
+          (_l.filter(x=>x!=='Auftraggeber').length?('<span style="display:block;font-size:11px;color:#e0a060;margin-top:1px">⚠ Stammdaten fehlen: '+escapeHtml(_l.filter(x=>x!=='Auftraggeber').join(', '))+'</span>'):'')+
           '<span style="display:block;font-size:11px;color:#a8a8a8;margin-top:1px">'+((p.lastEdit||p.created)?('Geändert: '+new Date(p.lastEdit||p.created).toLocaleDateString('de-DE')):'')+'</span></span>'+
-          '<button onclick="editAuftraggeber(\''+p.pid+'\',event)" title="Auftraggeber bearbeiten" style="background:none;border:none;color:#d7c1ae;font-size:15px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">🏢</button>'+
+          '<button onclick="editStammdaten(\''+p.pid+'\',event)" title="Stammdaten bearbeiten (Auftraggeber, Anschrift, Auftragsnummer)" style="background:none;border:none;color:'+(_l.length?'#e0a060':'#d7c1ae')+';font-size:15px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">🏢</button>'+
          '<button onclick="editBauleiter(\''+p.pid+'\',event)" title="Bauleiter zuordnen (für Aufgaben-Benachrichtigungen)" style="background:none;border:none;color:#d7c1ae;font-size:15px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">👷</button>'+
           '<button onclick="renameProject(\''+p.pid+'\',event)" title="Baustelle umbenennen" style="background:none;border:none;color:#d7c1ae;font-size:16px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">✏️</button>'+
           '<span style="color:#d7c1ae;font-size:18px">›</span>'+
-        '</div>'
-      ).join('')+
+        '</div>';
+      }).join('')+
       '<div id="projNone" style="display:none;color:#a8a8a8;font-size:13px;text-align:center;padding:14px;">Keine Baustelle gefunden.</div>'+
     '</div>'+
     '<button onclick="openImportWizard()" style="margin-top:18px;background:#d7c1ae;color:#2b2b2b;border:none;border-radius:10px;padding:13px 26px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;">➕ Neue Baustelle aus Stückliste</button>';
@@ -7846,20 +7934,47 @@ function filterProjects(q){
 }
 function switchProject(){ openProjectFlow(); }
 
-// Auftraggeber (Stammdaten) je Baustelle setzen/ändern – wird in die Einweisungsprotokolle übernommen.
-async function editAuftraggeber(pid, ev){
+// Stammdaten je Baustelle (🏢): Auftraggeber + Anschrift + Auftragsnummer.
+// Diese Angaben werden in JEDES Protokoll übernommen (projStamm) – deshalb ein
+// richtiger Dialog statt des früheren prompt(), das nur den Auftraggeber konnte.
+function editStammdaten(pid, ev){
   if(ev){ ev.stopPropagation(); ev.preventDefault(); }
   const p = PROJECTS.find(x=>x.pid===pid);
   if(!p){ return; }
-  const eingabe = prompt('Auftraggeber für „'+p.name+'":', p.auftraggeber||'');
-  if(eingabe==null) return;
-  const ag = eingabe.trim();
-  if(ag===(p.auftraggeber||'')) return;
-  const alt = p.auftraggeber||'';
-  p.auftraggeber = ag;
+  let ov=document.getElementById('stammDlg');
+  if(!ov){ ov=document.createElement('div'); ov.id='stammDlg'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) stammClose(); };
+  const fld='width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #6a5433;background:#3a3530;color:#fff;font-size:16px;font-family:inherit';
+  const lbl='display:block;font-size:12px;color:#a8a8a8;margin:12px 0 5px;font-weight:700;letter-spacing:.3px';
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:22px;max-width:460px;width:100%;max-height:88vh;overflow:auto;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:17px;font-weight:700;margin-bottom:2px">🏢 Stammdaten</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:6px">'+escapeHtml(p.name)+'</div>'+
+    '<div style="font-size:11px;color:#a8a8a8;border-left:3px solid #4a423a;padding-left:9px;margin-bottom:6px">Diese Angaben werden in alle Protokolle übernommen: Inbetriebnahme, DGUV V3, Einweisung, Schlüsselübergabe, Servicebericht, Bautagebuch, Dichtigkeitsprotokoll und Mängelfreimeldung.</div>'+
+    '<label style="'+lbl+'">Kunde / Auftraggeber</label>'+
+    '<input id="stAg" type="text" value="'+escapeHtml(p.auftraggeber||'')+'" placeholder="z. B. Goetze KG Armaturen" style="'+fld+'">'+
+    '<div style="font-size:12px;color:#d7c1ae;font-weight:700;letter-spacing:.3px;margin:18px 0 0">ANSCHRIFT DER BAUSTELLE</div>'+
+    '<label style="'+lbl+'">Straße, Hausnummer</label>'+
+    '<input id="stStr" type="text" value="'+escapeHtml(p.strasse||'')+'" placeholder="z. B. Haimbacher Straße 27" style="'+fld+'">'+
+    '<div style="display:flex;gap:12px">'+
+      '<div style="flex:0 0 34%"><label style="'+lbl+'">PLZ</label><input id="stPlz" type="text" inputmode="numeric" value="'+escapeHtml(p.plz||'')+'" placeholder="36041" style="'+fld+'"></div>'+
+      '<div style="flex:1"><label style="'+lbl+'">Ort</label><input id="stOrt" type="text" value="'+escapeHtml(p.ort||'')+'" placeholder="Fulda" style="'+fld+'"></div>'+
+    '</div>'+
+    '<label style="'+lbl+'">Auftrags-/Kommissionsnummer</label>'+
+    '<input id="stAuftr" type="text" value="'+escapeHtml(p.auftragsnr||'')+'" placeholder="leer lassen = Projektnummer'+(p.nummer?(' ('+escapeHtml(p.nummer)+')'):'')+'" style="'+fld+'">'+
+    '<div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">'+
+      '<button type="button" onclick="stammClose()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
+      '<button type="button" onclick="stammSave(\''+pid+'\')" style="background:#b8860b;border:none;color:#fff;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Speichern</button>'+
+    '</div></div>';
+}
+function stammClose(){ const o=document.getElementById('stammDlg'); if(o) o.remove(); }
+async function stammSave(pid){
+  const p=PROJECTS.find(x=>x.pid===pid); if(!p){ stammClose(); return; }
+  const v=id=>((document.getElementById(id)||{}).value||'').trim();
+  const alt={auftraggeber:p.auftraggeber, strasse:p.strasse, plz:p.plz, ort:p.ort, auftragsnr:p.auftragsnr};
+  p.auftraggeber=v('stAg'); p.strasse=v('stStr'); p.plz=v('stPlz'); p.ort=v('stOrt'); p.auftragsnr=v('stAuftr');
   try{ await saveProjects(); }
-  catch(e){ p.auftraggeber = alt; alert('Speichern fehlgeschlagen: '+(e.message||e)); return; }
-  renderProjectPicker();
+  catch(e){ Object.assign(p,alt); alert('Speichern fehlgeschlagen: '+(e.message||e)); return; }
+  stammClose(); renderProjectPicker();
 }
 
 // Zuständige je Baustelle (Stammdaten): MEHRERE Bauleiter + MEHRERE Büro-/
@@ -7987,8 +8102,16 @@ function openImportWizard(){
     '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Projektname / Objekt <span style="color:#e0a060">*</span></label>'+
     '<input id="impObjekt" type="text" placeholder="z.B. Upbeat" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:10px">'+
     '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Kunde / Auftraggeber <span style="color:#e0a060">*</span></label>'+
-    '<input id="impAuftraggeber" type="text" placeholder="z.B. Goetze KG Armaturen" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:5px">'+
-    '<div style="font-size:11px;color:#a8a8a8;margin-bottom:16px">Anzeigename wird als „Nummer Ort Objekt" gebildet. Kunde wird in die Einweisungsprotokolle übernommen.</div>'+
+    '<input id="impAuftraggeber" type="text" placeholder="z.B. Goetze KG Armaturen" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:10px">'+
+    '<div style="display:flex;gap:10px;margin-bottom:10px">'+
+      '<div style="flex:1"><label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Straße, Hausnr. (Baustelle) <span style="color:#e0a060">*</span></label>'+
+        '<input id="impStrasse" type="text" placeholder="z.B. Haimbacher Straße 27" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;box-sizing:border-box"></div>'+
+      '<div style="flex:0 0 30%"><label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">PLZ <span style="color:#e0a060">*</span></label>'+
+        '<input id="impPlz" type="text" inputmode="numeric" placeholder="z.B. 36041" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;box-sizing:border-box"></div>'+
+    '</div>'+
+    '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Auftrags-/Kommissionsnummer <span style="font-size:11px">(nur wenn abweichend von der Projektnummer)</span></label>'+
+    '<input id="impAuftragsnr" type="text" placeholder="leer lassen = Projektnummer" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:5px">'+
+    '<div style="font-size:11px;color:#a8a8a8;margin-bottom:16px">Anzeigename wird als „Nummer Ort Objekt" gebildet. Diese Angaben werden in ALLE Protokolle übernommen (Inbetriebnahme, DGUV, Einweisung, Servicebericht, Bautagebuch, Dichtigkeit, Mängelfreimeldung).</div>'+
     '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Stückliste (Excel .xlsx/.csv oder PDF)</label>'+
     '<input id="impFile" type="file" accept=".xlsx,.xls,.csv,.pdf" onchange="handleImportFile(this.files[0])" style="width:100%;color:#fff;font-size:13px;margin-bottom:8px">'+
     '<div style="font-size:11px;color:#a8a8a8;margin-bottom:14px">Empfohlen: Excel-Vorlage (saubere Spalten). PDF wird grob ausgelesen – bitte Vorschau prüfen.<br>'+
@@ -8047,10 +8170,17 @@ async function confirmCreateProject(){
   const ort=(document.getElementById('impOrt').value||'').trim();
   const objekt=(document.getElementById('impObjekt').value||'').trim();
   const auftraggeber=(document.getElementById('impAuftraggeber').value||'').trim();
+  const strasse=(document.getElementById('impStrasse').value||'').trim();
+  const plz=(document.getElementById('impPlz').value||'').trim();
+  const auftragsnr=(document.getElementById('impAuftragsnr').value||'').trim();
   if(!nummer){ alert('Bitte die Projektnummer eingeben (Pflichtfeld).'); document.getElementById('impNummer').focus(); return; }
   if(!ort){ alert('Bitte den Ort eingeben (Pflichtfeld).'); document.getElementById('impOrt').focus(); return; }
   if(!objekt){ alert('Bitte den Projektnamen / das Objekt eingeben (Pflichtfeld).'); document.getElementById('impObjekt').focus(); return; }
   if(!auftraggeber){ alert('Bitte den Kunden / Auftraggeber eingeben (Pflichtfeld).'); document.getElementById('impAuftraggeber').focus(); return; }
+  // Anschrift ist Pflicht: sie geht in jedes Protokoll. Wer sie beim Anlegen
+  // überspringt, trägt sie später an 55 Protokollen NICHT nach.
+  if(!strasse){ alert('Bitte die Straße der Baustelle eingeben (Pflichtfeld – steht in jedem Protokoll).'); document.getElementById('impStrasse').focus(); return; }
+  if(!plz){ alert('Bitte die PLZ der Baustelle eingeben (Pflichtfeld).'); document.getElementById('impPlz').focus(); return; }
   // Stückliste ist optional: für Abnahme-/Servicefälle wird zunächst nur die Baustelle
   // gebraucht (Mängel hängen als allgemeine Restarbeiten an ihr, nicht an Positionen).
   const lv = PENDING_LV || [];
@@ -8060,7 +8190,7 @@ async function confirmCreateProject(){
   const name=(nummer+' '+ort+' '+objekt).replace(/\s+/g,' ').trim();
   const act=document.getElementById('impActions');
   act.innerHTML='<div style="color:#d7c1ae">Baustelle wird angelegt …</div>';
-  try{ const pid=await createProject(name, lv, auftraggeber, {nummer,ort,objekt}); await selectProject(pid); }
+  try{ const pid=await createProject(name, lv, auftraggeber, {nummer,ort,objekt,strasse,plz,auftragsnr}); await selectProject(pid); }
   catch(e){ alert('Anlegen fehlgeschlagen: '+(e.message||e)); openImportWizard(); }
 }
 
