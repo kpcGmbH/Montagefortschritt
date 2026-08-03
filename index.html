@@ -481,6 +481,17 @@ body.lvadm .lvonly.blk{display:block !important;}
 .ragw.set{color:var(--braun);font-weight:700;border-color:var(--braun);}
 .rats{font-size:9px;color:var(--accent2);white-space:nowrap;font-family:Arial Narrow,Arial,sans-serif;}
 .rafg{display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;padding-left:24px;}
+/* Zwei Fotogruppen je Restarbeit: Mangel (Erfassung) und Nachweis (Erledigung).
+   Ohne Beschriftung weiß nach zwei Wochen niemand mehr, welches Bild was zeigt. */
+.rafgrp{margin-top:4px;}
+.rafglbl{display:block;font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;padding-left:24px;}
+.rafgrp .rafg{margin-top:2px;}
+.rafok{color:var(--green);}                 /* Nachweisfoto-Knopf */
+.rarow.done:not(.expanded) .rafgrp{display:none;}
+/* Vom Auftraggeber gemeldeter Mangel – ohne Aufklappen erkennbar */
+.rarow.mangel{border-left:3px solid var(--braun);}
+.ptype-hd{padding:8px 14px;color:var(--accent);font-size:10px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;background:rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.08);}
 .rafth{position:relative;width:54px;height:54px;border-radius:4px;overflow:hidden;
   border:1.5px solid var(--border);cursor:pointer;flex-shrink:0;}
 .rafth img{width:100%;height:100%;object-fit:cover;}
@@ -1464,8 +1475,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 101;
+const APP_VERSION = 102;
 const CHANGELOG = [
+  { v:102, titel:'Mangel oder Restarbeit – und Fotos vorher/nachher', punkte:[
+    'Jede Zeile hat jetzt ein Feld „Art": <b>Mangel (AG)</b> für das, was der Auftraggeber gemeldet hat, <b>Restarbeit</b> für unsere eigenen Nacharbeiten. Beim Übernehmen einer Mängelliste wird das automatisch gesetzt. Mängel sind an der Liste am kupferfarbenen Rand erkennbar.',
+    'Die Mängelfreimeldung schlägt dadurch nur noch die Mängel des Auftraggebers vor – eigene Nacharbeiten, die er nie gemeldet hat, müssen nicht mehr von Hand abgewählt werden.',
+    'Fotos werden getrennt: <b>📷 Mangel</b> zeigt den Zustand bei der Erfassung, <b>✓📷 Nachweis</b> die erledigte Arbeit. Bisher landete beides in einem Topf – die Freimeldung hängte dann ausgerechnet das Mangelfoto als „Nachweis" an.',
+    'Im Freimeldeschreiben stehen die Bilder jetzt beschriftet als „vorher" und „nachher"; die Vorher-Bilder lassen sich abschalten. Bereits vorhandene Fotos bleiben Mangelfotos – sie sind ja bei der Erfassung entstanden.',
+    'Auch „Offene Punkte" und der Excel-Export zeigen die Kennzeichnung und die beiden Fotogruppen; in Excel steht zusätzlich, ob und wann eine Zeile freigemeldet wurde.' ]},
   { v:101, titel:'Mängelfreimeldung – erledigte Mängel dem Auftraggeber melden', punkte:[
     'Neu unter „Berichte & Dokumente": 📤 Mängelfreimeldung. Bisher ließ sich das nur behelfsmäßig über „Offene Punkte" mit dem Filter „Nur erledigte" ausdrucken – ein Schreiben, das oben „Offene Punkte" heißt, ist beim Auftraggeber aber genau die falsche Botschaft.',
     'Ausgewählt wird gezielt: Es erscheinen alle als erledigt abgehakten Restarbeiten, vorangehakt sind die noch nicht gemeldeten. So lässt sich in Chargen freimelden, statt immer die ganze Liste zu schicken.',
@@ -5910,8 +5927,18 @@ function raEnsure(r){
   if(typeof r.erledigtAm==='undefined') r.erledigtAm=r.doneAt||null;
   if(typeof r.gw==='undefined') r.gw='';
   if(!Array.isArray(r.fotos)) r.fotos=[];
+  // fotos = Zustand bei der ERFASSUNG (Mangelfoto), fotosOk = Nachweis nach der
+  // Erledigung. Getrennt, weil im Freimeldeschreiben das „Nachher" gebraucht wird –
+  // vorher lagen beide in einem Topf und das Schreiben zeigte den Mangel.
+  // Altbestand bleibt bewusst in `fotos`: die Bilder entstanden bei der Erfassung.
+  if(!Array.isArray(r.fotosOk)) r.fotosOk=[];
+  // mangel=true: vom Auftraggeber gemeldeter Mangel (Mängelliste/Abnahmeprotokoll) –
+  // im Gegensatz zur eigenen Nacharbeit. Nur Mängel werden freigemeldet.
+  if(typeof r.mangel==='undefined') r.mangel=false;
   return r;
 }
+// Fotoliste einer Restarbeit nach Art („mangel" = Erfassung, „ok" = Nachweis)
+function raFotoArr(r, art){ raEnsure(r); return art==='ok' ? r.fotosOk : r.fotos; }
 // Namensliste für die Erlediger-Auswahl: eingeloggter Benutzer zuerst, dann Login-Name + Monteure
 function raNameList(){
   const names=[];
@@ -5952,25 +5979,41 @@ function updRA(pos){
   g.innerHTML=s.restarbeiten.map((r,i)=>{
     const tsErst=r.erstelltAm?raFmtTs(r.erstelltAm):'';
     const tsErl=r.done&&r.erledigtAm?raFmtTs(r.erledigtAm):'';
-    const fotosHtml=r.fotos.length?`<div class="rafg" id="RAFG_${id}_${i}">${r.fotos.map((src,fi)=>`<div class="rafth" onclick="raOlb('${pos}',${i},${fi})"><img class="raimg" data-fref="${src}"><button class="rafdel" onclick="event.stopPropagation();raFotoDel('${pos}',${i},${fi})">&#10005;</button></div>`).join('')}</div>`:'';
+    // Zwei Fotogruppen: Mangelfoto (Erfassung) und Nachweis (nach der Erledigung).
+    // Beschriftet, sonst weiß nach zwei Wochen niemand mehr, welches Bild was zeigt.
+    const grp=(art,lbl,farbe)=>{
+      const arr=raFotoArr(r,art);
+      if(!arr.length) return '';
+      return `<div class="rafgrp"><span class="rafglbl" style="color:${farbe}">${lbl}</span>`+
+        `<div class="rafg">${arr.map((src,fi)=>`<div class="rafth" onclick="raOlb('${pos}',${i},${fi},'${art}')"><img class="raimg" data-fref="${src}"><button class="rafdel" onclick="event.stopPropagation();raFotoDel('${pos}',${i},${fi},'${art}')">&#10005;</button></div>`).join('')}</div></div>`;
+    };
+    const fotosHtml=grp('mangel','Mangel / Erfassung','var(--accent2)')+grp('ok','Nachweis Erledigung','#3a7a3a');
     // Beschreibung nur anzeigen, wenn befüllt – sonst bleibt die Liste kompakt
     // und man klappt sie über „＋ Beschreibung" auf.
     const descHtml=(r.desc||'').trim()
       ? `<textarea class="radesc" rows="2" placeholder="Beschreibung (optional) – z. B. diktieren"
            oninput="raSetDesc('${pos}',${i},this.value);raDescFit(this)">${escapeHtml(r.desc||'')}</textarea>`
       : `<button type="button" class="radescbtn" onclick="raDescOpen('${pos}',${i})">＋ Beschreibung</button>`;
-    return `<div class="rarow${r.done?' done':''}" data-i="${i}" data-pos="${escapeHtml(pos)}" data-gw="${r.gw||'-'}" data-leer="${(r.txt||'').trim()||(r.fotos&&r.fotos.length)?'0':'1'}">
+    return `<div class="rarow${r.done?' done':''}${r.mangel?' mangel':''}" data-i="${i}" data-pos="${escapeHtml(pos)}" data-gw="${r.gw||'-'}" data-leer="${(r.txt||'').trim()||(r.fotos&&r.fotos.length)?'0':'1'}">
       <div class="ramain">
         <input type="checkbox" class="rachk" ${r.done?'checked':''} onchange="raToggle('${pos}',${i},this.checked)">
         <textarea class="ratxt" rows="1" placeholder="Restarbeit ${i+1}…"
           oninput="raSetTxt('${pos}',${i},this.value);raTxtFit(this)" onkeydown="raKey(event,'${pos}',${i})">${escapeHtml(r.txt||'')}</textarea>
         <span class="radonesum" onclick="raToggleExp(this)" title="Details ein-/ausblenden">${r.done?('&#10003; erledigt'+(tsErl?' '+tsErl:'')+(r.erledigtVon?' · '+escapeHtml(r.erledigtVon):'')):''}</span>
         <button type="button" class="raexp" onclick="raToggleExp(this)" title="Details ein-/ausblenden">&#9656;</button>
-        <button class="rafbtn" onclick="raFoto('${pos}',${i})" title="Foto zur Restarbeit">&#128247;</button>
+        <button class="rafbtn" onclick="raFoto('${pos}',${i},'mangel')" title="Foto vom Mangel / bei der Erfassung">&#128247;</button>
+        <button class="rafbtn rafok" onclick="raFoto('${pos}',${i},'ok')" title="Nachweisfoto nach der Erledigung – geht in die Freimeldung">&#10003;&#128247;</button>
         <button class="radel" onclick="raDel('${pos}',${i})" title="Zeile löschen">&#10005;</button>
       </div>
       ${descHtml}
       <div class="rameta">
+        <div class="rametacol">
+          <span class="rametalbl">Art:</span>
+          <select class="ragw raart${r.mangel?' set':''}" onchange="raSetMangel('${pos}',${i},this.value)">
+            <option value=""${r.mangel?'':' selected'}>Restarbeit</option>
+            <option value="1"${r.mangel?' selected':''}>Mangel (AG)</option>
+          </select>
+        </div>
         <div class="rametacol">
           <span class="rametalbl">Zust.:</span>
           <select class="ragw${r.gw?' set':''}" onchange="raSetGw('${pos}',${i},this.value)">
@@ -6191,6 +6234,7 @@ function raBulkOpen(key){
         '<input id="raBulkDesc" type="text" placeholder="z. B. Abnahmeprotokoll vom 03.07.2026, Frist 31.07.2026"></label>'+
     '</div>'+
     '<label class="rabulk-chk"><input type="checkbox" id="raBulkNr" checked onchange="raBulkPreview()"> Nummern voranstellen (M01, M02 …) – hilft beim Abgleich mit dem Auftraggeber</label>'+
+    '<label class="rabulk-chk"><input type="checkbox" id="raBulkMangel" checked> Als <b>Mängel des Auftraggebers</b> kennzeichnen – nur diese schlägt die Mängelfreimeldung vor</label>'+
     '<div class="rabulk-prev" id="raBulkPrev"></div>'+
     '<div class="rabulk-act">'+
       '<button class="rabulk-c" onclick="raBulkClose()">Abbrechen</button>'+
@@ -6234,9 +6278,12 @@ async function raBulkUebernehmen(){
   }
   const s=gsE(key);
   const jetzt=new Date().toISOString();
+  // Über diesen Weg kommen die Mängel des Auftraggebers in die App – deshalb wird
+  // hier das Merkmal gesetzt (§1.2a). Es steuert, was die Freimeldung vorschlägt.
+  const alsMangel=(document.getElementById('raBulkMangel')||{}).checked!==false;
   liste.forEach((r,i)=>{
-    s.restarbeiten.push({txt:raBulkTitel(r,i,mitNr), desc:desc, done:false,
-      ersteller:erf, erstelltAm:jetzt, erledigtVon:'', erledigtAm:null, gw:gw, fotos:[]});
+    s.restarbeiten.push({txt:raBulkTitel(r,i,mitNr), desc:desc, done:false, mangel:alsMangel,
+      ersteller:erf, erstelltAm:jetzt, erledigtVon:'', erledigtAm:null, gw:gw, fotos:[], fotosOk:[]});
   });
   raBulkClose();
   updAllgSection();
@@ -6329,6 +6376,17 @@ function raStampErstellt(pos,i){
     updRA(pos);
     raDebouncedSave(pos);
   }
+}
+// Restarbeit ⇄ Mangel. Steuert, was die Mängelfreimeldung vorschlägt (§1.4b) und
+// wie die Zeile in den Berichten gekennzeichnet ist. Bewusst KEIN eigener Listen-
+// block: die Zeile ist dieselbe, nur die Herkunft ist eine andere.
+function raSetMangel(pos,i,val){
+  const s=gs(pos);
+  if(!s.restarbeiten[i])return;
+  raEnsure(s.restarbeiten[i]);
+  s.restarbeiten[i].mangel=!!val;
+  updRA(pos);
+  raDebouncedSave(pos);
 }
 function raSetGw(pos,i,val){
   const s=gs(pos);
@@ -6654,19 +6712,22 @@ function raDebouncedSave(pos){
     delete RA_TIMERS[pos];
   },1000);
 }
-function raFoto(pos,idx){
-  RA_FOTO_TARGET={pos,idx};
+// art: 'mangel' (Zustand bei der Erfassung) oder 'ok' (Nachweis der Erledigung)
+function raFoto(pos,idx,art){
+  RA_FOTO_TARGET={pos,idx,art:(art==='ok'?'ok':'mangel')};
   let menu=document.getElementById('raFsrcMenu');
   if(!menu){
     menu=document.createElement('div');
     menu.id='raFsrcMenu';
     menu.className='ptype-menu';
-    menu.innerHTML='<div class="ptype-item" onclick="raSelectFsrc(\'cam\')">&#128247; Kamera aufnehmen</div><div class="ptype-item" onclick="raSelectFsrc(\'gal\')">&#128444; Aus Galerie wählen</div>';
+    menu.innerHTML='<div class="ptype-hd" id="raFsrcHd"></div><div class="ptype-item" onclick="raSelectFsrc(\'cam\')">&#128247; Kamera aufnehmen</div><div class="ptype-item" onclick="raSelectFsrc(\'gal\')">&#128444; Aus Galerie wählen</div>';
     document.body.appendChild(menu);
     document.addEventListener('click',e=>{if(!e.target.closest('#raFsrcMenu')&&!e.target.closest('.rafbtn'))menu.classList.remove('open');});
   }
+  const hd=document.getElementById('raFsrcHd');
+  if(hd) hd.textContent = RA_FOTO_TARGET.art==='ok' ? 'Nachweis der Erledigung' : 'Mangel / Zustand bei Erfassung';
   const id=sp(pos);
-  const btn=document.querySelector(`#RA${id} .rarow[data-i="${idx}"] .rafbtn`);
+  const btn=document.querySelector(`#RA${id} .rarow[data-i="${idx}"] .rafbtn`+(RA_FOTO_TARGET.art==='ok'?'.rafok':''));
   if(btn){
     const r=btn.getBoundingClientRect();
     menu.style.top=(r.bottom+window.scrollY+4)+'px';
@@ -6687,26 +6748,32 @@ function raSelectFsrc(src){
 }
 // Ablagename einer Restarbeiten-Datei – EINE Stelle für Dateidialog und Drag & Drop,
 // damit beide Wege nicht auseinanderlaufen.
-function raFotoName(pos, idx){
-  if(pos===PRAKEY) return safeName(curProjName())+'/_Restarbeiten/RA_Baustelle_'+idx+'_'+uniqTs()+'.jpg';
+// Nachweisfotos tragen „_OK" im Namen – wer in SharePoint in den Ordner schaut,
+// sieht sonst nicht, welches Bild den Mangel und welches die Erledigung zeigt.
+function raFotoName(pos, idx, art){
+  const tag=(art==='ok'?'OK_':'');
+  if(pos===PRAKEY) return safeName(curProjName())+'/_Restarbeiten/RA_'+tag+'Baustelle_'+idx+'_'+uniqTs()+'.jpg';
   if(isEKey(pos)){ const sec=secByEKey(pos);
-    return safeName(curProjName())+'/'+safeName(sec?sec.label:'Etage')+'/_Restarbeiten/RA_Etage_'+idx+'_'+uniqTs()+'.jpg'; }
-  return folderFor(pos)+'/RA_'+pos.replace(/\./g,'_')+'_'+idx+'_'+uniqTs()+'.jpg';
+    return safeName(curProjName())+'/'+safeName(sec?sec.label:'Etage')+'/_Restarbeiten/RA_'+tag+'Etage_'+idx+'_'+uniqTs()+'.jpg'; }
+  return folderFor(pos)+'/RA_'+tag+pos.replace(/\./g,'_')+'_'+idx+'_'+uniqTs()+'.jpg';
 }
 // Fotos, die am Rechner auf eine Restarbeiten-Zeile gezogen wurden. Läuft über
 // denselben Weg wie der Dateidialog (Komprimierung + Outbox), mehrere nacheinander.
-async function raDropFotos(pos, idx, files){
+// art wird beim Ziehen nicht abgefragt: eine erledigte Zeile bekommt Nachweisfotos,
+// eine offene Mangelfotos. Umhängen geht danach über das Vorschaubild (raFotoUm).
+async function raDropFotos(pos, idx, files, art){
   const s=gs(pos);
   if(!s.restarbeiten || !s.restarbeiten[idx]) return;
+  raEnsure(s.restarbeiten[idx]);
+  const ziel = art || (s.restarbeiten[idx].done ? 'ok' : 'mangel');
   const n=files.length; let ok=0;
   for(let i=0;i<n;i++){
     showLoader(n>1 ? ('Foto '+(i+1)+' von '+n+' wird gespeichert …') : 'Foto wird gespeichert...');
     try{
       const uf=await tryCompressImage(files[i]);
-      const fname=raFotoName(pos, idx);
+      const fname=raFotoName(pos, idx, ziel);
       await queueUpload(fname, uf, 'image/jpeg', pos);
-      raEnsure(s.restarbeiten[idx]);
-      s.restarbeiten[idx].fotos.push(fname);
+      raFotoArr(s.restarbeiten[idx], ziel).push(fname);
       ok++;
     }catch(err){ console.warn('RA-Foto übersprungen:', err&&err.message); }
   }
@@ -6719,15 +6786,15 @@ async function raHandleFotoUpload(e){
   e.target.remove();
   if(!file||!RA_FOTO_TARGET)return;
   const {pos,idx}=RA_FOTO_TARGET;
+  const art=RA_FOTO_TARGET.art||'mangel';
   showLoader('Foto wird gespeichert...');
   try{
     const uploadFile=await tryCompressImage(file);
-    const fname=raFotoName(pos, idx);
+    const fname=raFotoName(pos, idx, art);
     await queueUpload(fname, uploadFile, 'image/jpeg', pos);   // lokal + Warteschlange (offline-fähig)
     const s=gs(pos);
     if(s.restarbeiten[idx]){
-      raEnsure(s.restarbeiten[idx]);
-      s.restarbeiten[idx].fotos.push(fname);
+      raFotoArr(s.restarbeiten[idx], art).push(fname);
       updRA(pos);
       saveFotos(pos);
     }
@@ -6739,18 +6806,21 @@ async function raHandleFotoUpload(e){
   }
   RA_FOTO_TARGET=null;
 }
-function raFotoDel(pos,idx,fi){
+function raFotoDel(pos,idx,fi,art){
   const s=gs(pos);
   if(!s.restarbeiten[idx])return;
-  const fname=s.restarbeiten[idx].fotos[fi];
+  const arr=raFotoArr(s.restarbeiten[idx], art);
+  const fname=arr[fi];
   if(!confirm('Foto wirklich löschen?'))return;
-  s.restarbeiten[idx].fotos.splice(fi,1);
+  arr.splice(fi,1);
   updRA(pos);
   saveFotos(pos);
   if(fname){ removeQueuedFile(fname); spDelete(fname); }
 }
-function raOlb(pos,idx,fi){
-  const list=gs(pos).restarbeiten[idx]?.fotos;
+function raOlb(pos,idx,fi,art){
+  const r=gs(pos).restarbeiten[idx];
+  if(!r)return;
+  const list=raFotoArr(r, art);
   if(!list||!list.length)return;
   lbOpen(list, fi, x=>x);
 }
@@ -6767,7 +6837,7 @@ function collectRestRows(){
         geschoss:'Baustelle allgemein', bereich:'Etagenübergreifend', pos:'–', bez:'Baustellenweit',
         txt:r.txt, desc:r.desc||'', done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
         erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
-        fotos:(r.fotos||[]).slice()
+        fotos:(r.fotos||[]).slice(), fotosOk:(r.fotosOk||[]).slice(), mangel:!!r.mangel, fm:r.fm||null
       });
     });
   }
@@ -6782,7 +6852,7 @@ function collectRestRows(){
           geschoss:sec.label, bereich:'Etage allgemein', pos:'–', bez:'Etagenweit',
           txt:r.txt, desc:r.desc||'', done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
           erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
-          fotos:(r.fotos||[]).slice()
+          fotos:(r.fotos||[]).slice(), fotosOk:(r.fotosOk||[]).slice(), mangel:!!r.mangel, fm:r.fm||null
         });
       });
     }
@@ -6797,7 +6867,7 @@ function collectRestRows(){
             geschoss:sec.label, bereich:sub.bez, pos:item.pos, bez:item.bez.trim(),
             txt:r.txt, desc:r.desc||'', done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
             erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
-            fotos:(r.fotos||[]).slice()
+            fotos:(r.fotos||[]).slice(), fotosOk:(r.fotosOk||[]).slice(), mangel:!!r.mangel, fm:r.fm||null
           });
         });
       });
@@ -6835,18 +6905,23 @@ function expRestXlsx(){
   if(typeof XLSX==='undefined'){ alert('Excel-Bibliothek ist nicht geladen (Internet nötig).'); return; }
   const rows=collectRestRows();
   if(rows.length===0){ alert('Keine Restarbeiten erfasst.'); return; }
-  const aoa=[['Geschoss','Bereich','Pos.','Gerät','Restarbeit','Beschreibung','Zuständigkeit','Status','Erstellt von','Erstellt am','Erledigt von','Erledigt am','Fotos']];
+  // Spaltenreihenfolge bewusst UNVERÄNDERT – die Datei wird im Büro weiterverarbeitet.
+  // Neues („Art", Fotos getrennt, „Freigemeldet") kommt hinten dazu.
+  const aoa=[['Geschoss','Bereich','Pos.','Gerät','Restarbeit','Beschreibung','Zuständigkeit','Status','Erstellt von','Erstellt am','Erledigt von','Erledigt am','Fotos Mangel','Art','Fotos Nachweis','Freigemeldet']];
   rows.forEach(r=>aoa.push([
     r.geschoss||'', r.bereich||'', r.pos||'', r.bez||'', r.txt||'', r.desc||'',
     RA_GW_LBL[r.gw]||'',
     r.done?'Erledigt':'Offen',
     r.ersteller||'', raFmtTs(r.erstelltAm)||'',
     r.erledigtVon||'', raFmtTs(r.erledigtAm)||'',
-    (r.fotos&&r.fotos.length)?r.fotos.length:0
+    (r.fotos&&r.fotos.length)?r.fotos.length:0,
+    r.mangel?'Mangel (AG)':'Restarbeit',
+    (r.fotosOk&&r.fotosOk.length)?r.fotosOk.length:0,
+    r.fm&&r.fm.nr? ('Nr. '+r.fm.nr+(r.fm.datum?' vom '+fmDatDE(r.fm.datum):'')) : ''
   ]));
   const ws=XLSX.utils.aoa_to_sheet(aoa);
-  ws['!cols']=[{wch:14},{wch:20},{wch:8},{wch:26},{wch:44},{wch:50},{wch:13},{wch:9},{wch:16},{wch:15},{wch:16},{wch:15},{wch:6}];
-  ws['!autofilter']={ref:'A1:M1'};
+  ws['!cols']=[{wch:14},{wch:20},{wch:8},{wch:26},{wch:44},{wch:50},{wch:13},{wch:9},{wch:16},{wch:15},{wch:16},{wch:15},{wch:7},{wch:12},{wch:8},{wch:18}];
+  ws['!autofilter']={ref:'A1:P1'};
   const wb=XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Restarbeiten');
   const slug=curProjName().replace(/[^A-Za-z0-9]+/g,'_').replace(/^_+|_+$/g,'')||'Projekt';
@@ -6874,7 +6949,7 @@ async function expOffenePunkte(){
   // Mobilfunk) blockierte dann den GESAMTEN Bericht dauerhaft („lädt nicht mehr").
   // Jetzt: je Foto max. 15 s, insgesamt max. 45 s; was nicht lädt, erscheint ohne Bild.
   const fotoData={};
-  const alleSrc=[...new Set(raRowsAll.flatMap(r=>r.fotos||[]))];
+  const alleSrc=[...new Set(raRowsAll.flatMap(r=>(r.fotos||[]).concat(r.fotosOk||[])))];
   const anyFoto=alleSrc.length>0;
   if(anyFoto){
     const DEADLINE=performance.now()+45000;
@@ -6942,17 +7017,21 @@ async function expOffenePunkte(){
     raRows+=`<tr class="ra" data-done="${r.done?1:0}" data-gw="${r.gw||'-'}" style="background:${i%2===0?'#fff':'#faf9f7'}">
       <td style="padding:5px 8px;font-size:10px;color:#a8a8a8;white-space:nowrap">${escapeHtml(r.pos)}</td>
       <td style="padding:5px 8px;font-size:12px;font-weight:700">${escapeHtml(r.bez)}</td>
-      <td style="padding:5px 8px;font-size:12px">${escapeHtml(r.txt)}${(r.desc||'').trim()?`<div style="font-size:10.5px;color:#5f5a55;margin-top:2px;white-space:pre-wrap;line-height:1.4">${escapeHtml(r.desc)}</div>`:''}</td>
+      <td style="padding:5px 8px;font-size:12px">${r.mangel?'<span style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:8px;background:#895500;color:#fff;margin-right:5px;vertical-align:1px">MANGEL</span>':''}${escapeHtml(r.txt)}${(r.desc||'').trim()?`<div style="font-size:10.5px;color:#5f5a55;margin-top:2px;white-space:pre-wrap;line-height:1.4">${escapeHtml(r.desc)}</div>`:''}</td>
       <td style="padding:5px 8px;font-size:11px;text-align:center">${gwBadge(r.gw)}</td>
       <td style="padding:5px 8px;font-size:11px;text-align:center">${status}</td>
       <td style="padding:5px 8px;font-size:10px;color:#895500">${escapeHtml(r.ersteller||'')}${r.erstelltAm?' · '+raFmtTs(r.erstelltAm):''}</td>
       <td style="padding:5px 8px;font-size:10px;color:#3a7a3a">${escapeHtml(r.erledigtVon||'')}${r.erledigtAm?' · '+raFmtTs(r.erledigtAm):''}</td>
     </tr>`;
-    if(r.fotos && r.fotos.length){
-      let imgs='';
-      r.fotos.forEach(src=>{ const durl=fotoData[src]||''; if(!durl) return; imgs+=`<img src="${durl}" style="width:110px;height:82px;object-fit:cover;border-radius:4px;border:1px solid #eee;margin:0 6px 6px 0">`; });
-      if(imgs) raRows+=`<tr class="rafoto" data-done="${r.done?1:0}" data-gw="${r.gw||'-'}" style="background:${i%2===0?'#fff':'#faf9f7'}"><td colspan="7" style="padding:0 8px 8px 28px">${imgs}</td></tr>`;
-    }
+    // Zwei Foto-Gruppen getrennt und beschriftet: Zustand bei der Erfassung und
+    // Nachweis der Erledigung (sonst steht im Bericht ungeordnet beides nebeneinander).
+    const bildGrp=(arr,lbl,farbe)=>{
+      let im='';
+      (arr||[]).forEach(src=>{ const d=fotoData[src]||''; if(!d) return; im+=`<img src="${d}" style="width:110px;height:82px;object-fit:cover;border-radius:4px;border:1px solid #eee;margin:0 6px 6px 0">`; });
+      return im? `<div style="margin-bottom:2px"><div style="font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:${farbe};margin-bottom:3px">${lbl}</div>${im}</div>` : '';
+    };
+    const bilder=bildGrp(r.fotos,'Mangel / Erfassung','#a8a8a8')+bildGrp(r.fotosOk,'Nachweis der Erledigung','#3a7a3a');
+    if(bilder) raRows+=`<tr class="rafoto" data-done="${r.done?1:0}" data-gw="${r.gw||'-'}" style="background:${i%2===0?'#fff':'#faf9f7'}"><td colspan="7" style="padding:0 8px 8px 28px">${bilder}</td></tr>`;
   });
 
   const gwCounts={}; raRowsAll.forEach(r=>{ const k=r.gw||'-'; gwCounts[k]=(gwCounts[k]||0)+1; });
@@ -7123,9 +7202,13 @@ function openFreimeldung(){
       +'das ist zugleich der Nachweis (wer, wann) im Schreiben.');
     return;
   }
-  // Vorauswahl: alles, was noch NICHT freigemeldet wurde. Bereits gemeldete bleiben
-  // sichtbar (mit Vermerk) und lassen sich für eine Zweitschrift wieder anhaken.
-  FM_SEL=new Set(zeilen.filter(x=>!(x.r.fm&&x.r.fm.nr)).map(fmKey));
+  // Vorauswahl: die noch nicht gemeldeten MÄNGEL des Auftraggebers – eigene
+  // Nacharbeiten haben in einem Schreiben an ihn nichts verloren. Kennt die
+  // Baustelle keine Mängel (Altbestand ohne Merkmal), greift die alte Regel
+  // „alles noch nicht Gemeldete", sonst stünde man vor einer leeren Auswahl.
+  const offen=zeilen.filter(x=>!(x.r.fm&&x.r.fm.nr));
+  const maengel=offen.filter(x=>x.r.mangel);
+  FM_SEL=new Set((maengel.length? maengel : offen).map(fmKey));
   fmRender();
 }
 function fmClose(){ const o=document.getElementById('fmOv'); if(o) o.remove(); FM_SEL=null; }
@@ -7146,7 +7229,8 @@ function fmRender(erhalten){
     dat:(document.getElementById('fmDatum')||{}).value,
     unt:(document.getElementById('fmUnter')||{}).value,
     zus:(document.getElementById('fmZusatz')||{}).value,
-    fot:(document.getElementById('fmFotos')||{}).checked
+    fot:(document.getElementById('fmFotos')||{}).checked,
+    fotV:(document.getElementById('fmFotosVor')||{}).checked
   } : null;
   // Bezug vorbelegen: häufigster Herkunftstext der gewählten Mängel (raBulk legt ihn
   // als Beschreibung ab, z. B. „Abnahmeprotokoll vom 03.07.2026").
@@ -7169,13 +7253,17 @@ function fmRender(erhalten){
   zeilen.forEach(x=>{
     const k=fmKey(x), sel=FM_SEL.has(k), fm=x.r.fm;
     if(x.geschoss!==lastG){ liste+='<div style="font-size:11px;font-weight:700;letter-spacing:.5px;color:#d7c1ae;margin:12px 0 5px">'+escapeHtml(x.geschoss)+'</div>'; lastG=x.geschoss; }
+    const nw=(x.r.fotosOk||[]).length, vh=(x.r.fotos||[]).length;
     liste+='<div onclick="fmToggle('+escapeHtml(JSON.stringify(k))+')" style="display:flex;gap:10px;align-items:flex-start;padding:8px 9px;margin-bottom:5px;border:1px solid '+(sel?'#895500':'#3d3833')+';background:'+(sel?'#3a3128':'#241f1c')+';border-radius:8px;cursor:pointer">'+
       '<div style="width:20px;height:20px;flex-shrink:0;border:2px solid '+(sel?'#895500':'#5a534c')+';background:'+(sel?'#895500':'transparent')+';border-radius:5px;color:#fff;font-size:13px;display:flex;align-items:center;justify-content:center;margin-top:1px">'+(sel?'&#10003;':'')+'</div>'+
       '<div style="flex:1;min-width:0">'+
-        '<div style="font-size:13.5px;font-weight:700;color:#fff">'+escapeHtml(x.r.txt)+'</div>'+
+        '<div style="font-size:13.5px;font-weight:700;color:#fff">'+
+          (x.r.mangel? '<span style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:8px;background:#895500;color:#fff;margin-right:6px;vertical-align:1px">MANGEL</span>'
+                     : '<span style="display:inline-block;font-size:9px;font-weight:700;letter-spacing:.3px;padding:1px 6px;border-radius:8px;border:1px solid #5a534c;color:#a8a8a8;margin-right:6px;vertical-align:1px">intern</span>')+
+          escapeHtml(x.r.txt)+'</div>'+
         '<div style="font-size:11px;color:#a8a8a8;margin-top:2px">'+escapeHtml(fmOrt(x))+
           (x.r.erledigtVon||x.r.erledigtAm? ' · erledigt '+escapeHtml(x.r.erledigtVon||'')+(x.r.erledigtAm?' am '+raFmtTs(x.r.erledigtAm).slice(0,8):'') : '')+
-          ((x.r.fotos&&x.r.fotos.length)? ' · '+x.r.fotos.length+' Foto(s)' : '')+'</div>'+
+          (nw? ' · <span style="color:#7fb37f">'+nw+' Nachweisfoto(s)</span>' : (vh? ' · <span style="color:#b8860b">kein Nachweisfoto</span>' : ''))+'</div>'+
         (fm&&fm.nr? '<div style="font-size:11px;color:#b8860b;margin-top:2px">bereits freigemeldet: Nr. '+fm.nr+(fm.datum?' vom '+fmDatDE(fm.datum):'')+'</div>' : '')+
       '</div></div>';
   });
@@ -7193,9 +7281,12 @@ function fmRender(erhalten){
     '<div style="flex:1">'+feld('fmUnter','Unterzeichner (kpc)', alt?alt.unt:(USER||''), 'Vorname Nachname')+'</div></div>'+
     '<label style="display:block;margin-bottom:11px"><span style="'+lab+'">Zusatz zum Anschreiben (optional)</span>'+
       '<textarea id="fmZusatz" rows="2" placeholder="z. B. Hinweis auf Restpunkte, Terminvorschlag für die Nachschau …" style="'+inp+';resize:vertical">'+escapeHtml(alt?alt.zus:'')+'</textarea></label>'+
-    '<label style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid #4a423a;border-radius:8px;margin-bottom:16px;cursor:pointer;font-size:13px;font-weight:700">'+
-      '<input type="checkbox" id="fmFotos" '+((alt? alt.fot : true)?'checked':'')+' style="width:17px;height:17px"> Fotos als Nachweis anh&auml;ngen'+
-      '<span style="font-weight:400;font-size:11px;color:#a8a8a8">max. 4 je Mangel</span></label>'+
+    '<label style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid #4a423a;border-radius:8px 8px 0 0;border-bottom:none;cursor:pointer;font-size:13px;font-weight:700">'+
+      '<input type="checkbox" id="fmFotos" '+((alt? alt.fot : true)?'checked':'')+' style="width:17px;height:17px"> Nachweisfotos anh&auml;ngen'+
+      '<span style="font-weight:400;font-size:11px;color:#a8a8a8">nach der Erledigung, max. 4</span></label>'+
+    '<label style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid #4a423a;border-radius:0 0 8px 8px;margin-bottom:16px;cursor:pointer;font-size:13px;font-weight:700">'+
+      '<input type="checkbox" id="fmFotosVor" '+((alt&&alt.fotV)?'checked':'')+' style="width:17px;height:17px"> Mangelfotos als &bdquo;vorher&ldquo; mitschicken'+
+      '<span style="font-weight:400;font-size:11px;color:#a8a8a8">aus der Erfassung</span></label>'+
     '<div style="display:flex;align-items:center;gap:8px;margin-bottom:6px">'+
       '<span style="font-size:11px;font-weight:700;letter-spacing:.4px;color:#a8a8a8;flex:1">ERLEDIGTE M&Auml;NGEL &ndash; '+anz+' von '+zeilen.length+' gew&auml;hlt</span>'+
       '<button type="button" onclick="fmAlle(true)" style="background:none;border:1px solid #555;color:#ccc;border-radius:14px;padding:5px 11px;font-size:12px;cursor:pointer;font-family:inherit">Alle</button>'+
@@ -7217,6 +7308,7 @@ async function fmErstellen(){
   const unter=((document.getElementById('fmUnter')||{}).value||'').trim();
   const zusatz=((document.getElementById('fmZusatz')||{}).value||'').trim();
   const mitFotos=!!(document.getElementById('fmFotos')||{}).checked;
+  const mitVorher=!!(document.getElementById('fmFotosVor')||{}).checked;
   if(!unter){ alert('Bitte den Unterzeichner eintragen – er steht unter dem Schreiben.'); return; }
   const gewaehlt=fmErledigte().filter(x=>FM_SEL.has(fmKey(x)));
   if(!gewaehlt.length){ alert('Bitte mindestens einen Mangel auswählen.'); return; }
@@ -7231,8 +7323,9 @@ async function fmErstellen(){
     // Fotos vorladen – gleiches Muster wie „Offene Punkte": parallel, mit Zeitlimit,
     // damit ein hängendes Bild nicht das ganze Schreiben blockiert.
     const fotoData={};
-    if(mitFotos){
-      const src=[...new Set(gewaehlt.flatMap(x=>(x.r.fotos||[]).slice(0,4)))];
+    if(mitFotos||mitVorher){
+      const src=[...new Set(gewaehlt.flatMap(x=>
+        (mitFotos? (x.r.fotosOk||[]).slice(0,4) : []).concat(mitVorher? (x.r.fotos||[]).slice(0,4) : [])))];
       if(src.length){
         const DEADLINE=performance.now()+45000;
         const mitZeit=(p,ms)=>new Promise((res,rej)=>{ const t=setTimeout(()=>rej(new Error('timeout')),ms);
@@ -7250,7 +7343,7 @@ async function fmErstellen(){
       }
     }
     showLoader('Freimeldung wird erstellt …');
-    const blob=await fmBuildPdf({nr, datum, emp, bezug, unter, zusatz, mitFotos, zeilen:gewaehlt, fotoData});
+    const blob=await fmBuildPdf({nr, datum, emp, bezug, unter, zusatz, mitFotos, mitVorher, zeilen:gewaehlt, fotoData});
     const url=URL.createObjectURL(blob);
     if(win) win.location=url; else window.open(url,'_blank');
     const fname=safeName(curProjName())+'/_Freimeldungen/Freimeldung_'+String(nr).padStart(3,'0')+'_'+datum+'.pdf';
@@ -7366,17 +7459,20 @@ async function fmBuildPdf(o){
     doc.setFontSize(8.5); tc(grey); doc.text(oL,cx.ort,y+4);
     tc(gruen); doc.text(eL,cx.erl,y+4);
     y+=h;
-    // Nachweisfotos
-    if(o.mitFotos && x.r.fotos && x.r.fotos.length){
-      const bilder=x.r.fotos.slice(0,4).map(s=>o.fotoData[s]).filter(Boolean);
-      if(bilder.length){
-        const bw=32, bh=24;
-        platz(bh+4);
-        let bx=cx.txt;
-        bilder.forEach(d=>{ try{ doc.addImage(d,'JPEG',bx,y,bw,bh); }catch(e){ try{ doc.addImage(d,'PNG',bx,y,bw,bh); }catch(_){} } bx+=bw+3; });
-        y+=bh+3;
-      }
-    }
+    // Bildnachweis: „nachher" ist der eigentliche Beleg, „vorher" nur auf Wunsch.
+    // Beschriftet, sonst ist im Schreiben nicht erkennbar, was welches Bild zeigt.
+    const reihe=(quelle,lbl,farbe)=>{
+      const bilder=(quelle||[]).slice(0,4).map(s=>o.fotoData[s]).filter(Boolean);
+      if(!bilder.length) return;
+      const bw=32, bh=24;
+      platz(bh+7);
+      reg(); doc.setFontSize(7.5); tc(farbe); doc.text(lbl,cx.txt,y+3);
+      let bx=cx.txt, by=y+4.5;
+      bilder.forEach(d=>{ try{ doc.addImage(d,'JPEG',bx,by,bw,bh); }catch(e){ try{ doc.addImage(d,'PNG',bx,by,bw,bh); }catch(_){} } bx+=bw+3; });
+      y=by+bh+3;
+    };
+    if(o.mitVorher) reihe(x.r.fotos,'vorher – bei der Erfassung',grey);
+    if(o.mitFotos)  reihe(x.r.fotosOk,'nachher – Nachweis der Erledigung',gruen);
     dc(line); doc.setLineWidth(0.1); doc.line(M,y,R,y); y+=1.5;
   });
   y+=8;
