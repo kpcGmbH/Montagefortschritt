@@ -334,6 +334,8 @@ body.lvadm .lvonly.blk{display:block !important;}
 .allg-add{margin-top:2px;}
 .ptype-h{padding:9px 14px 7px;color:var(--accent);font-size:11px;font-weight:700;text-transform:uppercase;
   letter-spacing:.4px;border-bottom:1px solid var(--braun);opacity:.85;}
+/* Erklärzeile unter einem Menüeintrag (Art-Abfrage Restarbeit/Mangel) */
+.ptype-item small{display:block;font-weight:400;font-size:10px;color:#a8a8a8;letter-spacing:0;margin-top:2px;}
 
 /* Restarbeiten an JEDER Position erfassbar – auch an noch nicht begonnenen
    („beschädigt angeliefert", „Anschluss fehlt bauseits"). Früher nur bei
@@ -1319,7 +1321,7 @@ function buildPanels(){
     <div class="rasec">
       <div class="rahd">&#128203; Restarbeiten <span class="rai" id="RAI${id}"></span></div>
       <div class="ragrp" id="RA${id}"></div>
-      <button class="raadd" onclick="raAddNew('${item.pos}')">&#65291; Restarbeit</button>
+      <button class="raadd" onclick="raNeuMitArt('${item.pos}',this)">&#65291; Restarbeit / Mangel</button>
     </div>
   </div>
 </div>`;
@@ -1480,8 +1482,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 103;
+const APP_VERSION = 104;
 const CHANGELOG = [
+  { v:104, titel:'Beim Anlegen wird gefragt: Restarbeit oder Mangel?', punkte:[
+    'Der Knopf heißt jetzt „＋ Restarbeit / Mangel" und fragt beim Antippen nach, was erfasst wird – mit einem Satz Erklärung je Auswahl. Bisher stand das Auswahlfeld stillschweigend auf „Restarbeit"; wer es übersah, hatte einen Mangel des Auftraggebers erfasst, den die Freimeldung nie vorschlägt.',
+    'Beim Weg über „Projekt / Etage" kommt die Frage nach dem Geltungsbereich – also erst wofür, dann was.',
+    'Enter am Ende einer Zeile legt wie bisher sofort die nächste an und übernimmt dabei die Art der Zeile darüber. Beim Abtippen einer Mängelliste geht also kein Menü auf.' ]},
   { v:103, titel:'Foto nachträglich als Mangel- oder Nachweisbild einordnen', punkte:[
     'Unter jedem Foto einer Restarbeit sitzt jetzt eine kleine Leiste: „↓✓" schiebt ein Mangelfoto zum Nachweis der Erledigung, „↑📷" wieder zurück. Ein Fehlgriff beim Foto-Knopf heißt damit nicht mehr, dass jemand nochmal hinfahren und neu fotografieren muss.',
     'Die Datei in SharePoint wird dabei passend umbenannt, damit auch der Ordner die richtige Zuordnung zeigt. Ist das Foto noch nicht hochgeladen (unterwegs ohne Netz), bleibt der Dateiname stehen – in der App stimmt die Zuordnung trotzdem.' ]},
@@ -6112,7 +6118,7 @@ function updAllgSection(){
           '<div class="ragrp" id="RA'+sp(sc.key)+'"></div></div>';
   });
   if(!html) html='<div class="allg-empty">Noch keine allgemeinen Restarbeiten erfasst.</div>';
-  html+='<button class="raadd allg-add" onclick="raAddAllg(this)">&#65291; Restarbeit (Projekt / Etage)</button>';
+  html+='<button class="raadd allg-add" onclick="raAddAllg(this)">&#65291; Restarbeit / Mangel (Projekt / Etage)</button>';
   body.innerHTML=html;
   scopes.forEach(sc=>{ if(document.getElementById('RA'+sp(sc.key))) updRA(sc.key); });
   updAllgBadge();
@@ -6147,7 +6153,7 @@ function raAddAllg(anchor){
   if(!menu){ menu=document.createElement('div'); menu.id='allgScopeMenu'; menu.className='ptype-menu';
     document.body.appendChild(menu);
     document.addEventListener('click',function(e){ if(!e.target.closest('#allgScopeMenu')&&!e.target.closest('.allg-add')) menu.classList.remove('open'); }); }
-  menu.innerHTML='<div class="ptype-h">Restarbeit f&uuml;r &hellip;</div>'+
+  menu.innerHTML='<div class="ptype-h">Restarbeit / Mangel f&uuml;r &hellip;</div>'+
     scopes.map((sc,i)=>'<div class="ptype-item" onclick="raAddAllgPick('+i+')">'+sc.ic+'&nbsp; '+escapeHtml(sc.label)+'</div>').join('')+
     '<div class="ptype-h" style="margin-top:4px">Mehrere auf einmal</div>'+
     scopes.map((sc,i)=>'<div class="ptype-item" onclick="raBulkPick('+i+')">&#128203;&nbsp; Liste f&uuml;r '+escapeHtml(sc.label)+'</div>').join('');
@@ -6164,15 +6170,19 @@ function raBulkPick(i){
 function raAddAllgPick(i){
   const sc=ALLG_SCOPES[i]; if(!sc) return;
   const menu=document.getElementById('allgScopeMenu'); if(menu) menu.classList.remove('open');
-  raAddNew(sc.key);        // leere Zeile anlegen/wiederverwenden (Ablage = §E§-Bereichszeile)
-  updAllgSection();        // Gruppe (ggf. neu) rendern
-  const body=document.getElementById('ALLGBODY');
-  if(body){ body.classList.add('open'); const t=document.getElementById('ALLGCNT'); if(t) t.classList.add('act'); }
-  setTimeout(()=>{
-    const cont=document.getElementById('RA'+sp(sc.key));
-    if(cont){ const rows=cont.querySelectorAll('.rarow .ratxt'); const last=rows[rows.length-1];
-      if(last){ last.focus(); try{ last.scrollIntoView({block:'center'}); }catch(e){} } }
-  },30);
+  // Zweiter Schritt: Restarbeit oder Mangel? (Das Menü hier um eine zweite
+  // Abteilung zu erweitern hätte 15 Einträge ergeben.)
+  raArtFragen(document.querySelector('.allg-add'), m=>{
+    raAddNew(sc.key, m);   // leere Zeile anlegen/wiederverwenden (Ablage = §E§-Bereichszeile)
+    updAllgSection();      // Gruppe (ggf. neu) rendern
+    const body=document.getElementById('ALLGBODY');
+    if(body){ body.classList.add('open'); const t=document.getElementById('ALLGCNT'); if(t) t.classList.add('act'); }
+    setTimeout(()=>{
+      const cont=document.getElementById('RA'+sp(sc.key));
+      if(cont){ const rows=cont.querySelectorAll('.rarow .ratxt'); const last=rows[rows.length-1];
+        if(last){ last.focus(); try{ last.scrollIntoView({block:'center'}); }catch(e){} } }
+    },30);
+  });
 }
 // ── Sammel-Erfassung: mehrere Restarbeiten aus einer Textliste ───────────────
 // Für Mängellisten aus Abnahmeprotokollen: die Liste einfach hineinkopieren.
@@ -6686,7 +6696,10 @@ function raKey(ev,pos,i){
   if(ev.key!=='Enter')return;
   ev.preventDefault();
   const s=gs(pos);
-  s.restarbeiten.splice(i+1,0,{txt:'',desc:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[]});
+  // Enter erbt die Art der Zeile darüber – beim Tippen einer Liste soll kein Menü
+  // aufgehen, und die nächste Zeile ist fast immer dieselbe Sorte.
+  s.restarbeiten.splice(i+1,0,{txt:'',desc:'',done:false,mangel:!!(s.restarbeiten[i]&&s.restarbeiten[i].mangel),
+    ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[],fotosOk:[]});
   updRA(pos);
   saveFotos(pos);
   setTimeout(()=>{
@@ -6695,16 +6708,52 @@ function raKey(ev,pos,i){
     if(newRow)newRow.focus();
   },10);
 }
+// ── Art-Abfrage bei der Neuanlage ───────────────────────────────────────────
+// Ein stiller Standard „Restarbeit" wäre gefährlich: wer das Auswahlfeld danach
+// nicht anfasst, hat einen Mangel des Auftraggebers erfasst, der nie freigemeldet
+// wird (§1.4b). Deshalb wird bei JEDER Neuanlage über einen Knopf gefragt.
+// Ausnahme: Enter in einer Zeile erbt die Art der Zeile darüber (raKey) – beim
+// Tippen einer Liste soll kein Menü aufgehen.
+let RA_ART_CB=null;
+function raArtFragen(anchor, cb){
+  RA_ART_CB=cb;
+  let menu=document.getElementById('raArtMenu');
+  if(!menu){
+    menu=document.createElement('div'); menu.id='raArtMenu'; menu.className='ptype-menu';
+    document.body.appendChild(menu);
+    // .ptype-item ausnehmen: das Menü wird oft AUS einem anderen Menü heraus geöffnet
+    // (Geltungsbereich → Art), sonst schlösse derselbe Klick es sofort wieder.
+    document.addEventListener('click',function(e){
+      if(!e.target.closest('#raArtMenu')&&!e.target.closest('.raadd')&&!e.target.closest('.ptype-item')) menu.classList.remove('open');
+    });
+  }
+  menu.innerHTML='<div class="ptype-h">Was wird erfasst?</div>'+
+    '<div class="ptype-item" onclick="raArtWahl(0)">&#128295;&nbsp; Restarbeit<small>eigene Nacharbeit</small></div>'+
+    '<div class="ptype-item" onclick="raArtWahl(1)">&#9888;&#65039;&nbsp; Mangel (AG)<small>vom Auftraggeber gemeldet &ndash; wird freigemeldet</small></div>';
+  const r=(anchor&&anchor.getBoundingClientRect)? anchor.getBoundingClientRect() : {bottom:80,left:16};
+  menu.style.top=(r.bottom+window.scrollY+4)+'px';
+  menu.style.left=Math.max(8,Math.min((r.left||0)+window.scrollX, window.innerWidth-244))+'px';
+  menu.classList.add('open');
+}
+function raArtWahl(m){
+  const cb=RA_ART_CB; RA_ART_CB=null;
+  const menu=document.getElementById('raArtMenu'); if(menu) menu.classList.remove('open');
+  if(cb) cb(!!m);
+}
+// Art abfragen und die Zeile anlegen (Knopf „＋ Restarbeit" an der Position)
+function raNeuMitArt(pos, anchor){ raArtFragen(anchor, m=>raAddNew(pos, m)); }
+
 // Explizit neue Restarbeit anlegen (Button unter der Liste – funktioniert auch ohne Enter
 // und bei Positionen, deren Liste noch nie gerendert wurde)
-function raAddNew(pos){
+function raAddNew(pos, mangel){
   const s=gs(pos);
   s.restarbeiten.forEach(raEnsure);
-  let idx=s.restarbeiten.findIndex(r=>!(r.txt&&r.txt.trim())&&!(r.desc&&r.desc.trim())&&!(r.fotos&&r.fotos.length));
-  if(idx<0){ s.restarbeiten.push({txt:'',desc:'',done:false,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[]}); idx=s.restarbeiten.length-1; }
+  let idx=s.restarbeiten.findIndex(r=>!(r.txt&&r.txt.trim())&&!(r.desc&&r.desc.trim())&&!(r.fotos&&r.fotos.length)&&!(r.fotosOk&&r.fotosOk.length));
+  if(idx<0){ s.restarbeiten.push({txt:'',desc:'',done:false,mangel:!!mangel,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[],fotosOk:[]}); idx=s.restarbeiten.length-1; }
   // Auch bei einer wiederverwendeten (noch leeren) Zeile den angemeldeten Benutzer
   // eintragen – sonst bliebe „Erst." leer, wenn die Zeile vor dem Login entstand.
-  else if(!s.restarbeiten[idx].ersteller && USER) s.restarbeiten[idx].ersteller=USER;
+  else { if(!s.restarbeiten[idx].ersteller && USER) s.restarbeiten[idx].ersteller=USER;
+         if(typeof mangel!=='undefined') s.restarbeiten[idx].mangel=!!mangel; }
   updRA(pos);
   setTimeout(()=>{
     const el=document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+idx+'"] .ratxt');
