@@ -1451,8 +1451,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 97;
+const APP_VERSION = 98;
 const CHANGELOG = [
+  { v:98, titel:'Gesetzte Schritte lassen sich nicht mehr aus Versehen zurücknehmen', punkte:[
+    'Ein Tipp auf einen bereits gesetzten Schritt – etwa „Montiert" – hat ihn bisher sofort wieder entfernt, samt Zeitstempel und Namen dessen, der ihn eingetragen hat. Am Handy passierte das schnell beim Scrollen.',
+    'Jetzt kommt eine Rückfrage, die zeigt, um welchen Schritt und welche Position es geht und wer ihn wann eingetragen hat. Das Setzen bleibt wie bisher ein einfacher Tipp.',
+    'Sind bereits spätere Schritte gesetzt, die diesen voraussetzen (z. B. „Inbetriebnahme" bei „Montiert"), weist die Rückfrage darauf hin – sonst entstünde unbemerkt ein widersprüchlicher Stand.' ]},
   { v:97, titel:'Inbetriebnahmeprotokolle wieder nachträglich bearbeitbar', punkte:[
     'Der Stift ✏️ an einem abgelegten IBN-Protokoll öffnet es wieder zum Weiterbearbeiten. Am Handy und Tablet passierte bisher oft gar nichts: das neue Fenster wurde vom Popup-Blocker abgefangen, weil es erst nach dem Laden der Daten geöffnet wurde. Es geht jetzt sofort beim Antippen auf und zeigt „Protokoll wird geladen …".',
     'Protokolle, die mit einer älteren App-Version abgelegt wurden, zeigten gar keinen Stift. Die App findet den gespeicherten Stand jetzt auch dann, wenn er woanders liegt als vermerkt, und merkt sich den richtigen Ort für das nächste Mal.',
@@ -1981,12 +1985,38 @@ function ckRender(pos,f){
   const tsEl=document.getElementById('T'+f+id);
   if(tsEl) tsEl.textContent = entf(s,f) ? 'entfällt' : (s[f]?ckLabel(s,f):'');
 }
+// Kurzform einer Position für Rückfragen: „05.02.00.00.03. Arbeitstisch mit HWB"
+function posLabel(pos){
+  if(pos===PRAKEY) return 'Baustelle allgemein';
+  if(isEKey(pos)){ const sec=secByEKey(pos); return (sec?(sec.label||sec.pos):pos)+' – allgemein'; }
+  let bez='';
+  (DATA||[]).some(sec=>sec.subsections.some(sub=>sub.items.some(it=>{ if(it.pos===pos){ bez=(it.bez||'').trim(); return true; } return false; })));
+  return pos+(bez?(' '+bez.slice(0,50)):'');
+}
 function tc(pos,f){
   if(ckHoldGerade()) return;               // Klick nach langem Druck ignorieren
   const s=gs(pos);
   // Auf einem entfallenen Schritt hebt der normale Klick das „entfällt" auf –
   // so kommt man ohne lange Geste wieder zurück.
   if(entf(s,f)){ tcNA(pos,f,false); return; }
+  // Einen GESETZTEN Schritt nimmt man selten absichtlich zurück – ein Fehlgriff
+  // löschte bisher stillschweigend Zeitstempel und Ausführer (der Nachweis, wer
+  // wann montiert hat). Deshalb Rückfrage; Setzen bleibt ein einfacher Tipp.
+  if(s[f]){
+    // Chronologie: Schritte, die diesen hier voraussetzen und schon gesetzt sind.
+    // Ohne den Hinweis entstünde lautlos ein widersprüchlicher Stand
+    // („in Betrieb", aber nicht mehr „montiert").
+    const rel=relFields(pos);
+    const spaeter=Object.keys(VORSTUFEN).filter(k=>
+      (VORSTUFEN[k]||[]).includes(f) && s[k] && !entf(s,k) && rel.includes(k));
+    const wer=(s.by&&s.by[f])?('\n\nEingetragen von: '+s.by[f]+(s.ts&&s.ts[f]?' · '+tsFmt(s.ts[f]):'')):'';
+    const warn=spaeter.length
+      ? ('\n\nAchtung: „'+spaeter.map(k=>FLD_LBL[k]||k).join('", „')+'" '+
+         (spaeter.length>1?'sind':'ist')+' bereits gesetzt und setz'+(spaeter.length>1?'en':'t')+
+         ' diesen Schritt voraus.')
+      : '';
+    if(!confirm('„'+(FLD_LBL[f]||f)+'" zurücknehmen?\n\n'+posLabel(pos)+wer+warn)) return;
+  }
   s[f]=!s[f];
   if(s[f]){ s.ts[f]=new Date().toISOString(); s.by[f]=USER; }
   else { delete s.ts[f]; delete s.by[f]; }
