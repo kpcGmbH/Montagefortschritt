@@ -881,6 +881,53 @@ async function idbAll(store){
 }
 
 function nowMs(){ return Date.now(); }
+
+// ── LOKALER SPEICHER ─────────────────────────────────────────────────────────
+// Im Store `photos` liegen ZWEI Dinge nebeneinander: der Zwischenspeicher
+// angesehener Fotos/PDFs (jederzeit wiederbeschaffbar) und die noch NICHT
+// übertragenen Dateien aus der Warteschlange (unersetzlich, solange sie nicht
+// oben sind). Läuft der Speicher voll, scheiterte bisher ausgerechnet der
+// Upload. Regel ab hier: **im Zweifel Zwischenspeicher opfern, nie den Upload.**
+let _PERSIST=null;   // null = noch nicht gefragt, true/false = Antwort des Browsers
+// Dauerhaften Speicher anfordern. Ohne das darf der Browser den lokalen Bestand
+// jederzeit räumen – iOS-Safari nach etwa 7 Tagen ohne Besuch, andere bei
+// Platzmangel – und mit ihm die noch nicht übertragenen Fotos und Protokolle.
+async function speicherSichern(){
+  try{
+    if(!navigator.storage || !navigator.storage.persist){ _PERSIST=false; return; }
+    if(navigator.storage.persisted && await navigator.storage.persisted()){ _PERSIST=true; return; }
+    _PERSIST = !!(await navigator.storage.persist());
+  }catch(e){ _PERSIST=false; }
+  updSyncBadge();
+}
+// Füllstand, gedrosselt: die Abfrage kostet, wird aber bei jedem Foto gebraucht.
+let _QUOTA={ts:0, voll:false};
+async function speicherPruefen(){
+  const t=nowMs();
+  if(t-_QUOTA.ts < 30000) return _QUOTA.voll;
+  _QUOTA.ts=t;
+  try{
+    if(!navigator.storage || !navigator.storage.estimate) return (_QUOTA.voll=false);
+    const {usage,quota}=await navigator.storage.estimate();
+    _QUOTA.voll = !!(quota && usage/quota > 0.8);
+  }catch(e){ _QUOTA.voll=false; }
+  return _QUOTA.voll;
+}
+// Datei ablegen, die NICHT verloren gehen darf. Scheitert das Schreiben, wird
+// Platz geschaffen: zuerst fliegen zwischengespeicherte Downloads raus (die
+// holt die App bei Bedarf wieder), niemals etwas aus der Warteschlange.
+async function photosSetGeschuetzt(fname, blob){
+  try{ await idbSet('photos', fname, blob); return true; }catch(e){}
+  const behalten=new Set([fname]);
+  try{ (await idbAll('outbox')).forEach(e=>{ if(e.val&&e.val.kind==='file'&&e.val.fname) behalten.add(e.val.fname); }); }catch(e){}
+  let keys=[];
+  try{ keys=(await idbAll('photos')).map(e=>e.key).filter(k=>!behalten.has(k)); }catch(e){}
+  for(let i=0;i<keys.length;i+=20){
+    for(const k of keys.slice(i,i+20)){ try{ await idbDel('photos', k); }catch(e){} }
+    try{ await idbSet('photos', fname, blob); _QUOTA.ts=0; return true; }catch(e){}
+  }
+  return false;
+}
 const DIRTY=new Set();        // Positionen mit lokalen, noch nicht synchronisierten Änderungen
 let _flushing=false;
 
@@ -915,9 +962,11 @@ async function enqueuePos(pos){
 
 // Datei (Foto/PDF) lokal ablegen + Upload in die Warteschlange legen
 async function queueUpload(fname, blob, contentType, pos){
-  let lokal=true;
-  try{ await idbSet('photos', fname, blob); }
-  catch(e){ lokal=false; console.warn('Lokale Datei-Ablage fehlgeschlagen:', (e&&e.message)||e); }
+  // photosSetGeschuetzt räumt bei Platzmangel zwischengespeicherte Downloads
+  // weg, bevor es aufgibt – die sind wiederbeschaffbar, dieser Upload nicht.
+  let lokal=false;
+  try{ lokal = await photosSetGeschuetzt(fname, blob); }
+  catch(e){ console.warn('Lokale Datei-Ablage fehlgeschlagen:', (e&&e.message)||e); }
   // OHNE lokale Kopie darf NICHTS in die Warteschlange: der Eintrag fände beim
   // Synchronisieren keinen Blob mehr, würde verworfen – und die Datei wäre für
   // immer weg, obwohl die App „abgelegt" gemeldet hat. Der Positionseintrag
@@ -949,7 +998,11 @@ async function getFileBlob(fname){
   const local = await idbGet('photos', fname);
   if(local) return local;
   const blob = await spDownloadBlob(fname);
-  try{ await idbSet('photos', fname, blob); }catch(e){}
+  // Zwischenspeichern ist NACHRANGIG: ab 80 % Füllstand gar nicht mehr, damit
+  // das Ansehen von Fotos nicht den Platz belegt, den der nächste noch nicht
+  // übertragene Upload braucht. Fehler werden bewusst geschluckt – ohne
+  // Zwischenspeicher lädt die App die Datei eben wieder herunter.
+  try{ if(!(await speicherPruefen())) await idbSet('photos', fname, blob); }catch(e){}
   return blob;
 }
 
@@ -1065,6 +1118,13 @@ async function updSyncBadge(){
     el.textContent = '✓ Synchron';
     el.style.color = '#7faa6a';
   }
+  // Ob der Browser den lokalen Bestand dauerhaft behält, entscheidet er selbst.
+  // Sagt er nein, ist das kein Fehler – aber es erklärt, warum Unversendetes
+  // nach längerer Zeit ohne Netz verschwinden kann. Deshalb im Tooltip nennen.
+  el.title = (n? (n+' Datei(en)/Änderung(en) noch nicht übertragen. ') : '')
+    + (_PERSIST===false
+        ? 'Achtung: Der Browser sichert den lokalen Speicher NICHT dauerhaft zu – nach längerer Zeit ohne Netz kann Unversendetes verloren gehen. Bei längeren Offline-Phasen bitte zeitnah in Netzreichweite synchronisieren.'
+        : (_PERSIST===true ? 'Lokaler Speicher ist dauerhaft gesichert.' : ''));
 }
 
 window.addEventListener('online', ()=>{ updSyncBadge(); flushOutbox(); });
@@ -1575,8 +1635,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 113;
+const APP_VERSION = 114;
 const CHANGELOG = [
+  { v:114, titel:'Robuster bei schlechtem Empfang', punkte:[
+    'Die App fordert jetzt beim Start <b>dauerhaften Speicher</b> beim Browser an. Ohne das darf der Browser den lokalen Bestand jederzeit löschen – auf dem iPhone schon nach etwa einer Woche ohne Besuch. Genau daran gingen bisher noch nicht übertragene Fotos und Protokolle verloren.',
+    'Angesehene Fotos und noch nicht übertragene Dateien lagen im selben Speicher. War er voll, scheiterte ausgerechnet das Hochladen – also das Einzige, was sich nicht wiederbeschaffen lässt. <b>Jetzt weicht immer der Zwischenspeicher, nie ein wartender Upload.</b>',
+    'Ab 80 % Füllstand werden angesehene Fotos nicht mehr zwischengespeichert. Sie werden dann bei Bedarf neu geladen – dafür bleibt Platz für das, was noch hochmuss.',
+    'Der Anzeiger oben rechts („↻ 3 wird synchronisiert…") verrät beim Draufzeigen, wie viel aussteht und ob der Browser den Speicher dauerhaft sichert.' ]},
   { v:113, titel:'Protokoll-Datei nachträglich zuordnen', punkte:[
     'Lässt sich ein abgelegtes Protokoll nicht öffnen, gibt es in der Fehleranzeige jetzt <b>„🔗 Datei zuordnen"</b>. Die App listet alle Protokoll-PDFs der Baustelle auf, die zu keinem Eintrag gehören – passende zur Position zuerst, mit Ordner, Größe und Datum.',
     'Ein Tipp darauf verknüpft die Datei mit dem Eintrag. Liegt der Datenstand daneben, wird er mit übernommen – dann funktioniert auch „✏️ bearbeiten" wieder.',
@@ -9019,6 +9084,7 @@ async function parsePdfToLV(file){
 }
 
 // INIT
+speicherSichern();   // dauerhaften Speicher anfordern, bevor irgendetwas abgelegt wird
 setHeaderHeight();
 window.addEventListener('resize', setHeaderHeight);
 // Die Kopfleiste ändert ihre Höhe auch ohne Fenstergröße (Gewerk-Umschalter
