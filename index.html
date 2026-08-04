@@ -915,7 +915,22 @@ async function enqueuePos(pos){
 
 // Datei (Foto/PDF) lokal ablegen + Upload in die Warteschlange legen
 async function queueUpload(fname, blob, contentType, pos){
-  try{ await idbSet('photos', fname, blob); }catch(e){ console.warn('Lokale Datei-Ablage fehlgeschlagen:', e); }
+  let lokal=true;
+  try{ await idbSet('photos', fname, blob); }
+  catch(e){ lokal=false; console.warn('Lokale Datei-Ablage fehlgeschlagen:', (e&&e.message)||e); }
+  // OHNE lokale Kopie darf NICHTS in die Warteschlange: der Eintrag fände beim
+  // Synchronisieren keinen Blob mehr, würde verworfen – und die Datei wäre für
+  // immer weg, obwohl die App „abgelegt" gemeldet hat. Der Positionseintrag
+  // zeigte danach dauerhaft ins Leere (genau der Fall aus Korbach:
+  // 01_04_00_00_03__IBN_Protokoll_1785838759985.pdf war nie in SharePoint).
+  // Also sofort direkt hochladen und einen Fehler NACH OBEN durchreichen,
+  // statt still zu verlieren. Typische Ursache: der Browser hat den lokalen
+  // Speicher geräumt oder das Kontingent ist voll (2,5-MB-Protokolle).
+  if(!lokal){
+    await spUpload(fname, blob, contentType||'application/octet-stream');
+    updSyncBadge();
+    return fname;
+  }
   await idbSet('outbox', 'file|'+fname, { kind:'file', pid:PID, pos:pos, fname:fname, contentType: contentType||'application/octet-stream', ts: nowMs() });
   updSyncBadge();
   // Kein eigener flushOutbox() hier: nach jedem queueUpload folgt saveFotos(pos),
@@ -964,6 +979,7 @@ async function flushOutbox(){
   if(!SPIDS || !SPIDS.listId){ updSyncBadge(); return; }   // noch nicht eingeloggt
   _flushing=true;
   let before=0, after=0;
+  const verloren=[];   // Dateien, deren lokale Kopie verschwunden ist – siehe unten
   try{
     const all = await idbAll('outbox');
     before = all.length;
@@ -972,7 +988,17 @@ async function flushOutbox(){
     for(const e of files){
       try{
         const blob = await idbGet('photos', e.val.fname);
-        if(blob){ await spUpload(e.val.fname, blob, e.val.contentType); }
+        if(!blob){
+          // Die lokale Kopie ist weg (Browser hat den Speicher geräumt). Damit
+          // ist die Datei nicht mehr hochzuladen. Den Eintrag stillschweigend zu
+          // löschen hiesse: die App meldet „synchron", während der Eintrag an der
+          // Position ins Leere zeigt und niemand es merkt. Also merken und
+          // hinterher benennen.
+          verloren.push({fname:e.val.fname, pos:e.val.pos||''});
+          await idbDel('outbox', e.key);
+          continue;
+        }
+        await spUpload(e.val.fname, blob, e.val.contentType);
         await idbDel('outbox', e.key);
       }catch(err){
         if(isNetErr(err)) throw err;             // Netzfehler -> abbrechen, Rest bleibt in Queue
@@ -998,6 +1024,16 @@ async function flushOutbox(){
   // Wenn Fortschritt erzielt wurde, aber noch etwas in der Queue liegt (z.B. inzwischen
   // dazugekommene Einträge), erneut synchronisieren – stoppt automatisch, wenn kein
   // Fortschritt mehr passiert (dauerhaft fehlschlagende Einträge -> keine Endlosschleife).
+  // Verlorene Dateien beim Namen nennen. Der Protokoll-Eintrag bleibt stehen –
+  // wer ihn löscht, entscheidet der Nutzer (das PDF könnte auf dem Gerät des
+  // Monteurs noch im Zwischenspeicher liegen und sich von dort neu ablegen lassen).
+  if(verloren.length){
+    const liste=verloren.map(v=>(v.pos?('Pos. '+v.pos+': '):'')+v.fname.slice(v.fname.lastIndexOf('/')+1)).join('\n• ');
+    try{ console.warn('Nicht hochgeladene Dateien ohne lokale Kopie:', verloren); }catch(e){}
+    alert('Achtung: '+verloren.length+' Datei(en) konnten NICHT nach SharePoint übertragen werden – die lokale Kopie ist nicht mehr vorhanden '
+      +'(der Browser räumt den Zwischenspeicher, wenn der Platz knapp wird).\n\n• '+liste
+      +'\n\nDie zugehörigen Einträge zeigen ins Leere. Betroffene Protokolle bitte neu erstellen und den alten Eintrag über ✕ entfernen.');
+  }
   try{ after=(await idbAll('outbox')).length; }catch(e){}
   if(after>0 && after<before && navigator.onLine){ setTimeout(flushOutbox, 300); }
 }
@@ -1539,8 +1575,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 111;
+const APP_VERSION = 112;
 const CHANGELOG = [
+  { v:112, titel:'Kein stiller Verlust von Fotos und Protokollen mehr', punkte:[
+    'Beim Ablegen wird eine Datei zuerst auf dem Gerät zwischengespeichert und von dort nach SharePoint übertragen. Ging das Zwischenspeichern schief – der Browser räumt den Speicher, wenn der Platz knapp wird –, meldete die App trotzdem „abgelegt", und die Datei wurde nie übertragen. Der Eintrag an der Position zeigte danach dauerhaft ins Leere.',
+    'Jetzt wird in diesem Fall sofort direkt nach SharePoint übertragen. Klappt auch das nicht (kein Netz), sagt die App das deutlich, statt Erfolg zu melden – das Protokoll bleibt dann zum erneuten Speichern stehen.',
+    'War die Zwischenkopie schon weg, bevor übertragen werden konnte, nennt die App jetzt Dateiname und Position, statt den Auftrag stillschweigend zu verwerfen. Betroffene Protokolle müssen neu erstellt werden.',
+    'Das betraf besonders Handys mit vielen zwischengespeicherten Fotos und große Protokolle (2–3 MB).' ]},
   { v:111, titel:'Protokolle: „PDF konnte nicht geladen werden" behoben', punkte:[
     'Ein abgelegtes Protokoll ließ sich nicht mehr öffnen, obwohl die Datei in SharePoint einwandfrei da war. Ursache: der Eintrag merkt sich den Dateipfad – und die Datei lag inzwischen in einem anderen Ordner.',
     'Wie kam es dazu? Wer ein Protokoll mit dem Stift bearbeitet und gespeichert hat, hat es dabei ungewollt aus dem Sammelordner „_Inbetriebnahme" in den Positionsordner verschoben. Das ist jetzt behoben – bearbeitete Protokolle bleiben, wo sie hingehören.',
@@ -5774,7 +5815,7 @@ async function pdfOpen(pos, i, readonly){
     // Dateiname mit in die Meldung: ohne ihn ist „geht nicht" nicht nachvollziehbar.
     pagesEl.innerHTML='<div style="color:#c0392b;padding:40px;font-size:15px;line-height:1.6">PDF konnte nicht geladen werden.<br><span style="font-size:13px;color:#d7c1ae">'+escapeHtml(e.message||'')+'</span>'
       +(e.__kand?('<br><span style="font-size:12px;color:#8a8f92">Gesucht wurde in: '+escapeHtml(e.__kand.join(' · '))+'</span>'):'')
-      +'<br><span style="font-size:12px;color:#8a8f92">Die Datei liegt möglicherweise noch in SharePoint – dann über die Bibliothek öffnen und den Eintrag hier neu ablegen.</span></div>';
+      +'<br><span style="font-size:12px;color:#8a8f92">Liegt die Datei in SharePoint an einer anderen Stelle, bitte den Pfad nennen. Ist sie dort gar nicht (mehr) vorhanden, wurde sie nie hochgeladen oder gelöscht – dann das Protokoll neu erstellen und diesen Eintrag über ✕ entfernen.</span></div>';
   }
 }
 
