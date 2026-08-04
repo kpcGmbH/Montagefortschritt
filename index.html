@@ -1539,8 +1539,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 110;
+const APP_VERSION = 111;
 const CHANGELOG = [
+  { v:111, titel:'Protokolle: „PDF konnte nicht geladen werden" behoben', punkte:[
+    'Ein abgelegtes Protokoll ließ sich nicht mehr öffnen, obwohl die Datei in SharePoint einwandfrei da war. Ursache: der Eintrag merkt sich den Dateipfad – und die Datei lag inzwischen in einem anderen Ordner.',
+    'Wie kam es dazu? Wer ein Protokoll mit dem Stift bearbeitet und gespeichert hat, hat es dabei ungewollt aus dem Sammelordner „_Inbetriebnahme" in den Positionsordner verschoben. Das ist jetzt behoben – bearbeitete Protokolle bleiben, wo sie hingehören.',
+    'Zusätzlich sucht die App eine nicht gefundene Datei selbst: unter ihrem Namen im Sammelordner, im Positionsordner und in der Baustelle. Wird sie gefunden, merkt sich der Eintrag den richtigen Pfad dauerhaft. Das repariert auch alle Protokolle, die schon verschoben wurden.',
+    'Lässt sich die Datei wirklich nicht finden, steht jetzt in der Meldung, wie sie heißt und wo gesucht wurde – statt nur „geht nicht".' ]},
   { v:110, titel:'Aufgeräumte Ansicht am Rechner', punkte:[
     'Zwischen den Bereichen klaffte im Tab „Alle" jeweils eine Lücke von 80 Pixeln – bei vier Bereichen 320 Pixel Leere. Der Abstand gehört an den Seitenfuß (Platz für den Aktionsknopf) und steht jetzt auch nur dort.',
     'Der Hinweis „Anlagenfotos = Montageverlauf · Bauphase = …" stand an jedem Bereich. Er erscheint jetzt nur noch beim obersten.',
@@ -5613,12 +5618,47 @@ function updPG(pos){
   }).join('');
 }
 
+// Wo liegt die PDF-Datei zu einem Protokoll-Eintrag? Gleiche Idee wie
+// ibnDataKandidaten: `fname` ist nur eine Abkürzung – zeigt er ins Leere, wird
+// die Datei unter ihrem NAMEN in den bekannten Ablagen gesucht, statt
+// aufzugeben. Nötig, weil dieselbe Datei je nach Weg woanders landete:
+//  · Sammelordner (_Inbetriebnahme/_DGUV/_Einweisung) beim Ablegen aus der App,
+//  · Positionsordner beim Speichern aus dem PDF-Editor (bis heute) und bei
+//    allen Protokollen von vor dem 02.07.2026 (`68f3121`),
+//  · Projektwurzel, wenn die Position nicht mehr in der Stückliste steht.
+function protoDateiKandidaten(p,pos){
+  const k=[], add=x=>{ if(x && k.indexOf(x)<0) k.push(x); };
+  add(p.fname);
+  const f=p.fname||'';
+  const datei=f.slice(f.lastIndexOf('/')+1);
+  if(!datei) return k;
+  try{ add(protoDir(p.type||'IBN Protokoll',pos)+'/'+datei); }catch(e){}
+  try{ add(folderFor(pos)+'/'+datei); }catch(e){}
+  try{ add(safeName(curProjName())+'/'+datei); }catch(e){}
+  return k;
+}
+// Liefert den Blob und schreibt den gefundenen Pfad zurück – beim nächsten Mal
+// wird nicht wieder gesucht (Muster `reconcilePdfs` der Einweisungs-App).
+async function protoBlob(p,pos){
+  const kand=protoDateiKandidaten(p,pos);
+  if(!kand.length) throw new Error('Zu diesem Eintrag ist keine Datei hinterlegt.');
+  let letzter=null;
+  for(const fn of kand){
+    try{
+      const b=await getFileBlob(fn);
+      if(fn!==p.fname){ p.fname=fn; saveFotos(pos); updPG(pos); }
+      return b;
+    }catch(e){ letzter=e; }
+  }
+  const e=new Error('Datei nicht gefunden: '+kand[0]+((letzter&&letzter.message)?(' – '+letzter.message):''));
+  e.__kand=kand; throw e;
+}
 async function dlProto(pos,i){
   const p=gs(pos).pdfs[i];
   if(!p)return;
   showLoader('Wird geladen...');
   try{
-    const blob=await getFileBlob(p.fname);
+    const blob=await protoBlob(p,pos);
     const a=document.createElement('a');
     a.href=URL.createObjectURL(blob);
     a.download=p.name;
@@ -5705,7 +5745,7 @@ async function pdfOpen(pos, i, readonly){
   pagesEl.innerHTML='<div style="color:#d7c1ae;padding:40px;font-size:15px;font-weight:700">PDF wird geladen...</div>';
   try{
     pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-    const buf=await (await getFileBlob(p.fname)).arrayBuffer();
+    const buf=await (await protoBlob(p,pos)).arrayBuffer();
     const pdf=await pdfjsLib.getDocument({data:buf}).promise;
     pagesEl.innerHTML='';
     const scale=2;
@@ -5731,7 +5771,10 @@ async function pdfOpen(pos, i, readonly){
       if(!EDREADONLY) attachInk(ink); // Im Viewer: keine Zeichen-Listener
     }
   }catch(e){
-    pagesEl.innerHTML='<div style="color:#c0392b;padding:40px;font-size:15px">PDF konnte nicht geladen werden: '+e.message+'</div>';
+    // Dateiname mit in die Meldung: ohne ihn ist „geht nicht" nicht nachvollziehbar.
+    pagesEl.innerHTML='<div style="color:#c0392b;padding:40px;font-size:15px;line-height:1.6">PDF konnte nicht geladen werden.<br><span style="font-size:13px;color:#d7c1ae">'+escapeHtml(e.message||'')+'</span>'
+      +(e.__kand?('<br><span style="font-size:12px;color:#8a8f92">Gesucht wurde in: '+escapeHtml(e.__kand.join(' · '))+'</span>'):'')
+      +'<br><span style="font-size:12px;color:#8a8f92">Die Datei liegt möglicherweise noch in SharePoint – dann über die Bibliothek öffnen und den Eintrag hier neu ablegen.</span></div>';
   }
 }
 
@@ -6012,7 +6055,12 @@ async function pdfSaveDataBg(pos, idx, pages){
   const blob=doc.output('blob');
 
   const typeSlug = (p.type||'Protokoll').replace(/ /g,'_');
-  const newFname = folderFor(pos)+'/'+pos.replace(/\./g,'_')+'_'+typeSlug+'_'+Date.now()+'.pdf';
+  // MUSS derselbe Ordner sein wie beim Ablegen (ibnReceive/trpdf): protoDir legt
+  // IBN/DGUV/Einweisung in den Sammelordner der Baustelle, alles andere in den
+  // Positionsordner. Vorher stand hier folderFor(pos) – wer ein IBN-Protokoll mit
+  // dem Stift bearbeitete, verschob es damit aus `_Inbetriebnahme` heraus, und der
+  // danebenliegende Datenstand blieb zurück.
+  const newFname = protoDir(p.type||'Protokoll',pos)+'/'+pos.replace(/\./g,'_')+'_'+typeSlug+'_'+Date.now()+'.pdf';
 
   await queueUpload(newFname, blob, 'application/pdf', pos);   // lokal + Warteschlange (offline-fähig)
 
