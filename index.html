@@ -1575,8 +1575,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 112;
+const APP_VERSION = 113;
 const CHANGELOG = [
+  { v:113, titel:'Protokoll-Datei nachträglich zuordnen', punkte:[
+    'Lässt sich ein abgelegtes Protokoll nicht öffnen, gibt es in der Fehleranzeige jetzt <b>„🔗 Datei zuordnen"</b>. Die App listet alle Protokoll-PDFs der Baustelle auf, die zu keinem Eintrag gehören – passende zur Position zuerst, mit Ordner, Größe und Datum.',
+    'Ein Tipp darauf verknüpft die Datei mit dem Eintrag. Liegt der Datenstand daneben, wird er mit übernommen – dann funktioniert auch „✏️ bearbeiten" wieder.',
+    'Gedacht für Protokolle, deren Datei nie hochgeladen oder in SharePoint von Hand verschoben wurde: das fertige PDF ist da, nur der gespeicherte Pfad stimmt nicht mehr. Vorher blieb nur „löschen und neu erstellen".' ]},
   { v:112, titel:'Kein stiller Verlust von Fotos und Protokollen mehr', punkte:[
     'Beim Ablegen wird eine Datei zuerst auf dem Gerät zwischengespeichert und von dort nach SharePoint übertragen. Ging das Zwischenspeichern schief – der Browser räumt den Speicher, wenn der Platz knapp wird –, meldete die App trotzdem „abgelegt", und die Datei wurde nie übertragen. Der Eintrag an der Position zeigte danach dauerhaft ins Leere.',
     'Jetzt wird in diesem Fall sofort direkt nach SharePoint übertragen. Klappt auch das nicht (kein Netz), sagt die App das deutlich, statt Erfolg zu melden – das Protokoll bleibt dann zum erneuten Speichern stehen.',
@@ -5694,6 +5698,72 @@ async function protoBlob(p,pos){
   const e=new Error('Datei nicht gefunden: '+kand[0]+((letzter&&letzter.message)?(' – '+letzter.message):''));
   e.__kand=kand; throw e;
 }
+// Dateien eines Ordners auflisten (nur Name + Größe; 404 -> leer).
+async function spListFiles(ordner){
+  try{
+    const res=await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encPath(ordner)+':/children?$top=200&$select=name,size,file,lastModifiedDateTime');
+    const j=await res.json();
+    return (j.value||[]).filter(x=>x.file).map(x=>({name:x.name, size:x.size||0, mod:x.lastModifiedDateTime||'', pfad:ordner+'/'+x.name}));
+  }catch(e){ return []; }
+}
+// Zeigt ins Leere zeigende Einträge auf eine vorhandene Datei umbiegen.
+// Gebraucht, wenn eine Datei nie hochgeladen wurde (§ Warteschlange) oder in
+// SharePoint von Hand verschoben/aufgeräumt wurde: das Protokoll IST da, nur
+// der gespeicherte Pfad stimmt nicht mehr. Ohne diesen Weg bliebe nur „löschen
+// und neu erstellen" – und das fertige PDF wäre umsonst.
+async function protoZuordnen(pos,i){
+  const p=gs(pos).pdfs[i];
+  if(!p){ alert('Eintrag nicht gefunden.'); return; }
+  showLoader('Dateien werden gesucht …');
+  const ordner=[]; const add=o=>{ if(o && ordner.indexOf(o)<0) ordner.push(o); };
+  try{ add(protoDir(p.type||'IBN Protokoll',pos)); }catch(e){}
+  try{ add(folderFor(pos)); }catch(e){}
+  try{ add(safeName(curProjName())); }catch(e){}
+  let dateien=[];
+  for(const o of ordner){ (await spListFiles(o)).forEach(f=>dateien.push(f)); }
+  hideLoader();
+  // Nur PDFs, und die bereits verknüpften ausblenden – ein PDF zweimal zu
+  // verknüpfen führt nur zu zwei Einträgen auf dieselbe Datei.
+  const belegt=new Set((gs(pos).pdfs||[]).map(x=>x.fname).filter(Boolean));
+  dateien=dateien.filter(f=>/\.pdf$/i.test(f.name) && !belegt.has(f.pfad));
+  if(!dateien.length){ alert('In den Protokoll-Ordnern dieser Baustelle wurde keine PDF-Datei gefunden, die noch nicht verknüpft ist.'); return; }
+  // Passendes zuerst: Dateien, deren Name mit der Positionsnummer beginnt
+  const prefix=pos.replace(/\./g,'_');
+  dateien.sort((a,b)=>{
+    const pa=a.name.indexOf(prefix)===0?0:1, pb=b.name.indexOf(prefix)===0?0:1;
+    return pa!==pb ? pa-pb : (b.mod||'').localeCompare(a.mod||'');
+  });
+  let ov=document.getElementById('protoZuOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='protoZuOv'; ov.style.cssText='position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+  ov.onclick=e=>{ if(e.target===ov) ov.remove(); };
+  const mb=n=>(n/1048576).toFixed(1).replace('.',',')+' MB';
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:22px;max-width:640px;width:100%;max-height:86vh;overflow:auto;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:17px;font-weight:700;margin-bottom:4px">🔗 Datei zuordnen</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:14px">Position '+escapeHtml(pos)+' · '+escapeHtml(p.type||'')+'<br>'+
+      'Der Eintrag zeigt auf <b>'+escapeHtml((p.fname||'').slice((p.fname||'').lastIndexOf('/')+1)||'(keine Datei)')+'</b> – diese Datei ist nicht (mehr) da. '+
+      'Unten stehen die Protokoll-PDFs dieser Baustelle, die noch zu keinem Eintrag gehören. Passende zuerst.</div>'+
+    dateien.slice(0,40).map((f,k)=>
+      '<button type="button" onclick="protoZuordnenWaehlen(\''+pos+'\','+i+','+k+')" style="display:block;width:100%;text-align:left;background:#332f2b;border:1px solid '+(f.name.indexOf(prefix)===0?'#8b6d22':'#4a423a')+';color:#fff;border-radius:8px;padding:10px 12px;font-size:13px;cursor:pointer;font-family:inherit;margin-bottom:6px">'+
+        '<span style="display:block;word-break:break-all">'+escapeHtml(f.name)+'</span>'+
+        '<span style="display:block;font-size:11px;color:#a8a8a8;margin-top:2px">'+escapeHtml(f.pfad.slice(0,f.pfad.lastIndexOf('/')))+' · '+mb(f.size)+(f.mod?(' · '+new Date(f.mod).toLocaleString('de-DE')):'')+'</span></button>').join('')+
+    '<div style="display:flex;justify-content:flex-end;margin-top:14px"><button type="button" onclick="document.getElementById(\'protoZuOv\').remove()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button></div></div>';
+  _PROTO_ZU=dateien;
+}
+let _PROTO_ZU=[];
+async function protoZuordnenWaehlen(pos,i,k){
+  const f=_PROTO_ZU[k], p=gs(pos).pdfs[i];
+  const ov=document.getElementById('protoZuOv'); if(ov) ov.remove();
+  if(!f||!p) return;
+  p.fname=f.pfad;
+  // Datenstand daneben mitnehmen, sonst bleibt „✏️ bearbeiten" tot. Regel wie in
+  // ibnReceive: gleicher Pfad, nur `_data.json` statt `.pdf`.
+  const json=f.pfad.replace(/\.pdf$/i,'_data.json');
+  try{ await getFileBlob(json); p.dataFname=json; p.ibn=true; }
+  catch(e){ p.dataFname=''; }
+  saveFotos(pos); updPG(pos);
+  showToast('Datei zugeordnet'+(p.dataFname?' (mit Datenstand)':' (ohne Datenstand – nur ansehen)'));
+  pdfView(pos,i);
+}
 async function dlProto(pos,i){
   const p=gs(pos).pdfs[i];
   if(!p)return;
@@ -5815,7 +5885,8 @@ async function pdfOpen(pos, i, readonly){
     // Dateiname mit in die Meldung: ohne ihn ist „geht nicht" nicht nachvollziehbar.
     pagesEl.innerHTML='<div style="color:#c0392b;padding:40px;font-size:15px;line-height:1.6">PDF konnte nicht geladen werden.<br><span style="font-size:13px;color:#d7c1ae">'+escapeHtml(e.message||'')+'</span>'
       +(e.__kand?('<br><span style="font-size:12px;color:#8a8f92">Gesucht wurde in: '+escapeHtml(e.__kand.join(' · '))+'</span>'):'')
-      +'<br><span style="font-size:12px;color:#8a8f92">Liegt die Datei in SharePoint an einer anderen Stelle, bitte den Pfad nennen. Ist sie dort gar nicht (mehr) vorhanden, wurde sie nie hochgeladen oder gelöscht – dann das Protokoll neu erstellen und diesen Eintrag über ✕ entfernen.</span></div>';
+      +'<br><button type="button" onclick="protoZuordnen(\''+pos+'\','+i+')" style="margin-top:14px;background:#b8860b;border:none;color:#fff;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">&#128279; Datei zuordnen</button>'
+      +'<br><span style="font-size:12px;color:#8a8f92;display:inline-block;margin-top:10px">Liegt das Protokoll als PDF in der Baustelle, l&auml;sst es sich hier verkn&uuml;pfen. Ist es gar nicht vorhanden, wurde es nie hochgeladen &ndash; dann neu erstellen und diesen Eintrag &uuml;ber &#10005; entfernen.</span></div>';
   }
 }
 
