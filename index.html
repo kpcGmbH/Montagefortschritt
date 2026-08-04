@@ -142,18 +142,10 @@ select.fs option{background:var(--surface);color:var(--text);}
 .panel{display:none;}
 .panel.on{display:block;}
 
-/* DESKTOP-LESEBREITE (ab 1200 px)
-   Die App ist fürs Handy gebaut und hatte für große Bildschirme keine einzige
-   Regel: auf einem breiten Fenster stand die Bereichs-Bezeichnung ganz links
-   und der Zähler ganz rechts, dazwischen nichts. Der INHALT bekommt eine
-   Spalte; die Kopfleisten behalten ihren durchgehenden Hintergrund und richten
-   ihren Inhalt über die Innenabstände an derselben Spalte aus (sonst entstünden
-   farbige Streifen mit Lücken). Unter 1200 px ändert sich nichts. */
+/* Der Inhalt läuft BEWUSST über die volle Fensterbreite. Eine zentrierte
+   Lesespalte (1100 px, v110) war kurz drin und wurde auf Wunsch wieder
+   entfernt – wer die Ansicht schmaler will, macht das Fenster schmaler. */
 main{display:block;padding-bottom:80px;}
-@media (min-width:1200px){
-  main{max-width:1100px;margin-left:auto;margin-right:auto;}
-  .h-top,.fbar,.tabs,.sbar{padding-left:calc((100% - 1100px)/2);padding-right:calc((100% - 1100px)/2);}
-}
 
 /* BEREICH */
 .bblock{background:var(--surface);margin:10px 0 0;}
@@ -1551,7 +1543,6 @@ const APP_VERSION = 110;
 const CHANGELOG = [
   { v:110, titel:'Aufgeräumte Ansicht am Rechner', punkte:[
     'Zwischen den Bereichen klaffte im Tab „Alle" jeweils eine Lücke von 80 Pixeln – bei vier Bereichen 320 Pixel Leere. Der Abstand gehört an den Seitenfuß (Platz für den Aktionsknopf) und steht jetzt auch nur dort.',
-    'Auf breiten Bildschirmen läuft der Inhalt nicht mehr über die volle Fensterbreite, sondern steht als ruhige Spalte in der Mitte (ab 1200 px Fensterbreite). Bezeichnung und Zähler einer Zeile stehen damit wieder beieinander statt an den entgegengesetzten Bildschirmrändern. Am Handy ändert sich nichts.',
     'Der Hinweis „Anlagenfotos = Montageverlauf · Bauphase = …" stand an jedem Bereich. Er erscheint jetzt nur noch beim obersten.',
     'Beim Scrollen bleibt die Bereichs-Zeile („21.01 Spülbereich · 9 Pos.") oben stehen, solange man in diesem Bereich ist – nur am großen Bildschirm, am Handy wäre die Bedienfläche sonst zu groß geworden.' ]},
   { v:109, titel:'„Alle" zeigt die Positionen jetzt sofort', punkte:[
