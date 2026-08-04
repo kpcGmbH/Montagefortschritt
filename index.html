@@ -1227,10 +1227,23 @@ function updTabBadges(){
   }
 }
 
+// Welche Etagen-Panels sind sichtbar? EINE Stelle für alle Aufrufer.
+// Die Regel stand vorher dreimal da (buildPanels, swTab, applyF) – und
+// buildPanels kannte den Fall ACT='__all' NICHT: dort galt nur
+// `sec.pos===ACT`, was für „Alle" nie zutrifft. Nach dem Öffnen einer
+// Baustelle war der Tab „Alle" deshalb leer (nur die allgemeinen
+// Restarbeiten, die außerhalb der Panels stehen, waren zu sehen), bis man
+// einmal einen Etagen-Tab angetippt hatte – swTab hat den Fall behandelt.
+// `alle` erzwingt zusätzlich alle Panels (Suche wirkt projektweit).
+function syncPanels(alle){
+  const all = alle || ACT==='__all';
+  document.querySelectorAll('.panel').forEach(pn=>pn.classList.toggle('on', all || pn.dataset.p===ACT));
+}
+
 function swTab(p){
   ACT=p;
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
-  document.querySelectorAll('.panel').forEach(pn=>pn.classList.toggle('on',p==='__all'||pn.dataset.p===p));
+  syncPanels();
   upStats();   // Status-Zeile zählt im Kontext der gewählten Etage
   // Kein restoreUI - UI ist beim Initial-Load schon gesetzt, Lazy Observer kümmert sich um neue Bilder
   const at=document.querySelector('.tab.on');
@@ -1271,7 +1284,7 @@ function buildPanels(){
   }
   DATA.forEach((sec,secIdx)=>{
     const panel=document.createElement('div');
-    panel.className='panel'+(sec.pos===ACT?' on':'');
+    panel.className='panel';   // Sichtbarkeit setzt syncPanels() am Ende
     panel.dataset.p=sec.pos;
     // Anlagen-/Übersichtsfotos dieser Etage (mit Kategorie + Verlauf)
     const etbar=document.createElement('div');
@@ -1350,6 +1363,7 @@ function buildPanels(){
   main.appendChild(dtb);
   updGewerkSwitcher();
   updAllgSection();   // Sammel-Balken für allgemeine Restarbeiten füllen
+  syncPanels();       // sichtbar machen, was zum aktiven Tab gehört (auch „Alle")
 }
 
 // Gewerk-Umschalter nur zeigen, wenn die Baustelle Gewerk-Daten hat; Ansicht auf "Alle" zurücksetzen
@@ -1486,8 +1500,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 108;
+const APP_VERSION = 109;
 const CHANGELOG = [
+  { v:109, titel:'„Alle" zeigt die Positionen jetzt sofort', punkte:[
+    'Nach dem Öffnen einer Baustelle stand der Tab „Alle" leer da – zu sehen waren nur die allgemeinen Restarbeiten. Erst ein Tipp auf einen Etagen-Tab und zurück auf „Alle" brachte die Positionen zum Vorschein.',
+    'Ursache: beim Aufbau der Seite wurde nur die gewählte Etage sichtbar geschaltet, und „Alle" ist keine Etage. Bei Baustellen mit nur einem Bereich fiel das besonders auf, weil „Alle" dort die normale Ansicht ist.',
+    'Die Positionen sind jetzt sofort da. An der Bedienung ändert sich nichts.' ]},
   { v:108, titel:'Bautagebuch: später Abgehaktes lässt sich nachtragen', punkte:[
     'Wird ein Bautagesbericht geschrieben und danach auf der Baustelle weitergearbeitet, fehlten die später gesetzten Haken im Bericht – beim erneuten Öffnen stand nur der gespeicherte Text da, alles Weitere musste von Hand abgetippt werden.',
     'Jetzt steht beim Öffnen eines bestehenden Berichts oben: <b>„Nach dem Speichern wurde weitergearbeitet: N Punkte sind noch nicht im Bericht"</b> – ein Tipp auf <b>„＋ Punkte nachtragen"</b> hängt genau das Fehlende an. Der vorhandene Text bleibt unverändert, nichts landet doppelt.',
@@ -2746,11 +2764,7 @@ function applyF(){
 
   // NUR die Suche zeigt alle Etagen; Status-/Gewerk-Filter bleiben in der Etagen-Ansicht
   // (Bauleiter-Workflow: Etage wählen -> Gewerk/Offen filtern -> nur diese Etage sehen)
-  if(q || ACT==='__all'){
-    document.querySelectorAll('.panel').forEach(pn=>pn.classList.add('on'));
-  } else {
-    document.querySelectorAll('.panel').forEach(pn=>pn.classList.toggle('on',pn.dataset.p===ACT));
-  }
+  syncPanels(!!q);
   if(active){
     document.querySelectorAll('.ilist.hid').forEach(l=>l.classList.remove('hid'));
   }
