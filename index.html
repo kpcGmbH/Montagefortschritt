@@ -651,6 +651,9 @@ body.lvadm .lvonly.blk{display:block !important;}
 .clog-t{font-size:14px;font-weight:700;color:var(--braun);margin-bottom:6px;}
 .clog-ul{margin:0;padding-left:20px;}
 .clog-ul li{font-size:13.5px;color:var(--text);line-height:1.5;margin-bottom:5px;}
+/* Einzige Stelle mit echter Fett-Auszeichnung: die Hervorhebungen im Changelog.
+   Das globale *{font-weight:300!important} oben schluckt sonst jedes <b>. */
+.clog-body b, .clog-body strong{font-weight:600 !important;}
 .clog-ver{text-align:center;font-size:11px;color:var(--accent2);margin:2px 0 6px;}
 .clog-ok{margin:4px 18px 18px;padding:13px;background:var(--braun);color:#fff;border:none;border-radius:12px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;}
 
@@ -1635,7 +1638,7 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 116;
+const APP_VERSION = 117;
 const CHANGELOG = [
   { v:116, titel:'Nichts wird mehr ohne Rückfrage gelöscht', punkte:[
     'Das rote ✕ am Foto einer Position löschte es sofort – am Handy war es beim Scrollen oder beim Antippen des Bildes schnell getroffen, und das Foto war weg. Jetzt kommt eine Abfrage, die die Position mit nennt.',
@@ -1980,6 +1983,13 @@ function closeChangelog(){
   const ov=document.getElementById('clogOv'); if(ov) ov.remove();
   try{ localStorage.setItem('kpc_seen_version', String(APP_VERSION)); }catch(e){}
 }
+// Changelog-Texte dürfen zur Hervorhebung <b> und <i> enthalten. Es wird
+// weiterhin alles maskiert; nur genau diese vier Tags werden danach wieder zu
+// echtem Markup. Attribute, andere Tags oder halbe Klammern kommen nicht durch.
+function changelogHtml(s){
+  return escapeHtml(s).replace(/&lt;(\/?)([bi])&gt;/gi, (m,slash,tag)=>'<'+slash+tag.toLowerCase()+'>');
+}
+
 function showChangelogModal(list){
   _clogShown=true;
   let ov=document.getElementById('clogOv');
@@ -1991,8 +2001,8 @@ function showChangelogModal(list){
     '<div class="clog-card">'+
       '<div class="clog-hd"><span class="clog-spark">✨</span> Was ist neu</div>'+
       '<div class="clog-body">'+
-        list.map(c=>'<div class="clog-sec"><div class="clog-t">'+escapeHtml(c.titel)+'</div><ul class="clog-ul">'+
-          c.punkte.map(p=>'<li>'+escapeHtml(p)+'</li>').join('')+'</ul></div>').join('')+
+        list.map(c=>'<div class="clog-sec"><div class="clog-t">'+changelogHtml(c.titel)+'</div><ul class="clog-ul">'+
+          c.punkte.map(p=>'<li>'+changelogHtml(p)+'</li>').join('')+'</ul></div>').join('')+
       '</div>'+
       // Versionsnummer sichtbar: bei „bei mir sieht es anders aus" sofort prüfbar,
       // ob das Gerät wirklich die neue Fassung geladen hat.
