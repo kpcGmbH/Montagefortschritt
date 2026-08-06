@@ -204,7 +204,15 @@ function syncEins(){ [...$('einsList').children].forEach((r,i)=>{ const e=EINS[i
   e.checkIn=r.querySelector('.eIn').value; e.checkOut=r.querySelector('.eOut').value;
   e.fahrzeit=r.querySelector('.eFahr').value; e.km=r.querySelector('.eKm').value; }); }
 function addEins(){ syncEins(); EINS.push({datum:today(),monteur:'',checkIn:'',checkOut:'',fahrzeit:'',km:''}); renderEins(); }
-function delEins(i){ syncEins(); EINS.splice(i,1); if(!EINS.length) EINS.push({datum:'',monteur:'',checkIn:'',checkOut:'',fahrzeit:'',km:''}); renderEins(); }
+function delEins(i){ syncEins(); const e=EINS[i]; if(!e) return;
+  // Ein Fehlgriff auf das ✕ neben dem Datum kostete bisher den ganzen Einsatz.
+  // Leere Zeile darf ohne Rückfrage weg.
+  if(((e.monteur||'').trim() || (e.checkIn||'').trim() || (e.checkOut||'').trim() ||
+      (e.fahrzeit||'').trim() || (e.km||'').trim()) &&
+     !confirm('Diesen Einsatz entfernen?\n\n'+(e.datum? e.datum.split('-').reverse().join('.') : '(ohne Datum)')+
+              ((e.monteur||'').trim()?(' · '+e.monteur):'')+
+              ((e.checkIn||e.checkOut)?('\n'+(e.checkIn||'?')+' – '+(e.checkOut||'?')):''))) return;
+  EINS.splice(i,1); if(!EINS.length) EINS.push({datum:'',monteur:'',checkIn:'',checkOut:'',fahrzeit:'',km:''}); renderEins(); }
 function renderMat(){
   $('matList').innerHTML=MAT.map((m,i)=>
     '<div style="display:flex;gap:8px;margin-bottom:6px;align-items:center">'+
@@ -216,7 +224,10 @@ function renderMat(){
 function syncMat(){ [...$('matList').children].forEach((r,i)=>{ const m=MAT[i]; if(!m) return;
   m.menge=r.querySelector('.mMenge').value; m.text=r.querySelector('.mText').value; }); }
 function addMat(){ syncMat(); MAT.push({menge:'',text:''}); renderMat(); }
-function delMat(i){ syncMat(); MAT.splice(i,1); if(!MAT.length) MAT.push({menge:'',text:''}); renderMat(); }
+function delMat(i){ syncMat(); const m=MAT[i]; if(!m) return;
+  if(((m.menge||'').trim() || (m.text||'').trim()) &&
+     !confirm('Diese Materialzeile entfernen?\n\n'+((m.menge||'').trim()?(m.menge+' × '):'')+((m.text||'').trim()||'(ohne Bezeichnung)'))) return;
+  MAT.splice(i,1); if(!MAT.length) MAT.push({menge:'',text:''}); renderMat(); }
 
 // ---- Unterschriften ----
 function sigSetup(c){
@@ -228,7 +239,9 @@ function sigSetup(c){
     ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; c.dataset.drawn='1'; e.preventDefault(); });
   ['pointerup','pointercancel','pointerleave'].forEach(ev=>c.addEventListener(ev,()=>{draw=false;}));
 }
-function sigClear(id){ const c=$(id); c.getContext('2d').clearRect(0,0,c.width,c.height); c.dataset.drawn=''; }
+function sigClear(id){ const c=$(id); if(!c) return;
+  if(c.dataset.drawn && !confirm('Unterschrift löschen?\n\nSie muss danach neu geleistet werden.')) return;
+  c.getContext('2d').clearRect(0,0,c.width,c.height); c.dataset.drawn=''; }
 function sigData(id){ const c=$(id); return c.dataset.drawn?c.toDataURL('image/png'):''; }
 function sigDraw(id,url){ if(!url) return; const c=$(id); const img=new Image();
   img.onload=()=>{ try{ c.getContext('2d').drawImage(img,0,0,c.width,c.height); c.dataset.drawn='1'; }catch(e){} }; img.src=url; }

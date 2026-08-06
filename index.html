@@ -1635,8 +1635,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 115;
+const APP_VERSION = 116;
 const CHANGELOG = [
+  { v:116, titel:'Nichts wird mehr ohne Rückfrage gelöscht', punkte:[
+    'Das rote ✕ am Foto einer Position löschte es sofort – am Handy war es beim Scrollen oder beim Antippen des Bildes schnell getroffen, und das Foto war weg. Jetzt kommt eine Abfrage, die die Position mit nennt.',
+    'Ebenfalls neu mit Abfrage: Unterschriften (Bautagebuch, Dichtigkeitsprotokoll, Servicebericht, Einweisung, Schlüsselübergabe, IBN-Protokolle), Beschäftigte im Bautagebuch, Einsatz- und Materialzeilen im Servicebericht, freie Zeilen der Schlüsselübergabe und die Felder im IBN-Protokoll-Editor.',
+    'Leere Zeilen verschwinden weiterhin ohne Rückfrage – gefragt wird nur, wenn wirklich etwas verloren ginge. Die Abfrage nennt immer, was es trifft (Positionsnummer, Name, Titel), damit man bei langen Listen nicht raten muss.',
+    'Gelöschte Dateien wandern in den SharePoint-Papierkorb und sind dort 93 Tage wiederherstellbar.' ]},
   { v:115, titel:'Nach dem Umbenennen ziehen jetzt alle Dateien mit', punkte:[
     'Der Ablageordner einer Baustelle trägt ihren Namen. Wird die Baustelle umbenannt, legt die App neue Dateien im neuen Ordner ab – das Ältere blieb im alten liegen. Deshalb bietet die App beim Öffnen an, alles zusammenzuführen.',
     'Dieses Zusammenführen kannte bisher nur Fotos und Protokolle, die an einer <b>Position</b> hängen. Die <b>Anlagenfotos und Bauphase-Bilder einer Etage</b> und die Fotos zu <b>allgemeinen Restarbeiten</b> blieben zurück – nutzbar, aber die Baustelle lag in zwei Ordnern verstreut.',
@@ -2592,8 +2597,14 @@ function blobToDataURL(blob){
     r.readAsDataURL(blob);
   });
 }
+// Das ✕ sitzt in der Ecke des Vorschaubildes – am Handy war damit beim Scrollen
+// oder Antippen des Fotos schnell ein Bild weg, ohne jede Rückfrage. Ein Foto ist
+// oft der einzige Nachweis; deshalb wird hier gefragt.
 function df(pos,i){
   const fname = gs(pos).fotos[i];
+  if(fname===undefined) return;
+  if(!confirm('Dieses Foto löschen?\n\n'+posLabel(pos)+
+              '\n\nDie Datei wandert in den SharePoint-Papierkorb und ist dort 93 Tage wiederherstellbar.')) return;
   gs(pos).fotos.splice(i,1);
   updFG(pos);rc(pos);upStats();
   saveFotos(pos);
@@ -3529,7 +3540,7 @@ function openBtbForm(datum){
           '<div style="font-size:11px;color:#a8a8a8;margin-bottom:4px">Bauleiter KPC</div>'+
           '<canvas id="btbSigKpc" width="500" height="150" style="width:100%;height:110px;background:#fff;border:1px solid #895500;border-radius:8px;touch-action:none;display:block"></canvas>'+
           '<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">'+
-            '<button type="button" onclick="btbSigClear(\'btbSigKpc\')" style="flex:1;min-width:70px;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px 6px;font-size:12px;cursor:pointer;font-family:inherit">Löschen</button>'+
+            '<button type="button" onclick="btbSigClear(\'btbSigKpc\',true)" style="flex:1;min-width:70px;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px 6px;font-size:12px;cursor:pointer;font-family:inherit">Löschen</button>'+
             '<button type="button" onclick="btbSaveOwnSig()" style="flex:1;min-width:70px;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px 6px;font-size:12px;cursor:pointer;font-family:inherit">Als meine speichern</button>'+
             '<button type="button" onclick="btbUseOwnSig()" style="flex:1;min-width:70px;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px 6px;font-size:12px;cursor:pointer;font-family:inherit">Gespeicherte</button>'+
           '</div>'+
@@ -3537,7 +3548,7 @@ function openBtbForm(datum){
         '<div style="flex:1;min-width:230px">'+
           '<div style="font-size:11px;color:#a8a8a8;margin-bottom:4px">Auftraggeber (optional, vor Ort)</div>'+
           '<canvas id="btbSigAg" width="500" height="150" style="width:100%;height:110px;background:#fff;border:1px solid #895500;border-radius:8px;touch-action:none;display:block"></canvas>'+
-          '<div style="margin-top:5px"><button type="button" onclick="btbSigClear(\'btbSigAg\')" style="width:100%;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit">Löschen</button></div>'+
+          '<div style="margin-top:5px"><button type="button" onclick="btbSigClear(\'btbSigAg\',true)" style="width:100%;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit">Löschen</button></div>'+
         '</div>'+
       '</div>'+
       '<div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap">'+
@@ -3662,7 +3673,11 @@ function btbSigSetup(canvas){
   canvas.addEventListener('mousedown',dn); canvas.addEventListener('mousemove',mv); window.addEventListener('mouseup',up);
   canvas.addEventListener('touchstart',dn,{passive:false}); canvas.addEventListener('touchmove',mv,{passive:false}); canvas.addEventListener('touchend',up);
 }
-function btbSigClear(id){ const c=document.getElementById(id); if(c){ c.getContext('2d').clearRect(0,0,c.width,c.height); c.dataset.drawn=''; } }
+// ask=true nur von den „Löschen"-Tasten unter den Feldern. Die internen Aufrufe
+// (Pad vor dem Einsetzen der gespeicherten Signatur leeren) fragen bewusst nicht.
+function btbSigClear(id, ask){ const c=document.getElementById(id); if(!c) return;
+  if(ask && c.dataset.drawn && !confirm('Unterschrift löschen?\n\nSie muss danach neu geleistet werden.')) return;
+  c.getContext('2d').clearRect(0,0,c.width,c.height); c.dataset.drawn=''; }
 function btbSigData(id){ const c=document.getElementById(id); return (c&&c.dataset.drawn)?c.toDataURL('image/png'):''; }
 function btbSigDrawImage(id,url){ const c=document.getElementById(id); if(!c||!url) return; const img=new Image(); img.onload=()=>{ try{ c.getContext('2d').drawImage(img,0,0,c.width,c.height); c.dataset.drawn='1'; }catch(e){} }; img.src=url; }
 function btbSaveOwnSig(){ const d=btbSigData('btbSigKpc'); if(!d){ showToast('Bitte zuerst unterschreiben',{bg:'#8b6d22'}); return; } try{ localStorage.setItem('kpc_btb_sig',d); showToast('Signatur gespeichert'); }catch(e){ showToast('Speichern fehlgeschlagen',{bg:'#8b6d22'}); } }
@@ -3773,7 +3788,14 @@ function btbNachtragUebernehmen(){
   showToast(n.zeilen.length+' Punkt'+(n.zeilen.length===1?'':'e')+' nachgetragen'+(neueP?(' · '+neueP+' Person'+(neueP===1?'':'en')+' ergänzt (Stunden fehlen)'):'')+' – prüfen, dann speichern');
 }
 function btbAddArbeiter(){ if(!BTB_FORM) return; btbSyncArbeiter(); BTB_FORM.arbeiter.push({name:'',rolle:BTB_ROLLEN[0],stunden:''}); btbRenderArbeiter(); }
-function btbDelArbeiter(i){ if(!BTB_FORM) return; btbSyncArbeiter(); BTB_FORM.arbeiter.splice(i,1); if(!BTB_FORM.arbeiter.length) BTB_FORM.arbeiter.push({name:'',rolle:BTB_ROLLEN[0],stunden:''}); btbRenderArbeiter(); }
+function btbDelArbeiter(i){ if(!BTB_FORM) return; btbSyncArbeiter();
+  const a=BTB_FORM.arbeiter[i]; if(!a) return;
+  // Nur fragen, wenn wirklich etwas verloren geht – eine leere Zeile darf ohne
+  // Dialog weg, sonst nervt die Rückfrage im Alltag.
+  if(((a.name||'').trim() || (a.stunden||'').trim()) &&
+     !confirm('Diese Person aus dem Bautagebuch entfernen?\n\n„'+((a.name||'').trim()||'(ohne Name)')+'"'+
+              ((a.stunden||'').trim()?(' · '+a.stunden+' h'):''))) return;
+  BTB_FORM.arbeiter.splice(i,1); if(!BTB_FORM.arbeiter.length) BTB_FORM.arbeiter.push({name:'',rolle:BTB_ROLLEN[0],stunden:''}); btbRenderArbeiter(); }
 
 function btbGather(){
   btbSyncArbeiter();
@@ -4116,14 +4138,14 @@ function openDichtForm(umfang){
           '<div style="font-size:11px;color:#a8a8a8;margin-bottom:4px">Prüfer KPC</div>'+
           '<canvas id="dtSigKpc" width="500" height="150" style="width:100%;height:110px;background:#fff;border:1px solid #895500;border-radius:8px;touch-action:none;display:block"></canvas>'+
           '<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">'+
-            '<button type="button" onclick="btbSigClear(\'dtSigKpc\')" style="flex:1;min-width:70px;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px 6px;font-size:12px;cursor:pointer;font-family:inherit">Löschen</button>'+
+            '<button type="button" onclick="btbSigClear(\'dtSigKpc\',true)" style="flex:1;min-width:70px;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px 6px;font-size:12px;cursor:pointer;font-family:inherit">Löschen</button>'+
             '<button type="button" onclick="dichtUseOwnSig()" style="flex:1;min-width:70px;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px 6px;font-size:12px;cursor:pointer;font-family:inherit">Gespeicherte</button>'+
           '</div>'+
         '</div>'+
         '<div style="flex:1;min-width:230px">'+
           '<div style="font-size:11px;color:#a8a8a8;margin-bottom:4px">Auftraggeber / Bauleitung (optional)</div>'+
           '<canvas id="dtSigAg" width="500" height="150" style="width:100%;height:110px;background:#fff;border:1px solid #895500;border-radius:8px;touch-action:none;display:block"></canvas>'+
-          '<div style="margin-top:5px"><button type="button" onclick="btbSigClear(\'dtSigAg\')" style="width:100%;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit">Löschen</button></div>'+
+          '<div style="margin-top:5px"><button type="button" onclick="btbSigClear(\'dtSigAg\',true)" style="width:100%;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit">Löschen</button></div>'+
         '</div>'+
       '</div>'+
       '<div style="display:flex;gap:10px;margin-top:22px;flex-wrap:wrap">'+
@@ -4475,13 +4497,13 @@ function openSvcForm(nr){
         '<div style="flex:1;min-width:230px">'+
           '<div style="font-size:11px;color:#a8a8a8;margin-bottom:4px">Kunde / Auftraggeber</div>'+
           '<canvas id="svcSigKunde" width="500" height="150" style="width:100%;height:110px;background:#fff;border:1px solid #895500;border-radius:8px;touch-action:none;display:block"></canvas>'+
-          '<div style="margin-top:5px"><button type="button" onclick="btbSigClear(\'svcSigKunde\')" style="width:100%;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit">Löschen</button></div>'+
+          '<div style="margin-top:5px"><button type="button" onclick="btbSigClear(\'svcSigKunde\',true)" style="width:100%;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px;font-size:12px;cursor:pointer;font-family:inherit">Löschen</button></div>'+
         '</div>'+
         '<div style="flex:1;min-width:230px">'+
           '<div style="font-size:11px;color:#a8a8a8;margin-bottom:4px">kpc (Techniker/Monteur)</div>'+
           '<canvas id="svcSigKpc" width="500" height="150" style="width:100%;height:110px;background:#fff;border:1px solid #895500;border-radius:8px;touch-action:none;display:block"></canvas>'+
           '<div style="display:flex;gap:6px;margin-top:5px;flex-wrap:wrap">'+
-            '<button type="button" onclick="btbSigClear(\'svcSigKpc\')" style="flex:1;min-width:70px;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px 6px;font-size:12px;cursor:pointer;font-family:inherit">Löschen</button>'+
+            '<button type="button" onclick="btbSigClear(\'svcSigKpc\',true)" style="flex:1;min-width:70px;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px 6px;font-size:12px;cursor:pointer;font-family:inherit">Löschen</button>'+
             '<button type="button" onclick="svcSaveOwnSig()" style="flex:1;min-width:70px;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px 6px;font-size:12px;cursor:pointer;font-family:inherit">Als meine speichern</button>'+
             '<button type="button" onclick="svcUseOwnSig()" style="flex:1;min-width:70px;background:#3a3530;border:1px solid #6a5433;color:#d7c1ae;border-radius:7px;padding:7px 6px;font-size:12px;cursor:pointer;font-family:inherit">Gespeicherte</button>'+
           '</div>'+
@@ -4548,7 +4570,14 @@ function svcMontOpen(inp,i){
   btbOpenMenu(inp, btbNameList(), function(name){ if(SVC_FORM&&SVC_FORM.einsaetze[i]) SVC_FORM.einsaetze[i].monteur=name; }, loginPresent);
 }
 function svcAddEins(){ if(!SVC_FORM) return; svcSyncEins(); const today=localDay(new Date().toISOString()); SVC_FORM.einsaetze.push({datum:today,monteur:'',checkIn:'',checkOut:'',fahrzeit:'',km:''}); svcRenderEins(); }
-function svcDelEins(i){ if(!SVC_FORM) return; svcSyncEins(); SVC_FORM.einsaetze.splice(i,1); if(!SVC_FORM.einsaetze.length) SVC_FORM.einsaetze.push({datum:'',monteur:'',checkIn:'',checkOut:'',fahrzeit:'',km:''}); svcRenderEins(); }
+function svcDelEins(i){ if(!SVC_FORM) return; svcSyncEins();
+  const e=SVC_FORM.einsaetze[i]; if(!e) return;
+  if(((e.monteur||'').trim() || (e.checkIn||'').trim() || (e.checkOut||'').trim() ||
+      (e.fahrzeit||'').trim() || (e.km||'').trim()) &&
+     !confirm('Diesen Einsatz entfernen?\n\n'+(e.datum?btbDeShort(e.datum):'(ohne Datum)')+
+              ((e.monteur||'').trim()?(' · '+e.monteur):'')+
+              ((e.checkIn||e.checkOut)?('\n'+(e.checkIn||'?')+' – '+(e.checkOut||'?')):''))) return;
+  SVC_FORM.einsaetze.splice(i,1); if(!SVC_FORM.einsaetze.length) SVC_FORM.einsaetze.push({datum:'',monteur:'',checkIn:'',checkOut:'',fahrzeit:'',km:''}); svcRenderEins(); }
 
 // ---- Materialzeilen ----
 function svcSyncMat(){
@@ -4571,7 +4600,11 @@ function svcRenderMat(){
     '</div>').join('');
 }
 function svcAddMat(){ if(!SVC_FORM) return; svcSyncMat(); SVC_FORM.material.push({menge:'',text:''}); svcRenderMat(); }
-function svcDelMat(i){ if(!SVC_FORM) return; svcSyncMat(); SVC_FORM.material.splice(i,1); if(!SVC_FORM.material.length) SVC_FORM.material.push({menge:'',text:''}); svcRenderMat(); }
+function svcDelMat(i){ if(!SVC_FORM) return; svcSyncMat();
+  const m=SVC_FORM.material[i]; if(!m) return;
+  if(((m.menge||'').trim() || (m.text||'').trim()) &&
+     !confirm('Diese Materialzeile entfernen?\n\n'+((m.menge||'').trim()?(m.menge+' × '):'')+((m.text||'').trim()||'(ohne Bezeichnung)'))) return;
+  SVC_FORM.material.splice(i,1); if(!SVC_FORM.material.length) SVC_FORM.material.push({menge:'',text:''}); svcRenderMat(); }
 
 // ---- Speichern + PDF ----
 function svcGather(){

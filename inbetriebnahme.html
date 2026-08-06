@@ -586,7 +586,9 @@ function initMySigPad(){var cv=$('cv_mysig'),wrap=$('wrap_mysig');if(!cv)return;
   function end(){drawing=false;}
   cv.onmousedown=start;cv.onmousemove=move;window.addEventListener('mouseup',end);
   cv.addEventListener('touchstart',start,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',end);}
-function clearMySig(){var cv=$('cv_mysig');if(cv){var ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);cv.__ink=false;}var ph=$('ph_mysig');if(ph)ph.style.display='';}
+function clearMySig(){var cv=$('cv_mysig');
+  if(cv&&cv.__ink&&!confirm('Eigene Signatur löschen?\n\nSie wird beim Speichern aus diesem Gerät entfernt und muss neu gezeichnet werden.'))return;
+  if(cv){var ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);cv.__ink=false;}var ph=$('ph_mysig');if(ph)ph.style.display='';}
 function saveMySig(){var cv=$('cv_mysig');MYSIG=(cv&&cv.__ink)?cv.toDataURL('image/png'):'';try{localStorage.setItem('ibn:mysig',MYSIG);}catch(e){}toast(MYSIG?'Eigene Signatur gespeichert':'Signatur entfernt');renderSigBtn();closeMySig();if(CUR.dev){applyPrefills();openForm(CUR.dev,true);}}
 function projLabel(){return PROJECT.name?(PROJECT.ort?PROJECT.name+' · '+PROJECT.ort:PROJECT.name):PROJECT.ort;}
 // Anschrift der Baustelle, einzeilig. NUR wenn wirklich eine gepflegt ist:
@@ -849,7 +851,9 @@ function initPad(key){
   cv.addEventListener('touchstart',start,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',end);
   PADS[key]=cv;
 }
-function clearPad(key){const cv=$('cv_'+key);if(cv){const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);}const g=STATE[key]||{};delete g.img;STATE[key]=g;if(STATE.__auto)delete STATE.__auto[key+'.img'];$('ph_'+key).style.display='';saveState();}
+function clearPad(key){
+  if(STATE[key]&&STATE[key].img&&!confirm('Unterschrift löschen?\n\nSie muss danach neu geleistet werden.'))return;
+  const cv=$('cv_'+key);if(cv){const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);}const g=STATE[key]||{};delete g.img;STATE[key]=g;if(STATE.__auto)delete STATE.__auto[key+'.img'];$('ph_'+key).style.display='';saveState();}
 
 /* ---------- Fortschritt ---------- */
 function updateProgress(){
@@ -1050,18 +1054,32 @@ function edSetTop(f,v){EDIT[f]=v;}
 function edTag(t,btn){var i=EDIT.tags.indexOf(t);if(i>=0)EDIT.tags.splice(i,1);else EDIT.tags.push(t);btn.classList.toggle('on');}
 function edSetKopf(i,f,v){EDIT.kopf[i][f]=v;if(f==='k')renderEditor();}
 function edAddKopf(){EDIT.kopf.push({k:'text',l:''});renderEditor();}
-function edDelKopf(i){EDIT.kopf.splice(i,1);renderEditor();}
+// Im Protokoll-Editor löscht das 🗑 sofort. Bei benannten Feldern/Abschnitten ist
+// das ein Fehlgriff mit echtem Verlust – deshalb Rückfrage; leere Zeilen ohne.
+function edDelKopf(i){var f=EDIT.kopf[i];if(!f)return;
+  if((f.l||'').trim()&&!confirm('Kopf-Feld löschen?\n\n„'+f.l.trim()+'"'))return;
+  EDIT.kopf.splice(i,1);renderEditor();}
 function edSetSec(i,f,v){EDIT.sections[i][f]=v;if(f==='colsName')renderEditor();}
 function edAddSection(){EDIT.sections.push({title:'Neuer Abschnitt',colsName:'Ja/Nein',comment:true,items:[{k:'check',l:''}]});renderEditor();}
-function edDelSection(i){EDIT.sections.splice(i,1);renderEditor();}
+function edDelSection(i){var s=EDIT.sections[i];if(!s)return;
+  var n=(s.items||[]).filter(function(it){return (it.l||'').trim();}).length;
+  if(((s.title||'').trim()||n)&&
+     !confirm('Ganzen Abschnitt löschen?\n\n„'+((s.title||'').trim()||'(ohne Titel)')+'"'+
+              (n? (n===1? '\n\nDazu gehört 1 Prüfpunkt, der mit verschwindet.'
+                        : '\n\nDazu gehören '+n+' Prüfpunkte, die mit verschwinden.') : '')))return;
+  EDIT.sections.splice(i,1);renderEditor();}
 function edSetItem(si,ii,f,v){EDIT.sections[si].items[ii][f]=v;if(f==='k')renderEditor();}
 function edOpts(si,ii,v){EDIT.sections[si].items[ii].options=v.split(';').map(function(x){return x.trim();}).filter(Boolean);}
 function edAddItem(si){EDIT.sections[si].items.push({k:'check',l:''});renderEditor();}
-function edDelItem(si,ii){EDIT.sections[si].items.splice(ii,1);renderEditor();}
+function edDelItem(si,ii){var s=EDIT.sections[si];if(!s)return;var it=s.items[ii];if(!it)return;
+  if((it.l||'').trim()&&!confirm('Prüfpunkt löschen?\n\n„'+it.l.trim()+'"'))return;
+  s.items.splice(ii,1);renderEditor();}
 function edMove(si,ii,d){var a=EDIT.sections[si].items,j=ii+d;if(j<0||j>=a.length)return;var t=a[ii];a[ii]=a[j];a[j]=t;renderEditor();}
 function edSetRole(i,v){EDIT.signRoles[i]=v;}
 function edAddRole(){EDIT.signRoles.push('');renderEditor();}
-function edDelRole(i){EDIT.signRoles.splice(i,1);renderEditor();}
+function edDelRole(i){var r=EDIT.signRoles[i];
+  if((r||'').trim()&&!confirm('Unterschriftsfeld löschen?\n\n„'+r.trim()+'"'))return;
+  EDIT.signRoles.splice(i,1);renderEditor();}
 function edCancel(){EDIT=null;if(CUR.mfr)goDevices(CUR.mfr);else goHome();}
 function edDeleteCur(){if(EDIT&&EDIT.ref){CUR.mfr=EDIT.ref.mfr;var dv=EDIT.ref.dev;EDIT=null;deleteDevice(dv);}}
 function edClean(){return {tags:EDIT.tags.slice(),

@@ -922,7 +922,12 @@ function setKeyNr(pos,v){ keyRow(pos).nr=v; }
 function setFrei(i,feld,v){ const f=(SESSION.frei||[])[i]; if(!f) return; f[feld]= feld==='anz'? Math.max(0,parseInt(v,10)||0) : v; if(feld==='anz') updKeySum(); }
 function addFrei(){ (SESSION.frei||(SESSION.frei=[])).push({bez:'',anz:1,nr:''}); renderSession();
   setTimeout(()=>{ const els=document.querySelectorAll('.kfree .kbez'); const el=els[els.length-1]; if(el) el.focus(); },20); }
-function delFrei(i){ (SESSION.frei||[]).splice(i,1); renderSession(); }
+function delFrei(i){ const f=(SESSION.frei||[])[i]; if(!f) return;
+  // Leere Zeile darf ohne Rückfrage weg – ausgefüllte nicht.
+  if(((f.bez||'').trim() || (f.nr||'').trim()) &&
+     !confirm('Diese Zeile entfernen?\n\n„'+((f.bez||'').trim()||'(ohne Bezeichnung)')+'"'+
+              ((f.nr||'').trim()?(' · Schlüssel-Nr. '+f.nr):''))) return;
+  (SESSION.frei||[]).splice(i,1); renderSession(); }
 // Alle Übergabezeilen der Sitzung (Stückliste + freie) in Protokoll-Reihenfolge
 function keyZeilen(){
   const out=[];
@@ -1007,6 +1012,7 @@ function sigPad(id, key){
 }
 function clearSig(key){
   key=key||'sig';
+  if(SESSION && SESSION[key] && !confirm('Unterschrift löschen?\n\nSie muss danach neu geleistet werden.')) return;
   if(SESSION) SESSION[key]='';
   const id=Object.keys(SIG_PADS).find(k=>SIG_PADS[k]===key);
   const cv=id&&document.getElementById(id); if(cv){ cv.getContext('2d').clearRect(0,0,cv.width,cv.height); }
