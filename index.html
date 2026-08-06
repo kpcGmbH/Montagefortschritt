@@ -1635,8 +1635,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 114;
+const APP_VERSION = 115;
 const CHANGELOG = [
+  { v:115, titel:'Nach dem Umbenennen ziehen jetzt alle Dateien mit', punkte:[
+    'Der Ablageordner einer Baustelle trägt ihren Namen. Wird die Baustelle umbenannt, legt die App neue Dateien im neuen Ordner ab – das Ältere blieb im alten liegen. Deshalb bietet die App beim Öffnen an, alles zusammenzuführen.',
+    'Dieses Zusammenführen kannte bisher nur Fotos und Protokolle, die an einer <b>Position</b> hängen. Die <b>Anlagenfotos und Bauphase-Bilder einer Etage</b> und die Fotos zu <b>allgemeinen Restarbeiten</b> blieben zurück – nutzbar, aber die Baustelle lag in zwei Ordnern verstreut.',
+    'Jetzt ziehen alle mit. Beim nächsten Öffnen einer umbenannten Baustelle nennt die Abfrage entsprechend mehr Dateien.' ]},
   { v:114, titel:'Robuster bei schlechtem Empfang', punkte:[
     'Die App fordert jetzt beim Start <b>dauerhaften Speicher</b> beim Browser an. Ohne das darf der Browser den lokalen Bestand jederzeit löschen – auf dem iPhone schon nach etwa einer Woche ohne Besuch. Genau daran gingen bisher noch nicht übertragene Fotos und Protokolle verloren.',
     'Angesehene Fotos und noch nicht übertragene Dateien lagen im selben Speicher. War er voll, scheiterte ausgerechnet das Hochladen – also das Einzige, was sich nicht wiederbeschaffen lässt. <b>Jetzt weicht immer der Zwischenspeicher, nie ein wartender Upload.</b>',
@@ -2080,10 +2084,7 @@ async function bilderEinordnen(dry, limit){
     try{
       await spMove(m.old, m.neu);
       const s=ST[m.pos];
-      if(m.kind==='foto'){ if(s.fotos[m.i]===m.old) s.fotos[m.i]=m.neu; }
-      else if(m.kind==='pdf'){ if(s.pdfs[m.i] && s.pdfs[m.i].fname===m.old) s.pdfs[m.i].fname=m.neu; }
-      else if(m.kind==='pdfdata'){ if(s.pdfs[m.i] && s.pdfs[m.i].dataFname===m.old) s.pdfs[m.i].dataFname=m.neu; }
-      else if(m.kind==='ra'){ const r=s.restarbeiten[m.ri]; if(r && r.fotos[m.fi]===m.old) r.fotos[m.fi]=m.neu; }
+      konsolAnwenden(s,m);
       changed.add(m.pos); ok++;
     }catch(e){ console.warn('Verschieben fehlgeschlagen:', m.old, (e&&e.message)||e); fail++; }
   }
@@ -2097,6 +2098,18 @@ async function bilderEinordnen(dry, limit){
 // in den Ordner mit dem AKTUELLEN Namen und gleicht die gespeicherten Pfade an.
 // Betrifft nur Referenzen mit Pfad, deren erste Ebene (Baustellen-Ordner) abweicht.
 // reroot(): erste Pfad-Ebene durch den aktuellen Baustellen-Ordner ersetzen.
+// Neuen Pfad in den Datensatz zurückschreiben. Von bilderEinordnen UND
+// ordnerKonsolidieren genutzt – stand vorher zweimal wortgleich da, und beim
+// Ergänzen einer Verweis-Art musste man beide finden.
+function konsolAnwenden(s,m){
+  if(!s) return;
+  if(m.kind==='foto'){ if(s.fotos && s.fotos[m.i]===m.old) s.fotos[m.i]=m.neu; }
+  else if(m.kind==='efoto'){ if(s.efotos && s.efotos[m.i]===m.old) s.efotos[m.i]=m.neu; }
+  else if(m.kind==='bfoto'){ if(s.bfotos && s.bfotos[m.i]===m.old) s.bfotos[m.i]=m.neu; }
+  else if(m.kind==='pdf'){ if(s.pdfs && s.pdfs[m.i] && s.pdfs[m.i].fname===m.old) s.pdfs[m.i].fname=m.neu; }
+  else if(m.kind==='pdfdata'){ if(s.pdfs && s.pdfs[m.i] && s.pdfs[m.i].dataFname===m.old) s.pdfs[m.i].dataFname=m.neu; }
+  else if(m.kind==='ra'){ const r=(s.restarbeiten||[])[m.ri]; if(r && r.fotos && r.fotos[m.fi]===m.old) r.fotos[m.fi]=m.neu; }
+}
 function konsolReroot(ref, root){
   if(!ref || /^https?:/i.test(ref)) return null;    // externe URL (z.B. Altbestand) -> nie verschieben
   if(ref.indexOf('/')<0) return null;               // flach abgelegt -> siehe bilderEinordnen
@@ -2104,27 +2117,39 @@ function konsolReroot(ref, root){
   if(ref.slice(0,i)===root) return null;            // liegt schon im aktuellen Ordner
   return root + ref.slice(i);
 }
-function konsolMoveCount(){
-  const root=safeName(curProjName()); let n=0;
+// ALLE Dateiverweise einer Baustelle aufzählen. Vorher stand die Aufzählung
+// zweimal da (Zählung und Umzug) und BEIDE kannten nur die Positions-Zeilen:
+// die Etagen-Alben (Anlagenfotos, Bauphase) und die allgemeinen Restarbeiten
+// auf Projekt-/Etagenebene blieben nach einer Umbenennung im alten Ordner –
+// nutzbar, aber die Baustelle lag dann in zwei Ordnern verstreut.
+function konsolRefs(){
+  const out=[];
   for(const sec of DATA){ for(const sub of sec.subsections){ for(const it of sub.items){
-    const s=ST[it.pos]; if(!s) continue;
-    (s.fotos||[]).forEach(r=>{ if(konsolReroot(r,root)) n++; });
-    (s.pdfs||[]).forEach(p=>{ if(konsolReroot(p&&p.fname,root)) n++; if(konsolReroot(p&&p.dataFname,root)) n++; });
-    (s.restarbeiten||[]).forEach(r=>{ (r.fotos||[]).forEach(f=>{ if(konsolReroot(f,root)) n++; }); });
+    const pos=it.pos, s=ST[pos]; if(!s) continue;
+    (s.fotos||[]).forEach((ref,i)=>out.push({pos,kind:'foto',i,old:ref}));
+    (s.pdfs||[]).forEach((p,i)=>{ out.push({pos,kind:'pdf',i,old:p&&p.fname}); out.push({pos,kind:'pdfdata',i,old:p&&p.dataFname}); });
+    (s.restarbeiten||[]).forEach((r,ri)=>(r.fotos||[]).forEach((ref,fi)=>out.push({pos,kind:'ra',ri,fi,old:ref})));
   }}}
-  return n;
+  // Etagen-Zeilen: Anlagenfotos (efotos), Bauphase (bfotos), allgemeine
+  // Restarbeiten der Etage – dazu die Projekt-Ebene (PRAKEY).
+  const etRow=(key)=>{
+    const s=ST[key]; if(!s) return;
+    (s.efotos||[]).forEach((ref,i)=>out.push({pos:key,kind:'efoto',i,old:ref}));
+    (s.bfotos||[]).forEach((ref,i)=>out.push({pos:key,kind:'bfoto',i,old:ref}));
+    (s.restarbeiten||[]).forEach((r,ri)=>(r.fotos||[]).forEach((ref,fi)=>out.push({pos:key,kind:'ra',ri,fi,old:ref})));
+  };
+  for(const sec of DATA){ try{ etRow(EKEY(sec)); }catch(e){} }
+  etRow(PRAKEY);
+  return out.filter(x=>x.old);
+}
+function konsolMoveCount(){
+  const root=safeName(curProjName());
+  return konsolRefs().filter(r=>konsolReroot(r.old,root)).length;
 }
 async function ordnerKonsolidieren(dry){
   if(!PID){ alert('Bitte zuerst die Baustelle öffnen.'); return; }
   const root=safeName(curProjName());
-  let moves=[];
-  for(const sec of DATA){ for(const sub of sec.subsections){ for(const it of sub.items){
-    const pos=it.pos, s=ST[pos]; if(!s) continue;
-    (s.fotos||[]).forEach((ref,i)=>{ const neu=konsolReroot(ref,root); if(neu) moves.push({pos,kind:'foto',i,old:ref,neu}); });
-    (s.pdfs||[]).forEach((p,i)=>{ const neu=konsolReroot(p&&p.fname,root); if(neu) moves.push({pos,kind:'pdf',i,old:p.fname,neu});
-      const neuD=konsolReroot(p&&p.dataFname,root); if(neuD) moves.push({pos,kind:'pdfdata',i,old:p.dataFname,neu:neuD}); });
-    (s.restarbeiten||[]).forEach((r,ri)=>{ (r.fotos||[]).forEach((ref,fi)=>{ const neu=konsolReroot(ref,root); if(neu) moves.push({pos,kind:'ra',ri,fi,old:ref,neu}); }); });
-  }}}
+  const moves=konsolRefs().map(r=>{ const neu=konsolReroot(r.old,root); return neu?Object.assign({},r,{neu}):null; }).filter(Boolean);
   if(dry){
     try{ console.table(moves.map(m=>({pos:m.pos,von:m.old,nach:m.neu}))); }catch(e){ console.log(moves); }
     alert('Vorschau: '+moves.length+' Datei(en) würden in „'+root+'" verschoben. Details in der Konsole. Zum Ausführen: ordnerKonsolidieren()');
@@ -2137,10 +2162,7 @@ async function ordnerKonsolidieren(dry){
     try{
       await spMove(m.old, m.neu);
       const s=ST[m.pos];
-      if(m.kind==='foto'){ if(s.fotos[m.i]===m.old) s.fotos[m.i]=m.neu; }
-      else if(m.kind==='pdf'){ if(s.pdfs[m.i] && s.pdfs[m.i].fname===m.old) s.pdfs[m.i].fname=m.neu; }
-      else if(m.kind==='pdfdata'){ if(s.pdfs[m.i] && s.pdfs[m.i].dataFname===m.old) s.pdfs[m.i].dataFname=m.neu; }
-      else if(m.kind==='ra'){ const r=s.restarbeiten[m.ri]; if(r && r.fotos[m.fi]===m.old) r.fotos[m.fi]=m.neu; }
+      konsolAnwenden(s,m);
       changed.add(m.pos); ok++;
     }catch(e){ console.warn('Verschieben fehlgeschlagen:', m.old, (e&&e.message)||e); fail++; }
   }
