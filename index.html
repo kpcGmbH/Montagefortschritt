@@ -104,6 +104,12 @@ header{background:var(--chrome-bg);position:sticky;top:0;z-index:100;box-shadow:
   cursor:pointer;font-family:inherit;white-space:nowrap;-webkit-tap-highlight-color:transparent;}
 .hidedone .hd-ic{font-size:12px;}
 .hidedone.on{background:var(--green);border-color:var(--green);color:#fff;}
+/* Restarbeiten-/Mängel-Filter: dritte, UNABHÄNGIGE Filterachse neben Gewerk und
+   Status – deshalb ein eigener Schalter und kein weiterer Gewerk-Knopf (die Leiste
+   lässt nur eine Auswahl zu, „Elektro + nur Mängel" wäre dort nicht möglich). */
+.hidedone.raf-ra{background:var(--braun);border-color:var(--braun);color:#fff;}
+.hidedone.raf-mangel{background:#8a2f2f;border-color:#8a2f2f;color:#fff;}
+.hidedone .hd-n{font-weight:700;opacity:.85;}
 select.fs{padding:7px 9px;border-radius:var(--r);border:1px solid var(--line);
   background:var(--surface);color:var(--text);font-size:12px;font-family:Arial Narrow,Arial,sans-serif;}
 select.fs option{background:var(--surface);color:var(--text);}
@@ -764,6 +770,7 @@ body.lvadm .lvonly.blk{display:block !important;}
       <input type="text" id="srch" placeholder="Suche: Bezeichnung, Fabrikat, Pos&#46;&#46;&#46;">
     </div>
     <button id="hideDoneBtn" class="hidedone" onclick="toggleHideDone()" title="Fertige Positionen ausblenden – nur offene und angefangene zeigen"><span class="hd-ic">&#10003;</span><span class="hd-lbl">Fertige aus</span></button>
+    <button id="rafBtn" class="hidedone" onclick="setRAF()" title="Nur Stellen mit offenen Restarbeiten zeigen – noch einmal tippen: nur M&#228;ngel des Auftraggebers"><span class="hd-ic">&#128203;</span><span class="hd-lbl">Restarbeiten</span><span class="hd-n" id="rafN"></span></button>
   </div>
   <div class="fbar gwbar" id="gwbar">
     <button class="gw on" data-t="all" onclick="setTF('all')">Alle</button>
@@ -1638,8 +1645,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 117;
+const APP_VERSION = 118;
 const CHANGELOG = [
+  { v:118, titel:'Neuer Filter: nur Restarbeiten / nur Mängel', punkte:[
+    'Neben „Fertige aus" steht jetzt <b>📋 Restarbeiten</b>. Ein Tipp zeigt nur noch die Stellen mit <b>offenen</b> Restarbeiten und Mängeln, ein zweiter nur die <b>Mängel des Auftraggebers</b>, ein dritter schaltet wieder alles ein. Die Zahl am Knopf sagt vorher, wie viele es sind.',
+    'Der Filter lässt sich mit dem Gewerk <b>kombinieren</b>: „Elektro" + „Restarbeiten" zeigt alles, was elektrisch offen ist – auch dann, wenn der Eintrag an einer Sanitär-Position hängt. Maßgeblich ist die <b>Zuständigkeit der Restarbeit</b>, nicht das Gewerk des Geräts.',
+    'Fertige Positionen bleiben dabei sichtbar, wenn an ihnen noch ein Mangel offen ist – auch bei eingeschaltetem „Fertige aus". Genau die will man beim Abarbeiten ja finden.',
+    'Die Mängel einer Abnahme hängen meist an der Etage oder der ganzen Baustelle. Der Balken <b>„Allgemeine Restarbeiten"</b> klappt deshalb bei aktivem Filter automatisch auf und zeigt nur die passenden Zeilen.',
+    'Der Filter merkt sich nichts: nach dem nächsten Start ist wieder alles zu sehen. Ein über Nacht angelassener Filter sähe sonst aus wie fehlende Daten.' ]},
   { v:116, titel:'Nichts wird mehr ohne Rückfrage gelöscht', punkte:[
     'Das rote ✕ am Foto einer Position löschte es sofort – am Handy war es beim Scrollen oder beim Antippen des Bildes schnell getroffen, und das Foto war weg. Jetzt kommt eine Abfrage, die die Position mit nennt.',
     'Ebenfalls neu mit Abfrage: Unterschriften (Bautagebuch, Dichtigkeitsprotokoll, Servicebericht, Einweisung, Schlüsselübergabe, IBN-Protokolle), Beschäftigte im Bautagebuch, Einsatz- und Materialzeilen im Servicebericht, freie Zeilen der Schlüsselübergabe und die Felder im IBN-Protokoll-Editor.',
@@ -2865,6 +2878,7 @@ function olbEt(idx, oi){
 
 // STATS
 function upStats(){
+  updRafBtn();   // Zahl am Restarbeiten-Knopf zählt im Kontext der gewählten Etage
   if(ZUST_ONLY[TF]){ upStatsZust(); return; }
   zustLabels(false);
   let tot=0,dn=0,pt=0,op=0,ang=0;
@@ -2918,6 +2932,80 @@ function toggleHideDone(){
   try{ localStorage.setItem('kpc_hide_done', HIDE_DONE?'1':'0'); }catch(e){}
   applyF();
 }
+// ── Restarbeiten-/Mängel-Filter (dritte Filterachse, ab v118) ──
+// 'all' → 'ra' (offene Restarbeiten UND Mängel) → 'mangel' (nur Mängel des AG) → 'all'
+// BEWUSST NICHT gespeichert (anders als HIDE_DONE): ein am Vortag angelassener
+// Filter zeigt beim nächsten Start eine fast leere Liste – und das liest sich wie
+// Datenverlust. Der Filter gilt für die Sitzung, nicht für das Gerät.
+let RAF='all';
+// Zählt OFFENE Einträge an einer Stelle (Position, Etage oder Baustelle).
+// Der Gewerk-Filter greift hier auf die Zuständigkeit der RESTARBEIT, nicht auf
+// das Gewerk der Position – ein Elektro-Mangel kann an einer Montage-Position
+// hängen, und genau den will man bei „Elektro + Mängel" sehen.
+function raOffen(key, nurMangel){
+  const s=ST[key]; if(!s||!Array.isArray(s.restarbeiten)) return 0;
+  return s.restarbeiten.filter(r=>
+    (r.txt||'').trim() && !r.done &&
+    (!nurMangel || r.mangel) &&
+    (TF==='all' || (r.gw||'-')===TF)
+  ).length;
+}
+// Alle Stellen der Baustelle im Kontext der Etagenauswahl (wie upStats)
+function rafKeys(){
+  const keys=[PRAKEY];
+  DATA.forEach(sec=>{
+    if(ACT!=='__all' && sec.pos!==ACT) return;
+    keys.push(EKEY(sec));
+    sec.subsections.forEach(sub=>sub.items.forEach(it=>keys.push(it.pos)));
+  });
+  return keys;
+}
+function setRAF(mode){
+  RAF = mode || (RAF==='all'?'ra':(RAF==='ra'?'mangel':'all'));
+  updRafBtn();
+  updRaGwVis();          // Zeilen in den Listen mitfiltern
+  applyF();              // Karten der Positionen
+  updAllgRafVis();       // Balken „Allgemeine Restarbeiten"
+  updDichtTasks();       // Prüfprotokoll-Karte trägt keine Restarbeiten -> raus
+}
+function updRafBtn(){
+  const b=document.getElementById('rafBtn'); if(!b) return;
+  b.classList.toggle('raf-ra', RAF==='ra');
+  b.classList.toggle('raf-mangel', RAF==='mangel');
+  const lbl=b.querySelector('.hd-lbl'); if(lbl) lbl.textContent = RAF==='mangel'?'Nur Mängel':'Restarbeiten';
+  // Zahl am Knopf: sonst muss man tippen, um zu erfahren, dass es nichts gibt.
+  const n=document.getElementById('rafN');
+  if(n){
+    let sum=0; rafKeys().forEach(k=>{ sum+=raOffen(k, RAF==='mangel'); });
+    n.textContent = RAF==='all' ? '' : ' '+sum;
+  }
+}
+// Zeile im Restarbeiten-Filter behalten? Leere Eingabezeilen nie verstecken.
+function rafRowOk(row){
+  if(RAF==='all') return true;
+  if(row.getAttribute('data-leer')==='1') return true;
+  if(row.classList.contains('done')) return false;
+  return RAF!=='mangel' || row.classList.contains('mangel');
+}
+// Gruppen im Balken „Allgemeine Restarbeiten" ohne Treffer ausblenden – und den
+// Balken aufklappen. Ohne das Aufklappen stünden die Mängel einer Abnahme (die
+// hängen als ALLGEMEINE Restarbeiten an Etage/Baustelle) unsichtbar im
+// zugeklappten Balken, während die Positionsliste leer aussieht.
+function updAllgRafVis(){
+  const body=document.getElementById('ALLGBODY'); if(!body) return;
+  let sichtbar=0;
+  body.querySelectorAll('.allg-grp').forEach(g=>{
+    const n=[...g.querySelectorAll('.rarow')].filter(r=>r.style.display!=='none' && r.getAttribute('data-leer')!=='1').length;
+    const aus = RAF!=='all' && !n;
+    g.style.display = aus?'none':'';
+    if(!aus) sichtbar++;
+  });
+  if(RAF!=='all' && sichtbar && !body.classList.contains('open')){
+    body.classList.add('open');
+    const t=document.getElementById('ALLGCNT'); if(t) t.classList.add('act');
+  }
+}
+
 function setSF(f){
   SF=(SF===f && f!=='all')?'all':f;
   document.getElementById('sfD').classList.toggle('on',SF==='done');
@@ -2955,12 +3043,13 @@ function setTF(t){
   updDichtTasks();   // Prüfprotokoll-Position: nur bei Gewerk „Sanitär"
   updRaGwVis();      // Restarbeiten des gewählten Gewerks
   updRaCounts();     // „x/y erledigt“ passend zum Filter
+  updAllgRafVis();   // leer gewordene Gruppen im Sammel-Balken ausblenden
   updEtbarVis();     // Fotoleiste ist gewerkeübergreifend -> bei Filter ausblenden
 }
 
 function applyF(){
   const q=document.getElementById('srch').value.toLowerCase().trim();
-  const active = q || SF!=='all' || TF!=='all' || HIDE_DONE;
+  const active = q || SF!=='all' || TF!=='all' || HIDE_DONE || RAF!=='all';
   const hb=document.getElementById('hideDoneBtn'); if(hb) hb.classList.toggle('on',HIDE_DONE);
 
   // NUR die Suche zeigt alle Etagen; Status-/Gewerk-Filter bleiben in der Etagen-Ansicht
@@ -2988,9 +3077,18 @@ function applyF(){
     // prüfung fehlt noch), gehört sie unter „Teilweise" – sonst stehen in der
     // Offen-Liste auch längst angeschlossene Geräte.
     else if(SF==='open') stOk=!done && !part;
-    const gwOk = TF==='all' || (ZUST_ONLY[TF] ? hatRA(pos,TF) : gewAttrMatch(c.dataset.gew,TF));
-    const doneOk = !(HIDE_DONE && done);   // „Fertige ausblenden": fertige Karten raus
-    const show=txtOk && stOk && gwOk && doneOk;
+    const raOk = RAF==='all' || raOffen(pos, RAF==='mangel')>0;
+    // Bei aktivem Restarbeiten-Filter ist der Gewerk-Filter schon in raOffen
+    // berücksichtigt – auf die Zuständigkeit der Restarbeit. Zusätzlich noch nach
+    // dem Gewerk der POSITION zu filtern würde einen Elektro-Mangel an einer
+    // Montage-Position verschlucken; genau der soll aber auftauchen.
+    const gwOk = RAF!=='all' ? true
+               : (TF==='all' || (ZUST_ONLY[TF] ? hatRA(pos,TF) : gewAttrMatch(c.dataset.gew,TF)));
+    // „Fertige ausblenden": fertige Karten raus – aber NICHT beim Restarbeiten-
+    // Filter. Eine Position kann alle Schritte erledigt haben und trotzdem einen
+    // offenen Mangel tragen; sie auszublenden wäre hier das Gegenteil des Zwecks.
+    const doneOk = RAF!=='all' ? true : !(HIDE_DONE && done);
+    const show=txtOk && stOk && gwOk && raOk && doneOk;
     c.style.display=show?'':'none';
     if(show && active){
       const ilist=c.closest('.ilist');
@@ -4005,7 +4103,9 @@ function updDichtTasks(){
   const el=document.getElementById('DT_bottom'); if(!el) return;
   const alle=dichtCollect('__all');
   // Nur im Sanitär-Filter und nur wenn es überhaupt Sanitärpositionen gibt.
-  if(TF!=='S' || !alle.length){ el.innerHTML=''; el.style.display='none'; return; }
+  // Bei aktivem Restarbeiten-Filter ebenfalls weg: die Karte ist keine LV-Position
+  // und trägt keine Restarbeiten – sie stünde sonst als einziger Treffer da.
+  if(TF!=='S' || !alle.length || RAF!=='all'){ el.innerHTML=''; el.style.display='none'; return; }
   el.style.display='block';   // .dtsec ist per CSS ausgeblendet -> explizit setzen
   const nGepr=alle.filter(x=>x.geprueft).length;
   const nProt=DICHT.length;
@@ -6354,8 +6454,13 @@ function updRaGwVis(scope){
   (scope||document).querySelectorAll('.rarow[data-gw]').forEach(r=>{
     const g=r.getAttribute('data-gw')||'-';
     const leer=r.getAttribute('data-leer')==='1';
-    const zeigen=(TF==='all'||g===TF||leer||RA_ALLE_ZEIGEN.has(r.closest('.ragrp')?r.closest('.ragrp').id:''));
-    r.style.display=zeigen?'':'none';
+    const gwOk=(TF==='all'||g===TF||leer||RA_ALLE_ZEIGEN.has(r.closest('.ragrp')?r.closest('.ragrp').id:''));
+    const rafOk=rafRowOk(r);
+    r.style.display=(gwOk&&rafOk)?'':'none';
+    // Warum versteckt? Der Hinweis unten spricht von „anderer Zuständigkeit" –
+    // er darf nur Zeilen zählen, die der GEWERK-Filter verbirgt, nicht die des
+    // Restarbeiten-Filters. Sonst verspricht ein Klick etwas, das er nicht hält.
+    r.dataset.hidBy = (gwOk&&rafOk) ? '' : (gwOk ? 'raf' : 'gw');
   });
   updRaVersteckt(scope);
 }
@@ -6367,7 +6472,7 @@ const RA_ALLE_ZEIGEN=new Set();
 function updRaVersteckt(scope){
   (scope&&scope.id? [scope] : [...document.querySelectorAll('.ragrp')]).forEach(g=>{
     if(!g||!g.id) return;
-    const n=[...g.querySelectorAll('.rarow')].filter(r=>r.style.display==='none').length;
+    const n=[...g.querySelectorAll('.rarow')].filter(r=>r.dataset.hidBy==='gw').length;
     let hint=g.parentNode?g.parentNode.querySelector('.rahid[data-for="'+g.id+'"]'):null;
     if(!n){ if(hint) hint.remove(); return; }
     if(!hint){
@@ -6599,6 +6704,7 @@ function updAllgSection(){
   body.innerHTML=html;
   scopes.forEach(sc=>{ if(document.getElementById('RA'+sp(sc.key))) updRA(sc.key); });
   updAllgBadge();
+  updAllgRafVis();   // nach dem Neuaufbau erneut auf den Restarbeiten-Filter anwenden
 }
 // Nur Zähler/Badge + Auto-Aufklappen (kein DOM-Neubau) – günstig, aus updRA heraus.
 function updAllgBadge(){
