@@ -769,7 +769,7 @@ body.lvadm .lvonly.blk{display:block !important;}
       <span class="si">&#128269;</span>
       <input type="text" id="srch" placeholder="Suche: Bezeichnung, Fabrikat, Pos&#46;&#46;&#46;">
     </div>
-    <button id="hideDoneBtn" class="hidedone" onclick="toggleHideDone()" title="Fertige Positionen ausblenden – nur offene und angefangene zeigen"><span class="hd-ic">&#10003;</span><span class="hd-lbl">Fertige aus</span></button>
+    <button id="hideDoneBtn" class="hidedone" onclick="toggleHideDone()" title="Fertige Positionen ausblenden. Weiter tippen w&#228;hlt den Bauabschnitt: angeschlossen &#8594; komplett (inkl. IBN + Einweisung) &#8594; montiert &#8594; aus"><span class="hd-ic">&#10003;</span><span class="hd-lbl">Fertige aus</span><span class="hd-n" id="hdN"></span></button>
     <button id="rafBtn" class="hidedone" onclick="setRAF()" title="Nur Stellen mit offenen Restarbeiten zeigen – noch einmal tippen: nur M&#228;ngel des Auftraggebers"><span class="hd-ic">&#128203;</span><span class="hd-lbl">Restarbeiten</span><span class="hd-n" id="rafN"></span></button>
   </div>
   <div class="fbar gwbar" id="gwbar">
@@ -1645,8 +1645,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 118;
+const APP_VERSION = 119;
 const CHANGELOG = [
+  { v:119, titel:'„Fertige aus" wirkt endlich – mit Bauabschnitt', punkte:[
+    'Der Schalter hat während der Bauzeit <b>nichts versteckt</b>. Grund: Inbetriebnahme und Einweisung zählen zum Gewerk Elektro, und die Einweisung findet erst zum Projektende statt – also war an jedem Elektrogerät immer ein Punkt offen. In den Ansichten „Alle" und „Elektro" war der Schalter damit wirkungslos, nur bei Montage und Sanitär tat er etwas.',
+    'Jetzt legt man fest, <b>bis wohin</b> „fertig" gilt. Weiter tippen schaltet um: <b>angeschlossen</b> (geliefert, montiert, angeschlossen – der Normalfall auf der Baustelle) → <b>komplett</b> (zusätzlich Inbetriebnahme und Einweisung – das alte Verhalten, für die Übergabe) → <b>montiert</b> (nur geliefert und montiert) → aus.',
+    'Am Knopf steht jetzt eine <b>Zahl</b>: wie viele Positionen er gerade verbirgt. Vorher war nicht zu erkennen, dass er nichts tat.',
+    'Eingeschaltet bleibt er wie bisher über Neustarts hinweg; die Stufe startet immer wieder bei „angeschlossen".' ]},
   { v:118, titel:'Neuer Filter: nur Restarbeiten / nur Mängel', punkte:[
     'Neben „Fertige aus" steht jetzt <b>📋 Restarbeiten</b>. Ein Tipp zeigt nur noch die Stellen mit <b>offenen</b> Restarbeiten und Mängeln, ein zweiter nur die <b>Mängel des Auftraggebers</b>, ein dritter schaltet wieder alles ein. Die Zahl am Knopf sagt vorher, wie viele es sind.',
     'Der Filter lässt sich mit dem Gewerk <b>kombinieren</b>: „Elektro" + „Restarbeiten" zeigt alles, was elektrisch offen ist – auch dann, wenn der Eintrag an einer Sanitär-Position hängt. Maßgeblich ist die <b>Zuständigkeit der Restarbeit</b>, nicht das Gewerk des Geräts.',
@@ -2878,7 +2883,7 @@ function olbEt(idx, oi){
 
 // STATS
 function upStats(){
-  updRafBtn();   // Zahl am Restarbeiten-Knopf zählt im Kontext der gewählten Etage
+  updRafBtn(); updHdBtn();   // Zahlen an den Filterknöpfen im Kontext der gewählten Etage
   if(ZUST_ONLY[TF]){ upStatsZust(); return; }
   zustLabels(false);
   let tot=0,dn=0,pt=0,op=0,ang=0;
@@ -2924,13 +2929,67 @@ function zustLabels(an){
 // SEARCH/FILTER
 
 let SF='all';
-// „Fertige ausblenden": versteckt fertige Positionen (fertig = im aktuellen Gewerk-
-// Filter alles erledigt). Bleibt über Gewerkwechsel und Sitzungen erhalten.
-let HIDE_DONE = (()=>{ try{ return localStorage.getItem('kpc_hide_done')==='1'; }catch(e){ return false; } })();
+// ── „Fertige ausblenden" mit Bauabschnitt (ab v119) ──
+// Bis v118 hieß „fertig" = ALLE Schritte des Gewerks erledigt. Da Inbetriebnahme und
+// Einweisung zum Gewerk Elektro gehören (GEW_FIELDS.E) und die Einweisung erst zum
+// Projektende stattfindet, war an einem Elektrogerät praktisch immer ein Punkt offen –
+// der Schalter versteckte in den Ansichten „Alle" und „Elektro" NICHTS. Nutzbar war er
+// nur bei Montage und Sanitär. Deshalb jetzt: „fertig" bis zu einem wählbaren
+// Bauabschnitt.
+const HD_STUFEN={
+  ansch:    {lbl:'angeschlossen', felder:['g','m','nu','sa','dp','ea','pa']},
+  komplett: {lbl:'komplett',      felder:ALL_CK},
+  mont:     {lbl:'montiert',      felder:['g','m','nu']}
+};
+// Reihenfolge des Durchtippens. Startet bei „angeschlossen": der Normalfall während
+// der Bauzeit. „komplett" = das alte Verhalten, für die Übergabe.
+const HD_CYCLE=['ansch','komplett','mont'];
+// Der Ein/Aus-Zustand bleibt gespeichert (wie bisher), die STUFE bewusst nicht –
+// sie startet immer bei „angeschlossen", damit niemand mit einer gestern gewählten
+// Sonderstufe in den Tag geht.
+let HD_STUFE = (()=>{ try{ return localStorage.getItem('kpc_hide_done')==='1'?'ansch':'off'; }catch(e){ return 'off'; } })();
 function toggleHideDone(){
-  HIDE_DONE=!HIDE_DONE;
-  try{ localStorage.setItem('kpc_hide_done', HIDE_DONE?'1':'0'); }catch(e){}
+  const i=HD_CYCLE.indexOf(HD_STUFE);
+  HD_STUFE = (HD_STUFE==='off') ? HD_CYCLE[0] : (HD_CYCLE[i+1] || 'off');
+  try{ localStorage.setItem('kpc_hide_done', HD_STUFE==='off'?'0':'1'); }catch(e){}
   applyF();
+}
+// Ist die Position bis zum gewünschten Bauabschnitt fertig? Spiegelt die Logik von
+// ist(): Gewerk-Kontext, „entfällt" und Positionen ohne Gewerk-Zuordnung.
+function fertigBis(p, stufe){
+  const s=gs(p);
+  const relP=relFields(p);
+  let alle = (TF==='all'||ZUST_ONLY[TF]) ? relP
+           : (TF_GEW[TF] ? tfFields(TF).filter(f=>relP.includes(f)) : relP);
+  if(!(POSGEW[p]||[]).length) alle=['g'];      // ohne Gewerk zählt nur die Lieferung
+  const stf=(HD_STUFEN[stufe]||HD_STUFEN.komplett).felder;
+  const fields=alle.filter(f=>stf.includes(f) && !entf(s,f));
+  // In dieser Stufe gibt es an der Position gar nichts zu tun (z. B. eine Anlage mit
+  // NUR Potentialausgleich bei „bis montiert"). Dann gilt sie NICHT als fertig –
+  // sonst verschwände sie, ohne dass jemand etwas erledigt hätte.
+  if(!fields.length) return false;
+  return fields.every(f=>s[f]);
+}
+function updHdBtn(){
+  const b=document.getElementById('hideDoneBtn'); if(!b) return;
+  const an=HD_STUFE!=='off';
+  b.classList.toggle('on',an);
+  const lbl=b.querySelector('.hd-lbl');
+  if(lbl) lbl.textContent = an ? ('Fertige aus: '+HD_STUFEN[HD_STUFE].lbl) : 'Fertige aus';
+  // Zahl = wie viele Positionen der Schalter gerade verbirgt. Ohne sie merkte
+  // niemand, dass er wirkungslos ist – genau das war das Problem bis v118.
+  const n=document.getElementById('hdN');
+  if(n){
+    let sum=0;
+    if(an) DATA.forEach(sec=>{
+      if(ACT!=='__all' && sec.pos!==ACT) return;
+      sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+        if(TF!=='all' && !ZUST_ONLY[TF] && !tfMatch(it.gew,TF)) return;
+        if(fertigBis(it.pos,HD_STUFE)) sum++;
+      }));
+    });
+    n.textContent = an ? ' '+sum : '';
+  }
 }
 // ── Restarbeiten-/Mängel-Filter (dritte Filterachse, ab v118) ──
 // 'all' → 'ra' (offene Restarbeiten UND Mängel) → 'mangel' (nur Mängel des AG) → 'all'
@@ -3049,8 +3108,8 @@ function setTF(t){
 
 function applyF(){
   const q=document.getElementById('srch').value.toLowerCase().trim();
-  const active = q || SF!=='all' || TF!=='all' || HIDE_DONE || RAF!=='all';
-  const hb=document.getElementById('hideDoneBtn'); if(hb) hb.classList.toggle('on',HIDE_DONE);
+  const active = q || SF!=='all' || TF!=='all' || HD_STUFE!=='off' || RAF!=='all';
+  updHdBtn();
 
   // NUR die Suche zeigt alle Etagen; Status-/Gewerk-Filter bleiben in der Etagen-Ansicht
   // (Bauleiter-Workflow: Etage wählen -> Gewerk/Offen filtern -> nur diese Etage sehen)
@@ -3087,7 +3146,9 @@ function applyF(){
     // „Fertige ausblenden": fertige Karten raus – aber NICHT beim Restarbeiten-
     // Filter. Eine Position kann alle Schritte erledigt haben und trotzdem einen
     // offenen Mangel tragen; sie auszublenden wäre hier das Gegenteil des Zwecks.
-    const doneOk = RAF!=='all' ? true : !(HIDE_DONE && done);
+    // Maßgeblich ist der gewählte Bauabschnitt, nicht mehr die Kartenfarbe: die
+    // steht auf „vollständig" erst nach Inbetriebnahme UND Einweisung.
+    const doneOk = RAF!=='all' ? true : !(HD_STUFE!=='off' && fertigBis(pos,HD_STUFE));
     const show=txtOk && stOk && gwOk && raOk && doneOk;
     c.style.display=show?'':'none';
     if(show && active){
