@@ -1649,8 +1649,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 121;
+const APP_VERSION = 122;
 const CHANGELOG = [
+  { v:122, titel:'Inbetriebnahme hakt sich mit dem Protokoll selbst ab', punkte:[
+    'Wird ein <b>Inbetriebnahmeprotokoll</b> an einer Position abgelegt, setzt die App den Schritt <b>„Inbetriebnahme"</b> jetzt selbst – das Protokoll IST ja der Nachweis. Den Haken hinterher von Hand zu setzen war doppelte Arbeit und wurde regelmäßig vergessen.',
+    'Gilt für beide Wege: das digital ausgefüllte Protokoll aus der Inbetriebnahme-App und ein hier hochgeladenes PDF.',
+    'Fehlen davorliegende Schritte wie der Elektroanschluss, werden sie wie beim normalen Abhaken mitgesetzt. Im Verlauf der Position steht nachvollziehbar „durch Protokoll gesetzt" beziehungsweise „automatisch mitgesetzt", mit Name und Zeitpunkt.',
+    'Nicht angetastet wird der Haken, wenn die Inbetriebnahme an der Position als <b>entfällt</b> gekennzeichnet ist – dann meldet die App den Widerspruch, statt die Entscheidung stillschweigend zu überschreiben. Das <b>DGUV-Protokoll</b> setzt bewusst nichts: es ist eine Prüfung der elektrischen Sicherheit, keine Inbetriebnahme.' ]},
   { v:121, titel:'Die beiden Filter fragen jetzt nach, statt durchzuschalten', punkte:[
     'Bei „Fertige Positionen ausblenden" und „Restarbeiten und Mängel" musste man sich bisher durch die Stufen tippen und dabei raten, was als Nächstes kommt. Beide öffnen jetzt ein <b>Auswahlfenster</b>, in dem jede Möglichkeit ausgeschrieben dasteht – mit einem Satz Erklärung und der Zahl, die sie betrifft.',
     'Bei „Fertige Positionen ausblenden" stehen zur Wahl: <b>alle zeigen</b>, <b>geliefert und montiert</b>, <b>zusätzlich angeschlossen</b> oder <b>vollständig, mit Inbetriebnahme und Einweisung</b>. Daneben steht jeweils, wie viele Positionen das verbergen würde.',
@@ -2257,7 +2262,7 @@ function histAdd(pos,art,txt){
   const ov=document.getElementById('histOv');
   if(ov && ov.dataset.pos===pos) renderHist(pos);   // offenes Fenster mitführen
 }
-const HIST_TXT={set:'abgehakt','set-auto':'automatisch mitgesetzt',unset:'Haken entfernt',notiz:'Anmerkung geändert',
+const HIST_TXT={set:'abgehakt','set-auto':'automatisch mitgesetzt','set-proto':'durch Protokoll gesetzt',unset:'Haken entfernt',notiz:'Anmerkung geändert',
   'notiz-weg':'Anmerkung gelöscht','ra-neu':'Restarbeit erfasst','ra-erledigt':'Restarbeit erledigt',
   'ra-offen':'Restarbeit wieder offen','na-set':'entfällt','na-unset':'entfällt aufgehoben'};
 function histFmt(t){ try{ const d=new Date(t);
@@ -2279,7 +2284,7 @@ function renderHist(pos){
   const zeilen = eintraege.length ? eintraege.map(e=>{
     const was=HIST_TXT[e.a]||e.a;
     const detail=e.x?('<span class="hd">'+escapeHtml(e.x)+'</span>'):'';
-    const farbe=(e.a==='set'||e.a==='set-auto'||e.a==='ra-erledigt')?'#3a7a3a':(e.a==='unset'||e.a==='ra-offen'?'#b3261e':'var(--braun)');
+    const farbe=(e.a==='set'||e.a==='set-auto'||e.a==='set-proto'||e.a==='ra-erledigt')?'#3a7a3a':(e.a==='unset'||e.a==='ra-offen'?'#b3261e':'var(--braun)');
     // Hat jemand anderes eingetragen, gehört das dazu – sonst behauptet der Verlauf,
     // der Monteur habe es selbst getan.
     const fremd=e.e?('<div class="he">erfasst von '+escapeHtml(e.e)+'</div>'):'';
@@ -2374,6 +2379,45 @@ function autoFillVorstufen(pos,f){
     histAdd(pos,'set-auto',FLD_LBL[p]||p);
     ckRender(pos,p);
   });
+}
+// ── Protokoll legt den zugehörigen Schritt automatisch ab (ab v122) ─────────
+// Ein abgelegtes Inbetriebnahmeprotokoll IST der Nachweis der Inbetriebnahme –
+// den Haken danach von Hand zu setzen war doppelte Arbeit und wurde regelmäßig
+// vergessen. Analog schreibt die Einweisungs-App längst „ew" zurück (§2).
+// Bewusst NICHT für das DGUV-Protokoll: das ist eine Prüfung der elektrischen
+// Sicherheit, keine Inbetriebnahme.
+const PROTO_SCHRITT={'IBN Protokoll':'ib'};
+// Zusatz für die Erfolgsmeldung: nur wenn wirklich etwas gesetzt wurde.
+function protoHinweis(auto){
+  return (auto && auto.stand==='gesetzt') ? (' · „'+(FLD_LBL[auto.feld]||auto.feld)+'" mit abgehakt') : '';
+}
+// Widerspruch zwischen Protokoll und „entfällt" gehört vor Augen, nicht in einen
+// Toast, der nach drei Sekunden weg ist.
+function protoWarnen(pos, auto){
+  if(!auto || auto.stand!=='entfaellt') return;
+  alert('Hinweis zu '+posLabel(pos)+'\n\n„'+(FLD_LBL[auto.feld]||auto.feld)+
+        '" ist an dieser Position als ENTFÄLLT gekennzeichnet – der Haken wurde deshalb '+
+        'nicht gesetzt.\n\nDas Protokoll ist abgelegt. Wenn der Schritt doch stattfindet, '+
+        'das „entfällt" über einen langen Druck auf den Schritt aufheben.');
+}
+// Gibt zurück, was passiert ist – der Aufrufer meldet es dem Nutzer.
+function schrittAusProtokoll(pos, type){
+  const f=PROTO_SCHRITT[type]; if(!f) return null;
+  if(isEKey(pos)||pos===PRAKEY) return null;      // Etagen-/Projektzeilen haben keine Schritte
+  const s=gs(pos);
+  // Gehört der Schritt überhaupt zu diesem Gerät? Ohne „ib" in relFields wird der
+  // Chip gar nicht angezeigt – ein unsichtbarer Haken hülfe niemandem.
+  if(!relFields(pos).includes(f)) return {stand:'nicht-relevant', feld:f};
+  // Als „entfällt" markiert: das war eine bewusste Entscheidung. Die wird nicht
+  // still überschrieben – aber gemeldet, denn sie widerspricht dem Protokoll.
+  if(entf(s,f)) return {stand:'entfaellt', feld:f};
+  if(s[f]) return {stand:'stand-schon', feld:f};
+  s[f]=true; s.ts[f]=new Date().toISOString(); s.by[f]=USER;
+  histAdd(pos,'set-proto',(FLD_LBL[f]||f)+' · '+type);
+  ckRender(pos,f);
+  autoFillVorstufen(pos,f);          // Chronologie wie beim normalen Abhaken
+  rc(pos); upStats(); savePos(pos);
+  return {stand:'gesetzt', feld:f};
 }
 // „Schritt entfällt" setzen/aufheben. Erreichbar über langen Druck bzw. Rechtsklick
 // auf den Chip – eine seltene, bewusste Entscheidung soll das Abhaken im Alltag
@@ -5912,7 +5956,12 @@ async function ibnReceive(p){
         if(old.dataFname){removeQueuedFile(old.dataFname);spDelete(old.dataFname);} } }
     if(!replaced) gs(pos).pdfs.push(entry);
     saveFotos(pos); updPG(pos);
-    showToast('✓ '+type+' bei Position '+pos+(replaced?' aktualisiert':' abgelegt'));
+    // Beim ERSETZEN eines Protokolls nichts nachsetzen – der Haken steht dann längst,
+    // und ein „entfällt" wäre schon beim ersten Ablegen gemeldet worden.
+    const auto = replaced ? null : schrittAusProtokoll(pos, type);
+    showToast('✓ '+type+' bei Position '+pos+(replaced?' aktualisiert':' abgelegt')+
+              protoHinweis(auto));
+    protoWarnen(pos, auto);
     ibnGoToPos(pos);
     return true;
   }catch(e){ _ibnSeen.delete(p.id); alert('IBN-Protokoll konnte nicht abgelegt werden: '+((e&&e.message)||e)); return false; }
@@ -6024,6 +6073,11 @@ document.getElementById('pi').addEventListener('change',async function(e){
     saveFotos(PPOS);
     updPG(PPOS);
     hideLoader();
+    // Gleicher Automatismus wie beim digital ausgefüllten Protokoll: ein hier
+    // hochgeladenes Inbetriebnahmeprotokoll ist derselbe Nachweis.
+    const auto=schrittAusProtokoll(PPOS, PTYPE);
+    if(auto && auto.stand==='gesetzt') showToast('✓ '+PTYPE+' abgelegt'+protoHinweis(auto));
+    protoWarnen(PPOS, auto);
   } catch(err){
     hideLoader();
     alert('Upload fehlgeschlagen: '+err.message);
