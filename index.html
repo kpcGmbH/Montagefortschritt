@@ -90,8 +90,12 @@ header{background:var(--chrome-bg);position:sticky;top:0;z-index:100;box-shadow:
 .tab .tno.done{color:var(--green,#3a7a3a);}
 
 /* FILTERBAR */
-.fbar{background:var(--chrome-bg);padding:7px 14px 8px;display:flex;gap:7px;align-items:center;border-top:1px solid var(--line);}
-.sw{position:relative;flex:1;}
+/* Umbruch erlaubt: die Filterknöpfe sind ab v121 ausgeschrieben („Fertige
+   Positionen ausblenden" statt „Fertige aus") und passen am Handy nicht mehr in
+   eine Zeile. Ohne Umbruch schrumpfte das Suchfeld auf die Lupe und der zweite
+   Knopf wurde am Rand abgeschnitten. `.gwbar` setzt weiterhin nowrap + Scrollen. */
+.fbar{background:var(--chrome-bg);padding:7px 14px 8px;display:flex;flex-wrap:wrap;gap:7px;align-items:center;border-top:1px solid var(--line);}
+.sw{position:relative;flex:1 1 190px;min-width:150px;}
 .sw input{width:100%;padding:7px 10px 7px 28px;border-radius:var(--r);border:1px solid var(--line);
   background:var(--surface);color:var(--text);font-size:13px;font-family:Arial Narrow,Arial,sans-serif;}
 .sw input::placeholder{color:var(--accent2);}
@@ -769,8 +773,8 @@ body.lvadm .lvonly.blk{display:block !important;}
       <span class="si">&#128269;</span>
       <input type="text" id="srch" placeholder="Suche: Bezeichnung, Fabrikat, Pos&#46;&#46;&#46;">
     </div>
-    <button id="hideDoneBtn" class="hidedone" onclick="toggleHideDone()" title="Fertige Positionen ausblenden. Weiter tippen w&#228;hlt den Bauabschnitt: angeschlossen &#8594; komplett (inkl. IBN + Einweisung) &#8594; montiert &#8594; aus"><span class="hd-ic">&#10003;</span><span class="hd-lbl">Fertige aus</span><span class="hd-n" id="hdN"></span></button>
-    <button id="rafBtn" class="hidedone" onclick="setRAF()" title="Nur Stellen mit offenen Restarbeiten zeigen – noch einmal tippen: nur M&#228;ngel des Auftraggebers"><span class="hd-ic">&#128203;</span><span class="hd-lbl">Restarbeiten</span><span class="hd-n" id="rafN"></span></button>
+    <button id="hideDoneBtn" class="hidedone" onclick="hdMenu(this)" title="Fertige Positionen ausblenden – Auswahl &#246;ffnen"><span class="hd-ic">&#10003;</span><span class="hd-lbl">Fertige Positionen ausblenden</span></button>
+    <button id="rafBtn" class="hidedone" onclick="rafMenu(this)" title="Nach Restarbeiten und M&#228;ngeln filtern – Auswahl &#246;ffnen"><span class="hd-ic">&#128203;</span><span class="hd-lbl">Restarbeiten und M&#228;ngel</span></button>
   </div>
   <div class="fbar gwbar" id="gwbar">
     <button class="gw on" data-t="all" onclick="setTF('all')">Alle</button>
@@ -1645,8 +1649,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 120;
+const APP_VERSION = 121;
 const CHANGELOG = [
+  { v:121, titel:'Die beiden Filter fragen jetzt nach, statt durchzuschalten', punkte:[
+    'Bei „Fertige Positionen ausblenden" und „Restarbeiten und Mängel" musste man sich bisher durch die Stufen tippen und dabei raten, was als Nächstes kommt. Beide öffnen jetzt ein <b>Auswahlfenster</b>, in dem jede Möglichkeit ausgeschrieben dasteht – mit einem Satz Erklärung und der Zahl, die sie betrifft.',
+    'Bei „Fertige Positionen ausblenden" stehen zur Wahl: <b>alle zeigen</b>, <b>geliefert und montiert</b>, <b>zusätzlich angeschlossen</b> oder <b>vollständig, mit Inbetriebnahme und Einweisung</b>. Daneben steht jeweils, wie viele Positionen das verbergen würde.',
+    'Bei „Restarbeiten und Mängel": <b>alle zeigen</b>, <b>nur mit offenen Restarbeiten und Mängeln</b> oder <b>nur mit offenen Mängeln des Auftraggebers</b> – jeweils mit der Anzahl.',
+    'Die Knöpfe sind ausgeschrieben statt abgekürzt und zeigen im Klartext, was gerade gilt – etwa „Ausgeblendet: angeschlossen (12)". Am Handy rutschen sie dafür in eine eigene Zeile unter das Suchfeld.' ]},
   { v:120, titel:'Restarbeiten-Anzeige lief aus dem Takt', punkte:[
     'Gemeldet: Am Balken „Restarbeit / Notiz" stand eine <b>1</b>, darunter war aber nichts zu sehen.',
     'Ursache: Die App holt alle 30 Sekunden den Stand der Kollegen. Wurde in genau dieser Karte gerade getippt, übernahm sie die Daten zwar, <b>zeichnete die Liste aber nicht neu</b> – und holte das nie nach, weil der Stand ab dann ja schon passte. Die Zahl am Balken zählte die echten Daten, die Liste zeigte den alten Stand.',
@@ -2946,19 +2955,10 @@ const HD_STUFEN={
   komplett: {lbl:'komplett',      felder:ALL_CK},
   mont:     {lbl:'montiert',      felder:['g','m','nu']}
 };
-// Reihenfolge des Durchtippens. Startet bei „angeschlossen": der Normalfall während
-// der Bauzeit. „komplett" = das alte Verhalten, für die Übergabe.
-const HD_CYCLE=['ansch','komplett','mont'];
 // Der Ein/Aus-Zustand bleibt gespeichert (wie bisher), die STUFE bewusst nicht –
 // sie startet immer bei „angeschlossen", damit niemand mit einer gestern gewählten
 // Sonderstufe in den Tag geht.
 let HD_STUFE = (()=>{ try{ return localStorage.getItem('kpc_hide_done')==='1'?'ansch':'off'; }catch(e){ return 'off'; } })();
-function toggleHideDone(){
-  const i=HD_CYCLE.indexOf(HD_STUFE);
-  HD_STUFE = (HD_STUFE==='off') ? HD_CYCLE[0] : (HD_CYCLE[i+1] || 'off');
-  try{ localStorage.setItem('kpc_hide_done', HD_STUFE==='off'?'0':'1'); }catch(e){}
-  applyF();
-}
 // Ist die Position bis zum gewünschten Bauabschnitt fertig? Spiegelt die Logik von
 // ist(): Gewerk-Kontext, „entfällt" und Positionen ohne Gewerk-Zuordnung.
 function fertigBis(p, stufe){
@@ -2975,26 +2975,68 @@ function fertigBis(p, stufe){
   if(!fields.length) return false;
   return fields.every(f=>s[f]);
 }
+// Wie viele Positionen würde diese Stufe verbergen? Zählt im Kontext der gewählten
+// Etage und des Gewerk-Filters – genau wie die Statuszeile.
+function hdCount(stufe){
+  let sum=0;
+  DATA.forEach(sec=>{
+    if(ACT!=='__all' && sec.pos!==ACT) return;
+    sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+      if(TF!=='all' && !ZUST_ONLY[TF] && !tfMatch(it.gew,TF)) return;
+      if(fertigBis(it.pos,stufe)) sum++;
+    }));
+  });
+  return sum;
+}
 function updHdBtn(){
   const b=document.getElementById('hideDoneBtn'); if(!b) return;
   const an=HD_STUFE!=='off';
   b.classList.toggle('on',an);
   const lbl=b.querySelector('.hd-lbl');
-  if(lbl) lbl.textContent = an ? ('Fertige aus: '+HD_STUFEN[HD_STUFE].lbl) : 'Fertige aus';
-  // Zahl = wie viele Positionen der Schalter gerade verbirgt. Ohne sie merkte
-  // niemand, dass er wirkungslos ist – genau das war das Problem bis v118.
-  const n=document.getElementById('hdN');
-  if(n){
-    let sum=0;
-    if(an) DATA.forEach(sec=>{
-      if(ACT!=='__all' && sec.pos!==ACT) return;
-      sec.subsections.forEach(sub=>sub.items.forEach(it=>{
-        if(TF!=='all' && !ZUST_ONLY[TF] && !tfMatch(it.gew,TF)) return;
-        if(fertigBis(it.pos,HD_STUFE)) sum++;
-      }));
+  // Ausgeschrieben, keine Kürzel: der Knopf sagt im Klartext, was gerade gilt.
+  if(lbl) lbl.textContent = an
+    ? ('Ausgeblendet: '+HD_STUFEN[HD_STUFE].lbl+' ('+hdCount(HD_STUFE)+')')
+    : 'Fertige Positionen ausblenden';
+}
+// ── Auswahlfenster statt Durchtippen (ab v121) ──────────────────────────────
+// Durchtippen zwang dazu, die Stufen zu erraten und blind durchzuschalten. Jetzt
+// steht jede Möglichkeit ausgeschrieben da – mit Erklärung und Trefferzahl.
+function openFilterMenu(id, btn, html, knopfSel){
+  let menu=document.getElementById(id);
+  if(!menu){
+    menu=document.createElement('div'); menu.id=id; menu.className='ptype-menu';
+    document.body.appendChild(menu);
+    document.addEventListener('click', e=>{
+      if(!e.target.closest('#'+id) && !e.target.closest(knopfSel)) menu.classList.remove('open');
     });
-    n.textContent = an ? ' '+sum : '';
   }
+  menu.innerHTML=html;
+  const r=btn.getBoundingClientRect();
+  menu.style.top=(r.bottom+window.scrollY+4)+'px';
+  menu.style.left=Math.max(8, Math.min(r.left+window.scrollX, window.innerWidth-292))+'px';
+  menu.style.maxWidth='284px';
+  menu.classList.add('open');
+}
+function hdMenu(btn){
+  const zeile=(k,lbl,hint)=>{
+    const akt=HD_STUFE===k;
+    const zus = k==='off' ? '' : (' · verbirgt '+hdCount(k)+' Position'+(hdCount(k)===1?'':'en'));
+    return '<div class="ptype-item'+(akt?' akt':'')+'" onclick="hdWahl(\''+k+'\')">'+lbl+
+      (akt?' <span class="ptype-akt">aktuell</span>':'')+'<small>'+hint+zus+'</small></div>';
+  };
+  openFilterMenu('hdMenu', btn,
+    '<div class="ptype-h">Fertige Positionen ausblenden</div>'+
+    zeile('off','Alle Positionen zeigen','Nichts ausblenden')+
+    zeile('mont','Geliefert und montiert','Für die Montagephase')+
+    zeile('ansch','Zusätzlich angeschlossen','Sanitäranschluss, Elektroanschluss, Potentialausgleich und Dichtigkeitsprüfung. Der Normalfall auf der Baustelle')+
+    zeile('komplett','Vollständig, mit Inbetriebnahme und Einweisung','Für die Übergabe. Während der Bauzeit bleibt fast alles stehen'),
+    '#hideDoneBtn');
+}
+function hdWahl(k){
+  HD_STUFE=k;
+  try{ localStorage.setItem('kpc_hide_done', k==='off'?'0':'1'); }catch(e){}
+  const m=document.getElementById('hdMenu'); if(m) m.classList.remove('open');
+  applyF();
 }
 // ── Restarbeiten-/Mängel-Filter (dritte Filterachse, ab v118) ──
 // 'all' → 'ra' (offene Restarbeiten UND Mängel) → 'mangel' (nur Mängel des AG) → 'all'
@@ -3024,8 +3066,14 @@ function rafKeys(){
   });
   return keys;
 }
-function setRAF(mode){
-  RAF = mode || (RAF==='all'?'ra':(RAF==='ra'?'mangel':'all'));
+// Wie viele offene Einträge fände dieser Filter? Über alle drei Ebenen (Position,
+// Etage, Baustelle) im Kontext der gewählten Etage.
+function rafCount(modus){
+  let sum=0; rafKeys().forEach(k=>{ sum+=raOffen(k, modus==='mangel'); });
+  return sum;
+}
+function setRAF(modus){
+  RAF = modus || 'all';
   updRafBtn();
   updRaGwVis();          // Zeilen in den Listen mitfiltern
   applyF();              // Karten der Positionen
@@ -3036,13 +3084,29 @@ function updRafBtn(){
   const b=document.getElementById('rafBtn'); if(!b) return;
   b.classList.toggle('raf-ra', RAF==='ra');
   b.classList.toggle('raf-mangel', RAF==='mangel');
-  const lbl=b.querySelector('.hd-lbl'); if(lbl) lbl.textContent = RAF==='mangel'?'Nur Mängel':'Restarbeiten';
-  // Zahl am Knopf: sonst muss man tippen, um zu erfahren, dass es nichts gibt.
-  const n=document.getElementById('rafN');
-  if(n){
-    let sum=0; rafKeys().forEach(k=>{ sum+=raOffen(k, RAF==='mangel'); });
-    n.textContent = RAF==='all' ? '' : ' '+sum;
-  }
+  const lbl=b.querySelector('.hd-lbl'); if(!lbl) return;
+  // Ausgeschrieben statt Kürzel – der Knopf sagt, was gerade gefiltert wird.
+  lbl.textContent = RAF==='ra'     ? ('Offene Restarbeiten ('+rafCount('ra')+')')
+                  : RAF==='mangel' ? ('Offene Mängel ('+rafCount('mangel')+')')
+                  : 'Restarbeiten und Mängel';
+}
+function rafMenu(btn){
+  const zeile=(k,lbl,hint)=>{
+    const akt=RAF===k;
+    const zus = k==='all' ? '' : (' · '+rafCount(k)+' offen');
+    return '<div class="ptype-item'+(akt?' akt':'')+'" onclick="rafWahl(\''+k+'\')">'+lbl+
+      (akt?' <span class="ptype-akt">aktuell</span>':'')+'<small>'+hint+zus+'</small></div>';
+  };
+  openFilterMenu('rafMenu', btn,
+    '<div class="ptype-h">Nach Restarbeiten und Mängeln filtern</div>'+
+    zeile('all','Alle Positionen zeigen','Kein Filter')+
+    zeile('ra','Nur mit offenen Restarbeiten und Mängeln','Alles, was noch zu tun ist')+
+    zeile('mangel','Nur mit offenen Mängeln des Auftraggebers','Aus Mängelliste oder Abnahmeprotokoll'),
+    '#rafBtn');
+}
+function rafWahl(k){
+  const m=document.getElementById('rafMenu'); if(m) m.classList.remove('open');
+  setRAF(k);
 }
 // Zeile im Restarbeiten-Filter behalten? Leere Eingabezeilen nie verstecken.
 function rafRowOk(row){
