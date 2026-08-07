@@ -1645,8 +1645,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 119;
+const APP_VERSION = 120;
 const CHANGELOG = [
+  { v:120, titel:'Restarbeiten-Anzeige lief aus dem Takt', punkte:[
+    'Gemeldet: Am Balken „Restarbeit / Notiz" stand eine <b>1</b>, darunter war aber nichts zu sehen.',
+    'Ursache: Die App holt alle 30 Sekunden den Stand der Kollegen. Wurde in genau dieser Karte gerade getippt, übernahm sie die Daten zwar, <b>zeichnete die Liste aber nicht neu</b> – und holte das nie nach, weil der Stand ab dann ja schon passte. Die Zahl am Balken zählte die echten Daten, die Liste zeigte den alten Stand.',
+    'Der umgekehrte Fall war der gefährlichere: Eine Restarbeit, die jemand anderes <b>erledigt und gelöscht</b> hatte, blieb auf dem eigenen Gerät stehen – man hätte sie ein zweites Mal abgearbeitet.',
+    'Jetzt wird das Nachzeichnen vorgemerkt und nachgeholt, sobald das Eingabefeld verlassen wird – spätestens beim nächsten Abgleich. Das gilt auch für die Anmerkung.' ]},
   { v:119, titel:'„Fertige aus" wirkt endlich – mit Bauabschnitt', punkte:[
     'Der Schalter hat während der Bauzeit <b>nichts versteckt</b>. Grund: Inbetriebnahme und Einweisung zählen zum Gewerk Elektro, und die Einweisung findet erst zum Projektende statt – also war an jedem Elektrogerät immer ein Punkt offen. In den Ansichten „Alle" und „Elektro" war der Schalter damit wirkungslos, nur bei Montage und Sanitär tat er etwas.',
     'Jetzt legt man fest, <b>bis wohin</b> „fertig" gilt. Weiter tippen schaltet um: <b>angeschlossen</b> (geliefert, montiert, angeschlossen – der Normalfall auf der Baustelle) → <b>komplett</b> (zusätzlich Inbetriebnahme und Einweisung – das alte Verhalten, für die Übergabe) → <b>montiert</b> (nur geliefert und montiert) → aus.',
@@ -5573,7 +5578,33 @@ async function clearState() {
 }
 
 // Polling für Live-Updates (alle 30 Sekunden)
+// ── Nachzügler-Rendering (Fix ab v120) ──────────────────────────────────────
+// Das Polling schreibt den Serverstand IMMER nach ST, rendert die Restarbeiten und
+// die Anmerkung aber NICHT, solange in der Karte getippt wird. Ohne Nachholen bleibt
+// die Anzeige dann DAUERHAFT veraltet: ab dem nächsten Durchlauf stimmt ST bereits
+// mit dem Server überein, `restChanged` wird nie wieder true, und niemand rendert
+// nach. So entstand das gemeldete Bild „Badge zeigt 1, aber keine Restarbeit da"
+// (cnUpdate lief später über die Anmerkung nach und zählte den Eintrag aus ST, den
+// die Liste nie gerendert hatte). Der umgekehrte Fall ist schlimmer: eine anderswo
+// gelöschte Restarbeit bliebe sichtbar und jemand arbeitet sie ab.
+const RA_PENDING=new Set();
+function raFlushPending(){
+  if(!RA_PENDING.size) return;
+  [...RA_PENDING].forEach(pos=>{
+    const card=document.getElementById('C'+sp(pos));
+    if(card && card.contains(document.activeElement)) return;   // tippt noch -> später
+    RA_PENDING.delete(pos);
+    if(document.getElementById('RA'+sp(pos))) updRA(pos);
+    const anm=card?card.querySelector('.anm'):null;
+    if(anm && anm!==document.activeElement) anm.value=(ST[pos]&&ST[pos].note)||'';
+  });
+}
+// Sobald die Eingabe verlassen wird, sofort nachziehen – nicht erst beim nächsten
+// Polling (das steht offline still, die Anzeige bliebe sonst beliebig lange falsch).
+document.addEventListener('focusout', ()=>{ setTimeout(raFlushPending,0); });
+
 setInterval(async () => {
+  raFlushPending();                       // zuerst offene Nachzügler abarbeiten
   if(!SPIDS.listId || !PID) return;
   if(!navigator.onLine) return;          // offline: kein Polling
   flushOutbox();                          // ausstehende lokale Änderungen synchronisieren
@@ -5620,12 +5651,14 @@ setInterval(async () => {
         if(card) card.className = 'card'+(st!=='open'?' '+st:'');
         const anm = card ? card.querySelector('.anm') : null;
         if(anm && anm !== document.activeElement) anm.value = ST[row.pos].note;
+        else if(anm) RA_PENDING.add(row.pos);          // Anmerkung später nachziehen
         updProg(row.pos);
-        // Restarbeiten nur rendern wenn diese Karte nicht gerade fokussiert ist
+        // Restarbeiten nur rendern wenn diese Karte nicht gerade fokussiert ist –
+        // ABER dann zum Nachholen vormerken (siehe raFlushPending).
         if(restChanged){
           const card2 = document.getElementById('C'+row.pos.replace(/\./g,'_'));
           const tippt = card2 && card2.contains(document.activeElement);
-          if(!tippt) updRA(row.pos);
+          if(!tippt) updRA(row.pos); else RA_PENDING.add(row.pos);
         }
       }
     });
