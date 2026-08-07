@@ -1649,8 +1649,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 122;
+const APP_VERSION = 123;
 const CHANGELOG = [
+  { v:123, titel:'Alle Protokolle jetzt auch unter „Berichte & Dokumente"', punkte:[
+    'Inbetriebnahme-, DGUV- und Einweisungsprotokoll waren bisher nur über die einzelne Position erreichbar („📄 Protokoll" auf der Gerätekarte). Wer sie unter <b>Berichte & Dokumente</b> gesucht hat, fand sie nicht.',
+    '<b>Inbetriebnahmeprotokoll</b> und <b>DGUV-Prüfprotokoll</b> öffnen zuerst eine Geräteauswahl – solche Protokolle gehören immer zu einem Gerät. Mit Fabrikat und Typ, bereits abgelegte Protokolle sind gekennzeichnet, und ein Suchfeld hilft bei langen Stücklisten.',
+    'Die Listen sind bewusst verschieden: Bei der Inbetriebnahme stehen nur Geräte, an denen es diesen Schritt überhaupt gibt. Beim DGUV-Prüfprotokoll steht alles elektrisch Angeschlossene – also auch ein Gerät, das nur den Potentialausgleich hat und gar nicht in Betrieb genommen wird.',
+    'Danach läuft alles wie gewohnt: Protokoll ausfüllen, es landet an der Position – und beim Inbetriebnahmeprotokoll hakt sich der Schritt „Inbetriebnahme" selbst ab.',
+    '<b>Einweisungsprotokoll</b> öffnet das Modul Einweisung, in dem die Geräte ausgewählt und quittiert werden.' ]},
   { v:122, titel:'Inbetriebnahme hakt sich mit dem Protokoll selbst ab', punkte:[
     'Wird ein <b>Inbetriebnahmeprotokoll</b> an einer Position abgelegt, setzt die App den Schritt <b>„Inbetriebnahme"</b> jetzt selbst – das Protokoll IST ja der Nachweis. Den Haken hinterher von Hand zu setzen war doppelte Arbeit und wurde regelmäßig vergessen.',
     'Gilt für beide Wege: das digital ausgefüllte Protokoll aus der Inbetriebnahme-App und ein hier hochgeladenes PDF.',
@@ -5143,6 +5149,12 @@ function openBerichteSheet(){
     {ic:'📅', t:'Tagesbericht', d:'Arbeiten eines Tages', fn:'openTagesberichtDialog()'},
     {ic:'📓', t:'Bautagebuch', d:'Tageseintrag mit Wetter, Stunden …', fn:'openBautagebuchDialog()'},
     {ic:'🔧', t:'Servicebericht', d:'kpc-Serviceformular', fn:'openServiceDialog()'},
+    // Beide Protokolle hängen an einem GERÄT, nicht an der Baustelle. Bisher waren
+    // sie nur über die einzelne Position erreichbar („📄 Protokoll" auf der Karte) –
+    // wer von „Berichte & Dokumente" aus dachte, fand sie nicht.
+    {ic:'⚙️', t:'Inbetriebnahmeprotokoll', d:'Gerät wählen, Protokoll digital ausfüllen', fn:"openProtoAuswahl('IBN Protokoll')"},
+    {ic:'⚡', t:'DGUV-Prüfprotokoll', d:'Prüfung der elektrischen Sicherheit', fn:"openProtoAuswahl('DGUV Protokoll')"},
+    {ic:'📋', t:'Einweisungsprotokoll', d:'Geräte einweisen und quittieren lassen', fn:'openEinweisung()'},
     // Liegt im Modul Einweisung (gleiches Backend, beide Unterschriften dort schon da) –
     // von hier aus nur der Direkteinstieg, damit der Weg über „Berichte" auffindbar ist.
     {ic:'🔑', t:'Schlüsselübergabe', d:'Schlüsselprotokoll zum Unterschreiben', fn:'openSchluesselprotokoll()'},
@@ -5851,6 +5863,95 @@ function _openIbnDigital(pos,nr,menge){const it=itemByPos(pos)||{};const q=funct
   // und braucht window.opener, um das Protokoll direkt zurückzureichen und nach dem
   // Speichern hierher zurückzuspringen. Mit noopener war beides tot.
   window.open(url,'_blank');}
+// ── Geräteauswahl für gerätegebundene Protokolle (ab v123) ──────────────────
+// Aufgerufen aus „Berichte & Dokumente". Inbetriebnahme- und DGUV-Protokoll gehören
+// zu EINEM Gerät – die IBN-App braucht pos/bez/hersteller/typ, um das fertige
+// Protokoll zurückreichen zu können (und damit §1.13 den Haken setzen kann).
+// Deshalb hier erst die Position wählen, danach läuft exakt derselbe Weg wie über
+// „📄 Protokoll" auf der Gerätekarte.
+const PROTO_AUSWAHL={
+  'IBN Protokoll': {
+    ic:'⚙️', titel:'Inbetriebnahmeprotokoll – Gerät wählen',
+    // Nur Geräte, an denen es den Schritt Inbetriebnahme überhaupt gibt.
+    passt:it=>relFields(it.pos).includes('ib'),
+    leer:'An dieser Baustelle gibt es keine Position mit dem Schritt „Inbetriebnahme".',
+    start:(pos,nr,menge)=>_openIbnDigital(pos,nr,menge)
+  },
+  'DGUV Protokoll': {
+    ic:'⚡', titel:'DGUV-Prüfprotokoll – Gerät wählen',
+    // Prüfung der elektrischen Sicherheit: alles elektrisch Angeschlossene, also
+    // dieselbe Menge wie der Gewerk-Filter „Elektro" (E einschließlich PA).
+    passt:it=>tfMatch(it.gew,'E'),
+    leer:'An dieser Baustelle gibt es keine elektrisch angeschlossene Position.',
+    start:(pos,nr,menge)=>_openDguvDigital(pos,nr,menge)
+  }
+};
+function protoKandidaten(type){
+  const cfg=PROTO_AUSWAHL[type]; const rows=[];
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+    if(!cfg.passt(it)) return;
+    rows.push({pos:it.pos, bez:(it.bez||'').trim(), fab:(it.fabrikat||'').trim(), typ:(it.typ||'').trim(),
+               ort:[(sec.label||sec.pos), (sub.bez||'')].filter(Boolean).join(' · '),
+               n:ibnCount(it.pos,type)});
+  })));
+  return rows;
+}
+function openProtoAuswahl(type){
+  const cfg=PROTO_AUSWAHL[type]; if(!cfg) return;
+  if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
+  const rows=protoKandidaten(type);
+  if(!rows.length){
+    alert(cfg.leer+'\n\nDas Protokoll hängt immer an einem Gerät – prüfen Sie die Gewerk-Zuordnung der Positionen.');
+    return;
+  }
+  let ov=document.getElementById('protoAuswahlOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='protoAuswahlOv'; ov.className='sheet-ov';
+    document.body.appendChild(ov);
+    ov.addEventListener('click',function(e){ if(e.target===ov) closeProtoAuswahl(); }); }
+  const fld='width:100%;box-sizing:border-box;padding:9px 11px;border-radius:10px;border:1px solid var(--line);'+
+            'background:var(--surface);color:var(--text);font-size:14px;font-family:inherit;margin-bottom:10px';
+  ov.innerHTML='<div class="sheet" onclick="event.stopPropagation()">'+
+    '<div class="sheet-grip"></div>'+
+    '<div class="sheet-h">'+cfg.ic+' '+escapeHtml(cfg.titel)+'</div>'+
+    '<input id="protoAuswahlSuche" style="'+fld+'" placeholder="Suche: Position, Bezeichnung, Fabrikat …" oninput="protoAuswahlFiltern(this.value)">'+
+    '<div id="protoAuswahlListe">'+
+      rows.map(r=>{
+        const zus=[r.fab,r.typ].filter(Boolean).join(' · ');
+        const hat=r.n? ('<span class="sheet-d" style="color:var(--green)">✓ '+r.n+' Protokoll'+(r.n===1?'':'e')+' abgelegt</span>') : '';
+        const such=(r.pos+' '+r.bez+' '+zus+' '+r.ort).toLowerCase();
+        return '<button class="sheet-item protorow" data-such="'+escapeHtml(such)+'" '+
+          'onclick="protoAuswahlWahl(\''+escapeHtml(type)+'\',\''+escapeHtml(r.pos)+'\')">'+
+          '<span class="sheet-ic" style="font-size:12px;font-weight:700;color:var(--braun)">'+escapeHtml(r.pos)+'</span>'+
+          '<span class="sheet-tx"><span class="sheet-t">'+escapeHtml(r.bez||'(ohne Bezeichnung)')+'</span>'+
+          '<span class="sheet-d">'+escapeHtml(zus||r.ort)+'</span>'+hat+'</span>'+
+          '<span class="sheet-chev">&#8250;</span></button>';
+      }).join('')+
+    '</div>'+
+    '<div id="protoAuswahlLeer" class="sheet-d" style="display:none;text-align:center;padding:18px">Kein Gerät gefunden.</div>'+
+    '<button class="sheet-cancel" onclick="closeProtoAuswahl()">Schlie&#223;en</button>'+
+  '</div>';
+  requestAnimationFrame(()=>ov.classList.add('on'));
+}
+function protoAuswahlFiltern(q){
+  q=(q||'').toLowerCase().trim();
+  let sichtbar=0;
+  document.querySelectorAll('#protoAuswahlListe .protorow').forEach(b=>{
+    const treffer=!q || (b.dataset.such||'').includes(q);
+    b.style.display=treffer?'':'none';
+    if(treffer) sichtbar++;
+  });
+  const leer=document.getElementById('protoAuswahlLeer');
+  if(leer) leer.style.display=sichtbar?'none':'block';
+}
+function closeProtoAuswahl(){ const ov=document.getElementById('protoAuswahlOv'); if(ov) ov.classList.remove('on'); }
+// Synchron aus dem Klick heraus – window.open in der IBN-App darf nicht vom
+// Popup-Blocker kassiert werden (§9).
+function protoAuswahlWahl(type,pos){
+  const cfg=PROTO_AUSWAHL[type]; if(!cfg) return;
+  closeProtoAuswahl();
+  ibnStart(pos,type,function(nr,menge){ cfg.start(pos,nr,menge); });
+}
+
 // ── DGUV digital: öffnet die IBN-App direkt beim DGUV-V3-Prüfprotokoll (Kontext + Kunde per Hash) ──
 function openDguvDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.classList.remove('open');
   ibnStart(pos,'DGUV Protokoll',function(nr,menge){ _openDguvDigital(pos,nr,menge); });}
