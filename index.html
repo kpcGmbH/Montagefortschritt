@@ -1670,8 +1670,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 125;
+const APP_VERSION = 126;
 const CHANGELOG = [
+  { v:126, titel:'Kennzeichnung „Nachtrag" nachträglich änderbar', punkte:[
+    'Die Marke <b>„Nachtrag"</b> ließ sich bisher nur beim Anlegen einer Position setzen. Wer sie versehentlich gesetzt oder vergessen hatte, kam nicht mehr heran.',
+    'Der Haken <b>„Als Nachtrag kennzeichnen"</b> steht jetzt auch unter <b>✎ Position</b> – anhaken oder abwählen, speichern, fertig. Gilt je Position.' ]},
   { v:125, titel:'Etagen und Anlagen lassen sich jetzt auch ändern', punkte:[
     'Seit v124 lassen sich Etagen und Anlagen von Hand anlegen – ändern ließ sich danach aber nichts mehr. Wer eine Anlage falsch benannt oder an der falschen Stelle angelegt hatte, kam nicht mehr heran.',
     'Jetzt öffnen das <b>✎</b> im Kopf einer Anlage und <b>„✎ Etage"</b> in der Fotoleiste: <b>Umbenennen</b>, <b>Reihenfolge ▲▼</b> und <b>Löschen</b>. Damit rückt ein versehentlich an falscher Stelle angelegter Bereich an seinen Platz, ohne die Stückliste neu einzulesen.',
@@ -9362,6 +9365,11 @@ function openPosEdit(pos){
     +'<div style="display:flex;gap:10px"><div style="flex:1">'+lvFeld('lvMenge','Menge', it.menge)+'</div><div style="flex:1">'+lvFeld('lvEinh','Einheit', it.einh)+'</div></div>'
     +lvFeld('lvFab','Fabrikat', it.fabrikat)
     +lvFeld('lvTyp','Typ', it.typ)
+    // Die Marke „Nachtrag" ließ sich bis v125 nur beim Anlegen setzen – ein
+    // Fehlgriff im Anlegen-Dialog war danach nicht mehr zu korrigieren.
+    +'<label style="display:flex;align-items:center;gap:9px;padding:9px 11px;border:1px solid var(--line);border-radius:8px;margin:4px 0 12px;cursor:pointer;font-weight:700;font-size:13px">'
+    +'<input type="checkbox" id="lvNt" '+(it.nt?'checked':'')+' style="width:17px;height:17px"> Als Nachtrag kennzeichnen'
+    +'<span style="font-weight:400;font-size:11px;color:var(--accent2)">Marke an der Karte</span></label>'
     +'<div style="font-size:11px;color:var(--accent2);margin:-2px 0 14px">Die Positionsnummer lässt sich nicht ändern – an ihr hängen Häkchen, Fotos und Protokolle.</div>'
     +'<div style="display:flex;gap:10px;justify-content:flex-end">'+lvBtn('Abbrechen','lvOvClose()')+lvBtn('Speichern','posEditSpeichern(\''+pos+'\')','ok')+'</div>'
     +'<div style="border-top:1px solid var(--line);margin-top:18px;padding-top:14px">'
@@ -9378,6 +9386,9 @@ async function posEditSpeichern(pos){
   if(!bez){ alert('Bitte eine Bezeichnung angeben.'); return; }
   f.item.bez=bez; f.item.menge=g('lvMenge'); f.item.einh=g('lvEinh');
   f.item.fabrikat=g('lvFab'); f.item.typ=g('lvTyp');
+  // Marke „Nachtrag" setzen ODER wieder entfernen. `delete` statt `nt=0`, damit die
+  // Stückliste sauber bleibt (ntBadge prüft auf Wahrheitswert).
+  if((document.getElementById('lvNt')||{}).checked) f.item.nt=1; else delete f.item.nt;
   lvOvClose();
   await saveLV();
   lvRebuild(pos);
