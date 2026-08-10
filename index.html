@@ -316,6 +316,14 @@ body.lvadm .lvonly.blk{display:block !important;}
 /* frisch ergänzte Position kurz hervorheben, damit sie in 30 Karten auffindbar ist */
 .card.lvnew{outline:2px solid var(--accent);outline-offset:-3px;}
 .bblock.lvnew{outline:2px solid var(--accent);outline-offset:-2px;}
+/* ✎ im Kopf einer Anlage bzw. in der Etagenleiste – nur Bauleitung + Innendienst */
+/* Trefferfläche bewusst großzügig: der Knopf sitzt zwischen Anlagennamen und
+   Positionszähler – zu klein war er am Handy ein Fehlgriff-Kandidat (vgl. v95). */
+.bedit{background:transparent;border:1px solid var(--line);border-radius:6px;color:var(--braun);
+  font-size:15px;line-height:1;padding:8px 12px;margin-left:6px;cursor:pointer;font-family:inherit;
+  flex:0 0 auto;-webkit-tap-highlight-color:transparent;touch-action:manipulation;}
+.bedit:active{background:var(--chrome-bg2);}
+body.lvadm .bhdr .lvonly{display:inline-block !important;}
 .rasec.etrasec{display:block;margin-top:0;border-top:none;background:var(--bhdr-bg);border-bottom:1px solid var(--line);padding:8px 14px 10px;}
 .rasec.etrasec .rahd{margin-bottom:2px;}
 .fcnt{background:var(--accent);color:var(--anthrazit);font-size:10px;padding:0 5px;border-radius:10px;font-weight:700;}
@@ -1446,6 +1454,7 @@ function buildPanels(){
     // data-etidx/-etalbum: Ziel für Fotos, die am Rechner auf den Knopf gezogen werden (dragZiel)
     etbar.innerHTML='<button class="etbtn" data-etidx="'+secIdx+'" data-etalbum="efotos" onclick="openEtageFotos('+secIdx+',\'efotos\')">&#128248; Anlagenfotos <span class="etcnt" id="ETC'+secIdx+'"></span></button>'+
       '<button class="etbtn" style="background:#5b4c2a" data-etidx="'+secIdx+'" data-etalbum="bfotos" onclick="openEtageFotos('+secIdx+',\'bfotos\')">&#127959; Bauphase <span class="etcnt" id="ETCB'+secIdx+'"></span></button>'+
+      '<button class="bedit lvonly" title="Etage umbenennen, verschieben oder löschen" onclick="openEtageEdit(\''+escapeHtml(sec.pos)+'\')">&#9998; Etage</button>'+
       '<span class="ethint">Anlagenfotos = Montageverlauf · Bauphase = Bauleiter (Bauzustand, Installationskontrolle, Aufmaß)</span>';
     panel.appendChild(etbar);
     // Etagen-Restarbeiten stehen gebündelt oben im Sammel-Balken „Allgemeine
@@ -1500,6 +1509,7 @@ function buildPanels(){
       div.innerHTML=`<div class="bhdr" onclick="tgB(this)">
   <span class="bpos">${sub.pos}</span>
   <h3>${sub.bez}</h3>
+  <button class="bedit lvonly" title="Anlage umbenennen, verschieben oder löschen" onclick="event.stopPropagation();openAnlageEdit('${escapeHtml(sec.pos)}','${escapeHtml(sub.pos)}')">&#9998;</button>
   <span class="bcnt">${sub.items.length}&nbsp;Pos.</span>
   <span class="bprog" id="P${sid}"></span>
   <span class="btog cl">&#9660;</span>
@@ -1660,8 +1670,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 124;
+const APP_VERSION = 125;
 const CHANGELOG = [
+  { v:125, titel:'Etagen und Anlagen lassen sich jetzt auch ändern', punkte:[
+    'Seit v124 lassen sich Etagen und Anlagen von Hand anlegen – ändern ließ sich danach aber nichts mehr. Wer eine Anlage falsch benannt oder an der falschen Stelle angelegt hatte, kam nicht mehr heran.',
+    'Jetzt öffnen das <b>✎</b> im Kopf einer Anlage und <b>„✎ Etage"</b> in der Fotoleiste: <b>Umbenennen</b>, <b>Reihenfolge ▲▼</b> und <b>Löschen</b>. Damit rückt ein versehentlich an falscher Stelle angelegter Bereich an seinen Platz, ohne die Stückliste neu einzulesen.',
+    'Gelöscht werden können nur <b>leere</b> Anlagen und Etagen. Stecken noch Positionen darin, sagt die App das und nennt die Anzahl – so bleibt nachvollziehbar, was mit erfassten Ständen, Fotos und Protokollen passiert.',
+    'Die Kurzbezeichnung einer Etage bleibt fest: an ihr hängen die allgemeinen Restarbeiten und die Etagenfotos. Für die Reihenfolge gibt es deshalb die Pfeile.',
+    'Wie beim Ergänzen und Löschen von Positionen: nur <b>Bauleitung und Innendienst</b>, und nur online.' ]},
   { v:124, titel:'Baustelle ganz ohne Excel aufbauen', punkte:[
     'Bisher brauchte jede Baustelle eine importierte Stückliste. „＋ Position ergänzen" hängt an einer Anlage – gab es keine Datei, gab es auch keine Anlage, und man kam nicht weiter.',
     'Jetzt lassen sich <b>Etage und Anlage von Hand anlegen</b>: bei einer Baustelle ohne Stückliste über „＋ Etage von Hand anlegen", sonst unten in jeder Etage über <b>„＋ Anlage ergänzen"</b> und <b>„＋ Etage anlegen"</b>.',
@@ -9481,6 +9497,182 @@ async function anlageNeuSpeichern(secPos){
   lvRebuild();
   lvBlockHervorheben(nr);
   showToast('Anlage „'+bez+'" angelegt');
+}
+// ---- Anlage / Etage bearbeiten, verschieben, löschen (ab v125) ----
+// v124 konnte nur ANLEGEN. Wer eine Anlage falsch benannt oder an der falschen
+// Stelle angelegt hatte, kam nicht mehr heran – gemeldet aus dem Einsatz
+// („Zulauftisch als Bereich angelegt, sollte eine Position sein").
+// Reihenfolge wird über ▲▼ geändert, NICHT über die Nummer: an der Etagennummer
+// hängen die Etagen-Restarbeiten und -Fotos (§E§<pos>), sie bleibt deshalb fest.
+function lvVerschiebenBtns(fnBase, args, i, n){
+  const b=(d,pfeil,titel)=>{
+    const aus=(d<0&&i===0)||(d>0&&i===n-1);
+    return '<button '+(aus?'disabled':'')+' onclick="'+fnBase+'('+args+','+d+')" title="'+titel+'" '
+      +'style="background:transparent;border:1px solid var(--line);border-radius:8px;color:'+(aus?'var(--line)':'var(--text)')
+      +';padding:8px 14px;font-size:15px;cursor:'+(aus?'default':'pointer')+';font-family:inherit">'+pfeil+'</button>';
+  };
+  return '<div style="display:flex;align-items:center;gap:8px;margin:2px 0 14px">'
+    +'<span style="font-size:11px;font-weight:700;letter-spacing:.4px;color:var(--accent2)">REIHENFOLGE</span>'
+    +b(-1,'&#9650;','nach oben')+b(1,'&#9660;','nach unten')
+    +'<span style="font-size:11px;color:var(--accent2)">Platz '+(i+1)+' von '+n+'</span></div>';
+}
+function openAnlageEdit(secPos, subPos){
+  if(!darfLVAendern()) return lvGesperrt();
+  const sec=DATA.find(s=>s.pos===secPos);
+  const i=sec ? sec.subsections.findIndex(x=>x.pos===subPos) : -1;
+  if(i<0){ alert('Diese Anlage steht nicht mehr in der Stückliste.'); return; }
+  const sub=sec.subsections[i], n=sub.items.length;
+  lvOv(
+     '<div style="font-size:16px;font-weight:700;margin-bottom:2px">Anlage bearbeiten</div>'
+    +'<div style="font-size:12px;color:var(--accent2);margin-bottom:14px">'+escapeHtml(sec.label||sec.pos)+' · '
+    +(n? (n+' Position'+(n===1?'':'en')) : 'noch keine Position')+'</div>'
+    +lvFeld('lvAnNr','Nummer', sub.pos, '', 'Muss in der ganzen Baustelle einmalig sein.')
+    +lvFeld('lvAnBez','Bezeichnung', sub.bez||'')
+    +lvVerschiebenBtns('anlageVerschieben','\''+escapeHtml(secPos)+'\',\''+escapeHtml(subPos)+'\'', i, sec.subsections.length)
+    +'<div style="display:flex;gap:10px;justify-content:space-between;align-items:center">'
+    +lvBtn('Anlage löschen','anlageLoeschen(\''+escapeHtml(secPos)+'\',\''+escapeHtml(subPos)+'\')','rot')
+    +'<span style="display:flex;gap:10px">'+lvBtn('Abbrechen','lvOvClose()')
+    +lvBtn('Übernehmen','anlageEditSpeichern(\''+escapeHtml(secPos)+'\',\''+escapeHtml(subPos)+'\')','ok')+'</span></div>');
+  setTimeout(()=>{ const el=document.getElementById('lvAnBez'); if(el) el.focus(); }, 40);
+}
+async function anlageEditSpeichern(secPos, subPos){
+  if(!darfLVAendern()) return lvGesperrt();
+  if(!lvOnline()) return;
+  const sec=DATA.find(s=>s.pos===secPos);
+  const sub=sec && sec.subsections.find(x=>x.pos===subPos);
+  if(!sub){ alert('Diese Anlage steht nicht mehr in der Stückliste.'); return; }
+  const g=id=>String(((document.getElementById(id)||{}).value)||'').trim();
+  const nr=g('lvAnNr'), bez=g('lvAnBez');
+  if(!lvNrPruef(nr,'Anlagen-Nummer')) return;
+  if(!bez){ alert('Bitte eine Bezeichnung angeben.'); return; }
+  if(nr!==sub.pos && DATA.some(s=>s.subsections.some(x=>String(x.pos)===nr))){
+    alert('Die Anlagen-Nummer '+nr+' gibt es in dieser Baustelle schon.'); return;
+  }
+  sub.pos=nr; sub.bez=bez;
+  lvOvClose();
+  await saveLV();
+  lvRebuild();
+  lvBlockHervorheben(nr);
+  showToast('Anlage gespeichert');
+}
+async function anlageVerschieben(secPos, subPos, d){
+  if(!darfLVAendern()) return lvGesperrt();
+  if(!lvOnline()) return;
+  const sec=DATA.find(s=>s.pos===secPos);
+  const i=sec ? sec.subsections.findIndex(x=>x.pos===subPos) : -1;
+  const j=i+d;
+  if(i<0 || j<0 || j>=sec.subsections.length) return;
+  const [x]=sec.subsections.splice(i,1);
+  sec.subsections.splice(j,0,x);
+  await saveLV();
+  lvRebuild();
+  lvBlockHervorheben(subPos);
+  openAnlageEdit(secPos, subPos);      // Dialog offen lassen: mehrere Schritte am Stück
+}
+// Löschen NUR wenn leer. Eine Anlage mit Positionen mitzulöschen hieße, für jede
+// Position denselben Abbau wie posLoeschen zu fahren (ST, ITEMID unter ZWEI
+// Schlüsselformen, Listen-Item in SharePoint, Outbox) – ein halb geprüfter
+// Sammellöschweg hinterließe Leichen, die das 30-s-Polling zurückschreibt.
+async function anlageLoeschen(secPos, subPos){
+  if(!darfLVAendern()) return lvGesperrt();
+  if(!lvOnline()) return;
+  const sec=DATA.find(s=>s.pos===secPos);
+  const i=sec ? sec.subsections.findIndex(x=>x.pos===subPos) : -1;
+  if(i<0){ alert('Diese Anlage steht nicht mehr in der Stückliste.'); return; }
+  const sub=sec.subsections[i];
+  if(sub.items.length){
+    alert('Die Anlage „'+(sub.bez||sub.pos)+'" enthält noch '+sub.items.length+' Position'+(sub.items.length===1?'':'en')+'.\n\n'+
+          'Bitte diese zuerst löschen oder – falls sie bleiben sollen – die Anlage nur umbenennen.\n\n'+
+          'So bleibt nachvollziehbar, was mit den erfassten Ständen, Fotos und Protokollen passiert.');
+    return;
+  }
+  if(sec.subsections.length===1){
+    alert('„'+(sub.bez||sub.pos)+'" ist die einzige Anlage dieser Etage.\n\n'+
+          'Eine Etage ohne Anlage kann keine Positionen aufnehmen. Bitte stattdessen die ganze Etage löschen (✎ Etage).');
+    return;
+  }
+  if(!confirm('Anlage „'+(sub.bez||sub.pos)+'" löschen?\n\nSie ist leer – es gehen keine Positionen verloren.')) return;
+  sec.subsections.splice(i,1);
+  lvOvClose();
+  await saveLV();
+  lvRebuild();
+  showToast('Anlage gelöscht');
+}
+function openEtageEdit(secPos){
+  if(!darfLVAendern()) return lvGesperrt();
+  const i=DATA.findIndex(s=>s.pos===secPos);
+  if(i<0){ alert('Diese Etage steht nicht mehr in der Stückliste.'); return; }
+  const sec=DATA[i];
+  const nPos=sec.subsections.reduce((a,x)=>a+x.items.length,0);
+  lvOv(
+     '<div style="font-size:16px;font-weight:700;margin-bottom:2px">Etage bearbeiten</div>'
+    +'<div style="font-size:12px;color:var(--accent2);margin-bottom:14px">'+sec.subsections.length+' Anlage'
+    +(sec.subsections.length===1?'':'n')+' · '+(nPos? (nPos+' Position'+(nPos===1?'':'en')) : 'keine Position')+'</div>'
+    +lvFeld('lvEtLbl','Name', sec.label||'')
+    +'<div style="font-size:11px;color:var(--accent2);margin:-4px 0 12px">Kurzbezeichnung „'+escapeHtml(sec.pos)
+    +'" ist nicht änderbar – an ihr hängen die Restarbeiten und Fotos dieser Etage.</div>'
+    +lvVerschiebenBtns('etageVerschieben','\''+escapeHtml(secPos)+'\'', i, DATA.length)
+    +'<div style="display:flex;gap:10px;justify-content:space-between;align-items:center">'
+    +lvBtn('Etage löschen','etageLoeschen(\''+escapeHtml(secPos)+'\')','rot')
+    +'<span style="display:flex;gap:10px">'+lvBtn('Abbrechen','lvOvClose()')
+    +lvBtn('Übernehmen','etageEditSpeichern(\''+escapeHtml(secPos)+'\')','ok')+'</span></div>');
+  setTimeout(()=>{ const el=document.getElementById('lvEtLbl'); if(el) el.focus(); }, 40);
+}
+async function etageEditSpeichern(secPos){
+  if(!darfLVAendern()) return lvGesperrt();
+  if(!lvOnline()) return;
+  const sec=DATA.find(s=>s.pos===secPos);
+  if(!sec){ alert('Diese Etage steht nicht mehr in der Stückliste.'); return; }
+  const lbl=String(((document.getElementById('lvEtLbl')||{}).value)||'').trim();
+  if(!lbl){ alert('Bitte einen Namen angeben.'); return; }
+  sec.label=lbl;
+  lvOvClose();
+  await saveLV();
+  buildTabs(); lvRebuild();
+  showToast('Etage gespeichert');
+}
+async function etageVerschieben(secPos, d){
+  if(!darfLVAendern()) return lvGesperrt();
+  if(!lvOnline()) return;
+  const i=DATA.findIndex(s=>s.pos===secPos), j=i+d;
+  if(i<0 || j<0 || j>=DATA.length) return;
+  const [x]=DATA.splice(i,1);
+  DATA.splice(j,0,x);
+  await saveLV();
+  buildTabs(); lvRebuild();
+  openEtageEdit(secPos);
+}
+async function etageLoeschen(secPos){
+  if(!darfLVAendern()) return lvGesperrt();
+  if(!lvOnline()) return;
+  const i=DATA.findIndex(s=>s.pos===secPos);
+  if(i<0){ alert('Diese Etage steht nicht mehr in der Stückliste.'); return; }
+  const sec=DATA[i];
+  const nPos=sec.subsections.reduce((a,x)=>a+x.items.length,0);
+  if(nPos){
+    alert('Die Etage „'+(sec.label||sec.pos)+'" enthält noch '+nPos+' Position'+(nPos===1?'':'en')+'.\n\n'+
+          'Bitte diese zuerst löschen. So bleibt nachvollziehbar, was mit den erfassten Ständen, Fotos und Protokollen passiert.');
+    return;
+  }
+  // Etagen-Restarbeiten und -Fotos hängen an §E§<pos> und würden verwaisen.
+  const e=ST[EKEY(sec)]||{};
+  const teile=[];
+  if((e.restarbeiten||[]).filter(r=>(r.txt||'').trim()).length) teile.push((e.restarbeiten||[]).filter(r=>(r.txt||'').trim()).length+' allgemeine Restarbeit(en)');
+  if((e.efotos||[]).length) teile.push((e.efotos||[]).length+' Anlagenfoto(s)');
+  if((e.bfotos||[]).length) teile.push((e.bfotos||[]).length+' Bauphase-Foto(s)');
+  let frage='Etage „'+(sec.label||sec.pos)+'" löschen?\n\nSie enthält keine Positionen.';
+  if(teile.length) frage+='\n\nDaran hängen aber: '+teile.join(', ')+'.\nDiese Einträge verschwinden aus der Ansicht; die Fotodateien bleiben in SharePoint.';
+  if(!confirm(frage)) return;
+  if(teile.length){
+    const a=String(prompt('Zur Sicherheit bitte LÖSCHEN eingeben.\n\n'+(sec.label||sec.pos)+'\n'+teile.join(', '))||'').trim().toUpperCase();
+    if(a!=='LÖSCHEN' && a!=='LOESCHEN' && a!=='LOSCHEN'){ alert('Abgebrochen – die Etage bleibt stehen.'); return; }
+  }
+  DATA.splice(i,1);
+  if(ACT===secPos) ACT='__all';
+  lvOvClose();
+  await saveLV();
+  buildTabs(); lvRebuild();
+  showToast('Etage gelöscht');
 }
 // Frisch angelegte Anlage aufklappen, anspringen und kurz hervorheben – in einer
 // langen Etage findet man sie sonst nicht wieder.
