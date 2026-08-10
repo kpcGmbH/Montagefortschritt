@@ -315,6 +315,7 @@ body.lvadm .lvonly.blk{display:block !important;}
 .lvadd:active{background:var(--chrome-bg2);}
 /* frisch ergänzte Position kurz hervorheben, damit sie in 30 Karten auffindbar ist */
 .card.lvnew{outline:2px solid var(--accent);outline-offset:-3px;}
+.bblock.lvnew{outline:2px solid var(--accent);outline-offset:-2px;}
 .rasec.etrasec{display:block;margin-top:0;border-top:none;background:var(--bhdr-bg);border-bottom:1px solid var(--line);padding:8px 14px 10px;}
 .rasec.etrasec .rahd{margin-bottom:2px;}
 .fcnt{background:var(--accent);color:var(--anthrazit);font-size:10px;padding:0 5px;border-radius:10px;font-weight:700;}
@@ -1428,6 +1429,10 @@ function buildPanels(){
       'Für Positionen (Geräte, Status, Fotos je Gerät) die Stückliste nachtragen.</div>'+
       '<input id="lvNachInp" type="file" accept=".xlsx,.xls,.csv,.pdf" style="display:none" onchange="lvNachtragen(this.files[0])">'+
       '<button class="lvhint-b" onclick="document.getElementById(\'lvNachInp\').click()">&#128193; St&uuml;ckliste nachtragen</button>'+
+      // Ohne Datei ging es bisher gar nicht weiter: „＋ Position ergänzen" hängt an
+      // einer Anlage, und die gibt es hier noch nicht. Für kleine Baustellen
+      // (Abnahme, Serviceauftrag) deshalb der Weg von Hand.
+      '<button class="lvhint-b lvonly" style="background:transparent;color:var(--braun);border:1px solid var(--line);margin-left:8px" onclick="openEtageNeu()">&#65291; Etage von Hand anlegen</button>'+
       '<div class="lvhint-m" id="lvNachStat"></div>';
     main.appendChild(hint);
   }
@@ -1503,6 +1508,12 @@ function buildPanels(){
 <div class="ilist hid" id="L${sid}">${cards}<div class="lvonly blk"><button class="lvadd" onclick="openPosNeu('${sec.pos}','${sub.pos}')" title="Nachtrag / fehlende Position in dieser Anlage ergänzen">&#65291; Position erg&auml;nzen</button></div></div>`;
       panel.appendChild(div);
     });
+    // Struktur von Hand erweitern – gleiche Rechte wie „＋ Position ergänzen".
+    const lvst=document.createElement('div');
+    lvst.className='lvonly blk';
+    lvst.innerHTML='<button class="lvadd" onclick="openAnlageNeu(\''+escapeHtml(sec.pos)+'\')" title="Weitere Anlage in dieser Etage anlegen">&#65291; Anlage erg&auml;nzen</button>'+
+      '<button class="lvadd" onclick="openEtageNeu()" title="Weitere Etage / weiteren Bereich anlegen">&#65291; Etage anlegen</button>';
+    panel.appendChild(lvst);
     main.appendChild(panel);
   });
   // Dichtigkeitsprotokoll (Sanitär) = Abschluss → EIN Einstieg ganz unten,
@@ -1649,8 +1660,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 123;
+const APP_VERSION = 124;
 const CHANGELOG = [
+  { v:124, titel:'Baustelle ganz ohne Excel aufbauen', punkte:[
+    'Bisher brauchte jede Baustelle eine importierte Stückliste. „＋ Position ergänzen" hängt an einer Anlage – gab es keine Datei, gab es auch keine Anlage, und man kam nicht weiter.',
+    'Jetzt lassen sich <b>Etage und Anlage von Hand anlegen</b>: bei einer Baustelle ohne Stückliste über „＋ Etage von Hand anlegen", sonst unten in jeder Etage über <b>„＋ Anlage ergänzen"</b> und <b>„＋ Etage anlegen"</b>.',
+    'Eine Etage wird immer zusammen mit ihrer ersten Anlage angelegt – Positionen hängen nun einmal an einer Anlage. Nummern werden vorgeschlagen und sind frei änderbar; doppelte Nummern weist die App ab.',
+    'Danach geht es wie gewohnt weiter mit „＋ Position ergänzen". Gedacht für kleine Baustellen ohne Stückliste – Abnahme, Serviceauftrag, Nachtragsbereich.',
+    'Wie beim Ergänzen und Löschen von Positionen: nur <b>Bauleitung und Innendienst</b>, und nur online – die Stückliste gilt für die ganze Baustelle.' ]},
   { v:123, titel:'Alle Protokolle jetzt auch unter „Berichte & Dokumente"', punkte:[
     'Inbetriebnahme-, DGUV- und Einweisungsprotokoll waren bisher nur über die einzelne Position erreichbar („📄 Protokoll" auf der Gerätekarte). Wer sie unter <b>Berichte & Dokumente</b> gesucht hat, fand sie nicht.',
     '<b>Inbetriebnahmeprotokoll</b> und <b>DGUV-Prüfprotokoll</b> öffnen zuerst eine Geräteauswahl – solche Protokolle gehören immer zu einem Gerät. Mit Fabrikat und Typ, bereits abgelegte Protokolle sind gekennzeichnet, und ein Suchfeld hilft bei langen Stücklisten.',
@@ -9244,7 +9261,11 @@ function lvNextPos(sub, sec){
       n++;
     }
   }
-  return String(sub.pos||'')+'01.';
+  // Letzter Ausweg – leere Anlage ohne Vorbild. Importierte Anlagennummern enden auf
+  // einem Trennzeichen („01.02.00.00."), von Hand angelegte nicht („01.1"). Ohne die
+  // Unterscheidung käme aus „01.1" die Nummer „01.101." heraus.
+  const basis=String(sub.pos||'');
+  return /[.\-_ ]$/.test(basis) ? basis+'01.' : basis+'.01';
 }
 // Was hängt an dieser Position? Klartext für die Rückfrage vor dem Löschen.
 function lvBestand(pos){
@@ -9344,6 +9365,135 @@ async function posEditSpeichern(pos){
   lvOvClose();
   await saveLV();
   lvRebuild(pos);
+}
+
+// ---- Etage / Anlage von Hand anlegen (ab v124) ----
+// Bis v123 brauchte eine Baustelle zwingend eine importierte Stückliste: „＋ Position
+// ergänzen" hängt an einer Anlage, und ohne Datei gab es keine. Für kleine Baustellen
+// (Abnahme, Serviceauftrag, Nachtragsbereich) fehlte damit jeder Einstieg.
+// Nummern werden zu DOM-IDs (sp()), zu §E§-Schlüsseln (EKEY) und zu Ordnernamen –
+// deshalb dasselbe enge Muster wie bei den Positionsnummern.
+const LV_NR_OK=/^[A-Za-z0-9][A-Za-z0-9 ._-]*$/;
+function lvNrPruef(nr, was){
+  if(!nr){ alert('Bitte eine '+was+' angeben.'); return false; }
+  if(!LV_NR_OK.test(nr)){
+    alert('In der '+was+' sind nur Ziffern, Buchstaben, Punkt, Bindestrich, Unterstrich und Leerzeichen erlaubt.');
+    return false;
+  }
+  return true;
+}
+// Vorschlag: höchste rein numerische Etagennummer + 1, Stellenzahl beibehalten.
+function lvNextEtagePos(){
+  let max=0, breite=2;
+  DATA.forEach(s=>{ const m=String(s.pos||'').match(/^(\d+)$/);
+    if(m){ const n=parseInt(m[1],10); if(n>max){ max=n; breite=m[1].length; } } });
+  for(let n=max+1;n<999;n++){
+    const k=String(n).padStart(breite,'0');
+    if(!DATA.some(s=>String(s.pos)===k)) return k;
+  }
+  return String(DATA.length+1);
+}
+// Vorschlag für die nächste Anlage einer Etage: „<Etage>.<lfd>".
+function lvNextAnlagePos(sec){
+  const alle=DATA.flatMap(s=>s.subsections.map(x=>String(x.pos)));
+  for(let n=(sec.subsections||[]).length+1;n<999;n++){
+    const k=String(sec.pos)+'.'+n;
+    if(!alle.includes(k)) return k;
+  }
+  return String(sec.pos)+'.1';
+}
+function openEtageNeu(){
+  if(!darfLVAendern()) return lvGesperrt();
+  const nr=lvNextEtagePos();
+  lvOv(
+     '<div style="font-size:16px;font-weight:700;margin-bottom:2px">Etage anlegen</div>'
+    +'<div style="font-size:12px;color:var(--accent2);margin-bottom:14px">Eine Etage braucht mindestens eine Anlage – Positionen hängen immer an einer Anlage. Beides wird hier zusammen angelegt.</div>'
+    +lvFeld('lvEtNr','Etage – Kurzbezeichnung', nr, '', 'Steht auf dem Reiter. Muss einmalig sein.')
+    +lvFeld('lvEtLbl','Etage – Name', '', 'z. B. Erdgeschoss')
+    +'<div style="border-top:1px solid var(--line);margin:16px 0 13px"></div>'
+    +lvFeld('lvAnNr','Erste Anlage – Nummer', nr+'.1', '', 'Muss in der ganzen Baustelle einmalig sein.')
+    +lvFeld('lvAnBez','Erste Anlage – Bezeichnung', '', 'z. B. Küche')
+    +'<div style="display:flex;gap:10px;justify-content:flex-end">'+lvBtn('Abbrechen','lvOvClose()')
+    +lvBtn('Anlegen','etageNeuSpeichern()','ok')+'</div>');
+  setTimeout(()=>{ const el=document.getElementById('lvEtLbl'); if(el) el.focus(); }, 40);
+}
+async function etageNeuSpeichern(){
+  if(!darfLVAendern()) return lvGesperrt();
+  if(!lvOnline()) return;
+  const g=id=>String(((document.getElementById(id)||{}).value)||'').trim();
+  const etNr=g('lvEtNr'), etLbl=g('lvEtLbl'), anNr=g('lvAnNr'), anBez=g('lvAnBez');
+  if(!lvNrPruef(etNr,'Etagen-Kurzbezeichnung')) return;
+  if(!etLbl){ alert('Bitte einen Namen für die Etage angeben.'); return; }
+  if(DATA.some(s=>String(s.pos)===etNr)){ alert('Die Etage '+etNr+' gibt es in dieser Baustelle schon.'); return; }
+  if(!lvNrPruef(anNr,'Anlagen-Nummer')) return;
+  if(!anBez){ alert('Bitte eine Bezeichnung für die Anlage angeben.'); return; }
+  if(DATA.some(s=>s.subsections.some(x=>String(x.pos)===anNr))){
+    alert('Die Anlagen-Nummer '+anNr+' gibt es in dieser Baustelle schon.'); return;
+  }
+  // Etagen-Restarbeiten und -Fotos hängen an §E§<pos>. Liegen dort noch Daten einer
+  // früher gelöschten Etage, tauchten sie mit der neuen wieder auf.
+  const ek=EKEY({pos:etNr}), alt=ST[ek];
+  if(alt && ((alt.restarbeiten&&alt.restarbeiten.length)||(alt.efotos&&alt.efotos.length)||(alt.bfotos&&alt.bfotos.length))
+     && !confirm('Zur Etage '+etNr+' liegen noch Restarbeiten oder Fotos einer früheren Etage.\n\nSie würden mit der neuen Etage wieder auftauchen. Trotzdem verwenden?')) return;
+  const sec={pos:etNr, label:etLbl, subsections:[{pos:anNr, bez:anBez, items:[]}]};
+  // Einsortieren, ohne die vorhandene Reihenfolge anzufassen (wie bei Positionen).
+  let i=DATA.findIndex(s=>lvPosCmp(s.pos,etNr)>0);
+  if(i<0) i=DATA.length;
+  DATA.splice(i,0,sec);
+  lvOvClose();
+  await saveLV();
+  buildTabs();            // die Etage ist ein neuer Reiter – lvRebuild baut nur die Panels
+  lvRebuild();
+  swTab(etNr);            // direkt in die neue Etage springen
+  lvBlockHervorheben(anNr);
+  showToast('Etage „'+etLbl+'" mit Anlage „'+anBez+'" angelegt');
+}
+function openAnlageNeu(secPos){
+  if(!darfLVAendern()) return lvGesperrt();
+  const sec=DATA.find(s=>s.pos===secPos);
+  if(!sec){ alert('Diese Etage steht nicht mehr in der Stückliste.'); return; }
+  lvOv(
+     '<div style="font-size:16px;font-weight:700;margin-bottom:2px">Anlage ergänzen</div>'
+    +'<div style="font-size:12px;color:var(--accent2);margin-bottom:14px">'+escapeHtml(sec.label||sec.pos)+'</div>'
+    +lvFeld('lvAnNr','Nummer', lvNextAnlagePos(sec), '', 'Muss in der ganzen Baustelle einmalig sein.')
+    +lvFeld('lvAnBez','Bezeichnung', '', 'z. B. Spülbereich')
+    +'<div style="display:flex;gap:10px;justify-content:flex-end">'+lvBtn('Abbrechen','lvOvClose()')
+    +lvBtn('Anlegen','anlageNeuSpeichern(\''+secPos+'\')','ok')+'</div>');
+  setTimeout(()=>{ const el=document.getElementById('lvAnBez'); if(el) el.focus(); }, 40);
+}
+async function anlageNeuSpeichern(secPos){
+  if(!darfLVAendern()) return lvGesperrt();
+  if(!lvOnline()) return;
+  const sec=DATA.find(s=>s.pos===secPos);
+  if(!sec){ alert('Diese Etage steht nicht mehr in der Stückliste.'); return; }
+  const g=id=>String(((document.getElementById(id)||{}).value)||'').trim();
+  const nr=g('lvAnNr'), bez=g('lvAnBez');
+  if(!lvNrPruef(nr,'Anlagen-Nummer')) return;
+  if(!bez){ alert('Bitte eine Bezeichnung angeben.'); return; }
+  if(DATA.some(s=>s.subsections.some(x=>String(x.pos)===nr))){
+    alert('Die Anlagen-Nummer '+nr+' gibt es in dieser Baustelle schon.'); return;
+  }
+  let i=sec.subsections.findIndex(x=>lvPosCmp(x.pos,nr)>0);
+  if(i<0) i=sec.subsections.length;
+  sec.subsections.splice(i,0,{pos:nr, bez:bez, items:[]});
+  lvOvClose();
+  await saveLV();
+  lvRebuild();
+  lvBlockHervorheben(nr);
+  showToast('Anlage „'+bez+'" angelegt');
+}
+// Frisch angelegte Anlage aufklappen, anspringen und kurz hervorheben – in einer
+// langen Etage findet man sie sonst nicht wieder.
+function lvBlockHervorheben(subPos){
+  const l=document.getElementById('L'+sp(subPos)); if(!l) return;
+  l.classList.remove('hid');
+  const blk=l.parentElement;
+  const t=blk&&blk.querySelector('.btog'); if(t) t.classList.remove('cl');
+  if(blk){
+    blk.classList.add('lvnew');
+    setTimeout(()=>{ blk.scrollIntoView({block:'center'}); }, 30);
+    setTimeout(()=>blk.classList.remove('lvnew'), 3000);
+  }
 }
 
 // ---- Position ergänzen (Nachtrag) ----
