@@ -1670,8 +1670,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 128;
+const APP_VERSION = 129;
 const CHANGELOG = [
+  { v:129, titel:'Protokoll-Übersicht wird in SharePoint abgelegt', punkte:[
+    'In der Protokoll-Übersicht gibt es jetzt <b>„📤 In SharePoint ablegen"</b>. Die Liste wird als PDF im kpc-Design erzeugt und in der Baustellen-Ablage unter <b>_Protokolluebersicht</b> hinterlegt – damit liegt sie dort, wo auch alle im Büro drankommen.',
+    'Das PDF ist im <b>Querformat</b>, damit die Spalte mit den Dateinamen lesbar bleibt. Auf Folgeseiten werden Etage und Anlage mit dem Zusatz „(Fortsetzung)" wiederholt.',
+    'Es wird immer <b>dieselbe Datei überschrieben</b>: die Übersicht zeigt den aktuellen Stand, sie ist keine Dokumentenreihe. So sammelt sich dort nicht wieder an, wogegen die Übersicht gerade helfen soll.',
+    '„🖨 Drucken" bleibt für den lokalen Ausdruck.' ]},
   { v:128, titel:'Neue Übersicht: welches Protokoll gehört zu welcher Position', punkte:[
     'Unter <b>Berichte & Dokumente</b> gibt es jetzt die <b>Protokoll-Übersicht</b> – ein Blatt je Baustelle, das alle abgelegten Protokolle nach Etage und Anlage sortiert auflistet: Position, Gerät, Protokollart, Gerätenummer bei mehreren gleichen Geräten, Hersteller und Ablagezeitpunkt.',
     'Die Spalte <b>Datei</b> nennt den Dateinamen aus der SharePoint-Bibliothek. Damit lässt sich der Ordner Zeile für Zeile abgleichen – wozu eine Datei gehört, ist dann keine Rätselfrage mehr.',
@@ -8308,6 +8313,175 @@ function protoUebersichtDaten(){
   })));
   return {zeilen, ohne, anzahl, mitProto, ibnPflicht};
 }
+// PDF im kpc-CD (§1.7) – QUERFORMAT, weil sieben Spalten samt Dateinamen in
+// Hochformat unlesbar schmal würden. Muster wie fmBuildPdf/btbBuildPdf.
+async function puBuildPdf(){
+  if(!window.jspdf) throw new Error('PDF-Bibliothek nicht geladen (Seite neu laden)');
+  const {jsPDF}=window.jspdf;
+  const doc=new jsPDF({orientation:'l',unit:'mm',format:'a4'});
+  const M=14, W=297, R=W-M, PH=210;
+  const copper=[137,86,0], dark=[43,43,43], grey=[120,120,120], line=[214,209,203];
+  const tc=c=>doc.setTextColor(c[0],c[1],c[2]);
+  const dc=c=>doc.setDrawColor(c[0],c[1],c[2]);
+  let FF='helvetica';
+  try{ if(typeof BTB_FONT_B64!=='undefined' && BTB_FONT_B64){ doc.addFileToVFS('RC.ttf',BTB_FONT_B64); doc.addFont('RC.ttf','RobotoCondensed','normal'); FF='RobotoCondensed'; } }catch(e){ FF='helvetica'; }
+  const bold=()=>doc.setFont(FF, FF==='helvetica'?'bold':'normal');
+  const reg=()=>doc.setFont(FF,'normal');
+  reg();
+  const d=protoUebersichtDaten();
+  const st=projStamm();
+  const heute=new Date().toLocaleDateString('de-DE');
+  const logo=await btbSvgToPng(repLogo(),300);
+  let y=M;
+  const briefkopf=(titel)=>{
+    let lb=y+12;
+    if(logo){ const lw=26, lh=lw*logo.h/logo.w; doc.addImage(logo.png,'PNG',M,y,lw,lh); lb=y+lh; }
+    bold(); tc(dark); doc.setFontSize(17); doc.text(titel,R,y+6,{align:'right'});
+    reg(); doc.setFontSize(9); tc(grey);
+    doc.text(curProjName()+(st.auftrag?('  ·  Auftrag '+st.auftrag):'')+'  ·  Stand '+heute, R, y+12, {align:'right'});
+    y=Math.max(lb, y+14)+2; dc(copper); doc.setLineWidth(0.7); doc.line(M,y,R,y); y+=6;
+  };
+  briefkopf('Protokoll-Übersicht');
+
+  // Kennzahlen
+  reg(); doc.setFontSize(8); tc(grey);
+  const kz=[[d.anzahl,'Protokolle abgelegt'],[d.mitProto,'Positionen mit Protokoll'],
+            [d.ohne.length,'ohne Inbetriebnahmeprotokoll'],[d.ibnPflicht,'Positionen mit Inbetriebnahme']];
+  let kx=M;
+  kz.forEach(([n,l])=>{ bold(); doc.setFontSize(13); tc(copper); doc.text(String(n),kx,y+4);
+    reg(); doc.setFontSize(7.5); tc(grey); doc.text(l,kx,y+8.5); kx+=Math.max(42,doc.getTextWidth(l)+10); });
+  y+=14;
+
+  // Spalten: Summe = 269 mm nutzbare Breite
+  const cw=[22,62,34,22,45,30,54];
+  const cx=[]; let x=M; cw.forEach(w=>{ cx.push(x); x+=w; });
+  const KOPF=['Pos.','Bezeichnung','Protokoll','Gerät','Hersteller / Gerät','Abgelegt','Datei'];
+  const tabkopf=()=>{
+    doc.setFillColor(43,43,43); doc.rect(M,y,R-M,6.5,'F');
+    bold(); doc.setFontSize(7.5); doc.setTextColor(215,193,174);
+    KOPF.forEach((t,i)=>doc.text(t,cx[i]+1,y+4.4));
+    y+=6.5; reg();
+  };
+  // Auf Folgeseiten Briefkopf + Tabellenkopf wiederholen – UND die aktuelle Etage
+  // samt Anlage erneut setzen. Ohne das beginnt Seite 2 mit Zeilen, zu denen die
+  // Zuordnung fehlt; man weiß nicht, in welcher Etage man liest.
+  let lastE='', lastA='';
+  const etageKopf=(txt,fortsetzung)=>{
+    doc.setFillColor(43,43,43); doc.rect(M,y,R-M,6,'F');
+    bold(); doc.setFontSize(8.5); doc.setTextColor(215,193,174);
+    doc.text(txt+(fortsetzung?'  (Fortsetzung)':''),M+2,y+4.2);
+    y+=6; reg();
+  };
+  const anlageKopf=(txt,fortsetzung)=>{
+    doc.setFillColor(240,236,232); doc.rect(M,y,R-M,5.2,'F');
+    bold(); doc.setFontSize(7.5); tc(copper);
+    doc.text(txt+(fortsetzung?'  (Fortsetzung)':''),M+2,y+3.7);
+    y+=5.2; reg();
+  };
+  // Die Fortsetzungs-Überschriften werden NICHT sofort beim Seitenwechsel gesetzt,
+  // sondern erst, wenn wirklich eine Datenzeile folgt. Sonst steht am Seitenanfang
+  // „Küche (Fortsetzung)" ohne eine einzige Zeile darunter, weil direkt danach ein
+  // neuer Bereich beginnt.
+  let contOffen=false;
+  const platz=(h)=>{
+    if(y+h<=PH-14) return;
+    doc.addPage(); y=M; briefkopf('Protokoll-Übersicht'); tabkopf();
+    contOffen=true;
+  };
+  const contEinloesen=()=>{
+    if(!contOffen) return;
+    contOffen=false;
+    if(lastE) etageKopf(lastE,true);
+    if(lastA) anlageKopf(lastA,true);
+  };
+  bold(); doc.setFontSize(10); tc(copper); doc.text('Abgelegte Protokolle',M,y+3); y+=6;
+  reg(); doc.setFontSize(7); tc(grey);
+  doc.text('Die Spalte „Datei" nennt den Dateinamen in der SharePoint-Bibliothek – damit lässt sich der Ordner Zeile für Zeile abgleichen.',M,y+3); y+=6;
+  tabkopf();
+
+  if(!d.zeilen.length){ reg(); doc.setFontSize(9); tc(grey); doc.text('Kein Protokoll abgelegt.',M+1,y+5); y+=10; }
+  d.zeilen.forEach(r=>{
+    // Wechselt die Gruppe, werden ohnehin echte Überschriften gesetzt – dann ist
+    // eine Fortsetzungszeile überflüssig.
+    if(r.etage!==lastE){ platz(20); contOffen=false; lastE=r.etage; lastA=''; etageKopf(r.etage,false); }
+    if(r.anlage!==lastA){ platz(14); contOffen=false; lastA=r.anlage; anlageKopf(r.anlage,false); }
+    const bez=doc.splitTextToSize(r.bez||'', cw[1]-3);
+    const zus=r.zus?doc.splitTextToSize(r.zus, cw[1]-3):[];
+    const hst=doc.splitTextToSize(r.geraet||'–', cw[4]-3);
+    const dat=doc.splitTextToSize(r.datei||'', cw[6]-3);
+    const zeilen=Math.max(bez.length+(zus.length?zus.length:0), hst.length, dat.length, 1);
+    const h=Math.max(7, zeilen*3.2+3.4);
+    platz(h);
+    contEinloesen();
+    dc(line); doc.setLineWidth(0.1); doc.line(M,y+h,R,y+h);
+    let ty=y+4;
+    bold(); doc.setFontSize(7.5); tc(dark); doc.text(String(r.pos),cx[0]+1,ty);
+    reg(); doc.setFontSize(8); tc(dark); bez.forEach((t,i)=>doc.text(t,cx[1],ty+i*3.2));
+    doc.setFontSize(6.8); tc(grey); zus.forEach((t,i)=>doc.text(t,cx[1],ty+(bez.length+i)*3.2));
+    doc.setFontSize(7.5); tc(dark); doc.text(String(r.art||''),cx[2],ty);
+    const geraetTxt = r.von>1 ? (r.nr?('Nr. '+r.nr+' von '+r.von):('– von '+r.von)) : (r.nr?('Nr. '+r.nr):'');
+    tc(copper); doc.text(geraetTxt,cx[3],ty); tc(dark);
+    hst.forEach((t,i)=>doc.text(t,cx[4],ty+i*3.2));
+    doc.text(String(r.datum||''),cx[5],ty);
+    doc.setFontSize(6.2); tc(grey); dat.forEach((t,i)=>doc.text(t,cx[6],ty+i*3.2));
+    if(r.daten) doc.text('+ Datenstand',cx[6],ty+dat.length*3.2);
+    y+=h;
+  });
+
+  if(d.ohne.length){
+    y+=6; platz(24);
+    bold(); doc.setFontSize(10); tc(copper); doc.text('Noch ohne Inbetriebnahmeprotokoll',M,y+3); y+=6;
+    reg(); doc.setFontSize(7); tc(grey);
+    doc.text('Positionen, an denen es den Schritt „Inbetriebnahme" gibt, zu denen aber kein Protokoll abgelegt ist.',M,y+3); y+=6;
+    const ow=[46,52,26,145], ox=[]; let xx=M; ow.forEach(w=>{ ox.push(xx); xx+=w; });
+    doc.setFillColor(43,43,43); doc.rect(M,y,R-M,6.5,'F');
+    bold(); doc.setFontSize(7.5); doc.setTextColor(215,193,174);
+    ['Etage','Anlage','Pos.','Bezeichnung'].forEach((t,i)=>doc.text(t,ox[i]+1,y+4.4));
+    y+=6.5; reg();
+    d.ohne.forEach(o=>{
+      platz(7);
+      dc(line); doc.setLineWidth(0.1); doc.line(M,y+6.5,R,y+6.5);
+      doc.setFontSize(7.5); tc(dark);
+      doc.text(String(o.etage||''),ox[0]+1,y+4.4);
+      doc.text(String(o.anlage||''),ox[1]+1,y+4.4);
+      bold(); doc.text(String(o.pos),ox[2]+1,y+4.4); reg();
+      doc.text(String(o.bez||'')+(o.zus?('  ·  '+o.zus):''),ox[3]+1,y+4.4);
+      y+=6.5;
+    });
+  }
+
+  // Fußzeile auf allen Seiten
+  const n=doc.internal.getNumberOfPages();
+  for(let i=1;i<=n;i++){
+    doc.setPage(i); reg(); doc.setFontSize(6.5); tc(grey);
+    doc.text('Erstellt am '+heute+(USER?(' · '+USER):''), M, PH-7);
+    doc.text('Seite '+i+' von '+n, R, PH-7, {align:'right'});
+  }
+  return doc.output('blob');
+}
+// Übersicht als PDF in der Baustellen-Ablage hinterlegen. BEWUSST EIN fester
+// Dateiname: die Übersicht ist eine Momentaufnahme des aktuellen Stands, keine
+// Dokumentenreihe. Mit Datum im Namen sammelte sich genau die Ablage-Flut an,
+// wegen der die Übersicht überhaupt entstanden ist (§1.16).
+const PU_ORDNER='_Protokolluebersicht';
+async function puInSharePoint(){
+  if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
+  if(!navigator.onLine || !SPIDS.driveId){
+    alert('Dafür muss die App online sein.\n\nDie Übersicht wird direkt in die Baustellen-Ablage geschrieben.');
+    return;
+  }
+  showLoader('Übersicht wird erstellt …');
+  try{
+    const blob=await puBuildPdf();
+    const fname=safeName(curProjName())+'/'+PU_ORDNER+'/Protokolluebersicht.pdf';
+    await spUpload(fname, blob, 'application/pdf');
+    hideLoader();
+    showToast('✓ Übersicht abgelegt: '+PU_ORDNER+'/Protokolluebersicht.pdf');
+  }catch(e){
+    hideLoader();
+    alert('Ablegen fehlgeschlagen: '+((e&&e.message)||e));
+  }
+}
 function expProtokollUebersicht(){
   if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
   const d=protoUebersichtDaten();
@@ -8369,7 +8543,23 @@ h2{font-size:14px;color:#895500;margin:26px 0 6px;padding-bottom:4px;border-bott
 .sum b{display:block;font-size:19px;color:#895500;font-weight:700}
 @media print{body{padding:10px;}button{display:none!important;}.meta{padding-right:0;}.tw{overflow:visible;}table{min-width:0;}
   tr{break-inside:avoid;} h2{break-after:avoid;}}</style></head><body>
-<button onclick="window.print()" style="position:fixed;top:10px;right:110px;z-index:999;background:#895500;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#128424; Als PDF</button>
+<button onclick="ablegen()" style="position:fixed;top:10px;right:230px;z-index:999;background:#2b2b2b;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#128228; In SharePoint ablegen</button>
+<button onclick="window.print()" style="position:fixed;top:10px;right:110px;z-index:999;background:#895500;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#128424; Drucken</button>
+<script>
+// Das Ablegen läuft in der App (dort sitzen jsPDF, Graph-Token und die Daten) –
+// dieses Fenster hat beides nicht. Ist das Elternfenster weg (am Handy werden
+// Hintergrund-Tabs verworfen), sagen wir das, statt stumm nichts zu tun.
+function ablegen(){
+  try{
+    if(window.opener && !window.opener.closed && window.opener.puInSharePoint){
+      window.opener.puInSharePoint();
+      try{ window.opener.focus(); }catch(e){}
+      return;
+    }
+  }catch(e){}
+  alert('Dafür wird das App-Fenster gebraucht.\n\nBitte zur App zurückkehren und dort unter „Berichte & Dokumente" erneut die Protokoll-Übersicht öffnen.');
+}
+<\/script>
 <button onclick="window.close()" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
 <div class="kpc">
   <img class="logo-img" src="${repLogo()}" alt="KPC GmbH">
