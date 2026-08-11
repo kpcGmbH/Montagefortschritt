@@ -1670,8 +1670,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 126;
+const APP_VERSION = 127;
 const CHANGELOG = [
+  { v:127, titel:'Inbetriebnahmeprotokolle: nur noch der finale Stand', punkte:[
+    'Wer ein Protokoll ausgefüllt, exportiert, dann noch etwas korrigiert und <b>erneut exportiert</b> hat, legte damit bisher jedes Mal ein <b>weiteres</b> Protokoll ab – Eintrag und Datei. In SharePoint standen dadurch mehrere Fassungen derselben Inbetriebnahme.',
+    'Jetzt <b>ersetzt</b> ein erneuter Export die vorherige Fassung: Position, Protokollart und Geräte-Nummer bestimmen, worum es geht. Die alte Datei wird entfernt, es bleibt der letzte Stand.',
+    'Mehrere Geräte an einer Position bleiben getrennt – „＋ Neues Gerät" vergibt weiterhin eine eigene Nummer. Auch DGUV- und Inbetriebnahmeprotokoll am selben Gerät bleiben zwei Protokolle.',
+    'Beim Weg „✎ Letztes Protokoll weiterbearbeiten" behält das Protokoll jetzt seine Geräte-Nummer. Vorher ging sie verloren, und der nächste Export legte wieder eine zweite Fassung an.' ]},
   { v:126, titel:'Kennzeichnung „Nachtrag" nachträglich änderbar', punkte:[
     'Die Marke <b>„Nachtrag"</b> ließ sich bisher nur beim Anlegen einer Position setzen. Wer sie versehentlich gesetzt oder vergessen hatte, kam nicht mehr heran.',
     'Der Haken <b>„Als Nachtrag kennzeichnen"</b> steht jetzt auch unter <b>✎ Position</b> – anhaken oder abwählen, speichern, fertig. Gilt je Position.' ]},
@@ -6086,9 +6091,30 @@ async function ibnReceive(p){
     }
     if(!gs(pos).pdfs) gs(pos).pdfs=[];
     const entry={type:type, name:p.name||(type+'.pdf'), fname:fname, ibn:true, mfr:p.mfr||'', dev:p.dev||'', dataFname:dataFname, nr:(p.nr||0), von:(p.von||0)};
+    // Welchen vorhandenen Eintrag ersetzt dieses Protokoll?
+    // 1. „✎ weiterbearbeiten" liefert den Dateinamen mit (replaceFname).
+    // 2. OHNE replaceFname: Wer ein frisch geöffnetes Formular ZWEIMAL exportiert
+    //    (korrigieren, nochmal ausgeben), schickte bisher jedes Mal ein NEUES
+    //    Protokoll – Eintrag und Datei. In SharePoint standen dadurch bis zu vier
+    //    Fassungen desselben Protokolls. Position + Art + Geräte-Nummer (`nr`, aus
+    //    ibnStart: 1..Stückzahl) identifizieren das Protokoll eindeutig; ein
+    //    Treffer ist also dieselbe Sache in neuer Fassung, kein zweites Gerät.
+    //    `nr>0` ist Bedingung: Altbestand ohne `nr` würde sonst zusammenfallen.
+    let ersetzt=p.replaceFname||'';
+    if(!ersetzt && (p.nr||0)>0){
+      const vor=(gs(pos).pdfs||[]).find(x=>x.ibn && (x.type||'')===type && (x.nr||0)===(p.nr||0));
+      if(vor) ersetzt=vor.fname;
+    }
     let replaced=false;
-    if(p.replaceFname){ const arr=gs(pos).pdfs, idx=arr.findIndex(x=>x.fname===p.replaceFname);
-      if(idx>=0){ const old=arr[idx]; arr[idx]=entry; replaced=true;
+    if(ersetzt){ const arr=gs(pos).pdfs, idx=arr.findIndex(x=>x.fname===ersetzt);
+      if(idx>=0){ const old=arr[idx];
+        // Geräte-Nummer des ersetzten Eintrags übernehmen, wenn die Übergabe keine
+        // mitbringt: der Weg „✎ weiterbearbeiten" schickt keine `nr`. Ohne das
+        // verlöre das Protokoll seine Nummer und die Regel oben griffe beim
+        // nächsten Export nicht mehr.
+        if(!(p.nr||0) && (old.nr||0)) entry.nr=old.nr;
+        if(!(p.von||0) && (old.von||0)) entry.von=old.von;
+        arr[idx]=entry; replaced=true;
         if(old.fname){removeQueuedFile(old.fname);spDelete(old.fname);}
         if(old.dataFname){removeQueuedFile(old.dataFname);spDelete(old.dataFname);} } }
     if(!replaced) gs(pos).pdfs.push(entry);
