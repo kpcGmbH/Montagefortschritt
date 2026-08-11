@@ -1670,8 +1670,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 127;
+const APP_VERSION = 128;
 const CHANGELOG = [
+  { v:128, titel:'Neue Übersicht: welches Protokoll gehört zu welcher Position', punkte:[
+    'Unter <b>Berichte & Dokumente</b> gibt es jetzt die <b>Protokoll-Übersicht</b> – ein Blatt je Baustelle, das alle abgelegten Protokolle nach Etage und Anlage sortiert auflistet: Position, Gerät, Protokollart, Gerätenummer bei mehreren gleichen Geräten, Hersteller und Ablagezeitpunkt.',
+    'Die Spalte <b>Datei</b> nennt den Dateinamen aus der SharePoint-Bibliothek. Damit lässt sich der Ordner Zeile für Zeile abgleichen – wozu eine Datei gehört, ist dann keine Rätselfrage mehr.',
+    'Darunter steht, <b>wo noch ein Inbetriebnahmeprotokoll fehlt</b>: alle Positionen mit dem Schritt „Inbetriebnahme", zu denen keines abgelegt ist. Ein Einweisungs- oder DGUV-Protokoll zählt dafür nicht.',
+    'Oben die Kennzahlen auf einen Blick, über „🖨 Als PDF" wandert das Blatt in eine Datei.' ]},
   { v:127, titel:'Inbetriebnahmeprotokolle: nur noch der finale Stand', punkte:[
     'Wer ein Protokoll ausgefüllt, exportiert, dann noch etwas korrigiert und <b>erneut exportiert</b> hat, legte damit bisher jedes Mal ein <b>weiteres</b> Protokoll ab – Eintrag und Datei. In SharePoint standen dadurch mehrere Fassungen derselben Inbetriebnahme.',
     'Jetzt <b>ersetzt</b> ein erneuter Export die vorherige Fassung: Position, Protokollart und Geräte-Nummer bestimmen, worum es geht. Die alte Datei wird entfernt, es bleibt der letzte Stand.',
@@ -5193,6 +5198,7 @@ function openBerichteSheet(){
     // Beide Protokolle hängen an einem GERÄT, nicht an der Baustelle. Bisher waren
     // sie nur über die einzelne Position erreichbar („📄 Protokoll" auf der Karte) –
     // wer von „Berichte & Dokumente" aus dachte, fand sie nicht.
+    {ic:'🗂️', t:'Protokoll-Übersicht', d:'welches Protokoll zu welcher Position gehört (PDF)', fn:'expProtokollUebersicht()'},
     {ic:'⚙️', t:'Inbetriebnahmeprotokoll', d:'Gerät wählen, Protokoll digital ausfüllen', fn:"openProtoAuswahl('IBN Protokoll')"},
     {ic:'⚡', t:'DGUV-Prüfprotokoll', d:'Prüfung der elektrischen Sicherheit', fn:"openProtoAuswahl('DGUV Protokoll')"},
     {ic:'📋', t:'Einweisungsprotokoll', d:'Geräte einweisen und quittieren lassen', fn:'openEinweisung()'},
@@ -8250,6 +8256,143 @@ opGw('${preGw}');
 <\/script>
 </body></html>`;
   if(w.closed){return;}
+  w.document.open(); w.document.write(html); w.document.close();
+}
+
+// ================= PROTOKOLL-ÜBERSICHT =================
+// „Welches Protokoll gehört zu welcher Position?" – gemeldet, weil sich der Inhalt
+// des SharePoint-Ordners sonst nicht gegen die App prüfen lässt. Deshalb steht in
+// der Liste bewusst auch der DATEINAME: er ist die Brücke zwischen beidem.
+// Der Zeitpunkt steckt im Dateinamen (…_<ms>.pdf) – der Eintrag selbst führt keinen.
+function protoTs(fname){
+  const m=String(fname||'').match(/_(\d{13})\.[A-Za-z0-9]+$/);
+  if(!m) return null;
+  const d=new Date(parseInt(m[1],10));
+  return isNaN(d.getTime())?null:d;
+}
+function protoDatum(fname){
+  const d=protoTs(fname);
+  return d ? (String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+d.getFullYear()
+             +' · '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')) : '–';
+}
+// Alle Protokolle der Baustelle, in der Reihenfolge der Stückliste.
+function protoUebersichtDaten(){
+  const zeilen=[], ohne=[];
+  let anzahl=0, mitProto=0, ibnPflicht=0;
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+    const pdfs=(gs(it.pos).pdfs||[]).slice();
+    // Innerhalb einer Position nach Art, dann Gerätenummer, dann Zeit sortieren –
+    // sonst steht die Reihenfolge der Ablage drin, die niemandem hilft.
+    pdfs.sort((a,b)=>String(a.type||'').localeCompare(String(b.type||''))
+                    || ((a.nr||0)-(b.nr||0))
+                    || (((protoTs(a.fname)||0)&&protoTs(a.fname).getTime()||0)-(((protoTs(b.fname)||0)&&protoTs(b.fname).getTime())||0)));
+    const braucht=relFields(it.pos).includes('ib');
+    if(braucht) ibnPflicht++;
+    if(pdfs.length) mitProto++;
+    // „Fehlt" heißt: kein INBETRIEBNAHMEprotokoll. Ein Einweisungs- oder
+    // DGUV-Protokoll an derselben Position ersetzt es nicht – sonst gälte ein Gerät
+    // als versorgt, für das nur die Einweisung abgelegt wurde.
+    if(braucht && !pdfs.some(p=>(p.type||'')==='IBN Protokoll'))
+      ohne.push({etage:sec.label||sec.pos, anlage:sub.bez||sub.pos, pos:it.pos,
+                 bez:(it.bez||'').trim(), zus:[it.fabrikat,it.typ].filter(Boolean).join(' · ')});
+    pdfs.forEach(p=>{
+      anzahl++;
+      zeilen.push({etage:sec.label||sec.pos, anlage:sub.bez||sub.pos, pos:it.pos,
+        bez:(it.bez||'').trim(), zus:[it.fabrikat,it.typ].filter(Boolean).join(' · '),
+        art:p.type||'Protokoll', nr:p.nr||0, von:p.von||0,
+        geraet:[p.mfr,p.dev].filter(Boolean).join(' · '),
+        datum:protoDatum(p.fname), datei:String(p.fname||'').split('/').pop(),
+        ordner:String(p.fname||'').split('/').slice(0,-1).join('/'),
+        daten:!!p.dataFname});
+    });
+  })));
+  return {zeilen, ohne, anzahl, mitProto, ibnPflicht};
+}
+function expProtokollUebersicht(){
+  if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
+  const d=protoUebersichtDaten();
+  if(!d.anzahl && !d.ohne.length){ alert('An dieser Baustelle ist noch kein Protokoll abgelegt.'); return; }
+  // Fenster SYNCHRON im Klick öffnen (§9) – sonst blockt der mobile Popup-Blocker.
+  const w=window.open('','_blank');
+  if(!w){ alert('Das Berichtsfenster wurde vom Browser blockiert. Bitte Popups für diese Seite erlauben.'); return; }
+  const now=new Date(), dat=now.toLocaleDateString('de-DE');
+  const st=projStamm();
+  let rows='', lastE='', lastA='';
+  d.zeilen.forEach(r=>{
+    if(r.etage!==lastE){
+      rows+=`<tr><td colspan="7" style="background:#2b2b2b;color:#d7c1ae;font-weight:700;font-size:13px;padding:7px 10px;letter-spacing:1px">${escapeHtml(r.etage)}</td></tr>`;
+      lastE=r.etage; lastA='';
+    }
+    if(r.anlage!==lastA){
+      rows+=`<tr><td colspan="7" style="background:#f0ece8;color:#895500;font-weight:700;font-size:11.5px;padding:5px 10px">${escapeHtml(r.anlage)}</td></tr>`;
+      lastA=r.anlage;
+    }
+    const geraetSpalte = r.von>1 ? (r.nr?('Nr. '+r.nr+' von '+r.von):('– von '+r.von)) : (r.nr?('Nr. '+r.nr):'');
+    rows+=`<tr>
+      <td style="padding:5px 8px;font-size:11px;font-weight:700;white-space:nowrap">${escapeHtml(r.pos)}</td>
+      <td style="padding:5px 8px;font-size:12px">${escapeHtml(r.bez)}${r.zus?`<div style="font-size:10.5px;color:#a8a8a8">${escapeHtml(r.zus)}</div>`:''}</td>
+      <td style="padding:5px 8px;font-size:11px;white-space:nowrap">${escapeHtml(r.art)}</td>
+      <td style="padding:5px 8px;font-size:11px;white-space:nowrap;color:#895500">${escapeHtml(geraetSpalte)}</td>
+      <td style="padding:5px 8px;font-size:11px">${escapeHtml(r.geraet||'–')}</td>
+      <td style="padding:5px 8px;font-size:11px;white-space:nowrap">${escapeHtml(r.datum)}</td>
+      <td style="padding:5px 8px;font-size:9.5px;font-family:Menlo,Consolas,monospace;color:#6b6b6b;word-break:break-all">${escapeHtml(r.datei)}${r.daten?'<div style="color:#a8a8a8">+ Datenstand</div>':''}</td>
+    </tr>`;
+  });
+  let fehlt='';
+  if(d.ohne.length){
+    fehlt='<h2>Noch ohne Inbetriebnahmeprotokoll</h2>'+
+      '<div class="hint">Positionen, an denen es den Schritt „Inbetriebnahme" gibt, zu denen aber kein Protokoll abgelegt ist.</div>'+
+      '<div class="tw"><table><thead><tr><th>Etage</th><th>Anlage</th><th>Pos.</th><th>Bezeichnung</th></tr></thead><tbody>'+
+      d.ohne.map(o=>`<tr>
+        <td style="padding:5px 8px;font-size:11px">${escapeHtml(o.etage)}</td>
+        <td style="padding:5px 8px;font-size:11px">${escapeHtml(o.anlage)}</td>
+        <td style="padding:5px 8px;font-size:11px;font-weight:700;white-space:nowrap">${escapeHtml(o.pos)}</td>
+        <td style="padding:5px 8px;font-size:12px">${escapeHtml(o.bez)}${o.zus?`<div style="font-size:10.5px;color:#a8a8a8">${escapeHtml(o.zus)}</div>`:''}</td>
+      </tr>`).join('')+'</tbody></table></div>';
+  }
+  const html=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+<title>Protokoll-Übersicht ${escapeHtml(curProjName())} – ${dat}</title>
+<style>@import url('https://fonts.googleapis.com/css2?family=Roboto+Condensed:wght@300;400;700&display=swap');body{font-family:'Roboto Condensed','Arial Narrow',Arial,sans-serif;font-weight:300;margin:0;padding:20px;color:#2b2b2b;}
+.kpc{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:3px solid #895500;padding-bottom:12px;margin-bottom:20px;}
+.logo-img{height:48px;width:auto;display:block;}
+.meta{text-align:right;font-size:12px;color:#a8a8a8;line-height:1.6;padding-right:210px;}
+.meta strong{display:block;font-size:15px;color:#2b2b2b;font-weight:700;}
+.tw{overflow-x:auto;}
+table{width:100%;border-collapse:collapse;margin-bottom:10px;min-width:640px;table-layout:fixed;}
+col.c-pos{width:8%}col.c-bez{width:24%}col.c-art{width:14%}col.c-ger{width:10%}
+col.c-hst{width:15%}col.c-dat{width:13%}col.c-fil{width:16%}
+th{background:#2b2b2b;color:#d7c1ae;font-size:11px;padding:7px 8px;text-align:left;font-weight:700;letter-spacing:0.5px;}
+td{border-bottom:1px solid #eeecea;vertical-align:top;}
+h2{font-size:14px;color:#895500;margin:26px 0 6px;padding-bottom:4px;border-bottom:1px solid #d7c1ae;letter-spacing:.5px;}
+.hint{font-size:11px;color:#a8a8a8;margin:0 0 10px}
+.sum{display:flex;gap:26px;flex-wrap:wrap;font-size:12px;margin:0 0 16px}
+.sum b{display:block;font-size:19px;color:#895500;font-weight:700}
+@media print{body{padding:10px;}button{display:none!important;}.meta{padding-right:0;}.tw{overflow:visible;}table{min-width:0;}
+  tr{break-inside:avoid;} h2{break-after:avoid;}}</style></head><body>
+<button onclick="window.print()" style="position:fixed;top:10px;right:110px;z-index:999;background:#895500;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#128424; Als PDF</button>
+<button onclick="window.close()" style="position:fixed;top:10px;right:10px;z-index:999;background:#8b2222;color:#fff;border:none;border-radius:6px;padding:8px 14px;font-size:14px;font-weight:700;cursor:pointer;font-family:Arial Narrow,Arial,sans-serif">&#10005; Schließen</button>
+<div class="kpc">
+  <img class="logo-img" src="${repLogo()}" alt="KPC GmbH">
+  <div class="meta"><strong>Protokoll-Übersicht</strong>Projekt: ${escapeHtml(curProjName())}${st.auftraggeber?'<br>Auftraggeber: '+escapeHtml(st.auftraggeber):''}${st.auftrag?'<br>Auftrags-Nr.: '+escapeHtml(st.auftrag):''}<br>Datum: ${dat}<br>Dok.-Nr.: PU-${curProjCode()}-${now.toISOString().slice(0,10).replace(/-/g,'')}</div>
+</div>
+<div class="sum">
+  <div><b>${d.anzahl}</b>Protokolle abgelegt</div>
+  <div><b>${d.mitProto}</b>Positionen mit Protokoll</div>
+  <div><b>${d.ohne.length}</b>noch ohne Inbetriebnahmeprotokoll</div>
+  <div><b>${d.ibnPflicht}</b>Positionen mit Inbetriebnahme</div>
+</div>
+<h2>Abgelegte Protokolle</h2>
+<div class="hint">Die Spalte „Datei" nennt den Dateinamen in der SharePoint-Bibliothek – damit lässt sich der Ordner Zeile für Zeile abgleichen. „+ Datenstand" heißt: zum Protokoll liegt zusätzlich die Datei für „✏️ bearbeiten" (<span style="font-family:Menlo,Consolas,monospace">_data.json</span>).</div>
+<div class="tw"><table><colgroup><col class="c-pos"><col class="c-bez"><col class="c-art"><col class="c-ger"><col class="c-hst"><col class="c-dat"><col class="c-fil"></colgroup><thead><tr><th>Pos.</th><th>Bezeichnung</th><th>Protokoll</th><th>Gerät</th><th>Hersteller / Gerät</th><th>Abgelegt</th><th>Datei</th></tr></thead><tbody>
+${rows||'<tr><td colspan="7" style="padding:14px;color:#a8a8a8;font-size:12px">Kein Protokoll abgelegt.</td></tr>'}
+</tbody></table></div>
+${fehlt}
+<div style="margin-top:26px;font-size:10.5px;color:#a8a8a8;line-height:1.6">
+Ordner in der Bibliothek „Montagefortschritt – Fotos": ${escapeHtml(d.zeilen.length?(d.zeilen[0].ordner||'–'):'–')} u. a.<br>
+Erstellt am ${dat} · ${escapeHtml(USER||'')}
+</div>
+</body></html>`;
+  if(w.closed) return;
   w.document.open(); w.document.write(html); w.document.close();
 }
 
