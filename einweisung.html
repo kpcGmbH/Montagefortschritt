@@ -314,6 +314,22 @@ async function ensureFolder(path){
   }
 }
 // Gibt das angelegte Graph-Item zurück (…​.id überlebt späteres Umbenennen/Verschieben).
+// ── Dateibenennung nach der kpc-Verfahrensanweisung (ab v130) ────────────────
+// Schema: JJMMTT_[Quelle]_[Phase]_Dokumententyp_Bezeichnung[_Version]
+// Identisch zur Hauptapp – wer eines ändert, ändert bitte beide.
+function vaSan(s){
+  return String(s==null?'':s)
+    .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue')
+    .replace(/Ä/g,'Ae').replace(/Ö/g,'Oe').replace(/Ü/g,'Ue')
+    .replace(/ß/g,'ss').replace(/\s+/g,'-').replace(/[^A-Za-z0-9\-\._]/g,'')
+    .replace(/-{2,}/g,'-').replace(/^[-.]+|[-.]+$/g,'');
+}
+function vaDatum(d){
+  const x=(d instanceof Date)?d:(d?new Date(d):new Date());
+  const p=n=>String(n).padStart(2,'0');
+  return String(x.getFullYear()).slice(2)+p(x.getMonth()+1)+p(x.getDate());
+}
+function vaName(teile){ return teile.map(vaSan).filter(Boolean).join('_').replace(/_{2,}/g,'_'); }
 async function spUpload(fname, body, contentType){
   const i=fname.lastIndexOf('/'); if(i>0) await ensureFolder(fname.slice(0,i));
   const res=await graph('/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encPath(fname)+':/content',{method:'PUT',headers:{'Content-Type':contentType||'application/octet-stream'},body:body});
@@ -1067,8 +1083,16 @@ async function finishSession(){
       const folder=safeName(PROJNAME)+(isK? '/_Schluesselprotokolle' : '/_Einweisung');
       // Etage(n) gehören in den Dateinamen: sonst sind mehrere Protokolle eines Tages
       // in SharePoint nicht auseinanderzuhalten und werden von Hand umbenannt.
-      const etTag=etagen.length? '_'+safeName(etagen.slice(0,3).join('_')).replace(/\s+/g,'')+(etagen.length>3?'_ua':'') : '';
-      fname=folder+'/'+(isK?'Schluesselprotokoll':'Einweisung_'+SESSION.typ)+'_'+SESSION.datum.replace(/-/g,'')+etTag+'_'+id.slice(-6)+'.pdf';
+      const etTag=etagen.length? safeName(etagen.slice(0,3).join('-')).replace(/\s+/g,'')+(etagen.length>3?'-ua':'') : '';
+      // Benennung nach der kpc-Verfahrensanweisung (KPC-Benennungstool):
+      //   JJMMTT_[Phase]_Dokumententyp_Bezeichnung
+      // Sprechender Dokumententyp statt VA-Kategorie. Die laufende Kennung am Ende
+      // bleibt: sonst wären zwei Protokolle desselben Tages in derselben Etage
+      // nicht auseinanderzuhalten (die VA kennt nur ein Tagesdatum).
+      const teile = isK
+        ? [vaDatum(SESSION.datum), 'Schluesseluebergabeprotokoll', etTag, id.slice(-6)]
+        : [vaDatum(SESSION.datum), 'Einweisungsprotokoll', SESSION.typ, etTag, id.slice(-6)];
+      fname=folder+'/'+vaName(teile)+'.pdf';
     }
     const up=await spUpload(fname, pdfBlob, 'application/pdf');
     // Status aktualisieren

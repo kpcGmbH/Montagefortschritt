@@ -1670,8 +1670,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 129;
+const APP_VERSION = 130;
 const CHANGELOG = [
+  { v:130, titel:'Dateinamen folgen jetzt der kpc-Verfahrensanweisung', punkte:[
+    'Alle Protokolle und Berichte werden nach dem Schema des kpc-Benennungstools abgelegt: <b>JJMMTT_[Phase]_Dokumententyp_Bezeichnung</b>. Umlaute werden aufgelöst, Leerzeichen zu Bindestrichen.',
+    'Beispiele: <b>260811_IBN_Protokoll_Meiko_M-iClean-HM_02-0005.pdf</b> · <b>260811_DGUV_Meiko_M-iClean-HM_02-0005.pdf</b> · <b>260811_Einweisungsprotokoll_02-0005.pdf</b> · <b>260811_Dichtigkeitsprotokoll_Erdgeschoss_003.pdf</b> · <b>260811_Bautagebuch-003.pdf</b> · <b>260811_Maengelfreimeldung_003.pdf</b>',
+    'Die <b>Positionsnummer</b> steht in der Bezeichnung – die Verfahrensanweisung hat dafür kein eigenes Feld, für uns ist sie aber der wichtigste Teil. Bei mehreren gleichen Geräten kommt „Geraet-2" dazu: das Schema kennt nur ein Tagesdatum, sonst hießen beide gleich.',
+    'Bereits abgelegte Dateien behalten ihren Namen und bleiben verknüpft. Wird ein altes Protokoll mit dem Stift bearbeitet, wandert es dabei ins neue Schema – mit seinem ursprünglichen Datum.',
+    'Fotos behalten ihr bisheriges Schema aus Position und Zeitstempel: sie sind keine Dokumente im Sinne der Verfahrensanweisung.' ]},
   { v:129, titel:'Protokoll-Übersicht wird in SharePoint abgelegt', punkte:[
     'In der Protokoll-Übersicht gibt es jetzt <b>„📤 In SharePoint ablegen"</b>. Die Liste wird als PDF im kpc-Design erzeugt und in der Baustellen-Ablage unter <b>_Protokolluebersicht</b> hinterlegt – damit liegt sie dort, wo auch alle im Büro drankommen.',
     'Das PDF ist im <b>Querformat</b>, damit die Spalte mit den Dateinamen lesbar bleibt. Auf Folgeseiten werden Etage und Anlage mit dem Zusatz „(Fortsetzung)" wiederholt.',
@@ -4175,7 +4181,8 @@ async function btbSave(thenPdf){
   if(!thenPdf){ showToast('Bautagebuch Nr. '+entry.nr+' gespeichert'); closeBtbForm(); openBautagebuchDialog(); return; }
   try{
     const blob=await btbBuildPdf(entry);
-    const fname=safeName(curProjName())+'/_Bautagebuch/Bautagebuch_'+String(entry.nr).padStart(3,'0')+'_'+entry.datum+'.pdf';
+    const fname=safeName(curProjName())+'/_Bautagebuch/'+
+      vaName([vaDatum(entry.datum),'Bautagebuch-'+String(entry.nr).padStart(3,'0')])+'.pdf';
     const url=URL.createObjectURL(blob);
     if(win){ win.location=url; } else { window.open(url,'_blank'); }
     try{ await spUpload(fname, blob, 'application/pdf'); showToast('PDF erstellt & in _Bautagebuch abgelegt'); }
@@ -4552,7 +4559,9 @@ async function dichtSave(thenPdf){
   if(!thenPdf){ showToast('Dichtigkeitsprotokoll Nr. '+entry.nr+' gespeichert'); closeDichtForm(); openDichtDialog(); return; }
   try{
     const blob=await dichtBuildPdf(entry);
-    const fname=safeName(curProjName())+'/_Dichtigkeitsprotokoll/Dichtigkeitsprotokoll_'+String(entry.nr).padStart(3,'0')+'_'+safeName(entry.umfangLabel)+'_'+entry.datum+'.pdf';
+    const fname=safeName(curProjName())+'/_Dichtigkeitsprotokoll/'+
+      vaName([vaDatum(entry.datum),'Dichtigkeitsprotokoll',
+              entry.umfangLabel, String(entry.nr).padStart(3,'0')])+'.pdf';
     const url=URL.createObjectURL(blob);
     if(win) win.location=url; else window.open(url,'_blank');
     try{ await spUpload(fname, blob, 'application/pdf'); showToast('PDF erstellt & abgelegt'); }
@@ -4985,7 +4994,9 @@ async function svcSave(thenPdf){
   if(!thenPdf){ showToast('Servicebericht Nr. '+entry.nr+' gespeichert'); closeSvcForm(); openServiceDialog(); return; }
   try{
     const blob=await svcBuildPdf(entry);
-    const fname=safeName(curProjName())+'/_Servicebericht/Servicebericht_'+String(entry.nr).padStart(3,'0')+'_'+(entry.sigDatum||localDay(new Date().toISOString()))+'.pdf';
+    const fname=safeName(curProjName())+'/_Servicebericht/'+
+      vaName([vaDatum(entry.sigDatum||new Date()),'Servicebericht',
+              projStamm().auftrag||curProjCode(), String(entry.nr).padStart(3,'0')])+'.pdf';
     const url=URL.createObjectURL(blob);
     if(win) win.location=url; else window.open(url,'_blank');
     try{ await spUpload(fname, blob, 'application/pdf'); showToast('PDF erstellt & in _Servicebericht abgelegt'); }
@@ -5564,6 +5575,48 @@ function safeName(s){ return String(s==null?'':s).replace(/[\\/:*?"<>|#%]/g,'-')
 // überschreibt das erste in SharePoint.
 let _tsLast=0;
 function uniqTs(){ const t=Math.max(Date.now(), _tsLast+1); _tsLast=t; return t; }
+
+// ── Dateibenennung nach der kpc-Verfahrensanweisung (ab v130) ────────────────
+// Schema aus dem KPC-Benennungstool:
+//   JJMMTT_[Quelle]_[Phase]_Dokumententyp_Bezeichnung[_Version]
+// Gilt für DOKUMENTE (Protokolle, Berichte). Fotos behalten ihr eigenes Schema –
+// sie sind keine VA-Dokumente, und ihr Millisekunden-Stempel hält sie eindeutig.
+//
+// WICHTIG – das Schema kennt kein Feld für die Position. Unsere Ablage lebt davon
+// („welche Datei gehört zu welchem Gerät"), deshalb steht sie in der Bezeichnung.
+// Ebenso die Gerätenummer bei Stückzahl > 1: das Schema hat nur ein TAGESdatum,
+// zwei Geräte derselben Position am selben Tag hießen sonst gleich.
+function vaSan(s){
+  return String(s==null?'':s)
+    .replace(/ä/g,'ae').replace(/ö/g,'oe').replace(/ü/g,'ue')
+    .replace(/Ä/g,'Ae').replace(/Ö/g,'Oe').replace(/Ü/g,'Ue')
+    .replace(/ß/g,'ss')
+    .replace(/\s+/g,'-')
+    .replace(/[^A-Za-z0-9\-\._]/g,'')
+    // Aus „& " oder „ / " entstehen sonst doppelte Bindestriche („Spuelkueche--Co.").
+    // Das Zeichenrepertoire der VA bleibt unberührt, der Name wird nur lesbarer.
+    .replace(/-{2,}/g,'-').replace(/^[-.]+|[-.]+$/g,'');
+}
+function vaDatum(d){
+  const x=(d instanceof Date)?d:(d?new Date(d):new Date());
+  const p=n=>String(n).padStart(2,'0');
+  return String(x.getFullYear()).slice(2)+p(x.getMonth()+1)+p(x.getDate());
+}
+// Teile in der Reihenfolge des Schemas; leere fallen weg.
+function vaName(teile){
+  return teile.map(vaSan).filter(Boolean).join('_').replace(/_{2,}/g,'_');
+}
+// Dokumententyp je Protokollart. Bewusst der SPRECHENDE Name statt der
+// VA-Kategorie: „Bautagebuch" sagt mehr als „Bericht_Bautagebuch", und die
+// Kategorie steht ohnehin im Ordner. Aufbau und Zeichenvorrat bleiben VA-konform.
+function vaProtoTeile(type, pos, p){
+  const posT=vaSan(String(pos||'').replace(/\./g,'-'));
+  const ger=(p&&(p.von||0)>1&&(p.nr||0)) ? ('Geraet-'+p.nr) : '';
+  if(type==='IBN Protokoll')        return ['IBN_Protokoll', (p&&p.mfr)||'', (p&&p.dev)||'', posT, ger];
+  if(type==='DGUV Protokoll')       return ['DGUV', (p&&p.mfr)||'', (p&&p.dev)||'', posT, ger];
+  if(type==='Einweisungsprotokoll') return ['Einweisungsprotokoll', posT, ger];
+  return [vaSan(type), posT, ger];     // unbekannte Art: Name der Art als Typ
+}
 // Zielordner für eine Position: Baustelle / Etage / Anlage
 function folderFor(pos){
   for(const sec of DATA){ for(const sub of sec.subsections){ if(sub.items.some(i=>i.pos===pos)){
@@ -6092,7 +6145,7 @@ async function ibnReceive(p){
   _ibnSeen.add(p.id);
   try{
     const pos=p.pos, type=p.ptype||'IBN Protokoll', ts=Date.now();
-    const base=protoDir(type,pos)+'/'+pos.replace(/\./g,'_')+'_'+type.replace(/ /g,'_')+'_'+ts;
+    const base=protoDir(type,pos)+'/'+vaName([vaDatum()].concat(vaProtoTeile(type,pos,p)));
     const fname=base+'.pdf';
     await queueUpload(fname, _dataURLtoBlob(p.pdf), 'application/pdf', pos);
     let dataFname='';
@@ -6126,8 +6179,12 @@ async function ibnReceive(p){
         if(!(p.nr||0) && (old.nr||0)) entry.nr=old.nr;
         if(!(p.von||0) && (old.von||0)) entry.von=old.von;
         arr[idx]=entry; replaced=true;
-        if(old.fname){removeQueuedFile(old.fname);spDelete(old.fname);}
-        if(old.dataFname){removeQueuedFile(old.dataFname);spDelete(old.dataFname);} } }
+        // NUR löschen, was nicht gerade neu geschrieben wurde. Seit der VA-Benennung
+        // (v130) steckt im Namen nur noch das TAGESdatum – ersetzt man ein Protokoll
+        // am selben Tag, ist der neue Name IDENTISCH mit dem alten. Der Löschbefehl
+        // träfe dann die soeben hochgeladene Datei.
+        if(old.fname && old.fname!==fname){removeQueuedFile(old.fname);spDelete(old.fname);}
+        if(old.dataFname && old.dataFname!==dataFname){removeQueuedFile(old.dataFname);spDelete(old.dataFname);} } }
     if(!replaced) gs(pos).pdfs.push(entry);
     saveFotos(pos); updPG(pos);
     // Beim ERSETZEN eines Protokolls nichts nachsetzen – der Haken steht dann längst,
@@ -6240,7 +6297,7 @@ document.getElementById('pi').addEventListener('change',async function(e){
   showLoader(PTYPE+' wird gespeichert...');
   try {
     const ext=file.name.split('.').pop();
-    const fname=protoDir(PTYPE,PPOS)+'/'+PPOS.replace(/\./g,'_')+'_'+PTYPE.replace(/ /g,'_')+'_'+Date.now()+'.'+ext;
+    const fname=protoDir(PTYPE,PPOS)+'/'+vaName([vaDatum()].concat(vaProtoTeile(PTYPE,PPOS,null)))+'.'+ext;
     await queueUpload(fname, file, file.type||'application/pdf', PPOS);   // lokal + Warteschlange (offline-fähig)
     if(!gs(PPOS).pdfs) gs(PPOS).pdfs=[];
     gs(PPOS).pdfs.push({type:PTYPE,name:file.name,fname:fname});
@@ -6680,10 +6737,13 @@ async function pdfSaveData(){
   if(!doc) throw new Error('PDF konnte nicht erstellt werden');
   const blob=doc.output('blob');
 
-  // Strategie: NEUE Datei schreiben (INSERT, funktioniert immer)
-  // Dateiname mit aktuellem Zeitstempel = niemals Konflikt
-  const typeSlug = (p.type||'Protokoll').replace(/ /g,'_');
-  const newFname = folderFor(EDPOS)+'/'+EDPOS.replace(/\./g,'_')+'_'+typeSlug+'_'+Date.now()+'.pdf';
+  // VA-Benennung (v130): DERSELBE Name wie beim Ablegen. Das mit dem Stift
+  // ergänzte Protokoll überschreibt damit seine Vorfassung, statt eine zweite
+  // Datei anzulegen – der Löschzweig unten greift dann nicht (Namensgleichheit).
+  // Das Datum bleibt das der ERSTELLUNG: annotieren ändert nicht, wann das
+  // Protokoll entstanden ist.
+  const newFname = folderFor(EDPOS)+'/'+
+    vaName([vaDatum(protoTs(p.fname)||new Date())].concat(vaProtoTeile(p.type||'Protokoll', EDPOS, p)))+'.pdf';
 
   await queueUpload(newFname, blob, 'application/pdf', EDPOS);   // lokal + Warteschlange (offline-fähig)
 
@@ -6782,13 +6842,14 @@ async function pdfSaveDataBg(pos, idx, pages){
   if(!doc) throw new Error('PDF konnte nicht erstellt werden');
   const blob=doc.output('blob');
 
-  const typeSlug = (p.type||'Protokoll').replace(/ /g,'_');
   // MUSS derselbe Ordner sein wie beim Ablegen (ibnReceive/trpdf): protoDir legt
   // IBN/DGUV/Einweisung in den Sammelordner der Baustelle, alles andere in den
   // Positionsordner. Vorher stand hier folderFor(pos) – wer ein IBN-Protokoll mit
   // dem Stift bearbeitete, verschob es damit aus `_Inbetriebnahme` heraus, und der
   // danebenliegende Datenstand blieb zurück.
-  const newFname = protoDir(p.type||'Protokoll',pos)+'/'+pos.replace(/\./g,'_')+'_'+typeSlug+'_'+Date.now()+'.pdf';
+  // VA-Benennung (v130) mit dem Datum der Erstellung -> überschreibt die Vorfassung.
+  const newFname = protoDir(p.type||'Protokoll',pos)+'/'+
+    vaName([vaDatum(protoTs(p.fname)||new Date())].concat(vaProtoTeile(p.type||'Protokoll', pos, p)))+'.pdf';
 
   await queueUpload(newFname, blob, 'application/pdf', pos);   // lokal + Warteschlange (offline-fähig)
 
@@ -8269,16 +8330,28 @@ opGw('${preGw}');
 // des SharePoint-Ordners sonst nicht gegen die App prüfen lässt. Deshalb steht in
 // der Liste bewusst auch der DATEINAME: er ist die Brücke zwischen beidem.
 // Der Zeitpunkt steckt im Dateinamen (…_<ms>.pdf) – der Eintrag selbst führt keinen.
+// Zeitpunkt aus dem Dateinamen. ZWEI Formate, weil Altbestand erhalten bleibt:
+//   bis v129: …_<13-stellige Millisekunden>.pdf   (auf die Minute genau)
+//   ab  v130: <JJMMTT>_…                          (VA-Benennung, nur Tagesdatum)
 function protoTs(fname){
-  const m=String(fname||'').match(/_(\d{13})\.[A-Za-z0-9]+$/);
-  if(!m) return null;
-  const d=new Date(parseInt(m[1],10));
-  return isNaN(d.getTime())?null:d;
+  const datei=String(fname||'').split('/').pop();
+  const alt=datei.match(/_(\d{13})\.[A-Za-z0-9]+$/);
+  if(alt){ const d=new Date(parseInt(alt[1],10)); return isNaN(d.getTime())?null:d; }
+  const va=datei.match(/^(\d{2})(\d{2})(\d{2})_/);
+  if(va){
+    const d=new Date(2000+ +va[1], (+va[2])-1, +va[3]);
+    return isNaN(d.getTime())?null:d;
+  }
+  return null;
 }
 function protoDatum(fname){
   const d=protoTs(fname);
-  return d ? (String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+d.getFullYear()
-             +' · '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')) : '–';
+  if(!d) return '–';
+  const tag=String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+d.getFullYear();
+  // Uhrzeit nur, wenn sie im Namen wirklich steckt (Altbestand). Bei der
+  // VA-Benennung gibt es nur ein Tagesdatum – „00:00" wäre eine Scheingenauigkeit.
+  const mitZeit=/_(\d{13})\.[A-Za-z0-9]+$/.test(String(fname||'').split('/').pop());
+  return mitZeit ? (tag+' · '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')) : tag;
 }
 // Alle Protokolle der Baustelle, in der Reihenfolge der Stückliste.
 function protoUebersichtDaten(){
@@ -8784,7 +8857,8 @@ async function fmErstellen(){
     const blob=await fmBuildPdf({nr, datum, emp, bezug, unter, zusatz, mitFotos, mitVorher, zeilen:gewaehlt, fotoData});
     const url=URL.createObjectURL(blob);
     if(win) win.location=url; else window.open(url,'_blank');
-    const fname=safeName(curProjName())+'/_Freimeldungen/Freimeldung_'+String(nr).padStart(3,'0')+'_'+datum+'.pdf';
+    const fname=safeName(curProjName())+'/_Freimeldungen/'+
+    vaName([vaDatum(datum),'Maengelfreimeldung',String(nr).padStart(3,'0')])+'.pdf';
     let hoch=true;
     try{ await spUpload(fname, blob, 'application/pdf'); }catch(e){ hoch=false; console.warn('Freimeldung-Upload:',(e&&e.message)||e); }
     // Vermerk an den Restarbeiten – erst NACH dem PDF, damit bei einem Abbruch
