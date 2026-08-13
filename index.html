@@ -1670,8 +1670,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 131;
+const APP_VERSION = 132;
 const CHANGELOG = [
+  { v:132, titel:'Restarbeiten-Filter zeigt die Restarbeiten gleich mit', punkte:[
+    'Wer auf „nur Restarbeiten" oder „nur Mängel" filtert, bekam bisher zwar die richtigen Positionen, aber mit <b>zugeklapptem Balken „Restarbeit / Notiz"</b> – man musste jede Karte einzeln öffnen, um zu sehen, was dort offen ist. Besonders im Tab „Alle" war das mühsam.',
+    'Jetzt klappt die App die Balken der Treffer <b>selbst auf</b>, wie sie es beim Sammel-Balken „Allgemeine Restarbeiten" schon immer getan hat.',
+    'Zugeklappt wird nie automatisch: Ein Balken, den man gerade befüllt, verschwindet nicht unter einem.' ]},
   { v:131, titel:'Protokoll-Übersicht hält sich von allein aktuell', punkte:[
     'Die Übersicht in SharePoint musste bisher von Hand neu abgelegt werden – nach dem ersten neuen Protokoll stimmte die Datei dort nicht mehr.',
     'Jetzt wird sie <b>nach jeder Änderung am Protokollbestand</b> selbst überschrieben: neues Protokoll aus der Inbetriebnahme-App, von Hand hochgeladenes PDF, gelöschtes Protokoll und auch nach dem Bearbeiten mit dem Stift.',
@@ -3245,6 +3249,27 @@ function updAllgRafVis(){
     const t=document.getElementById('ALLGCNT'); if(t) t.classList.add('act');
   }
 }
+// Dasselbe für die POSITIONSKARTEN: bei aktivem Restarbeiten-Filter den Balken
+// „Restarbeit / Notiz" der Treffer aufklappen. Ohne das steht die gefilterte
+// Liste da, ohne zu zeigen, WAS dort offen ist – man müsste jede Karte einzeln
+// öffnen, und genau danach hatte man gerade gefiltert. Gleiche Falle wie beim
+// Sammel-Balken (updAllgRafVis).
+// Zugeklappt wird NIE automatisch (Regel aus cnUpdate): sonst verschwände der
+// Balken unter jemandem, der gerade eine Zeile befüllt.
+function updRafKarten(){
+  if(RAF==='all') return;
+  document.querySelectorAll('.card:not(.dtcard)').forEach(c=>{
+    if(c.style.display==='none') return;
+    const id=c.id.slice(1), box=document.getElementById('CN'+id);
+    if(!box || box.classList.contains('open')) return;
+    box.classList.add('open');
+    const btn=document.getElementById('CNT'+id); if(btn) btn.classList.add('act');
+    // Höhen nachziehen – zugeklappt war scrollHeight 0 (wie in tgNotes)
+    const anm=box.querySelector('.anm'); if(anm) autoR(anm);
+    box.querySelectorAll('textarea.radesc').forEach(raDescFit);
+    box.querySelectorAll('textarea.ratxt').forEach(raTxtFit);
+  });
+}
 
 function setSF(f){
   SF=(SF===f && f!=='all')?'all':f;
@@ -3349,6 +3374,11 @@ function applyF(){
     const anyVisible=Array.from(bb.querySelectorAll('.card')).some(c=>c.style.display!=='none');
     bb.style.display=anyVisible?'':'none';
   });
+
+  // Zum Schluss, weil es die fertige Sichtbarkeit der Karten braucht. Hier statt
+  // in setRAF: der Filter bleibt beim Gewerk- und Etagenwechsel stehen, und die
+  // Treffermenge ändert sich dabei.
+  updRafKarten();
 }
 
 
