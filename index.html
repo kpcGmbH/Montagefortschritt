@@ -1670,8 +1670,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 130;
+const APP_VERSION = 131;
 const CHANGELOG = [
+  { v:131, titel:'Protokoll-Übersicht hält sich von allein aktuell', punkte:[
+    'Die Übersicht in SharePoint musste bisher von Hand neu abgelegt werden – nach dem ersten neuen Protokoll stimmte die Datei dort nicht mehr.',
+    'Jetzt wird sie <b>nach jeder Änderung am Protokollbestand</b> selbst überschrieben: neues Protokoll aus der Inbetriebnahme-App, von Hand hochgeladenes PDF, gelöschtes Protokoll und auch nach dem Bearbeiten mit dem Stift.',
+    'Das passiert <b>im Hintergrund</b>, ohne Ladebalken – und gesammelt: Kommen mehrere Protokolle kurz nacheinander, wird die Übersicht einmal am Ende geschrieben statt für jedes einzeln.',
+    'Ohne Verbindung passiert nichts; die nächste Änderung mit Netz zieht sie nach. Der Knopf „📤 In SharePoint ablegen" bleibt für den Fall, dass man sie sofort will.' ]},
   { v:130, titel:'Dateinamen folgen jetzt der kpc-Verfahrensanweisung', punkte:[
     'Alle Protokolle und Berichte werden nach dem Schema des kpc-Benennungstools abgelegt: <b>JJMMTT_[Phase]_Dokumententyp_Bezeichnung</b>. Umlaute werden aufgelöst, Leerzeichen zu Bindestrichen.',
     'Beispiele: <b>260811_IBN_Protokoll_Meiko_M-iClean-HM_02-0005.pdf</b> · <b>260811_DGUV_Meiko_M-iClean-HM_02-0005.pdf</b> · <b>260811_Einweisungsprotokoll_02-0005.pdf</b> · <b>260811_Dichtigkeitsprotokoll_Erdgeschoss_003.pdf</b> · <b>260811_Bautagebuch-003.pdf</b> · <b>260811_Maengelfreimeldung_003.pdf</b>',
@@ -6187,6 +6192,7 @@ async function ibnReceive(p){
         if(old.dataFname && old.dataFname!==dataFname){removeQueuedFile(old.dataFname);spDelete(old.dataFname);} } }
     if(!replaced) gs(pos).pdfs.push(entry);
     saveFotos(pos); updPG(pos);
+    puAuto();                       // Übersicht in SharePoint nachziehen
     // Beim ERSETZEN eines Protokolls nichts nachsetzen – der Haken steht dann längst,
     // und ein „entfällt" wäre schon beim ersten Ablegen gemeldet worden.
     const auto = replaced ? null : schrittAusProtokoll(pos, type);
@@ -6304,6 +6310,7 @@ document.getElementById('pi').addEventListener('change',async function(e){
     saveFotos(PPOS);
     updPG(PPOS);
     hideLoader();
+    puAuto();                       // Übersicht in SharePoint nachziehen
     // Gleicher Automatismus wie beim digital ausgefüllten Protokoll: ein hier
     // hochgeladenes Inbetriebnahmeprotokoll ist derselbe Nachweis.
     const auto=schrittAusProtokoll(PPOS, PTYPE);
@@ -6458,6 +6465,7 @@ function delProto(pos,i){
   gs(pos).pdfs.splice(i,1);
   saveFotos(pos);
   updPG(pos);
+  puAuto();                         // Übersicht in SharePoint nachziehen
   if(p.fname){ removeQueuedFile(p.fname); spDelete(p.fname); }
   if(p.dataFname){ removeQueuedFile(p.dataFname); spDelete(p.dataFname); }
 }
@@ -6751,6 +6759,7 @@ async function pdfSaveData(){
   p.fname = newFname;
   saveFotos(EDPOS);
   updPG(EDPOS);
+  puAuto();                         // Übersicht in SharePoint nachziehen
 
   // Alte Datei im Hintergrund löschen
   if(oldFname && oldFname !== newFname){ removeQueuedFile(oldFname); spDelete(oldFname); }
@@ -6856,6 +6865,7 @@ async function pdfSaveDataBg(pos, idx, pages){
   p.fname = newFname;
   saveFotos(pos);
   updPG(pos);
+  puAuto();                         // Übersicht in SharePoint nachziehen
 
   if(oldFname && oldFname !== newFname){ removeQueuedFile(oldFname); spDelete(oldFname); }
   return true;
@@ -8537,6 +8547,14 @@ async function puBuildPdf(){
 // Dokumentenreihe. Mit Datum im Namen sammelte sich genau die Ablage-Flut an,
 // wegen der die Übersicht überhaupt entstanden ist (§1.16).
 const PU_ORDNER='_Protokolluebersicht';
+function puPfad(){ return safeName(curProjName())+'/'+PU_ORDNER+'/Protokolluebersicht.pdf'; }
+// still=true: aus dem Automatismus heraus – kein Ladebalken, kein Fenster, keine
+// Störung des laufenden Arbeitsschritts. Fehler landen nur in der Konsole.
+async function puAblegen(still){
+  const blob=await puBuildPdf();
+  await spUpload(puPfad(), blob, 'application/pdf');
+  if(!still) showToast('✓ Übersicht abgelegt: '+PU_ORDNER+'/Protokolluebersicht.pdf');
+}
 async function puInSharePoint(){
   if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
   if(!navigator.onLine || !SPIDS.driveId){
@@ -8544,16 +8562,28 @@ async function puInSharePoint(){
     return;
   }
   showLoader('Übersicht wird erstellt …');
-  try{
-    const blob=await puBuildPdf();
-    const fname=safeName(curProjName())+'/'+PU_ORDNER+'/Protokolluebersicht.pdf';
-    await spUpload(fname, blob, 'application/pdf');
-    hideLoader();
-    showToast('✓ Übersicht abgelegt: '+PU_ORDNER+'/Protokolluebersicht.pdf');
-  }catch(e){
-    hideLoader();
-    alert('Ablegen fehlgeschlagen: '+((e&&e.message)||e));
-  }
+  try{ await puAblegen(false); hideLoader(); }
+  catch(e){ hideLoader(); alert('Ablegen fehlgeschlagen: '+((e&&e.message)||e)); }
+}
+// ── Übersicht nach jeder Protokoll-Änderung nachziehen (ab v131) ─────────────
+// Bisher musste jemand daran denken, sie neu abzulegen – dann stimmte die Datei in
+// SharePoint nach dem ersten neuen Protokoll nicht mehr.
+// ENTPRELLT: Beim Abarbeiten einer Baustelle kommen Protokolle im Minutentakt; ohne
+// Verzögerung entstünde für jedes ein eigener PDF-Aufbau samt Upload. Der Zeitgeber
+// startet nach der LETZTEN Änderung neu.
+let _puTimer=null, _puLaeuft=false;
+function puAuto(){
+  if(!PID || !navigator.onLine || !SPIDS.driveId) return;   // offline: beim nächsten Mal
+  const pidBeimPlanen=PID;
+  clearTimeout(_puTimer);
+  _puTimer=setTimeout(async ()=>{
+    // Baustelle inzwischen gewechselt -> die Änderung gehört nicht mehr hierher.
+    if(PID!==pidBeimPlanen || _puLaeuft) return;
+    _puLaeuft=true;
+    try{ await puAblegen(true); }
+    catch(e){ console.warn('Protokoll-Übersicht konnte nicht aktualisiert werden:', (e&&e.message)||e); }
+    finally{ _puLaeuft=false; }
+  }, 8000);
 }
 function expProtokollUebersicht(){
   if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
