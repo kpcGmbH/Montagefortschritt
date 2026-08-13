@@ -1670,8 +1670,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 133;
+const APP_VERSION = 134;
 const CHANGELOG = [
+  { v:134, titel:'Einweisungsprotokolle lassen sich vorbereiten', punkte:[
+    'Ein Protokoll kann jetzt <b>im Büro vorbereitet und vor Ort fertiggestellt</b> werden: Geräte auswählen, Checklisten, Teilnehmer, Datum – und dann „💾 Zwischenspeichern – ohne Unterschrift".',
+    'Der Zwischenstand liegt in SharePoint und steht in der Einweisungs-App oben unter <b>„Vorbereitete Protokolle"</b>. Jeder, der die Baustelle öffnet, sieht ihn und kann ihn fortsetzen.',
+    'Ein Entwurf zählt <b>nicht</b> als Nachweis: Es entsteht kein PDF, der Schritt „Einweisung" wird nicht abgehakt, und in der Protokoll-Historie taucht er nicht auf. Erst das Abschließen mit beiden Unterschriften macht daraus ein Protokoll – dann verschwindet der Entwurf von selbst.',
+    'Unterschriften werden bewusst nicht mit zwischengespeichert: Sie gelten dem Stand, der beim Unterschreiben dastand.' ]},
   { v:133, titel:'DGUV-Protokolle heißen jetzt nach dem geprüften Gerät', punkte:[
     'Das erste DGUV-Protokoll im neuen Namensschema hieß <b>260813_DGUV_DGUV-V3_Pruefprotokoll-elektrische-Geraete_3-0-0-00-10.pdf</b> – die Protokollart stand doppelt darin, das geprüfte Gerät gar nicht.',
     'Jetzt stehen <b>Fabrikat und Typ aus der Stückliste</b> im Namen: <b>260813_DGUV_Rational_iCombi-Pro-6-1-1_3-0-0-00-10.pdf</b>.',

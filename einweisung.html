@@ -152,6 +152,10 @@ main{padding:14px 12px 40px;max-width:900px;margin:0 auto;}
 .sigtools button{background:none;border:none;color:var(--braun);font-size:12px;font-weight:700;cursor:pointer;}
 .finish{width:100%;background:var(--green);color:#fff;border:none;border-radius:12px;padding:15px;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px;}
 .finish:disabled{background:var(--accent2);opacity:.6;}
+/* Zwischenspeichern steht ÜBER dem Abschließen und sieht bewusst anders aus:
+   es erzeugt kein Protokoll und hakt nichts ab. */
+.entw{width:100%;background:transparent;color:var(--braun);border:1px solid var(--braun);border-radius:12px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;}
+.entw-hint{font-size:11px;color:var(--accent2);margin:6px 2px 0;line-height:1.5;text-align:center;}
 .hint{font-size:11px;color:var(--accent2);margin:2px 2px 12px;line-height:1.5;}
 .empty{text-align:center;color:var(--accent2);font-size:13px;padding:36px 20px;line-height:1.6;}
 
@@ -377,6 +381,10 @@ async function loadEW(pid){
   let ew={ v:1, devices:{}, std:{}, protokolle:[] };
   if(txt){ try{ ew=JSON.parse(txt); }catch(e){} }
   ew.devices=ew.devices||{}; ew.std=ew.std||{}; ew.protokolle=ew.protokolle||[];
+  // Entwürfe liegen BEWUSST in einem eigenen Feld, nicht in `protokolle`: Alles,
+  // was dort steht, gilt als Nachweis (Historie, `complete`, `protFolgen`, der
+  // Haken „eingewiesen"). Ein Entwurf ist keiner.
+  ew.entwuerfe=ew.entwuerfe||[];
   if(ew.auftraggeber==null) ew.auftraggeber=''; if(ew.ort==null) ew.ort=''; if(ew.adresse==null) ew.adresse='';
   return ew;
 }
@@ -625,6 +633,15 @@ function renderOverview(){
   let html='<div class="toolbar"><button class="btn-primary" onclick="startSession()">+ Neues Protokoll</button>'+
     '<span class="summary">'+c.ein+' von '+c.tot+' Geräten eingewiesen</span></div>';
 
+  // Entwürfe ganz oben – sie sind eine offene Aufgabe, keine Ablage. Ohne
+  // Entwürfe keine Karte: sonst stünde auf jeder Baustelle ein leerer Kasten.
+  if(EW.entwuerfe.length){
+    html+='<div class="card"><div class="card-h">Vorbereitete Protokolle ('+EW.entwuerfe.length+')</div><div class="card-b">'+
+      '<div class="hint">Zwischenstände ohne Unterschrift. Sie zählen NICHT als Nachweis: kein PDF, kein Haken „eingewiesen". Vor Ort fortsetzen, unterschreiben lassen, abschließen.</div>'+
+      EW.entwuerfe.slice().sort((a,b)=>(b.ts||0)-(a.ts||0)).map(entwurfLine).join('')+
+      '</div></div>';
+  }
+
   // Allgemein-Karte
   const allgProt=EW.protokolle.filter(p=>p.typ==='allgemein');
   html+='<div class="card"><div class="card-h">Allgemein-Grundlagen</div><div class="card-b">'+
@@ -825,6 +842,99 @@ function editProt(id){
   renderSession();
 }
 
+// ══════════════════ Entwürfe (vorbereitete Protokolle) ══════════════════
+// Ein Protokoll lässt sich im Büro vorbereiten und vor Ort fertigstellen. Der
+// Entwurf trägt ALLES außer den Unterschriften – und er darf nichts auslösen:
+// kein PDF, kein Eintrag in `EW.protokolle`, keine `ew`-Rückschreibung, kein
+// „eingewiesen"-Haken. Erst das Abschließen mit beiden Unterschriften ist der
+// Nachweis (dieselbe Regel wie beim Löschen: kein Haken ohne Nachweis).
+// Unterschriften werden BEWUSST nicht mitgespeichert: sie gelten dem Text, der
+// zum Zeitpunkt der Unterschrift dastand – genau die Begründung, aus der auch
+// `editProt` beide Pads leer lässt.
+function entwurfEtagen(positions){
+  const et=[];
+  (positions||[]).forEach(pos=>{ const d=allDevices().find(x=>x.g.pos===pos);
+    const e=d&&(d.et.label||'').trim(); if(e&&et.indexOf(e)<0) et.push(e); });
+  return et;
+}
+function entwurfTitel(typ, etagen){
+  const art = typ==='schluessel'? 'Schlüsselübergabe' : typ==='allgemein'? 'Grundlagen-Einweisung' : 'Geräte-Einweisung';
+  return art+(etagen.length&&etagen.length<=2? ' – '+etagen.join(', ') : '');
+}
+async function saveEntwurf(){
+  if(!SESSION) return;
+  const positions=Object.keys(SESSION.selected||{});
+  const zeilen=istSchluessel()? keyZeilen() : [];
+  // Ein völlig leerer Entwurf hilft niemandem und steht später als Karteileiche da.
+  if(!positions.length && !zeilen.length && !(SESSION.teilnehmer||'').trim() && !(SESSION.kommentar||'').trim()){
+    alert('Für einen Zwischenstand fehlt noch alles: kein Gerät ausgewählt, kein Name, kein Kommentar.');
+    return;
+  }
+  const etagen=entwurfEtagen(positions);
+  const id=SESSION.entwurfId||('E'+Date.now());
+  const daten={ id, typ:SESSION.typ, positions,
+    sonder:SESSION.sonder||{}, std:SESSION.std||{},
+    keys:(SESSION.keys||{}), frei:(SESSION.frei||[]),
+    teilnehmer:(SESSION.teilnehmer||'').trim(), auftraggeber:(SESSION.auftraggeber||'').trim(),
+    ort:(SESSION.ort||'').trim(), adresse:(SESSION.adresse||'').trim(), auftrag:(SESSION.auftrag||'').trim(),
+    datum:SESSION.datum||todayISO(), einweiser:(SESSION.einweiser||'').trim(),
+    kommentar:(SESSION.kommentar||'').trim(), etagen, titel:entwurfTitel(SESSION.typ, etagen),
+    ts:Date.now(), von:USER||'' };
+  showLoader('Zwischenstand wird gespeichert …');
+  try{
+    const i=EW.entwuerfe.findIndex(e=>e.id===id);
+    if(i>=0) EW.entwuerfe[i]=daten; else EW.entwuerfe.push(daten);
+    await saveEW();
+    hideLoader(); closeOverlay(); renderOverview();
+    toast('✓ Zwischenstand gespeichert – noch kein Protokoll');
+  }catch(e){
+    hideLoader(); console.error(e);
+    // Kein Netz = der Zwischenstand ist WEG. Das gehört gesagt, nicht verschwiegen.
+    alert('Zwischenspeichern fehlgeschlagen: '+((e&&e.message)||e)+'\n\nDer Entwurf wurde NICHT abgelegt – das Fenster bleibt offen, damit nichts verloren geht.');
+  }
+}
+function editEntwurf(id){
+  const e=EW.entwuerfe.find(x=>x.id===id); if(!e) return;
+  const selected={}, sonder={};
+  (e.positions||[]).forEach(pos=>{ selected[pos]=true;
+    if(e.sonder&&e.sonder[pos]) sonder[pos]=e.sonder[pos].map(c=>({txt:c.txt,done:!!c.done})); });
+  const std={};
+  Object.keys(e.std||{}).forEach(fid=>{ std[fid]=(e.std[fid]||[]).map(c=>({txt:c.txt,done:!!c.done})); });
+  SESSION={ entwurfId:id, typ:e.typ, selected, sonder, std,
+    keys:JSON.parse(JSON.stringify(e.keys||{})), frei:JSON.parse(JSON.stringify(e.frei||[])), collapsed:{},
+    teilnehmer:e.teilnehmer||'', auftraggeber:e.auftraggeber||'', ort:e.ort||'',
+    adresse:(e.adresse!=null?e.adresse:PROJ_ADR), auftrag:(e.auftrag!=null?e.auftrag:PROJ_AUFTRAG),
+    datum:(e.datum||'').slice(0,10)||todayISO(), einweiser:e.einweiser||'',
+    kommentar:e.kommentar||'', sig:'', sigKpc:'' };
+  // Checklisten nachziehen: im Entwurf fehlen sie, wenn ein Gerät ohne sie
+  // ausgewählt wurde oder die Stückliste inzwischen ergänzt wurde.
+  Object.keys(selected).forEach(pos=>ensureSonder(pos));
+  mkOverlay('Vorbereitetes Protokoll fortsetzen');
+  renderSession();
+}
+async function deleteEntwurf(id){
+  const e=EW.entwuerfe.find(x=>x.id===id); if(!e) return;
+  if(!confirm('Entwurf „'+(e.titel||'Protokoll')+'" verwerfen?\n\n'+
+    ((e.positions||[]).length? (e.positions.length+' ausgewählte(s) Gerät(e)') : 'Kein Gerät ausgewählt')+
+    '\nZuletzt bearbeitet: '+fmtDE(new Date(e.ts||Date.now()).toISOString())+
+    '\n\nEs wird nichts abgehakt und kein Protokoll gelöscht – nur der Zwischenstand.')) return;
+  showLoader('Entwurf wird verworfen …');
+  try{
+    EW.entwuerfe=EW.entwuerfe.filter(x=>x.id!==id);
+    await saveEW(); hideLoader(); renderOverview(); toast('Entwurf verworfen');
+  }catch(err){ hideLoader(); alert('Verwerfen fehlgeschlagen: '+((err&&err.message)||err)); }
+}
+function entwurfLine(e){
+  const umfang=(e.positions&&e.positions.length)? e.positions.length+' Gerät(e)' : 'noch kein Gerät';
+  return '<div class="prow"><div class="pmain"><div class="pt">📝 '+esc(e.titel||'Protokoll')+
+    ' <span style="color:var(--braun)">Entwurf</span></div>'+
+    '<div class="pm">'+fmtDE(e.datum)+(e.etagen&&e.etagen.length? ' · '+esc(e.etagen.join(', ')):'')+
+    (e.teilnehmer? ' · '+esc(e.teilnehmer):'')+' · '+umfang+
+    (e.von? ' · vorbereitet von '+esc(e.von):'')+'</div></div>'+
+    '<button class="plink" onclick="editEntwurf(\''+esc(e.id)+'\')">Fortsetzen</button>'+
+    '<button class="pdel" onclick="deleteEntwurf(\''+esc(e.id)+'\')" title="Entwurf verwerfen">🗑</button></div>';
+}
+
 // ══════════════════ Sitzung (Neue Einweisung) ══════════════════
 let SESSION=null;
 function startSession(){
@@ -993,6 +1103,12 @@ function footerFields(){
     '<div class="fld"><label>Bestätigung '+(isK?'des Übernehmers':'der eingewiesenen Person')+'</label><div class="confbox">'+esc(confText())+'</div></div>'+
     '<div class="fld"><label>Unterschrift '+(isK?'des Übernehmers *':'der eingewiesenen Person *')+'</label><div class="sigwrap"><canvas id="sigCanvas"></canvas><div class="sigtools"><span style="font-size:11px;color:var(--accent2)">Mit der Unterschrift wird die obige Bestätigung anerkannt</span><button onclick="clearSig(\'sig\')">Löschen</button></div></div></div>'+
     (SESSION.editId? '<div class="hint" style="margin-bottom:8px">Korrektur: Beide Unterschriften werden neu erfasst – die alten gelten dem alten Text. Das bisherige PDF wird ersetzt (die Vorversion bleibt im SharePoint-Versionsverlauf).</div>' : '')+
+    // Zwischenspeichern gibt es nur beim Vorbereiten. Bei einer KORREKTUR wäre es
+    // sinnlos bis gefährlich: das Protokoll existiert bereits, ein Entwurf daneben
+    // hieße, dass zwei Stände dasselbe Protokoll meinen.
+    (SESSION.editId? '' :
+      '<button class="entw" onclick="saveEntwurf()">&#128190; Zwischenspeichern &ndash; ohne Unterschrift</button>'+
+      '<div class="entw-hint">Hebt den Stand auf, damit er vor Ort fertiggestellt werden kann. Es entsteht <b>kein PDF</b>, und der Schritt „Einweisung" wird <b>nicht</b> abgehakt.</div>')+
     '<button class="finish" onclick="finishSession()">'+(SESSION.editId? 'Korrektur speichern' : 'Protokoll abschließen &amp; speichern')+'</button>';
 }
 function devByPos(pos){ const d=allDevices().find(x=>x.g.pos===pos); return d?d.g:null; }
@@ -1127,6 +1243,9 @@ async function finishSession(){
     if(isK){ daten.zeilen=zeilen.map(z=>({pos:z.pos,bez:z.bez,anz:z.anz,nr:z.nr})); daten.schluessel=anzSchl; }
     if(alt){ Object.assign(alt, daten, { korrigiertAm:new Date().toISOString(), korrigiertVon:USER||einw }); MISSING.delete(id); }
     else { EW.protokolle.push(daten); }
+    // Der Entwurf hat seinen Zweck erfüllt – sonst stünde derselbe Stand doppelt
+    // da, einmal als Protokoll und einmal als offene Aufgabe.
+    if(SESSION.entwurfId) EW.entwuerfe=EW.entwuerfe.filter(x=>x.id!==SESSION.entwurfId);
     showLoader('Wird in SharePoint gespeichert …');
     await saveEW();
     hideLoader();
