@@ -1841,7 +1841,8 @@ async function startOffline(){
   if(!pid || !ew || !lv){
     const st=document.getElementById('loginMsStatus');
     if(st) st.innerHTML='Kein Netz – und von dieser Baustelle liegt noch nichts auf dem Gerät.<br>'+
-      'Einmal mit Verbindung öffnen, danach geht es auch offline.';
+      'Es genügt, sie einmal mit Verbindung in der <b>Montagefortschritt-App</b> zu öffnen: '+
+      'die legt den Stand für die Einweisung gleich mit ab.';
     updSyncBadge();
     return false;
   }

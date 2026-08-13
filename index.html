@@ -1670,8 +1670,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 135;
+const APP_VERSION = 136;
 const CHANGELOG = [
+  { v:136, titel:'Einweisung offline: kein Vorbereiten mehr nötig', punkte:[
+    'Seit v135 arbeitet die Einweisung ohne Netz – man musste sie aber vorher einmal <b>mit</b> Netz auf der jeweiligen Baustelle geöffnet haben. Genau das vergisst man auf dem Weg zur Baustelle.',
+    'Jetzt legt die <b>Montagefortschritt-App</b> den Stand für die Einweisung gleich mit ab, sobald eine Baustelle geöffnet wird: Stückliste, Einweisungsstand und Stammdaten.',
+    'Für den Monteur heißt das: morgens einmal die Baustelle öffnen wie immer – die Einweisung ist damit vor Ort einsatzbereit, auch im Funkloch.',
+    'Noch nicht übertragene Einträge werden dabei nie überschrieben: Liegt in der Einweisung etwas in der Warteschlange, bleibt der dortige Stand stehen.' ]},
   { v:135, titel:'Die Einweisungs-App arbeitet jetzt ohne Netz', punkte:[
     'Bisher brauchte die Einweisung durchgehend Verbindung – ohne Netz kam „Speichern fehlgeschlagen" und der Inhalt war weg. Jetzt arbeitet sie <b>wie die Montagefortschritt-App</b>: Jede Änderung wird sofort auf dem Gerät gespeichert und in eine Warteschlange gelegt; sobald wieder Netz da ist, läuft sie von selbst nach oben.',
     'Das gilt für alles – Entwürfe, fertige Protokolle samt PDF und Unterschriften, Löschungen und den Haken „eingewiesen" in den Positionen.',
@@ -9199,6 +9204,68 @@ function slugify(s){
 async function spTryDownloadText(fname){
   try{ return await (await spDownloadBlob(fname)).text(); }catch(e){ return null; }
 }
+// ---- Einweisungs-App offline versorgen ----
+// Die Einweisung hat einen eigenen lokalen Speicher (IndexedDB `kpc_einweisung`).
+// Der füllte sich bisher NUR, wenn jemand die Einweisungs-App selbst einmal MIT
+// NETZ auf genau dieser Baustelle geöffnet hatte. Im Einsatz ist das ein Schritt,
+// den niemand macht: Der Monteur öffnet morgens DIESE App – die Einweisung erst
+// vor Ort, wenn das Gerät eingewiesen wird, und dort ist oft kein Netz.
+// Deshalb legt die Hauptapp den Stand beim Öffnen einer Baustelle gleich mit ab.
+// Beide Apps laufen unter derselben Adresse und teilen sich damit den Speicher.
+// ACHTUNG: Datenbankname, Version und Store-Namen müssen zu einweisung.html
+// passen – wer dort etwas ändert, ändert es hier mit.
+const EW_IDB_NAME='kpc_einweisung', EW_IDB_VER=1, EW_IDB_STORES=['cache','files','outbox'];
+function ewIdb(){
+  return new Promise((res,rej)=>{
+    let req; try{ req=indexedDB.open(EW_IDB_NAME, EW_IDB_VER); }catch(e){ rej(e); return; }
+    req.onupgradeneeded=()=>{ const db=req.result; EW_IDB_STORES.forEach(s=>{ if(!db.objectStoreNames.contains(s)) db.createObjectStore(s); }); };
+    req.onsuccess=()=>res(req.result); req.onerror=()=>rej(req.error);
+  });
+}
+async function ewCacheSet(key,val){
+  const db=await ewIdb();
+  return new Promise((res,rej)=>{ const tx=db.transaction('cache','readwrite'); tx.objectStore('cache').put(val,key); tx.oncomplete=()=>res(true); tx.onerror=()=>rej(tx.error); });
+}
+// Liegt in der Einweisungs-App noch etwas Unversendetes für diese Baustelle?
+// Dann NICHT überschreiben: der dortige Stand ist der neuere (er enthält die noch
+// nicht übertragene Arbeit), und ihn durch den Serverstand zu ersetzen hieße, dem
+// Monteur seine eigenen Einträge wegzunehmen.
+async function ewHatOffene(pid){
+  try{
+    const db=await ewIdb();
+    return await new Promise((res)=>{
+      const out=[]; const req=db.transaction('outbox','readonly').objectStore('outbox').openCursor();
+      req.onsuccess=()=>{ const c=req.result; if(c){ if(c.value&&c.value.pid===pid) out.push(1); c.continue(); } else res(out.length>0); };
+      req.onerror=()=>res(false);
+    });
+  }catch(e){ return false; }
+}
+async function ewVorladen(pid){
+  if(!pid || !navigator.onLine || !SPIDS.driveId) return;
+  // Stückliste: liegt hier schon geladen vor – keine zweite Anfrage nötig.
+  try{ if(DATA && DATA.length) await ewCacheSet('lv|'+pid, JSON.parse(JSON.stringify(DATA))); }catch(e){}
+  try{
+    const s=projStamm(PROJECTS.find(p=>p.pid===pid));
+    await ewCacheSet('stamm|'+pid, { PROJNAME:s.name||pid, PROJ_AG:s.auftraggeber||'', PROJ_ORT:s.ort||'',
+      PROJ_ADR:[s.strasse, s.plzOrt].filter(Boolean).join(', '), PROJ_AUFTRAG:s.auftrag||'' });
+  }catch(e){}
+  // Einweisungsstand – die einzige zusätzliche Anfrage, eine kleine JSON.
+  try{
+    if(await ewHatOffene(pid)) return;
+    const txt=await spTryDownloadTextStrict('EINWEISUNG_'+pid+'.json');
+    let ew = txt? JSON.parse(txt) : { v:1 };
+    ew.devices=ew.devices||{}; ew.std=ew.std||{}; ew.protokolle=ew.protokolle||[]; ew.entwuerfe=ew.entwuerfe||[];
+    if(ew.auftraggeber==null) ew.auftraggeber=''; if(ew.ort==null) ew.ort=''; if(ew.adresse==null) ew.adresse='';
+    await ewCacheSet('ew|'+pid, ew);
+    // Damit ein Direktaufruf der Einweisung OHNE #pid offline auf der richtigen
+    // Baustelle landet – etwa vom Startbildschirm des Handys.
+    const nm=(PROJECTS.find(p=>p.pid===pid)||{}).name||pid;
+    try{ localStorage.setItem('kpc_ew_letzte', JSON.stringify({pid, name:nm})); }catch(e){}
+  }catch(e){ /* offline oder Datei (noch) nicht da: beim nächsten Mal */ }
+}
+// Zurück im Netz und eine Baustelle offen? Dann den Vorrat auffrischen.
+window.addEventListener('online', ()=>{ if(PID) ewVorladen(PID).catch(()=>{}); });
+
 // Wie oben, aber: null nur bei "nicht vorhanden" (404); echte Netzfehler werden geworfen,
 // damit der Offline-Lesepfad auf den lokalen Cache zurückfallen kann statt zu "leer".
 async function spTryDownloadTextStrict(fname){
@@ -9485,6 +9552,7 @@ async function selectProject(pid){
   try{
     PID = pid;
     DATA = await loadProjectLV(pid);
+    ewVorladen(pid).catch(()=>{});        // Einweisungs-App offline-fähig machen (nicht blockierend)
     loadBautagebuch(pid).catch(()=>{});   // Bautagebuch der Baustelle nachladen (nicht blockierend)
     loadDicht(pid).then(()=>updDichtTasks()).catch(()=>{});   // Dichtigkeitsprotokolle nachladen (nicht blockierend)
     loadService(pid).catch(()=>{});   // Serviceberichte nachladen (nicht blockierend)
