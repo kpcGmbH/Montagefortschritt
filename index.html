@@ -1670,8 +1670,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 134;
+const APP_VERSION = 135;
 const CHANGELOG = [
+  { v:135, titel:'Die Einweisungs-App arbeitet jetzt ohne Netz', punkte:[
+    'Bisher brauchte die Einweisung durchgehend Verbindung – ohne Netz kam „Speichern fehlgeschlagen" und der Inhalt war weg. Jetzt arbeitet sie <b>wie die Montagefortschritt-App</b>: Jede Änderung wird sofort auf dem Gerät gespeichert und in eine Warteschlange gelegt; sobald wieder Netz da ist, läuft sie von selbst nach oben.',
+    'Das gilt für alles – Entwürfe, fertige Protokolle samt PDF und Unterschriften, Löschungen und den Haken „eingewiesen" in den Positionen.',
+    'Im Kopf steht wie in der Hauptapp der Stand: <b>✓ Synchron</b>, <b>↻ wird synchronisiert</b> oder <b>⚠ Offline · n ausstehend</b>.',
+    'Stückliste, Einweisungsstand und Stammdaten liegen nach dem ersten Öffnen einer Baustelle auf dem Gerät – die App startet dann auch im Funkloch. Nur beim allerersten Mal braucht eine Baustelle einmal Verbindung.',
+    '<b>Kein Überschreiben mehr:</b> Übertragen wird nicht die ganze Datei, sondern die einzelne Änderung. Arbeiten zwei Leute am selben Tag an derselben Baustelle, bleibt beides erhalten – bisher konnte der Stand des einen den des anderen verdrängen.' ]},
   { v:134, titel:'Einweisungsprotokolle lassen sich vorbereiten', punkte:[
     'Ein Protokoll kann jetzt <b>im Büro vorbereitet und vor Ort fertiggestellt</b> werden: Geräte auswählen, Checklisten, Teilnehmer, Datum – und dann „💾 Zwischenspeichern – ohne Unterschrift".',
     'Der Zwischenstand liegt in SharePoint und steht in der Einweisungs-App oben unter <b>„Vorbereitete Protokolle"</b>. Jeder, der die Baustelle öffnet, sieht ihn und kann ihn fortsetzen.',

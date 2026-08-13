@@ -2,11 +2,15 @@
 // Cacht die App-Shell + CDN-Bibliotheken (cache-first), damit die App offline startet.
 // Microsoft Graph / Login / SharePoint werden NIE gecacht (network-only) – Daten und
 // Tokens laufen ausschließlich live. Bei jeder Veröffentlichung CACHE-Version erhöhen.
-const CACHE = 'kpc-montage-v152';
+const CACHE = 'kpc-montage-v153';
 
 const SHELL = [
   './',
   './index.html',
+  // Die Einweisung arbeitet seit v135 offline (eigene Warteschlange). Damit sie
+  // das auch beim ERSTEN Aufruf ohne Netz kann, wird sie mit vorgeladen – sonst
+  // läge sie erst nach einem Besuch mit Verbindung im Zwischenspeicher.
+  './einweisung.html',
   './manifest.webmanifest',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js',
   'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js',

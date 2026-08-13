@@ -152,6 +152,9 @@ main{padding:14px 12px 40px;max-width:900px;margin:0 auto;}
 .sigtools button{background:none;border:none;color:var(--braun);font-size:12px;font-weight:700;cursor:pointer;}
 .finish{width:100%;background:var(--green);color:#fff;border:none;border-radius:12px;padding:15px;font-size:16px;font-weight:700;cursor:pointer;margin-top:8px;}
 .finish:disabled{background:var(--accent2);opacity:.6;}
+/* Übertragungsstand im Kopf – gleiche Stelle und gleicher Wortlaut wie in der Hauptapp. */
+.sync{display:none;align-items:center;font-size:11px;font-weight:700;white-space:nowrap;}
+@media(max-width:600px){ .sync{font-size:10px;} }
 /* Zwischenspeichern steht ÜBER dem Abschließen und sieht bewusst anders aus:
    es erzeugt kein Protokoll und hakt nichts ab. */
 .entw{width:100%;background:transparent;color:var(--braun);border:1px solid var(--braun);border-radius:12px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;margin-top:8px;}
@@ -220,6 +223,7 @@ main{padding:14px 12px 40px;max-width:900px;margin:0 auto;}
     <img class="logo-img" src="data:image/svg+xml;base64,PD94bWwgdmVyc2lvbj0iMS4wIiBlbmNvZGluZz0idXRmLTgiPz4KPCEtLSBHZW5lcmF0b3I6IEFkb2JlIElsbHVzdHJhdG9yIDI0LjAuMSwgU1ZHIEV4cG9ydCBQbHVnLUluIC4gU1ZHIFZlcnNpb246IDYuMDAgQnVpbGQgMCkgIC0tPgo8c3ZnIHZlcnNpb249IjEuMSIgaWQ9IkViZW5lXzEiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyIgeG1sbnM6eGxpbms9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkveGxpbmsiIHg9IjBweCIgeT0iMHB4IgoJIHZpZXdCb3g9IjAgMCAxNDkuOCAxODEiIHN0eWxlPSJlbmFibGUtYmFja2dyb3VuZDpuZXcgMCAwIDE0OS44IDE4MTsiIHhtbDpzcGFjZT0icHJlc2VydmUiPgo8c3R5bGUgdHlwZT0idGV4dC9jc3MiPgoJLnN0MHtmaWxsOiNGRkZGRkY7fQoJLnN0MXtmaWxsOiM4OTU2MTM7fQoJLnN0MntmaWxsOiM2NzZDNkU7fQo8L3N0eWxlPgo8cGF0aCBjbGFzcz0ic3QwIiBkPSJNMTAuOCw4MS41YzUtNy40LDE3LjctMjUuMywyNC42LTM1LjZoMTIuMWMtNi43LDkuNS0xMy45LDE5LjItMjAuOSwyOC44bDIzLDQ2LjdIMzcuM2wtMTguMS0zOAoJYy0yLDIuOC02LjEsOC40LTguNCwxMS4ydjI2LjdIMEMwLDgwLjksMCw0MC40LDAsMGMzLjYsMCw3LjIsMCwxMC44LDBDMTAuOCwyNy4yLDEwLjgsNTQuMywxMC44LDgxLjV6Ii8+CjxwYXRoIGNsYXNzPSJzdDAiIGQ9Ik0xNDkuOCw5OC4zYy0wLjMsNC4xLTEuOSwyNC40LTI0LjIsMjQuNGMtMTkuNiwwLTI1LjEtMTcuNC0yNS4xLTM5LjNjMC0yMS4zLDYuOS0zOC44LDI2LjEtMzguOAoJYzIxLjksMCwyMi45LDIwLjIsMjMsMjMuOGgtMTEuMmMtMC4xLTIuOS0xLjItMTQuNC0xMi0xNC40cy0xNC45LDEyLTE0LjksMjkuM2MwLDE4LjcsNC4yLDMwLDE0LjMsMzBjMTAuOCwwLDEyLjItMTEuMSwxMi44LTE1CglIMTQ5LjhMMTQ5LjgsOTguM3oiLz4KPHBhdGggY2xhc3M9InN0MCIgZD0iTTQ5LjksMTgxVjY3LjhjMC0xMC4zLDAtMTcuMy0wLjEtMjJoMTAuNmMwLjEsMS40LDAuNSw2LjQsMC41LDEwLjJjMi41LTYuNSw3LjktMTEuMywxNy44LTExLjMKCWMxNC4zLDAsMjIsMTIuNiwyMiwzNy44YzAsMjcuMi05LjQsNDAuMi0yNC4yLDQwLjJjLTksMC0xMy41LTQuMy0xNS44LTlWMTgxSDQ5Ljl6IE03NS4zLDU0LjFjLTExLjcsMC0xNC45LDExLjItMTQuOSwyOQoJUzYyLjEsMTEzLDc0LjUsMTEzYzkuOSwwLDE1LTExLjYsMTUtMzBDODkuNiw2My45LDg1LjIsNTQuMSw3NS4zLDU0LjF6Ii8+CjxyZWN0IHk9IjEzMi4yIiBjbGFzcz0ic3QxIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+CjxyZWN0IHg9IjI0LjkiIHk9IjEzMi4yIiBjbGFzcz0ic3QyIiB3aWR0aD0iMTAuOCIgaGVpZ2h0PSI0OC44Ii8+Cjwvc3ZnPgo=" alt="kpc GmbH">
     <span class="ew-label">EINWEISUNG</span>
     <div class="h-right">
+      <span class="sync" id="syncStatus" title="Übertragungsstand"></span>
       <button class="theme-btn" onclick="backToApp()" title="Zurück zur Montagefortschritt-App">‹ Hauptapp</button>
       <button class="theme-btn" onclick="cycleTheme()" title="Erscheinungsbild: Automatik / Hell / Dunkel"><span id="themeIcon">🌓</span><span id="themeLbl">Auto</span></button>
       <div class="proj"><strong id="projName">–</strong><span id="projSub">Baustelle</span></div>
@@ -367,19 +371,36 @@ async function spTryDownloadText(fname){
 async function spUploadText(fname, text){ return spUpload(fname, new Blob([text],{type:'application/json'}), 'application/json'); }
 
 // ══════════════════ Projekt / LV / Einweisungs-Status laden ══════════════════
+// Alle drei Lader gehen erst ans Netz und legen das Ergebnis lokal ab; ohne Netz
+// (oder wenn der Abruf scheitert) kommt der letzte bekannte Stand aus dem
+// lokalen Speicher. Nur wenn es auch den nicht gibt, ist wirklich Schluss.
 async function loadProjectsList(){
-  const txt=await spTryDownloadText('__projects.json');
-  try{ return txt? (JSON.parse(txt)||[]) : []; }catch(e){ return []; }
+  try{
+    const txt=await spTryDownloadText('__projects.json');
+    const arr=txt? (JSON.parse(txt)||[]) : [];
+    await cacheSet('projects', arr);
+    return arr;
+  }catch(e){
+    const lokal=await cacheGet('projects');
+    if(lokal) return lokal;
+    throw e;
+  }
 }
 async function loadLV(pid){
-  const txt=await spTryDownloadText('LV_'+pid+'.json');
-  if(!txt) throw new Error('Stückliste (LV) für dieses Projekt nicht gefunden.');
-  return JSON.parse(txt);
+  try{
+    const txt=await spTryDownloadText('LV_'+pid+'.json');
+    if(!txt) throw new Error('Stückliste (LV) für dieses Projekt nicht gefunden.');
+    const lv=JSON.parse(txt);
+    await cacheSet('lv|'+pid, lv);
+    return lv;
+  }catch(e){
+    const lokal=await cacheGet('lv|'+pid);
+    if(lokal) return lokal;
+    throw e;
+  }
 }
-async function loadEW(pid){
-  const txt=await spTryDownloadText('EINWEISUNG_'+pid+'.json');
-  let ew={ v:1, devices:{}, std:{}, protokolle:[] };
-  if(txt){ try{ ew=JSON.parse(txt); }catch(e){} }
+function ewNormalisieren(ew){
+  ew=ew||{ v:1 };
   ew.devices=ew.devices||{}; ew.std=ew.std||{}; ew.protokolle=ew.protokolle||[];
   // Entwürfe liegen BEWUSST in einem eigenen Feld, nicht in `protokolle`: Alles,
   // was dort steht, gilt als Nachweis (Historie, `complete`, `protFolgen`, der
@@ -388,7 +409,261 @@ async function loadEW(pid){
   if(ew.auftraggeber==null) ew.auftraggeber=''; if(ew.ort==null) ew.ort=''; if(ew.adresse==null) ew.adresse='';
   return ew;
 }
-async function saveEW(){ await spUploadText('EINWEISUNG_'+PID+'.json', JSON.stringify(EW)); }
+async function loadEW(pid){
+  let ew=null, ausNetz=false;
+  try{
+    const txt=await spTryDownloadText('EINWEISUNG_'+pid+'.json');
+    ew = txt? JSON.parse(txt) : { v:1 };
+    ausNetz=true;
+  }catch(e){
+    ew = await cacheGet('ew|'+pid);
+    if(!ew) throw e;
+  }
+  ew=ewNormalisieren(ew);
+  // Noch nicht übertragene eigene Änderungen gehören OBENAUF – sonst zeigt die
+  // App nach dem Neuladen den Serverstand und der Monteur hält seine offline
+  // erfasste Arbeit für verloren.
+  if(ausNetz){
+    try{
+      const offen=(await idbAll('outbox')).filter(e=>e.val&&e.val.kind==='ew'&&e.val.pid===pid)
+        .sort((a,b)=>(a.val.ts||0)-(b.val.ts||0));
+      offen.forEach(e=>(e.val.ops||[]).forEach(op=>applyEwOp(ew, op)));
+    }catch(e){}
+  }
+  await cacheSet('ew|'+pid, ew);
+  return ew;
+}
+// `saveEW()` (ganze Datei hochladen) gibt es hier BEWUSST NICHT MEHR. Es war der
+// Weg, auf dem der Stand eines anderen Geräts verschwinden konnte: wer die Datei
+// als Ganzes schreibt, macht seinen Stand zum einzigen. Änderungen laufen
+// ausschließlich über ewMutate() → Warteschlange → Zusammenführen beim Übertragen.
+
+// ══════════════════ Offline: lokale Ablage + Warteschlange ══════════════════
+// Muster wie in der Montagefortschritt-App: jede Änderung wird SOFORT lokal
+// gespeichert und in eine Warteschlange gelegt; sobald Netz da ist, läuft sie
+// nach oben.
+//
+// EIN Unterschied ist wesentlich und bestimmt den ganzen Aufbau: Die Hauptapp
+// schreibt je Position einen eigenen Listeneintrag – „der letzte gewinnt" trifft
+// dort immer nur eine Position. Hier hängt ALLES an EINER Datei
+// (EINWEISUNG_<pid>.json). Würde die Warteschlange die fertige Datei aufheben
+// und später hochladen, überschriebe sie stillschweigend alles, was in der
+// Zwischenzeit von anderen Geräten dazugekommen ist – zwei Monteure am selben
+// Tag, und ein Protokoll wäre weg. Deshalb liegen in der Warteschlange nicht
+// Dateien, sondern EINZELNE ÄNDERUNGEN (Ops). Beim Übertragen wird der DANN
+// aktuelle Stand geladen und die Ops werden darauf angewendet.
+const IDB_NAME='kpc_einweisung', IDB_VER=1;
+const IDB_STORES=['cache','files','outbox'];
+let _idbPromise=null, _flushing=false;
+function idb(){
+  if(_idbPromise) return _idbPromise;
+  _idbPromise=new Promise((resolve,reject)=>{
+    let req; try{ req=indexedDB.open(IDB_NAME,IDB_VER); }catch(e){ reject(e); return; }
+    req.onupgradeneeded=()=>{ const db=req.result; IDB_STORES.forEach(s=>{ if(!db.objectStoreNames.contains(s)) db.createObjectStore(s); }); };
+    req.onsuccess=()=>resolve(req.result); req.onerror=()=>reject(req.error);
+  });
+  return _idbPromise;
+}
+async function idbGet(store,key){
+  try{ const db=await idb(); return await new Promise((res,rej)=>{ const r=db.transaction(store,'readonly').objectStore(store).get(key); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error); }); }
+  catch(e){ return undefined; }
+}
+async function idbSet(store,key,val){
+  try{ const db=await idb(); return await new Promise((res,rej)=>{ const tx=db.transaction(store,'readwrite'); tx.objectStore(store).put(val,key); tx.oncomplete=()=>res(true); tx.onerror=()=>rej(tx.error); }); }
+  catch(e){ return false; }
+}
+async function idbDel(store,key){
+  try{ const db=await idb(); return await new Promise((res,rej)=>{ const tx=db.transaction(store,'readwrite'); tx.objectStore(store).delete(key); tx.oncomplete=()=>res(true); tx.onerror=()=>rej(tx.error); }); }
+  catch(e){ return false; }
+}
+async function idbAll(store){
+  try{ const db=await idb(); return await new Promise((res,rej)=>{ const out=[]; const req=db.transaction(store,'readonly').objectStore(store).openCursor(); req.onsuccess=()=>{ const c=req.result; if(c){ out.push({key:c.key,val:c.value}); c.continue(); } else res(out); }; req.onerror=()=>rej(req.error); }); }
+  catch(e){ return []; }
+}
+// Wortgleich zur Hauptapp: ein Netzfehler bricht das Übertragen ab, alles bleibt
+// in der Warteschlange. Ein Sachfehler (z. B. 404) darf den Rest nicht blockieren.
+function isNetErr(err){
+  if(!navigator.onLine) return true;
+  if(!err) return false;
+  if(err.name==='TypeError') return true;
+  return /failed to fetch|networkerror|load failed|network request failed|err_internet|interaction_required|no_network/i.test(((err.message||'')+''));
+}
+// Ohne dauerhaften Speicher räumt der Browser den lokalen Bestand irgendwann weg
+// – iOS-Safari nach etwa 7 Tagen ohne Besuch – und mit ihm alles, was noch nicht
+// übertragen ist. Fragen kostet nichts, die Antwort steht im Tooltip der Anzeige.
+let _PERSIST=null;
+async function speicherSichern(){
+  try{
+    if(!navigator.storage || !navigator.storage.persist){ _PERSIST=false; return; }
+    if(navigator.storage.persisted && await navigator.storage.persisted()){ _PERSIST=true; return; }
+    _PERSIST=!!(await navigator.storage.persist());
+  }catch(e){ _PERSIST=false; }
+  updSyncBadge();
+}
+
+// ── Lokaler Lesestand ────────────────────────────────────────────────────────
+// Alles, was zum Arbeiten nötig ist, liegt nach dem ersten Öffnen einer
+// Baustelle lokal: Stückliste, Einweisungsstand, Stammdaten, Baustellenliste.
+async function cacheSet(key,val){ return idbSet('cache',key,val); }
+async function cacheGet(key){ return idbGet('cache',key); }
+async function cacheEW(){ if(PID) await cacheSet('ew|'+PID, EW); }
+
+// ── Warteschlange ────────────────────────────────────────────────────────────
+// Eine Änderung an der JSON. `ops` ist eine Liste, weil zusammengehörige
+// Änderungen (Protokoll + Geräte + Stammdaten beim Abschließen) gemeinsam
+// hochgehen müssen und nicht halb.
+async function ewMutate(ops){
+  ops=[].concat(ops);
+  ops.forEach(op=>applyEwOp(EW, op));
+  await cacheEW();
+  await idbSet('outbox','ew|'+PID+'|'+nowMs()+'|'+Math.round(performance.now()*1000), { kind:'ew', pid:PID, ops, ts:nowMs() });
+  updSyncBadge();
+  flushOutbox();
+}
+function nowMs(){ return Date.now(); }
+// Eine einzelne Änderung auf einen Einweisungsstand anwenden. Bewusst rein und
+// ohne Seiteneffekte: dieselbe Funktion läuft lokal (sofort) und beim Übertragen
+// auf dem frisch geladenen Serverstand.
+function applyEwOp(ew, op){
+  if(!ew||!op) return;
+  ew.protokolle=ew.protokolle||[]; ew.entwuerfe=ew.entwuerfe||[];
+  ew.devices=ew.devices||{}; ew.std=ew.std||{};
+  if(op.typ==='prot-upsert'){
+    const i=ew.protokolle.findIndex(x=>x.id===op.daten.id);
+    if(i>=0) ew.protokolle[i]=Object.assign({}, ew.protokolle[i], op.daten); else ew.protokolle.push(op.daten);
+  } else if(op.typ==='prot-del'){ ew.protokolle=ew.protokolle.filter(x=>x.id!==op.id); }
+  else if(op.typ==='entw-upsert'){
+    const i=ew.entwuerfe.findIndex(x=>x.id===op.daten.id);
+    if(i>=0) ew.entwuerfe[i]=op.daten; else ew.entwuerfe.push(op.daten);
+  } else if(op.typ==='entw-del'){ ew.entwuerfe=ew.entwuerfe.filter(x=>x.id!==op.id); }
+  else if(op.typ==='dev-set'){ ew.devices[op.pos]=op.state; }
+  else if(op.typ==='dev-del'){ delete ew.devices[op.pos]; }
+  else if(op.typ==='std-set'){ ew.std[op.fid]=op.wert; }
+  else if(op.typ==='stamm'){
+    if(op.auftraggeber!=null) ew.auftraggeber=op.auftraggeber;
+    if(op.ort!=null) ew.ort=op.ort;
+    if(op.adresse!=null) ew.adresse=op.adresse;
+  }
+}
+// Eine Datei (PDF) ablegen. Ohne lokale Kopie darf NICHTS in die Warteschlange:
+// der Eintrag fände beim Übertragen keinen Blob mehr und die Datei wäre weg,
+// obwohl die App „gespeichert" gemeldet hat. Dieselbe Lehre wie in der Hauptapp
+// (Korbach) – deshalb im Zweifel sofort direkt hochladen und den Fehler zeigen.
+async function queueFile(fname, blob, contentType){
+  let lokal=false;
+  try{ await idbSet('files', fname, blob); lokal=!!(await idbGet('files', fname)); }catch(e){}
+  if(!lokal){
+    const up=await spUpload(fname, blob, contentType||'application/pdf');
+    updSyncBadge();
+    return up;
+  }
+  await idbSet('outbox','file|'+fname, { kind:'file', pid:PID, fname, contentType:contentType||'application/pdf', ts:nowMs() });
+  updSyncBadge();
+  return null;                 // noch keine SharePoint-ID – wird beim Übertragen geheilt
+}
+async function queueDelete(fname){
+  if(!fname) return;
+  // Liegt die Datei noch unversendet in der Warteschlange, ist Löschen einfach:
+  // Eintrag und lokale Kopie weg, oben war sie nie.
+  const offen=await idbGet('outbox','file|'+fname);
+  if(offen){ await idbDel('outbox','file|'+fname); await idbDel('files',fname); updSyncBadge(); return; }
+  await idbSet('outbox','del|'+fname, { kind:'del', pid:PID, fname, ts:nowMs() });
+  updSyncBadge();
+}
+// Rückschreibung in die Positionen-Liste der Hauptapp (Haken „eingewiesen").
+async function queuePos(positions, iso, by, aktion){
+  if(!positions||!positions.length) return;
+  await idbSet('outbox','pos|'+PID+'|'+aktion+'|'+nowMs(), { kind:'pos', pid:PID, positions, iso, by, aktion, ts:nowMs() });
+  updSyncBadge();
+}
+
+// ── Übertragen ───────────────────────────────────────────────────────────────
+// Reihenfolge: erst Dateien (das PDF muss oben sein, bevor der Eintrag darauf
+// zeigt), dann die JSON-Änderungen, dann die Haken in den Positionen.
+async function flushOutbox(){
+  if(_flushing) return;
+  if(!navigator.onLine){ updSyncBadge(); return; }
+  if(!SPIDS || !SPIDS.driveId){ updSyncBadge(); return; }    // nicht angemeldet
+  _flushing=true;
+  let before=0, after=0;
+  const verloren=[];
+  try{
+    const all=await idbAll('outbox');
+    before=all.length;
+    const files=all.filter(e=>e.val&&e.val.kind==='file');
+    const dels =all.filter(e=>e.val&&e.val.kind==='del');
+    const ews  =all.filter(e=>e.val&&e.val.kind==='ew').sort((a,b)=>(a.val.ts||0)-(b.val.ts||0));
+    const poss =all.filter(e=>e.val&&e.val.kind==='pos').sort((a,b)=>(a.val.ts||0)-(b.val.ts||0));
+    for(const e of files){
+      try{
+        const blob=await idbGet('files', e.val.fname);
+        if(!blob){ verloren.push(e.val.fname); await idbDel('outbox', e.key); continue; }
+        await spUpload(e.val.fname, blob, e.val.contentType);
+        await idbDel('outbox', e.key);
+      }catch(err){ if(isNetErr(err)) throw err; console.warn('Upload bleibt in der Warteschlange:', (err&&err.message)||err); }
+    }
+    for(const e of dels){
+      try{ await spDeleteFile(e.val.fname); await idbDel('outbox', e.key); }
+      catch(err){ if(isNetErr(err)) throw err; await idbDel('outbox', e.key); }   // schon weg = Ziel erreicht
+    }
+    // JSON-Änderungen je Baustelle gebündelt: EINMAL laden, alle Ops in ihrer
+    // Reihenfolge anwenden, EINMAL schreiben. Der frisch geladene Stand ist die
+    // Grundlage – dadurch bleibt erhalten, was andere in der Zwischenzeit
+    // eingetragen haben.
+    const proPid={};
+    ews.forEach(e=>{ (proPid[e.val.pid]=proPid[e.val.pid]||[]).push(e); });
+    for(const pid of Object.keys(proPid)){
+      try{
+        const txt=await spTryDownloadText('EINWEISUNG_'+pid+'.json');
+        let ew={ v:1, devices:{}, std:{}, protokolle:[], entwuerfe:[], auftraggeber:'', ort:'', adresse:'' };
+        if(txt){ try{ ew=JSON.parse(txt); }catch(e){} }
+        ew.devices=ew.devices||{}; ew.std=ew.std||{}; ew.protokolle=ew.protokolle||[]; ew.entwuerfe=ew.entwuerfe||[];
+        proPid[pid].forEach(e=>(e.val.ops||[]).forEach(op=>applyEwOp(ew, op)));
+        await spUploadText('EINWEISUNG_'+pid+'.json', JSON.stringify(ew));
+        for(const e of proPid[pid]) await idbDel('outbox', e.key);
+        // Der zusammengeführte Stand ist ab jetzt der richtige – auch auf diesem Gerät.
+        if(pid===PID){ EW=ew; await cacheEW(); renderOverview(); }
+        else { await cacheSet('ew|'+pid, ew); }
+      }catch(err){ if(isNetErr(err)) throw err; console.warn('JSON-Abgleich bleibt in der Warteschlange:', (err&&err.message)||err); }
+    }
+    for(const e of poss){
+      try{
+        if(e.val.aktion==='zurueck') await writeBackNichtEingewiesen(e.val.positions, true);
+        else await writeBackEingewiesen(e.val.positions, e.val.iso, e.val.by, true);
+        await idbDel('outbox', e.key);
+      }catch(err){ if(isNetErr(err)) throw err; console.warn('Rückschreibung bleibt in der Warteschlange:', (err&&err.message)||err); }
+    }
+  }catch(err){ /* Netzfehler: Rest bleibt liegen und wird beim nächsten Versuch geholt */ }
+  finally{ _flushing=false; updSyncBadge(); }
+  // Verlorene Dateien beim Namen nennen statt still zu verwerfen – sonst meldet
+  // die App „synchron", während ein Protokolleintrag ins Leere zeigt.
+  if(verloren.length){
+    alert('Achtung: '+verloren.length+' Datei(en) konnten NICHT übertragen werden – die lokale Kopie ist nicht mehr da '+
+      '(der Browser räumt den Speicher, wenn der Platz knapp wird).\n\n• '+
+      verloren.map(f=>f.slice(f.lastIndexOf('/')+1)).join('\n• ')+
+      '\n\nDie zugehörigen Protokolle bitte neu erstellen und den alten Eintrag über 🗑 entfernen.');
+  }
+  try{ after=(await idbAll('outbox')).length; }catch(e){}
+  if(after>0 && after<before && navigator.onLine) setTimeout(flushOutbox, 300);
+}
+async function spDeleteFile(fname){
+  const path='/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId+'/root:/'+encPath(fname);
+  await graph(path, {method:'DELETE'});
+}
+// Statusanzeige im Kopf – Wortlaut wie in der Hauptapp, damit beide dasselbe sagen.
+async function updSyncBadge(){
+  const el=document.getElementById('syncStatus'); if(!el) return;
+  let n=0; try{ n=(await idbAll('outbox')).length; }catch(e){}
+  el.style.display='inline-flex';
+  if(!navigator.onLine){ el.textContent='⚠ Offline'+(n?(' · '+n+' ausstehend'):''); el.style.color='#e0a060'; }
+  else if(n){ el.textContent='↻ '+n+' wird synchronisiert…'; el.style.color='#d7c1ae'; }
+  else { el.textContent='✓ Synchron'; el.style.color='#7faa6a'; }
+  el.title=(n? (n+' Änderung(en) noch nicht übertragen. '):'')
+    +(_PERSIST===false? 'Achtung: Der Browser sichert den lokalen Speicher NICHT dauerhaft zu – nach längerer Zeit ohne Netz kann Unversendetes verloren gehen.'
+      : (_PERSIST===true? 'Lokaler Speicher ist dauerhaft gesichert.' : ''));
+}
+window.addEventListener('online', ()=>{ updSyncBadge(); flushOutbox(); });
+window.addEventListener('offline', ()=>{ updSyncBadge(); });
 
 // Baut aus der LV die Geräte-Baumstruktur (Etage -> Bereich -> Gerät)
 function buildTreeFromLV(lv){
@@ -433,8 +708,12 @@ async function loadPositionItems(){
 }
 // Nimmt "Einweisung erledigt" (ew) zurück – für Geräte, deren Nachweis gelöscht wurde.
 // Spiegelbild von writeBackEingewiesen, ebenso feldschonend.
-async function writeBackNichtEingewiesen(positions){
+async function writeBackNichtEingewiesen(positions, vomFlush){
   if(!positions.length) return;
+  // Ohne Netz in die Warteschlange – der Haken in der Hauptapp wird nachgezogen,
+  // sobald wieder Verbindung da ist. `vomFlush` verhindert die Endlosschleife,
+  // wenn genau diese Warteschlange gerade abgearbeitet wird.
+  if(!vomFlush && (!navigator.onLine || !SPIDS.listId)){ await queuePos(positions, '', '', 'zurueck'); return; }
   const items=await loadPositionItems();
   for(const pos of positions){
     const ex=items[pos]; if(!ex||!ex.id) continue;   // Position gibt es nicht (mehr) -> nichts zurückzunehmen
@@ -448,8 +727,9 @@ async function writeBackNichtEingewiesen(positions){
 }
 // Schreibt "Einweisung erledigt" (ew) für die angegebenen Positionen zurück, ohne andere Felder zu verlieren.
 // `by` = wer eingewiesen hat (Einweiser aus dem Protokoll) – nicht, wer angemeldet ist.
-async function writeBackEingewiesen(positions, iso, by){
+async function writeBackEingewiesen(positions, iso, by, vomFlush){
   if(!positions.length) return;
+  if(!vomFlush && (!navigator.onLine || !SPIDS.listId)){ await queuePos(positions, iso, by, 'ein'); return; }
   const items=await loadPositionItems();
   for(const pos of positions){
     const ex=items[pos];
@@ -576,7 +856,14 @@ async function onLoggedIn(){
   applyUserBadge();
   updateThemeBtn();
   showLoader('Verbindung zu SharePoint …');
-  try{ await resolveIds(); }catch(e){ hideLoader(); document.getElementById('main').innerHTML='<div class="empty">SharePoint-Verbindung fehlgeschlagen:<br>'+esc((e&&e.message)||e)+'</div>'; return; }
+  try{ await resolveIds(); }catch(e){
+    hideLoader();
+    // Verbindung weg, aber lokal liegt etwas: weiterarbeiten statt Sackgasse.
+    if(await startOffline()) return;
+    document.getElementById('main').innerHTML='<div class="empty">SharePoint-Verbindung fehlgeschlagen:<br>'+esc((e&&e.message)||e)+'</div>'; return;
+  }
+  // Was vom letzten Mal offline liegen geblieben ist, geht jetzt nach oben.
+  updSyncBadge(); flushOutbox();
   // Projektkontext aus URL-Hash (#pid=...&projekt=...) – wie IBN-Aufruf aus der Hauptapp
   const h=new URLSearchParams((location.hash||'').replace(/^#/,''));
   const pid=h.get('pid'); const pname=h.get('projekt');
@@ -615,9 +902,21 @@ async function openProject(pid, pname){
       const _plzOrt=[(p.plz||'').trim(),(p.ort||'').trim()].filter(Boolean).join(' ');
       PROJ_ADR=[(p.strasse||'').trim(),_plzOrt].filter(Boolean).join(', ');
       PROJ_AUFTRAG=(p.auftragsnr||'').trim()||(p.nummer||'').trim();
-    } }catch(e){}
+      // Stammdaten mitsichern: ohne sie bleiben Kunde und Anschrift im Protokoll
+      // leer, und ausgerechnet offline ist das nicht nachzuholen.
+      await cacheSet('stamm|'+pid, {PROJNAME, PROJ_AG, PROJ_ORT, PROJ_ADR, PROJ_AUFTRAG});
+    } }catch(e){
+      const s=await cacheGet('stamm|'+pid);
+      if(s){ if(!PROJNAME||PROJNAME===pid) PROJNAME=s.PROJNAME||pid;
+        PROJ_AG=s.PROJ_AG||''; PROJ_ORT=s.PROJ_ORT||''; PROJ_ADR=s.PROJ_ADR||''; PROJ_AUFTRAG=s.PROJ_AUFTRAG||''; }
+    }
+    // Zuletzt geöffnete Baustelle merken: ohne Netz gibt es keine Baustellenliste,
+    // aber die App soll trotzdem dort weitermachen, wo der Trupp aufgehört hat.
+    try{ localStorage.setItem('kpc_ew_letzte', JSON.stringify({pid, name:PROJNAME})); }catch(e){}
     // Historie gegen den Ablageordner abgleichen (heilt umbenannte, markiert fehlende Dateien)
-    if(EW.protokolle.length){ showLoader('Protokolle werden geprüft …'); try{ await reconcilePdfs(); }catch(e){ console.warn('Abgleich:',e&&e.message); } }
+    // Ohne Netz übersprungen: der Abgleich könnte sonst alle Dateien als fehlend
+    // melden, obwohl sie nur gerade nicht erreichbar sind.
+    if(EW.protokolle.length && navigator.onLine && SPIDS.driveId){ showLoader('Protokolle werden geprüft …'); try{ await reconcilePdfs(); }catch(e){ console.warn('Abgleich:',e&&e.message); } }
   }catch(e){ hideLoader(); document.getElementById('main').innerHTML='<div class="empty">'+esc((e&&e.message)||e)+'</div>'; return; }
   document.getElementById('projName').textContent=PROJNAME;
   document.getElementById('projSub').textContent='Baustelle';
@@ -729,7 +1028,10 @@ async function reconcilePdfs(){
       if(p.pdf!==pfad||p.pdfId!==hit.id){ p.pdf=pfad; p.pdfId=hit.id; heilen=true; }
     });
   }
-  if(heilen){ try{ await saveEW(); }catch(e){} }
+  // Geheilte Pfade als einzelne Änderungen ablegen, nicht als ganze Datei:
+  // sonst überschriebe der Abgleich beim Öffnen alles, was ein anderes Gerät
+  // inzwischen eingetragen hat.
+  if(heilen){ try{ await ewMutate(EW.protokolle.map(p=>({typ:'prot-upsert', daten:{id:p.id, pdf:p.pdf, pdfId:p.pdfId}}))); }catch(e){} }
 }
 
 // ── Protokoll löschen ──
@@ -749,8 +1051,11 @@ function protFolgen(p, posListe){
   return {zurueck,umhaengen};
 }
 async function spDeletePdf(p){
+  // Ohne Netz in die Warteschlange – gelöscht wird, sobald Verbindung da ist.
+  if(!navigator.onLine || !SPIDS.driveId){ await queueDelete(p.pdf); return; }
   const base='/sites/'+SPIDS.siteId+'/drives/'+SPIDS.driveId;
   await graph(p.pdfId? base+'/items/'+encodeURIComponent(p.pdfId) : base+'/root:/'+encPath(p.pdf), {method:'DELETE'});
+  try{ await idbDel('files', p.pdf); }catch(e){}
 }
 async function deleteProt(id){
   const p=EW.protokolle.find(x=>x.id===id); if(!p) return;
@@ -773,16 +1078,18 @@ async function deleteProt(id){
       try{ await spDeletePdf(p); }
       catch(e){ if(!/ 404|404:|itemnotfound/i.test(((e&&e.message)||'')+'')) throw e; }
     }
+    const ops=[];
     if(f.zurueck.length){
       showLoader('Haken „eingewiesen" werden zurückgenommen …');
       await writeBackNichtEingewiesen(f.zurueck);
-      f.zurueck.forEach(pos=>{ delete EW.devices[pos]; });
+      f.zurueck.forEach(pos=>ops.push({typ:'dev-del', pos}));
     }
-    f.umhaengen.forEach(u=>{ const st=EW.devices[u.pos]; if(st){ st.protokollId=u.prot.id; st.datum=u.prot.datum; } });
-    EW.protokolle=EW.protokolle.filter(x=>x.id!==id);
+    f.umhaengen.forEach(u=>{ const st=EW.devices[u.pos];
+      if(st) ops.push({typ:'dev-set', pos:u.pos, state:Object.assign({}, st, {protokollId:u.prot.id, datum:u.prot.datum})}); });
+    ops.push({typ:'prot-del', id});
     MISSING.delete(id);
-    showLoader('Wird in SharePoint gespeichert …');
-    await saveEW();
+    showLoader('Wird gespeichert …');
+    await ewMutate(ops);
     hideLoader(); renderOverview();
     toast(fehlt? '✓ Eintrag entfernt' : '✓ Protokoll gelöscht');
   }catch(e){ hideLoader(); console.error(e); alert('Löschen fehlgeschlagen: '+((e&&e.message)||e)); }
@@ -790,6 +1097,10 @@ async function deleteProt(id){
 // Holt das PDF: erst über die Item-ID, dann über den Pfad, zuletzt über den
 // Namensstamm. Wird es unter neuem Namen gefunden, heilt der Eintrag sich selbst.
 async function fetchPdfBlob(fname, prot){
+  // Zuerst die lokale Kopie: das deckt frisch erstellte Protokolle ab, die noch
+  // in der Warteschlange liegen – und macht das Ansehen offline überhaupt möglich.
+  try{ const lokal=await idbGet('files', fname); if(lokal) return lokal; }catch(e){}
+  if(!navigator.onLine) throw new Error('Ohne Verbindung – dieses PDF liegt nicht auf dem Gerät.');
   if(prot&&prot.pdfId){ try{ return await spDownloadBlobById(prot.pdfId); }catch(e){} }
   try{ return await spDownloadBlob(fname); }
   catch(e){
@@ -798,7 +1109,7 @@ async function fetchPdfBlob(fname, prot){
     const hit=await spFindByStem(fname);
     if(!hit) throw new Error('Die Datei liegt nicht mehr in SharePoint – sie wurde gelöscht oder in einen anderen Ordner verschoben.');
     const blob=await spDownloadBlobById(hit.id);
-    if(prot){ prot.pdf=hit.path; prot.pdfId=hit.id; try{ await saveEW(); }catch(_){} }
+    if(prot){ try{ await ewMutate({typ:'prot-upsert', daten:{id:prot.id, pdf:hit.path, pdfId:hit.id}}); }catch(_){} }
     return blob;
   }
 }
@@ -882,14 +1193,12 @@ async function saveEntwurf(){
     ts:Date.now(), von:USER||'' };
   showLoader('Zwischenstand wird gespeichert …');
   try{
-    const i=EW.entwuerfe.findIndex(e=>e.id===id);
-    if(i>=0) EW.entwuerfe[i]=daten; else EW.entwuerfe.push(daten);
-    await saveEW();
+    await ewMutate({typ:'entw-upsert', daten});
     hideLoader(); closeOverlay(); renderOverview();
-    toast('✓ Zwischenstand gespeichert – noch kein Protokoll');
+    toast(navigator.onLine? '✓ Zwischenstand gespeichert – noch kein Protokoll'
+                          : '✓ Zwischenstand auf dem Gerät – geht mit Netz nach oben');
   }catch(e){
     hideLoader(); console.error(e);
-    // Kein Netz = der Zwischenstand ist WEG. Das gehört gesagt, nicht verschwiegen.
     alert('Zwischenspeichern fehlgeschlagen: '+((e&&e.message)||e)+'\n\nDer Entwurf wurde NICHT abgelegt – das Fenster bleibt offen, damit nichts verloren geht.');
   }
 }
@@ -920,8 +1229,8 @@ async function deleteEntwurf(id){
     '\n\nEs wird nichts abgehakt und kein Protokoll gelöscht – nur der Zwischenstand.')) return;
   showLoader('Entwurf wird verworfen …');
   try{
-    EW.entwuerfe=EW.entwuerfe.filter(x=>x.id!==id);
-    await saveEW(); hideLoader(); renderOverview(); toast('Entwurf verworfen');
+    await ewMutate({typ:'entw-del', id});
+    hideLoader(); renderOverview(); toast('Entwurf verworfen');
   }catch(err){ hideLoader(); alert('Verwerfen fehlgeschlagen: '+((err&&err.message)||err)); }
 }
 function entwurfLine(e){
@@ -1210,8 +1519,11 @@ async function finishSession(){
         : [vaDatum(SESSION.datum), 'Einweisungsprotokoll', SESSION.typ, etTag, id.slice(-6)];
       fname=folder+'/'+vaName(teile)+'.pdf';
     }
-    const up=await spUpload(fname, pdfBlob, 'application/pdf');
-    // Status aktualisieren
+    // PDF: ohne Netz erst lokal, die Warteschlange bringt es nach oben.
+    const up=await queueFile(fname, pdfBlob, 'application/pdf');
+    // Status aktualisieren – als einzelne Änderungen (Ops), damit sie beim
+    // Übertragen auf den DANN aktuellen Stand angewendet werden können.
+    const ops=[];
     if(SESSION.typ==='geraete'){
       // Bei einer Korrektur können Geräte weggefallen sein – die verlieren ihren Nachweis.
       if(alt){
@@ -1221,37 +1533,43 @@ async function finishSession(){
           if(f.zurueck.length){
             showLoader('Haken „eingewiesen" werden zurückgenommen …');
             await writeBackNichtEingewiesen(f.zurueck);
-            f.zurueck.forEach(pos=>{ delete EW.devices[pos]; });
+            f.zurueck.forEach(pos=>ops.push({typ:'dev-del', pos}));
           }
-          f.umhaengen.forEach(u=>{ const st=EW.devices[u.pos]; if(st){ st.protokollId=u.prot.id; st.datum=u.prot.datum; } });
+          f.umhaengen.forEach(u=>{ const st=EW.devices[u.pos];
+            if(st) ops.push({typ:'dev-set', pos:u.pos, state:Object.assign({}, st, {protokollId:u.prot.id, datum:u.prot.datum})}); });
         }
       }
-      positions.forEach(pos=>{ EW.devices[pos]={ eingewiesen:true, datum:iso, by:einw, protokollId:id, sonderChecks:(SESSION.sonder[pos]||[]).map(c=>({txt:c.txt,done:c.done})) }; });
+      positions.forEach(pos=>ops.push({typ:'dev-set', pos, state:{ eingewiesen:true, datum:iso, by:einw, protokollId:id, sonderChecks:(SESSION.sonder[pos]||[]).map(c=>({txt:c.txt,done:c.done})) }}));
       showLoader('Status wird in die Positionen zurückgeschrieben …');
       await writeBackEingewiesen(positions, iso, einw);
     } else if(SESSION.typ==='allgemein'){
-      Object.keys(SESSION.std).forEach(fid=>{ EW.std[fid]={ checks:SESSION.std[fid].map(c=>({txt:c.txt,done:c.done})) }; });
+      Object.keys(SESSION.std).forEach(fid=>ops.push({typ:'std-set', fid, wert:{ checks:SESSION.std[fid].map(c=>({txt:c.txt,done:c.done})) }}));
     }
     // Schlüsselübergabe ändert BEWUSST nichts am Einweisungsstand: ein übergebener
     // Schlüssel ist kein Nachweis dafür, dass jemand am Gerät eingewiesen wurde.
     // Auftraggeber + Ort projektweit merken (nachträglich editierbar)
-    EW.auftraggeber=SESSION.auftraggeber.trim(); EW.ort=SESSION.ort.trim(); EW.adresse=(SESSION.adresse||'').trim();
-    // "vollständig" = alle einweisungspflichtigen Geräte des Projekts jetzt eingewiesen
+    ops.push({typ:'stamm', auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), adresse:(SESSION.adresse||'').trim()});
+    // „vollständig" hängt vom Stand NACH diesen Änderungen ab – deshalb erst
+    // anwenden, dann zählen. Das erneute Anwenden in ewMutate schadet nicht:
+    // die Ops setzen absolute Werte.
+    ops.forEach(op=>applyEwOp(EW, op));
     let complete=false; if(SESSION.typ==='geraete'){ const c=counts(); complete = c.tot>0 && c.ein>=c.tot; }
     const daten={ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), adresse:(SESSION.adresse||'').trim(), auftrag:(SESSION.auftrag||'').trim(), einweiser:einw, kommentar:(SESSION.kommentar||'').trim(), positions, bereiche, etagen, titel, complete, pdf:fname, pdfId:(up&&up.id)||(alt&&alt.pdfId)||'', ts:Date.now() };
     // Schlüsselzeilen mitspeichern – nur so lässt sich das Protokoll später korrigieren.
     if(isK){ daten.zeilen=zeilen.map(z=>({pos:z.pos,bez:z.bez,anz:z.anz,nr:z.nr})); daten.schluessel=anzSchl; }
-    if(alt){ Object.assign(alt, daten, { korrigiertAm:new Date().toISOString(), korrigiertVon:USER||einw }); MISSING.delete(id); }
-    else { EW.protokolle.push(daten); }
+    if(alt){ daten.korrigiertAm=new Date().toISOString(); daten.korrigiertVon=USER||einw; MISSING.delete(id); }
+    ops.push({typ:'prot-upsert', daten});
     // Der Entwurf hat seinen Zweck erfüllt – sonst stünde derselbe Stand doppelt
     // da, einmal als Protokoll und einmal als offene Aufgabe.
-    if(SESSION.entwurfId) EW.entwuerfe=EW.entwuerfe.filter(x=>x.id!==SESSION.entwurfId);
-    showLoader('Wird in SharePoint gespeichert …');
-    await saveEW();
+    if(SESSION.entwurfId) ops.push({typ:'entw-del', id:SESSION.entwurfId});
+    showLoader('Wird gespeichert …');
+    await ewMutate(ops);
     hideLoader();
     closeOverlay();
     renderOverview();
-    toast(alt? '✓ Korrektur gespeichert' : (isK? '✓ Schlüsselprotokoll gespeichert' : '✓ Einweisungsprotokoll gespeichert'));
+    toast(navigator.onLine
+      ? (alt? '✓ Korrektur gespeichert' : (isK? '✓ Schlüsselprotokoll gespeichert' : '✓ Einweisungsprotokoll gespeichert'))
+      : '✓ Auf dem Gerät gespeichert – wird mit Netz übertragen');
     // PDF gleich anzeigen
     try{ window.open(URL.createObjectURL(pdfBlob),'_blank'); }catch(e){}
   }catch(e){ hideLoader(); console.error(e); alert('Speichern fehlgeschlagen: '+((e&&e.message)||e)); }
@@ -1510,11 +1828,56 @@ function buildPdf(titel, positions){
   return doc.output('blob');
 }
 
+// ══════════════════ Offline-Einstieg ══════════════════
+// Ohne Netz gibt es kein Token – die Anmeldung ist gar nicht erst möglich. Die
+// App muss deshalb ohne sie auskommen und aus dem lokalen Stand arbeiten. Was
+// später hochgeht, liegt so lange in der Warteschlange.
+async function startOffline(){
+  const h=new URLSearchParams((location.hash||'').replace(/^#/,''));
+  let pid=h.get('pid'), pname=h.get('projekt')||'';
+  if(!pid){ try{ const l=JSON.parse(localStorage.getItem('kpc_ew_letzte')||'null'); if(l){ pid=l.pid; pname=l.name||''; } }catch(e){} }
+  const ew = pid? await cacheGet('ew|'+pid) : null;
+  const lv = pid? await cacheGet('lv|'+pid) : null;
+  if(!pid || !ew || !lv){
+    const st=document.getElementById('loginMsStatus');
+    if(st) st.innerHTML='Kein Netz – und von dieser Baustelle liegt noch nichts auf dem Gerät.<br>'+
+      'Einmal mit Verbindung öffnen, danach geht es auch offline.';
+    updSyncBadge();
+    return false;
+  }
+  try{ USER=localStorage.getItem('kpc_user')||USER; }catch(e){}
+  document.getElementById('loginOv').style.display='none';
+  document.getElementById('appHeader').style.display='block';
+  document.getElementById('main').style.display='block';
+  applyUserBadge(); updateThemeBtn();
+  PID=pid; PROJNAME=pname||pid; LV=buildTreeFromLV(lv); EW=ewNormalisieren(ew);
+  const s=await cacheGet('stamm|'+pid);
+  if(s){ PROJNAME=s.PROJNAME||PROJNAME; PROJ_AG=s.PROJ_AG||''; PROJ_ORT=s.PROJ_ORT||''; PROJ_ADR=s.PROJ_ADR||''; PROJ_AUFTRAG=s.PROJ_AUFTRAG||''; }
+  document.getElementById('projName').textContent=PROJNAME;
+  document.getElementById('projSub').textContent='Baustelle · offline';
+  renderOverview(); updSyncBadge();
+  return true;
+}
+
 // ══════════════════ INIT ══════════════════
 (async function init(){
   const st=document.getElementById('loginMsStatus');
+  speicherSichern();
+  updSyncBadge();
+  // Eigene Service-Worker-Registrierung: Wer die Einweisung direkt aufruft, ohne
+  // je die Hauptapp geöffnet zu haben, hätte sonst keinen – und damit gar keine
+  // Offline-Fähigkeit. Ein bereits vorhandener wird dadurch nicht doppelt.
+  if('serviceWorker' in navigator){
+    try{ navigator.serviceWorker.register('./sw.js').catch(()=>{}); }catch(e){}
+  }
+  if(!navigator.onLine){ await startOffline(); return; }
   try{ await msalInit(); if(msalAccount) await onLoggedIn(); }
-  catch(e){ if(st) st.textContent='Init-Fehler: '+((e&&e.message)||e); console.error(e); }
+  catch(e){
+    // Anmeldung gescheitert (typisch: Funkloch mitten im Start) – wenn lokal
+    // etwas liegt, ist Weiterarbeiten besser als eine Fehlermeldung.
+    console.error(e);
+    if(!(await startOffline()) && st) st.textContent='Init-Fehler: '+((e&&e.message)||e);
+  }
 })();
 </script>
 </body>
