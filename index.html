@@ -1670,8 +1670,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 132;
+const APP_VERSION = 133;
 const CHANGELOG = [
+  { v:133, titel:'DGUV-Protokolle heißen jetzt nach dem geprüften Gerät', punkte:[
+    'Das erste DGUV-Protokoll im neuen Namensschema hieß <b>260813_DGUV_DGUV-V3_Pruefprotokoll-elektrische-Geraete_3-0-0-00-10.pdf</b> – die Protokollart stand doppelt darin, das geprüfte Gerät gar nicht.',
+    'Jetzt stehen <b>Fabrikat und Typ aus der Stückliste</b> im Namen: <b>260813_DGUV_Rational_iCombi-Pro-6-1-1_3-0-0-00-10.pdf</b>.',
+    'Sehr lange Typenbezeichnungen werden gekürzt – Zubehör ab „+" oder „mit" bleibt weg. Eindeutig ist der Name über Positionsnummer und Datum.',
+    'Bereits abgelegte Protokolle behalten ihren Namen und bleiben verknüpft.' ]},
   { v:132, titel:'Restarbeiten-Filter zeigt die Restarbeiten gleich mit', punkte:[
     'Wer auf „nur Restarbeiten" oder „nur Mängel" filtert, bekam bisher zwar die richtigen Positionen, aber mit <b>zugeklapptem Balken „Restarbeit / Notiz"</b> – man musste jede Karte einzeln öffnen, um zu sehen, was dort offen ist. Besonders im Tab „Alle" war das mühsam.',
     'Jetzt klappt die App die Balken der Treffer <b>selbst auf</b>, wie sie es beim Sammel-Balken „Allgemeine Restarbeiten" schon immer getan hat.',
@@ -5641,6 +5646,36 @@ function vaDatum(d){
 function vaName(teile){
   return teile.map(vaSan).filter(Boolean).join('_').replace(/_{2,}/g,'_');
 }
+// Der Typ aus der Stückliste wird lang („iCombi Pro 6 1/1 mit Untergestell +
+// Kondensationsunterbrecher" = 60 Zeichen). Zubehör-Anhängsel ab „ + " bzw.
+// „ mit " gehören nicht in den Dateinamen; was dann noch übersteht, wird an der
+// Wortgrenze gekappt. Eindeutig bleibt der Name ohnehin über Position und Datum.
+// „/" und „+" VORHER zu Bindestrichen: vaSan wirft sie ersatzlos weg, aus
+// „iCombi Pro 6 1/1" würde „iCombi-Pro-6-11" – das liest sich wie „elf".
+// Das Zeichenrepertoire der VA bleibt unberührt, der Name wird nur lesbar.
+function vaKurz(s, max){
+  let t=String(s==null?'':s).split(/\s+\+\s+|\s+mit\s+/i)[0].replace(/[\/+]/g,'-').trim();
+  if(t.length>max){ t=t.slice(0,max); const i=t.lastIndexOf(' '); if(i>8) t=t.slice(0,i); }
+  return t.trim();
+}
+// Geprüftes Gerät für den Dateinamen eines DGUV-Protokolls.
+// Die IBN-App schickt als „Hersteller/Gerät" den PROTOKOLLNAMEN mit
+// (mfr='DGUV V3', dev='Prüfprotokoll elektrische Geräte'). Übernähme man das,
+// hieße die Datei „DGUV_DGUV-V3_Pruefprotokoll-elektrische-Geraete_…" – die Art
+// doppelt, das geprüfte Gerät gar nicht. Also Fabrikat + Typ aus der Stückliste.
+function vaDguvGeraet(pos, p){
+  const it=(lvFind(pos)||{}).item;
+  if(it){
+    const fab=vaKurz(it.fabrikat, 30), typ=vaKurz(it.typ, 40);
+    if(fab||typ) return [fab, typ];
+    if((it.bez||'').trim()) return [vaKurz(it.bez, 40), ''];   // Position ohne Fabrikat/Typ
+  }
+  // Kein Stücklisteneintrag (Position gelöscht/umbenannt): die Übergabewerte nur
+  // dann, wenn sie ein Gerät benennen und nicht den Protokollnamen. Sonst lieber
+  // nichts – „260813_DGUV_3-0-0-00-10.pdf" sagt mehr als der doppelte Typ.
+  const mfr=((p&&p.mfr)||'').trim(), dev=((p&&p.dev)||'').trim();
+  return (/^DGUV/i.test(mfr) || /^Pr[üu]fprotokoll/i.test(dev)) ? ['',''] : [mfr, dev];
+}
 // Dokumententyp je Protokollart. Bewusst der SPRECHENDE Name statt der
 // VA-Kategorie: „Bautagebuch" sagt mehr als „Bericht_Bautagebuch", und die
 // Kategorie steht ohnehin im Ordner. Aufbau und Zeichenvorrat bleiben VA-konform.
@@ -5648,7 +5683,7 @@ function vaProtoTeile(type, pos, p){
   const posT=vaSan(String(pos||'').replace(/\./g,'-'));
   const ger=(p&&(p.von||0)>1&&(p.nr||0)) ? ('Geraet-'+p.nr) : '';
   if(type==='IBN Protokoll')        return ['IBN_Protokoll', (p&&p.mfr)||'', (p&&p.dev)||'', posT, ger];
-  if(type==='DGUV Protokoll')       return ['DGUV', (p&&p.mfr)||'', (p&&p.dev)||'', posT, ger];
+  if(type==='DGUV Protokoll')       return ['DGUV'].concat(vaDguvGeraet(pos,p), [posT, ger]);
   if(type==='Einweisungsprotokoll') return ['Einweisungsprotokoll', posT, ger];
   return [vaSan(type), posT, ger];     // unbekannte Art: Name der Art als Typ
 }
