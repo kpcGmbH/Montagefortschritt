@@ -178,6 +178,7 @@ textarea{border:1.4px solid var(--line);border-radius:8px;min-height:64px;resize
   <img id="logo" alt="kpc">
   <button class="loginbtn" onclick="backToApp()" title="Zurück zur Montagefortschritt-App">‹ Hauptapp</button>
   <button id="loginBtn" class="loginbtn" onclick="msLogin()">Mit Microsoft anmelden</button>
+  <button id="ausfBtn" class="loginbtn" onclick="chooseAusfuehrer()" title="Wer führt die Inbetriebnahme aus?">✎ Ausführer</button>
   <button id="sigBtn" class="loginbtn" onclick="openMySig()">✍ Meine Signatur</button>
   <span style="flex:1"></span>
   <div class="ttl">Leistungsfeststellung<b>Inbetriebnahmeprotokolle</b></div>
@@ -1186,15 +1187,84 @@ async function msLogin(){
     if(mob){await msalApp.loginRedirect({scopes:['User.Read']});return;}
     const r=await msalApp.loginPopup({scopes:['User.Read']});if(r&&r.account)setAccount(r.account);
   }catch(e){toast('Login fehlgeschlagen');}}
-function setAccount(acc){TECH.name=acc.name||acc.username||'';TECH.email=acc.username||'';renderLoginState();if(CUR.dev){applyPrefills();openForm(CUR.dev);}}
-function msLogout(){try{const a=msalApp&&msalApp.getAllAccounts()[0];if(a)msalApp.logoutPopup({account:a}).catch(function(){});}catch(e){}TECH.name='';TECH.email='';renderLoginState();toast('Abgemeldet');}
+// ── Ausführer: dieselbe Auswahl wie in Hauptapp und Einweisung ──────────────
+// Das MS-Konto ist der ZUGANG, nicht die Identität: angemeldet ist oft die
+// Bauleitung, ausgeführt hat der Monteur. Bisher stand in jedem Protokoll unter
+// „Name (Techniker)" zwangsweise das angemeldete Konto. Der gewählte Ausführer
+// liegt in `kpc_user` und gilt in ALLEN drei Apps gemeinsam; Namensliste
+// (`kpc_monteure`) und Rollen (`kpc_rollen`) veröffentlicht die Hauptapp –
+// hier bewusst keine zweite Kopie, die auseinanderlaufen könnte.
+let USER='';
+function loadUser(){ try{ USER=localStorage.getItem('kpc_user')||''; }catch(e){ USER=''; } if(USER) TECH.name=USER; }
+function setUser(name){ name=(name||'').trim(); if(!name) return false;
+  USER=name; try{ localStorage.setItem('kpc_user',USER); localStorage.setItem('kpc_user_typ','monteur'); }catch(e){}
+  TECH.name=USER; renderAusfBtn();
+  if(CUR.dev){ applyPrefills(); openForm(CUR.dev,true); }   // Techniker-Feld sofort nachziehen
+  return true; }
+// Namensform EXAKT wie in Hauptapp und Einweisung – sonst steht in den
+// Protokollen mal „WAHL, Johannes" und mal „Johannes Wahl".
+function deriveName(account){ if(!account) return '';
+  let n=(account.name||account.username||'').trim();
+  if(n.indexOf(',')>=0){ const p=n.split(',').map(function(s){return s.trim();}); if(p.length===2&&p[0]&&p[1]) n=p[1]+' '+p[0]; }
+  if(/@/.test(n)){ n=n.split('@')[0].replace(/[._]+/g,' ').trim().replace(/\b\w/g,function(c){return c.toUpperCase();}); }
+  return n; }
+function rollen(){ try{ return JSON.parse(localStorage.getItem('kpc_rollen')||'null'); }catch(e){ return null; } }
+function monteurListe(){ try{ return JSON.parse(localStorage.getItem('kpc_monteure')||'[]')||[]; }catch(e){ return []; } }
+function msAccount(){ try{ return (msalApp&&msalApp.getAllAccounts&&msalApp.getAllAccounts()[0])||null; }catch(e){ return null; } }
+// Geprüft wird das MICROSOFT-KONTO, NIEMALS USER: USER ist ja das, was gewechselt
+// wird. Leitplanke gegen versehentliches Umstellen, KEINE Sicherheitsgrenze.
+function darfBenutzerWechseln(){ const r=rollen(); if(!r) return false;
+  const n=String(deriveName(msAccount())||'').trim().toLowerCase(); if(!n) return false;
+  return (r.bauleitung||[]).concat(r.innendienst||[]).some(function(x){ return String(x).trim().toLowerCase()===n; }); }
+function renderAusfBtn(){ const b=$('ausfBtn'); if(!b) return;
+  const darf=darfBenutzerWechseln();
+  b.innerHTML= USER? ('✎ '+esc(USER)) : '✎ Ausführer';
+  b.classList.toggle('on', !!USER);
+  b.title= darf? 'Ausführer wechseln – steht als Techniker im Protokoll'
+                : (USER? (USER+' – wechseln dürfen nur Bauleitung und Innendienst') : 'Noch kein Ausführer gewählt'); }
+function chooseAusfuehrer(){
+  if(!darfBenutzerWechseln()){
+    alert(rollen()? 'Den Ausführer können nur Bauleitung und Innendienst wechseln.'
+      : 'Den Ausführer können nur Bauleitung und Innendienst wechseln.\n\nHinweis: Die Rollen sind auf diesem Gerät noch nicht bekannt – bitte einmal die Montagefortschritt-App öffnen.');
+    return; }
+  const login=deriveName(msAccount());
+  const liste=[]; if(login) liste.push(login);
+  monteurListe().forEach(function(n){ if(liste.indexOf(n)<0) liste.push(n); });
+  if(USER && liste.indexOf(USER)<0) liste.unshift(USER);
+  const opts=liste.map(function(n){ return '<option value="'+esc(n)+'"'+(n===USER?' selected':'')+'>'+esc(n)+(n===login?' (mein Login)':'')+'</option>'; }).join('');
+  let m=$('ausfModal');
+  if(!m){ m=document.createElement('div'); m.id='ausfModal'; m.className='modal'; document.body.appendChild(m); }
+  m.innerHTML='<div class="modal-box"><h3>Ausführer wählen</h3>'+
+    '<p style="font-size:12.5px;color:var(--gray);margin:0 0 14px">Steht im Protokoll unter „Name (Techniker)“. Angemeldet ist oft die Bauleitung – ausgeführt hat jemand anderes.</p>'+
+    '<select id="ausfSel" onchange="var f=document.getElementById(\'ausfFrei\'); if(this.value) f.value=this.value;" style="width:100%;padding:9px;border:1.4px solid var(--copper);border-radius:8px;font-family:inherit;font-size:15px;background:#fff">'+opts+'</select>'+
+    '<input id="ausfFrei" type="text" value="'+esc(USER||login||'')+'" placeholder="Vorname Nachname" style="width:100%;margin-top:9px;padding:9px;border:1.4px solid var(--copper);border-radius:8px;font-family:inherit;font-size:15px;box-sizing:border-box">'+
+    '<div class="modal-actions"><span style="flex:1"></span>'+
+    '<button class="loginbtn" onclick="closeAusfuehrer()">Abbrechen</button>'+
+    '<button class="loginbtn on" onclick="confirmAusfuehrer()">Übernehmen</button></div></div>';
+  m.classList.remove('hidden'); }
+function closeAusfuehrer(){ const m=$('ausfModal'); if(m) m.remove(); }
+function confirmAusfuehrer(){ const f=$('ausfFrei');
+  if(!setUser(f?f.value:'')){ alert('Bitte einen Namen eingeben.'); return; }
+  closeAusfuehrer(); toast('Ausführer: '+USER); }
+
+function setAccount(acc){TECH.email=acc.username||'';
+  // Das Konto füllt den Ausführer nur, wenn noch keiner gewählt ist – ein bewusst
+  // gewählter bleibt stehen (gleiche Regel wie in der Einweisungs-App).
+  if(!USER) setUser(deriveName(acc));
+  else TECH.name=USER;
+  renderLoginState();renderAusfBtn();if(CUR.dev){applyPrefills();openForm(CUR.dev);}}
+function msLogout(){try{const a=msalApp&&msalApp.getAllAccounts()[0];if(a)msalApp.logoutPopup({account:a}).catch(function(){});}catch(e){}TECH.email='';renderLoginState();renderAusfBtn();toast('Abgemeldet');}
 function renderLoginState(){const b=$('loginBtn');if(!b)return;
-  if(TECH.name){b.classList.add('on');b.innerHTML='\u{1F464} '+esc(TECH.name)+' \u00A0\u2715';b.title='Abmelden';}
-  else{b.classList.remove('on');b.textContent='Mit Microsoft anmelden';b.title='Anmelden, um den Techniker-Namen automatisch zu übernehmen';}}
+  // Der Knopf zeigt das ANGEMELDETE KONTO (Zugang). Wer ausführt, steht daneben.
+  const an=deriveName(msAccount());
+  if(an){b.classList.add('on');b.innerHTML='\u{1F464} '+esc(an)+'  ✕';b.title='Angemeldet als '+an+' – tippen zum Abmelden';}
+  else{b.classList.remove('on');b.textContent='Mit Microsoft anmelden';b.title='Anmelden, um den Techniker-Namen automatisch zu übernehmen';}
+  renderAusfBtn();}
 // Zurück zur Hauptapp: eigenen Tab schließen (falls per window.open geöffnet), sonst navigieren
 function backToApp(){ try{ window.close(); }catch(e){} setTimeout(function(){ window.location.href='index.html'; }, 150); }
 window.backToApp=backToApp;
 window.msLogin=msLogin;window.msLogout=msLogout;
+window.chooseAusfuehrer=chooseAusfuehrer;window.closeAusfuehrer=closeAusfuehrer;window.confirmAusfuehrer=confirmAusfuehrer;
 window.goHome=goHome;window.goDevices=goDevices;window.openForm=openForm;window.pickDevice=pickDevice;window.continueDraft=continueDraft;
 window.setVal=setVal;window.setCheck=setCheck;window.setCmt=setCmt;window.toggleOpt=toggleOpt;window.setSig=setSig;
 window.clearPad=clearPad;window.resetForm=resetForm;window.exportPDF=exportPDF;
@@ -1392,7 +1462,7 @@ function applyLoadState(){var raw;try{raw=localStorage.getItem('ibn:load');}catc
     saveProject();}
   try{localStorage.setItem('ibn:'+o.mfr+':'+o.dev+(o.pos?(':'+o.pos):''),JSON.stringify(o.state||{}));}catch(e){}
   openForm(o.dev);toast('Protokoll zum Bearbeiten geladen');return true;}
-STD_MFRS=Object.keys(DB);loadCustom();mergeCustom();loadProject();ensureMsal().catch(function(){});renderLoginState();loadMySig();renderSigBtn();var __nav=applyLoadState()||applyUrlContext();initProjectBar();if(!__nav)goHome();
+STD_MFRS=Object.keys(DB);loadCustom();mergeCustom();loadProject();loadUser();ensureMsal().catch(function(){});renderLoginState();renderAusfBtn();loadMySig();renderSigBtn();var __nav=applyLoadState()||applyUrlContext();initProjectBar();if(!__nav)goHome();
 </script>
 </body>
 </html>

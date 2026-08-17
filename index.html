@@ -1764,8 +1764,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 138;
+const APP_VERSION = 139;
 const CHANGELOG = [
+  { v:139, titel:'Ausführer wählen – jetzt auch in der Inbetriebnahme', punkte:[
+    'In der Inbetriebnahme-App stand unter „Name (Techniker)" bisher zwangsweise das <b>angemeldete Microsoft-Konto</b>. Angemeldet ist aber oft die Bauleitung, ausgeführt hat der Monteur – im Protokoll stand dann der Falsche.',
+    'Jetzt gibt es dort denselben Knopf wie in der Montagefortschritt-App: <b>✎ Ausführer</b> neben dem Login, mit derselben Namensliste. Der gewählte Ausführer gilt in allen drei Apps gemeinsam – einmal umstellen genügt.',
+    'Wie gewohnt dürfen nur <b>Bauleitung und Innendienst</b> wechseln, und das Anmelden überschreibt eine bewusste Wahl nicht.',
+    'Nebenbei vereinheitlicht: Der Name erscheint jetzt überall in derselben Form. Bisher stand im Inbetriebnahmeprotokoll „WAHL, Johannes", in den Positionen dagegen „Johannes WAHL".',
+    'Die Einweisungs-App hatte diese Auswahl bereits.' ]},
   { v:138, titel:'Weiterbearbeiten: falscher Kunde im Protokollkopf behoben', punkte:[
     'Beim Weiterbearbeiten eines Inbetriebnahme- oder DGUV-Protokolls standen <b>Kunde und Anschrift der zuletzt geöffneten Baustelle</b> im Kopf – gemeldet aus Marburg, wo die Anschrift der Messe Frankfurt erschien.',
     'Ursache: Die Inbetriebnahme-App merkt sich die Baustelle. Beim Anlegen eines Protokolls bekommt sie die Stammdaten mitgeschickt, beim Weiterbearbeiten bisher nicht – dann blieb der alte Stand stehen und überschrieb sogar die im Protokoll gespeicherten Werte.',
