@@ -1026,10 +1026,20 @@ async function removeQueuedFile(fname){
 // Der Schlüssel, über den ein Eintrag identifiziert wird, ist je Art ein anderer
 // (Bautagebuch: ein Eintrag je TAG, Dichtigkeit: einer je UMFANG, Servicebericht:
 // laufende NUMMER) – genau die Bedingung, nach der die Formulare selbst suchen.
+// `holen` gehört zwingend zu `setzen`: Ohne die Rückrichtung stand die Zuordnung
+// „Art -> Array" ein zweites Mal als Ternär in jsonSpeichern – und eine vierte Art
+// hätte man dort schlicht vergessen (genau der Fehler, der die Panel-Sichtbarkeit
+// dreimal auseinanderlaufen ließ). Jede Art beschreibt sich hier vollständig.
 const JSON_ARTEN={
-  btb:   { datei:pid=>'BAUTAGEBUCH_'+pid+'.json', schluessel:'datum',  sort:(a,b)=>(a.datum||'').localeCompare(b.datum||''), setzen:a=>{BTB=a;} },
-  dicht: { datei:pid=>'DICHT_'+pid+'.json',       schluessel:'umfang', sort:(a,b)=>(a.nr||0)-(b.nr||0), setzen:a=>{DICHT=a;}, nach:()=>{ try{ updDichtTasks(); }catch(e){} } },
-  svc:   { datei:pid=>'SERVICE_'+pid+'.json',     schluessel:'nr',     sort:(a,b)=>(a.nr||0)-(b.nr||0), setzen:a=>{SVC=a;} }
+  btb:   { datei:pid=>'BAUTAGEBUCH_'+pid+'.json', schluessel:'datum',  sort:(a,b)=>(a.datum||'').localeCompare(b.datum||''), setzen:a=>{BTB=a;}, holen:()=>BTB },
+  dicht: { datei:pid=>'DICHT_'+pid+'.json',       schluessel:'umfang', sort:(a,b)=>(a.nr||0)-(b.nr||0), setzen:a=>{DICHT=a;}, holen:()=>DICHT, nach:()=>{ try{ updDichtTasks(); }catch(e){} } },
+  svc:   { datei:pid=>'SERVICE_'+pid+'.json',     schluessel:'nr',     sort:(a,b)=>(a.nr||0)-(b.nr||0), setzen:a=>{SVC=a;}, holen:()=>SVC },
+  // Kundendienst: die Gerätekartei einer übergebenen Baustelle. EIGENE Datei je
+  // Baustelle, ein Eintrag je Gerät – damit gilt auch hier die Regel aus §1.19:
+  // in die Warteschlange kommt das EINZELNE Gerät, nie die ganze Kartei. Zwei
+  // Techniker, die am selben Tag verschiedene Geräte pflegen, überschreiben sich
+  // dadurch nicht.
+  kdger: { datei:pid=>'KD_GERAETE_'+pid+'.json',  schluessel:'gid',    sort:(a,b)=>String(a.pos||'').localeCompare(String(b.pos||''),'de',{numeric:true}), setzen:a=>{KDG=a;}, holen:()=>KDG }
 };
 function jsonUpsert(arr, schluessel, daten){
   const i=arr.findIndex(e=>e && e[schluessel]===daten[schluessel]);
@@ -1056,7 +1066,7 @@ async function queueJsonEintrag(art, daten){
 // Gemeinsamer Speicherweg der drei Berichte.
 async function jsonSpeichern(art, entry){
   const cfg=JSON_ARTEN[art]; if(!cfg||!PID) return;
-  const arr = art==='btb'? BTB : art==='dicht'? DICHT : SVC;
+  const arr = cfg.holen();
   arr.sort(cfg.sort);
   await jsonCacheSet(cfg.datei(PID), arr);
   await queueJsonEintrag(art, entry);
@@ -1764,8 +1774,15 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 141;
+const APP_VERSION = 142;
 const CHANGELOG = [
+  { v:142, titel:'Kundendienst: Gerätekartei mit Wartungsfristen (Pilot)', punkte:[
+    'Nach der Abnahme war in der App Schluss – Wartungen und Serviceeinsätze der folgenden Jahre hatten keinen Ort. Jetzt bekommt eine Baustelle ein <b>zweites Leben</b>: Unter „Berichte &amp; Dokumente" gibt es <b>🛠 Kundendienst</b>.',
+    'Bauleitung und Innendienst übergeben eine fertige Baustelle dort an den Kundendienst. Sie bleibt <b>dieselbe Baustelle</b> – Stückliste, Protokolle, Fotos und Stammdaten bleiben, wo sie sind.',
+    'Die <b>Gerätekartei</b> entsteht aus der Stückliste: ankreuzen, was der Kundendienst betreut. Vorausgewählt ist alles mit Elektroanschluss – bewusst nur ein Vorschlag, denn eine Kühlzelle gehört dazu und ein Regal nicht.',
+    'Je Gerät: Seriennummer, Wartungsintervall, letzte Wartung, Gewährleistung. Die App rechnet die <b>nächste Fälligkeit</b> aus und zeigt sie als Ampel – rot fällig, gelb in den nächsten 60 Tagen.',
+    'Wie alles andere <b>offline nutzbar</b>: Eingaben stehen sofort auf dem Gerät und gehen von selbst nach oben, sobald Netz da ist.',
+    'Noch nicht dabei: der Wartungsauftrag über mehrere Geräte samt Servicebericht und die baustellenübergreifende Fälligkeitsliste.' ]},
   { v:141, titel:'Baustelle im Aufbau: „nur für mich sichtbar"', punkte:[
     'Eine Baustelle, die noch vorbereitet wird, stand bisher ab dem ersten Moment in der Liste aller – mitten zwischen den laufenden.',
     'Unter 🏢 <b>Stammdaten</b> gibt es jetzt das Häkchen <b>„Nur für mich sichtbar"</b>. Die Baustelle verschwindet damit aus der Auswahl aller anderen – auch in der Einweisungs-App – und trägt bei dir ein 🔒. Häkchen wieder weg = für alle da.',
@@ -5347,6 +5364,250 @@ async function svcBuildPdf(entry){
 // Berichte-Sheet: fasst die früheren 7 FAB-Knöpfe zu EINEM Einstieg zusammen.
 // Die Aktionen laufen synchron aus dem Klick (wichtig für window.open, §9) –
 // closeBerichteSheet togglet nur eine CSS-Klasse und blockiert das nicht.
+// ═══════════════════ KUNDENDIENST – Gerätekartei und Fristen ═══════════════════
+// Zweites Leben einer Baustelle: Nach der Abnahme geht das Objekt in den
+// Kundendienst über, dort laufen Wartungen und Serviceeinsätze. Die Baustelle
+// bleibt dieselbe (dieselbe pid, dieselbe Stückliste, dieselben Protokolle) –
+// nur `phase` in __projects.json wechselt von „montage" auf „kundendienst".
+// Bewusst KEINE zweite Baustelle: die Gerätehistorie soll nicht an der Übergabe
+// zerreißen, und Stammdaten, Anschrift und IBN-Protokolle sind schon da.
+//
+// Die Kartei entsteht NICHT automatisch, sondern als Vorschlag zum Bestätigen.
+// Grund ist gemessen, nicht vermutet: Über alle 14 Baustellen tragen 296 von 959
+// Positionen die Elektro-Marke – bei fünf Baustellen ist sie gar nicht gepflegt,
+// obwohl dort Geräte stehen (Korbach hat drei Hobart-Protokolle und null
+// Elektro-Positionen). Wer die Kartei blind aus dem Gewerk zieht, bekommt dort
+// eine leere Kartei und merkt es nicht. Umgekehrt ist Wartungspflicht nicht
+// gleich Stromanschluss – eine Kühlzelle mit Kältemittel gehört hinein, ein
+// Lagerregal mit Fabrikat nicht.
+let KDG=[];                      // Gerätekartei der offenen Baustelle
+const KD_VORWARNUNG_TAGE=60;     // ab hier gilt eine Wartung als „bald fällig"
+async function loadKD(pid){ KDG = await jsonLaden('kdger', pid); }
+function kdPhase(pid){
+  const p=PROJECTS.find(x=>x.pid===(pid||PID));
+  return (p&&p.phase)==='kundendienst' ? 'kundendienst' : 'montage';
+}
+function kdHeute(){ return localDay(new Date().toISOString()); }
+// Datum + n Monate. Der 31. eines Monats landet in einem kürzeren Monat auf
+// dessen letztem Tag statt im Folgemonat – „31.01. + 1 Monat" soll der 28./29.02.
+// sein und nicht der 03.03.
+function kdPlusMonate(iso, monate){
+  const m=String(iso||'').match(/^(\d{4})-(\d{2})-(\d{2})$/); if(!m||!monate) return '';
+  const j=+m[1], mo=+m[2]-1, t=+m[3];
+  const ziel=new Date(j, mo+Number(monate), 1);
+  const letzterTag=new Date(ziel.getFullYear(), ziel.getMonth()+1, 0).getDate();
+  ziel.setDate(Math.min(t, letzterTag));
+  return localDay(ziel.toISOString());
+}
+// Nächste Wartung: letzte Wartung + Intervall; solange es keine gab, zählt die
+// Inbetriebnahme bzw. das Übergabedatum. Ohne Intervall ist nichts fällig.
+function kdNaechste(g){
+  if(!g || !g.intervall || g.aus) return '';
+  const start = g.letzte || g.ibnDatum || (PROJECTS.find(p=>p.pid===PID)||{}).kdSeit || '';
+  return start ? kdPlusMonate(start, g.intervall) : '';
+}
+function kdStatus(g){
+  const n=kdNaechste(g);
+  if(g.aus) return {k:'aus', t:'stillgelegt', f:'#8a8a8a', n};
+  if(!g.intervall) return {k:'ohne', t:'keine Wartung hinterlegt', f:'#8a8a8a', n};
+  if(!n) return {k:'ohne', t:'Startdatum fehlt', f:'#e0a060', n};
+  const tage=Math.round((new Date(n)-new Date(kdHeute()))/86400000);
+  if(tage<0)  return {k:'faellig', t:'seit '+(-tage)+' Tagen fällig', f:'#d97070', n};
+  if(tage<=KD_VORWARNUNG_TAGE) return {k:'bald', t:'in '+tage+' Tagen', f:'#e0a060', n};
+  return {k:'ok', t:'in '+tage+' Tagen', f:'#8fbf8f', n};
+}
+function kdDatDE(d){ const p=String(d||'').split('-'); return p.length===3?(p[2]+'.'+p[1]+'.'+p[0]):''; }
+
+// Wartungsintervall-Vorschlag je Gerätestichwort – pflegbar wie MONTEURE.
+// Das ist ein VORSCHLAG für die Ersterfassung, keine Vorgabe: maßgeblich ist der
+// Wartungsvertrag, und im Gerät lässt sich der Wert jederzeit ändern.
+const KD_INTERVALL=[
+  [/kombidämpfer|heißluft|dämpfer|combi/i, 12], [/spülmaschine|spültechnik|geschirrspül/i, 12],
+  [/fritteuse/i, 12], [/kühlzelle|tiefkühl|kühl|froster/i, 12], [/haube|abluft|lüftung/i, 12],
+  [/kaffee|heißgetränk/i, 12], [/herd|kochfeld|induktion|kessel|pfanne|bräter/i, 12],
+  [/eiswürfel|wasserspender|enthärter|osmose/i, 12]
+];
+function kdIntervallVorschlag(bez){ const t=String(bez||''); for(const [re,m] of KD_INTERVALL){ if(re.test(t)) return m; } return 12; }
+
+// Alle Positionen der Stückliste, flach – Grundlage für die Ersterfassung.
+function kdLvPositionen(){
+  const out=[];
+  (DATA||[]).forEach(g=>(g.subsections||[]).forEach(s=>(s.items||[]).forEach(it=>{
+    out.push({ pos:it.pos||'', bez:(it.bez||'').trim(), fabrikat:(it.fabrikat||'').trim(),
+      typ:(it.typ||'').trim(), menge:(it.menge||'').trim(),
+      elektro:(it.gew||[]).indexOf('E')>=0, etage:g.bez||'', anlage:s.bez||'' });
+  })));
+  return out;
+}
+
+function openKundendienst(){
+  if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
+  if(kdPhase()!=='kundendienst'){
+    const p=PROJECTS.find(x=>x.pid===PID)||{};
+    if(!darfBenutzerWechseln()){ alert('Diese Baustelle ist noch in der Montage.\nDie Übergabe an den Kundendienst nimmt die Bauleitung oder der Innendienst vor.'); return; }
+    if(!confirm('„'+(p.name||'')+'" ist noch als Montage-Baustelle geführt.\n\nJetzt an den Kundendienst übergeben? Die Baustelle bleibt mit allen Daten erhalten – sie bekommt zusätzlich eine Gerätekartei mit Wartungsfristen.')) return;
+    kdUebergeben(PID).then(()=>kdRender()).catch(e=>alert('Übergabe fehlgeschlagen: '+(e.message||e)));
+    return;
+  }
+  kdRender();
+}
+async function kdUebergeben(pid){
+  const p=PROJECTS.find(x=>x.pid===pid); if(!p) return;
+  const alt={phase:p.phase, kdSeit:p.kdSeit};
+  p.phase='kundendienst'; p.kdSeit=p.kdSeit||kdHeute();
+  try{ await saveProjects(); }
+  catch(e){ Object.assign(p,alt); throw e; }
+  await loadKD(pid);
+}
+function kdClose(){ const o=document.getElementById('kdOv'); if(o) o.remove(); }
+function kdRender(){
+  let ov=document.getElementById('kdOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='kdOv';
+    ov.style.cssText='position:fixed;inset:0;z-index:1950;background:#2b2b2b;overflow-y:auto;padding:calc(16px + env(safe-area-inset-top)) 14px 30px;';
+    document.body.appendChild(ov); }
+  const p=PROJECTS.find(x=>x.pid===PID)||{};
+  // Gelöschte bleiben als Grabstein in der Datei (sonst kämen sie beim nächsten
+  // Abgleich zurück, §1.19) – angezeigt werden sie nicht.
+  const liste=KDG.filter(g=>g&&!g.geloescht).sort(JSON_ARTEN.kdger.sort);
+  const offen=liste.filter(g=>{ const s=kdStatus(g); return s.k==='faellig'||s.k==='bald'; }).length;
+  const zeile=g=>{
+    const s=kdStatus(g);
+    return '<div onclick="kdEdit('+JSON.stringify(g.gid).replace(/"/g,'&quot;')+')" style="background:#3a3530;border:1px solid #895500;border-left:4px solid '+s.f+';border-radius:10px;padding:12px 14px;cursor:pointer;display:flex;align-items:center;gap:12px">'+
+      '<span style="flex:1;min-width:0">'+
+        '<span style="display:block;font-size:14px;font-weight:700;color:#fff">'+escapeHtml(g.bez||'(ohne Bezeichnung)')+'</span>'+
+        '<span style="display:block;font-size:11px;color:#c0a780;margin-top:2px">'+escapeHtml([g.pos,g.fabrikat,g.typ].filter(Boolean).join(' · '))+'</span>'+
+        (g.seriennr?'<span style="display:block;font-size:11px;color:#a8a8a8;margin-top:1px">SN '+escapeHtml(g.seriennr)+'</span>':'')+
+        '<span style="display:block;font-size:11px;color:'+s.f+';margin-top:2px">'+(s.n?('Wartung '+kdDatDE(s.n)+' · '):'')+escapeHtml(s.t)+'</span>'+
+      '</span><span style="color:#d7c1ae;font-size:18px">›</span></div>';
+  };
+  ov.innerHTML=
+    '<div style="max-width:560px;margin:0 auto">'+
+      '<div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">'+
+        '<div style="flex:1;font-size:17px;font-weight:700;color:#fff">🛠 Kundendienst</div>'+
+        '<button onclick="kdClose()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:7px 13px;font-size:14px;cursor:pointer;font-family:inherit">Schließen</button>'+
+      '</div>'+
+      '<div style="font-size:12px;color:#a8a8a8;margin-bottom:14px">'+escapeHtml(p.name||'')+(p.kdSeit?(' · übergeben am '+kdDatDE(p.kdSeit)):'')+'</div>'+
+      (liste.length?
+        '<div style="font-size:12px;color:'+(offen?'#e0a060':'#8fbf8f')+';margin-bottom:10px">'+
+          (offen? ('⚠ '+offen+' von '+liste.length+' Geräten fällig oder bald fällig') : ('✓ '+liste.length+' Geräte, nichts fällig'))+'</div>'+
+        '<div style="display:flex;flex-direction:column;gap:9px">'+liste.map(zeile).join('')+'</div>'
+        :'<div style="color:#a8a8a8;font-size:13px;border:1px dashed #4a423a;border-radius:10px;padding:18px;text-align:center">Noch keine Geräte in der Kartei.<br>Übernimm sie aus der Stückliste – ändern lässt sich danach alles.</div>')+
+      '<button onclick="kdSeedDialog()" style="margin-top:16px;width:100%;background:#d7c1ae;color:#2b2b2b;border:none;border-radius:10px;padding:13px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">➕ Geräte aus der Stückliste übernehmen</button>'+
+    '</div>';
+}
+// Ersterfassung: Vorschlagsliste zum Ankreuzen. Vorausgewählt ist, was einen
+// Elektroanschluss trägt – das ist die beste automatische Näherung, aber eben
+// nur eine Näherung (siehe Kopf des Moduls), deshalb entscheidet der Mensch.
+function kdSeedDialog(){
+  const drin=new Set(KDG.filter(g=>g&&!g.geloescht).map(g=>String(g.pos)));
+  // Vorausgewähltes nach oben. Sonst stehen bei Marburg 14 angehakte Geräte
+  // verstreut zwischen 89 Zeilen, und man scrollt an der eigenen Auswahl vorbei.
+  const kand=kdLvPositionen().filter(p=>!drin.has(String(p.pos)))
+    .sort((a,b)=>(b.elektro?1:0)-(a.elektro?1:0) || String(a.pos).localeCompare(String(b.pos),'de',{numeric:true}));
+  if(!kand.length){ alert('Alle Positionen der Stückliste sind bereits in der Kartei.'); return; }
+  let ov=document.getElementById('kdSeedDlg');
+  if(!ov){ ov=document.createElement('div'); ov.id='kdSeedDlg'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) kdSeedClose(); };
+  const vor=kand.filter(k=>k.elektro).length;
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:20px;max-width:560px;width:100%;max-height:88vh;display:flex;flex-direction:column;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:16px;font-weight:700">Geräte übernehmen</div>'+
+    '<div style="font-size:11px;color:#a8a8a8;border-left:3px solid #4a423a;padding-left:9px;margin:8px 0 10px">'+
+      'Vorausgewählt sind die '+vor+' Positionen mit Elektroanschluss. Das ist eine Näherung: Wartungspflicht hängt nicht am Strom – Kälte- und Lüftungstechnik gehört dazu, ein Regal nicht. Kreuze an, was der Kundendienst betreut.</div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:8px">'+
+      '<button onclick="kdSeedAlle(true)" style="background:#3a3530;border:1px solid #895500;color:#fff;border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;font-family:inherit">Alle</button>'+
+      '<button onclick="kdSeedAlle(false)" style="background:#3a3530;border:1px solid #895500;color:#fff;border-radius:8px;padding:7px 12px;font-size:12px;cursor:pointer;font-family:inherit">Keine</button>'+
+      '<span id="kdSeedZahl" style="flex:1;text-align:right;font-size:12px;color:#c0a780;align-self:center"></span>'+
+    '</div>'+
+    '<div style="flex:1;overflow-y:auto;display:flex;flex-direction:column;gap:6px;border-top:1px solid #3a3530;padding-top:8px">'+
+      kand.map((k,i)=>'<label style="display:flex;align-items:flex-start;gap:9px;padding:7px 8px;background:#332f2b;border-radius:8px;cursor:pointer">'+
+        '<input type="checkbox" class="kdSeedCb" data-i="'+i+'"'+(k.elektro?' checked':'')+' onchange="kdSeedZahl()" style="width:16px;height:16px;accent-color:#b8860b;flex:0 0 auto;margin-top:2px">'+
+        '<span style="font-size:12px;line-height:1.35"><b>'+escapeHtml(k.bez||'(ohne Bezeichnung)')+'</b>'+
+        '<span style="display:block;color:#a8a8a8">'+escapeHtml([k.pos,k.fabrikat,k.typ].filter(Boolean).join(' · '))+(k.elektro?' · ⚡':'')+'</span></span></label>').join('')+
+    '</div>'+
+    '<div style="display:flex;gap:10px;margin-top:14px;justify-content:flex-end">'+
+      '<button onclick="kdSeedClose()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
+      '<button onclick="kdSeedUebernehmen()" style="background:#b8860b;border:none;color:#fff;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Übernehmen</button>'+
+    '</div></div>';
+  KD_SEED_KAND=kand; kdSeedZahl();
+}
+let KD_SEED_KAND=[];
+function kdSeedClose(){ const o=document.getElementById('kdSeedDlg'); if(o) o.remove(); }
+function kdSeedAlle(an){ document.querySelectorAll('.kdSeedCb').forEach(cb=>cb.checked=!!an); kdSeedZahl(); }
+function kdSeedZahl(){ const n=document.querySelectorAll('.kdSeedCb:checked').length; const el=document.getElementById('kdSeedZahl'); if(el) el.textContent=n+' ausgewählt'; }
+async function kdSeedUebernehmen(){
+  const gew=[...document.querySelectorAll('.kdSeedCb:checked')].map(cb=>KD_SEED_KAND[+cb.dataset.i]).filter(Boolean);
+  if(!gew.length){ alert('Nichts ausgewählt.'); return; }
+  kdSeedClose();
+  for(const k of gew){
+    const g={ gid:String(k.pos), pos:k.pos, bez:k.bez, fabrikat:k.fabrikat, typ:k.typ,
+      etage:k.etage, anlage:k.anlage, seriennr:'', ibnDatum:'', gewBis:'',
+      intervall:kdIntervallVorschlag(k.bez+' '+k.typ), letzte:'', notiz:'', aus:false,
+      angelegt:new Date().toISOString(), by:USER||'' };
+    jsonUpsert(KDG, 'gid', g);
+    await jsonSpeichern('kdger', g);
+  }
+  showToast(gew.length+' Gerät'+(gew.length===1?'':'e')+' übernommen');
+  kdRender();
+}
+function kdEdit(gid){
+  const g=KDG.find(x=>String(x.gid)===String(gid)); if(!g) return;
+  let ov=document.getElementById('kdDlg');
+  if(!ov){ ov=document.createElement('div'); ov.id='kdDlg'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) kdEditClose(); };
+  const fld='width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #6a5433;background:#3a3530;color:#fff;font-size:16px;font-family:inherit';
+  const lbl='display:block;font-size:12px;color:#a8a8a8;margin:12px 0 5px;font-weight:700;letter-spacing:.3px';
+  const s=kdStatus(g);
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:20px;max-width:460px;width:100%;max-height:88vh;overflow:auto;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:16px;font-weight:700">'+escapeHtml(g.bez||'Gerät')+'</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:4px">'+escapeHtml([g.pos,g.fabrikat,g.typ].filter(Boolean).join(' · '))+'</div>'+
+    '<div style="font-size:12px;color:'+s.f+';margin-bottom:6px">'+(s.n?('Nächste Wartung: '+kdDatDE(s.n)+' — '):'')+escapeHtml(s.t)+'</div>'+
+    '<label style="'+lbl+'">Seriennummer</label>'+
+    '<input id="kdSn" type="text" value="'+escapeHtml(g.seriennr||'')+'" placeholder="steht auf dem Typenschild / im IBN-Protokoll" style="'+fld+'">'+
+    '<label style="'+lbl+'">Wartungsintervall (Monate) — 0 = keine Wartung</label>'+
+    '<input id="kdInt" type="number" inputmode="numeric" min="0" max="120" value="'+escapeHtml(String(g.intervall||0))+'" style="'+fld+'">'+
+    '<label style="'+lbl+'">Letzte Wartung</label>'+
+    '<input id="kdLetzte" type="date" value="'+escapeHtml(g.letzte||'')+'" style="'+fld+'">'+
+    '<label style="'+lbl+'">Inbetriebnahme (zählt, solange es keine Wartung gab)</label>'+
+    '<input id="kdIbn" type="date" value="'+escapeHtml(g.ibnDatum||'')+'" style="'+fld+'">'+
+    '<label style="'+lbl+'">Gewährleistung bis</label>'+
+    '<input id="kdGew" type="date" value="'+escapeHtml(g.gewBis||'')+'" style="'+fld+'">'+
+    '<label style="'+lbl+'">Notiz</label>'+
+    '<textarea id="kdNotiz" rows="2" style="'+fld+';resize:vertical">'+escapeHtml(g.notiz||'')+'</textarea>'+
+    '<label style="display:flex;align-items:center;gap:9px;margin-top:14px;padding:10px 12px;background:#332f2b;border:1px solid #4a423a;border-radius:9px;cursor:pointer">'+
+      '<input id="kdAus" type="checkbox"'+(g.aus?' checked':'')+' style="width:17px;height:17px;accent-color:#b8860b">'+
+      '<span style="font-size:13px;color:#ddd">Stillgelegt / ausgebaut <span style="display:block;font-size:11px;color:#a8a8a8">bleibt mit seiner Historie stehen, wird aber nicht mehr fällig</span></span></label>'+
+    '<div style="display:flex;gap:10px;margin-top:18px;justify-content:space-between;align-items:center">'+
+      '<button onclick="kdLoeschen('+JSON.stringify(g.gid).replace(/"/g,'&quot;')+')" style="background:none;border:1px solid #6a4040;color:#d99;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;font-family:inherit">🗑 Aus der Kartei</button>'+
+      '<span style="display:flex;gap:10px">'+
+        '<button onclick="kdEditClose()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
+        '<button onclick="kdSpeichern('+JSON.stringify(g.gid).replace(/"/g,'&quot;')+')" style="background:#b8860b;border:none;color:#fff;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Speichern</button>'+
+      '</span></div></div>';
+}
+function kdEditClose(){ const o=document.getElementById('kdDlg'); if(o) o.remove(); }
+async function kdSpeichern(gid){
+  const g=KDG.find(x=>String(x.gid)===String(gid)); if(!g){ kdEditClose(); return; }
+  const v=id=>((document.getElementById(id)||{}).value||'').trim();
+  g.seriennr=v('kdSn'); g.intervall=Math.max(0, Math.min(120, parseInt(v('kdInt'),10)||0));
+  g.letzte=v('kdLetzte'); g.ibnDatum=v('kdIbn'); g.gewBis=v('kdGew'); g.notiz=v('kdNotiz');
+  g.aus=!!(document.getElementById('kdAus')||{}).checked;
+  g.geaendert=new Date().toISOString(); g.by=USER||g.by||'';
+  jsonUpsert(KDG,'gid',g);
+  await jsonSpeichern('kdger', g);
+  kdEditClose(); kdRender(); showToast('Gerät gespeichert');
+}
+// Löschen mit Rückfrage – wie überall seit v116 (§1.8).
+async function kdLoeschen(gid){
+  const g=KDG.find(x=>String(x.gid)===String(gid)); if(!g) return;
+  if(!confirm('„'+(g.bez||'Gerät')+'" ('+(g.pos||'')+') aus der Gerätekartei entfernen?\n\nDie Position der Stückliste bleibt unberührt – nur der Kundendienst-Eintrag mit Fristen und Notiz geht verloren.')) return;
+  g.aus=true; g.geloescht=true; g.geaendert=new Date().toISOString();
+  // Als gelöscht MARKIEREN statt aus der Datei zu werfen: die Warteschlange
+  // überträgt einzelne Einträge (§1.19) – ein hier entferntes Gerät käme beim
+  // nächsten Abgleich vom Server zurück.
+  jsonUpsert(KDG,'gid',g);
+  await jsonSpeichern('kdger', g);
+  kdEditClose(); kdRender(); showToast('Gerät entfernt');
+}
+
 function openBerichteSheet(){
   if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
   let ov=document.getElementById('berichteOv');
@@ -5373,6 +5634,14 @@ function openBerichteSheet(){
     {ic:'🔑', t:'Schlüsselübergabe', d:'Schlüsselprotokoll zum Unterschreiben', fn:'openSchluesselprotokoll()'},
     {ic:'📊', t:'Restarbeitenliste', d:'als Excel-Datei', fn:'expRestXlsx()'}
   ];
+  // Kundendienst erscheint erst, wenn die Baustelle übergeben ist – und für
+  // Bauleitung/Innendienst zusätzlich davor, denn die nehmen die Übergabe vor.
+  // Der Trupp bekommt auf einer laufenden Baustelle keinen Eintrag zu sehen,
+  // mit dem er nichts anfangen kann.
+  if(kdPhase()==='kundendienst' || darfBenutzerWechseln()){
+    items.splice(6, 0, {ic:'🛠', t:'Kundendienst', d: kdPhase()==='kundendienst'
+      ? 'Gerätekartei, Wartungsfristen' : 'Baustelle an den Kundendienst übergeben', fn:'openKundendienst()'});
+  }
   ov.innerHTML='<div class="sheet" onclick="event.stopPropagation()">'+
     '<div class="sheet-grip"></div>'+
     '<div class="sheet-h">📄 Berichte &amp; Dokumente</div>'+
@@ -9534,6 +9803,7 @@ function renderProjectPicker(){
           '<span style="display:block;font-size:11px;color:'+(p.auftraggeber?'#c0a780':'#e0a060')+';margin-top:2px">'+(p.auftraggeber?('👤 '+escapeHtml(p.auftraggeber)):'⚠ Auftraggeber fehlt')+'</span>'+
           (_l.filter(x=>x!=='Auftraggeber').length?('<span style="display:block;font-size:11px;color:#e0a060;margin-top:1px">⚠ Stammdaten fehlen: '+escapeHtml(_l.filter(x=>x!=='Auftraggeber').join(', '))+'</span>'):'')+
           (p.privat?'<span style="display:block;font-size:11px;color:#8fbf8f;margin-top:1px">🔒 Nur für dich sichtbar</span>':'')+
+          (p.phase==='kundendienst'?'<span style="display:block;font-size:11px;color:#9fb8d0;margin-top:1px">🛠 Kundendienst'+(p.kdSeit?(' seit '+kdDatDE(p.kdSeit)):'')+'</span>':'')+
           '<span style="display:block;font-size:11px;color:#a8a8a8;margin-top:1px">'+((p.lastEdit||p.created)?('Geändert: '+new Date(p.lastEdit||p.created).toLocaleDateString('de-DE')):'')+'</span></span>'+
           '<button onclick="editStammdaten(\''+p.pid+'\',event)" title="Stammdaten bearbeiten (Auftraggeber, Anschrift, Auftragsnummer)" style="background:none;border:none;color:'+(_l.length?'#e0a060':'#d7c1ae')+';font-size:15px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">🏢</button>'+
          '<button onclick="editBauleiter(\''+p.pid+'\',event)" title="Bauleiter zuordnen (für Aufgaben-Benachrichtigungen)" style="background:none;border:none;color:#d7c1ae;font-size:15px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">👷</button>'+
@@ -9710,6 +9980,7 @@ async function selectProject(pid){
     loadBautagebuch(pid).catch(()=>{});   // Bautagebuch der Baustelle nachladen (nicht blockierend)
     loadDicht(pid).then(()=>updDichtTasks()).catch(()=>{});   // Dichtigkeitsprotokolle nachladen (nicht blockierend)
     loadService(pid).catch(()=>{});   // Serviceberichte nachladen (nicht blockierend)
+    KDG=[]; if(kdPhase(pid)==='kundendienst') loadKD(pid).catch(()=>{});   // Gerätekartei nur bei übergebenen Baustellen
     aufgFlush();                      // wartende Aufgaben-Einträge nachreichen
     const proj = PROJECTS.find(p=>p.pid===pid);
     const nm = document.getElementById('projName'); if(nm) nm.textContent = proj ? proj.name : pid;
