@@ -1764,8 +1764,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 137;
+const APP_VERSION = 138;
 const CHANGELOG = [
+  { v:138, titel:'Weiterbearbeiten: falscher Kunde im Protokollkopf behoben', punkte:[
+    'Beim Weiterbearbeiten eines Inbetriebnahme- oder DGUV-Protokolls standen <b>Kunde und Anschrift der zuletzt geöffneten Baustelle</b> im Kopf – gemeldet aus Marburg, wo die Anschrift der Messe Frankfurt erschien.',
+    'Ursache: Die Inbetriebnahme-App merkt sich die Baustelle. Beim Anlegen eines Protokolls bekommt sie die Stammdaten mitgeschickt, beim Weiterbearbeiten bisher nicht – dann blieb der alte Stand stehen und überschrieb sogar die im Protokoll gespeicherten Werte.',
+    'Jetzt gehen die Stammdaten auch beim Weiterbearbeiten mit. Sind sie an der Baustelle nicht gepflegt, bleiben die Felder <b>leer</b> statt falsch – und was im Protokoll bereits stand, bleibt stehen.',
+    'Wer den richtigen Kunden dauerhaft im Kopf haben will, trägt ihn über 🏢 bei der Baustelle ein.' ]},
   { v:137, titel:'Bautagebuch, Dichtigkeit, Servicebericht und Freimeldung offline', punkte:[
     'Die vier eigenständigen Berichte brauchten bisher als Einzige durchgehend Verbindung: Ohne Netz kam „Speichern fehlgeschlagen (online nötig)" und der ausgefüllte Bericht war weg – samt Kundenunterschrift. Ausgerechnet das, was der Monteur vor Ort ausfüllt.',
     'Jetzt gilt für <b>Bautagebuch, Dichtigkeitsprotokoll, Servicebericht und Mängelfreimeldung</b> dasselbe wie für alles andere: sofort auf dem Gerät gespeichert, in der Warteschlange, und sobald Netz da ist von selbst nach oben. Auch die PDFs.',
@@ -6284,6 +6289,16 @@ async function editIbnProto(pos,i){
   try{
     const o=JSON.parse(await blob.text());
     o.pos=pos; o.editFname=p.fname;
+    // Stammdaten der Baustelle MITGEBEN. Ohne sie behielt die IBN-App Kunde,
+    // Anschrift und Auftragsnummer der ZULETZT dort geöffneten Baustelle (sie
+    // merkt sich das Projekt im localStorage) – und überschrieb damit beim
+    // Weiterbearbeiten sogar die im Protokoll gespeicherten Werte. Gemeldet aus
+    // dem Einsatz: Protokoll in Marburg geöffnet, Anschrift der Messe Frankfurt
+    // im Kopf. Die Felder gehen BEWUSST auch leer mit – genau wie beim Anlegen
+    // (ibnStammHash): ein falscher Kunde ist schlimmer als ein leeres Feld.
+    const s=projStamm();
+    o.stamm={ projekt:(s.name||curProjName()), ort:s.ort, plz:s.plz, strasse:s.strasse,
+              kunde:s.auftraggeber, auftrag:s.auftrag };
     localStorage.setItem('ibn:load', JSON.stringify(o));
     // Gefundenen Pfad zurückschreiben: heilt fehlende/veraltete Merker dauerhaft,
     // beim nächsten Mal wird nicht wieder gesucht.
