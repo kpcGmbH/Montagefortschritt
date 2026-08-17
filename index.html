@@ -1779,8 +1779,9 @@ const CHANGELOG = [
   { v:142, titel:'Kundendienst: Gerätekartei mit Wartungsfristen (Pilot)', punkte:[
     'Nach der Abnahme war in der App Schluss – Wartungen und Serviceeinsätze der folgenden Jahre hatten keinen Ort. Jetzt bekommt eine Baustelle ein <b>zweites Leben</b>: Unter „Berichte &amp; Dokumente" gibt es <b>🛠 Kundendienst</b>.',
     'Bauleitung und Innendienst übergeben eine fertige Baustelle dort an den Kundendienst. Sie bleibt <b>dieselbe Baustelle</b> – Stückliste, Protokolle, Fotos und Stammdaten bleiben, wo sie sind.',
+    'Übergeben wird <b>nach Fertigstellung und Mängelbearbeitung</b>. Der Dialog zeigt vorher, wie die Baustelle dasteht: wie viele Positionen noch nicht vollständig sind und wie viele Restarbeiten und Mängel offen sind. Eine Sperre ist das nicht – die Zählung kennt den Grund nicht.',
     'Die <b>Gerätekartei</b> entsteht aus der Stückliste: ankreuzen, was der Kundendienst betreut. Vorausgewählt ist alles mit Elektroanschluss – bewusst nur ein Vorschlag, denn eine Kühlzelle gehört dazu und ein Regal nicht.',
-    'Je Gerät: Seriennummer, Wartungsintervall, letzte Wartung, Gewährleistung. Die App rechnet die <b>nächste Fälligkeit</b> aus und zeigt sie als Ampel – rot fällig, gelb in den nächsten 60 Tagen.',
+    'Je Gerät: Seriennummer, Wartungstakt (<b>1× oder 2× jährlich</b> auf Knopfdruck, anderer Rhythmus frei eingebbar), letzte Wartung, Gewährleistung. Die App rechnet die <b>nächste Fälligkeit</b> aus und zeigt sie als Ampel – rot fällig, gelb in den nächsten 60 Tagen.',
     'Wie alles andere <b>offline nutzbar</b>: Eingaben stehen sofort auf dem Gerät und gehen von selbst nach oben, sobald Netz da ist.',
     'Noch nicht dabei: der Wartungsauftrag über mehrere Geräte samt Servicebericht und die baustellenübergreifende Fälligkeitsliste.' ]},
   { v:141, titel:'Baustelle im Aufbau: „nur für mich sichtbar"', punkte:[
@@ -5421,6 +5422,10 @@ function kdDatDE(d){ const p=String(d||'').split('-'); return p.length===3?(p[2]
 // Wartungsintervall-Vorschlag je Gerätestichwort – pflegbar wie MONTEURE.
 // Das ist ein VORSCHLAG für die Ersterfassung, keine Vorgabe: maßgeblich ist der
 // Wartungsvertrag, und im Gerät lässt sich der Wert jederzeit ändern.
+// In der Regel wird 1× oder 2× jährlich gewartet (Angabe des Nutzers, 17.08.2026).
+// Deshalb sind das die beiden Knöpfe im Gerätedialog; der Monatswert bleibt frei
+// eingebbar, damit ein Vertrag mit vierteljährlicher Wartung nicht ansteht.
+const KD_TAKTE=[[12,'1× jährlich'],[6,'2× jährlich'],[0,'keine Wartung']];
 const KD_INTERVALL=[
   [/kombidämpfer|heißluft|dämpfer|combi/i, 12], [/spülmaschine|spültechnik|geschirrspül/i, 12],
   [/fritteuse/i, 12], [/kühlzelle|tiefkühl|kühl|froster/i, 12], [/haube|abluft|lüftung/i, 12],
@@ -5428,6 +5433,32 @@ const KD_INTERVALL=[
   [/eiswürfel|wasserspender|enthärter|osmose/i, 12]
 ];
 function kdIntervallVorschlag(bez){ const t=String(bez||''); for(const [re,m] of KD_INTERVALL){ if(re.test(t)) return m; } return 12; }
+function kdTaktLabel(m){ const t=KD_TAKTE.find(x=>x[0]===Number(m)); return t? t[1] : (Number(m)? ('alle '+Number(m)+' Monate') : 'keine Wartung'); }
+
+// ── Ist die Baustelle so weit? ──────────────────────────────────────────────
+// Übergeben wird nach Fertigstellung UND Mängelbearbeitung. Die App weiß beides
+// schon: offene Schritte stehen in den Positionsdaten, offene Mängel in den
+// Restarbeiten. Das ist eine ANZEIGE, keine Sperre – es gibt legitime Fälle
+// (eine Restarbeit wartet auf den Kunden), und wer die Baustelle betreut, weiß
+// mehr als die Zählung.
+function kdOffenePos(){
+  let offen=0, teil=0, gesamt=0;
+  (DATA||[]).forEach(sec=>(sec.subsections||[]).forEach(sub=>(sub.items||[]).forEach(it=>{
+    gesamt++; const st=ist(it.pos,'all');
+    if(st==='open') offen++; else if(st==='part') teil++;
+  })));
+  return {offen, teil, gesamt};
+}
+// Restarbeiten aller drei Ebenen (Baustelle, Etage, Position) – bewusst OHNE den
+// Gewerk-Filter TF, anders als raOffen: für die Übergabe zählt alles Offene.
+function kdOffeneRA(){
+  let offen=0, maengel=0;
+  const zaehl=key=>{ const s=ST[key]; if(!s||!Array.isArray(s.restarbeiten)) return;
+    s.restarbeiten.forEach(r=>{ if(!(r.txt||'').trim()||r.done) return; offen++; if(r.mangel) maengel++; }); };
+  zaehl(PRAKEY);
+  (DATA||[]).forEach(sec=>{ zaehl(EKEY(sec)); (sec.subsections||[]).forEach(sub=>(sub.items||[]).forEach(it=>zaehl(it.pos))); });
+  return {offen, maengel};
+}
 
 // Alle Positionen der Stückliste, flach – Grundlage für die Ersterfassung.
 function kdLvPositionen(){
@@ -5443,18 +5474,53 @@ function kdLvPositionen(){
 function openKundendienst(){
   if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
   if(kdPhase()!=='kundendienst'){
-    const p=PROJECTS.find(x=>x.pid===PID)||{};
     if(!darfBenutzerWechseln()){ alert('Diese Baustelle ist noch in der Montage.\nDie Übergabe an den Kundendienst nimmt die Bauleitung oder der Innendienst vor.'); return; }
-    if(!confirm('„'+(p.name||'')+'" ist noch als Montage-Baustelle geführt.\n\nJetzt an den Kundendienst übergeben? Die Baustelle bleibt mit allen Daten erhalten – sie bekommt zusätzlich eine Gerätekartei mit Wartungsfristen.')) return;
-    kdUebergeben(PID).then(()=>kdRender()).catch(e=>alert('Übergabe fehlgeschlagen: '+(e.message||e)));
-    return;
+    kdUebergabeDialog(); return;
   }
   kdRender();
 }
-async function kdUebergeben(pid){
+// Übergabe an den Kundendienst – mit dem Stand der Baustelle vor Augen.
+function kdUebergabeDialog(){
+  const p=PROJECTS.find(x=>x.pid===PID)||{};
+  const pos=kdOffenePos(), ra=kdOffeneRA();
+  const fertig = !pos.offen && !pos.teil, sauber = !ra.offen;
+  let ov=document.getElementById('kdUebDlg');
+  if(!ov){ ov=document.createElement('div'); ov.id='kdUebDlg'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:16px'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) kdUebClose(); };
+  const zeile=(ok,txt)=>'<div style="display:flex;gap:9px;align-items:flex-start;font-size:13px;color:'+(ok?'#8fbf8f':'#e0a060')+';margin-top:7px">'+
+    '<span>'+(ok?'✓':'⚠')+'</span><span>'+txt+'</span></div>';
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:22px;max-width:460px;width:100%;max-height:88vh;overflow:auto;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:17px;font-weight:700">🛠 An den Kundendienst übergeben</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:10px">'+escapeHtml(p.name||'')+'</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;border-left:3px solid #4a423a;padding-left:9px">Übergeben wird nach Fertigstellung und Mängelbearbeitung. Die Baustelle bleibt vollständig erhalten – Stückliste, Protokolle, Fotos und Berichte. Sie bekommt zusätzlich eine Gerätekartei mit Wartungsfristen.</div>'+
+    '<div style="margin-top:12px;padding:12px;background:#332f2b;border-radius:9px">'+
+      '<div style="font-size:12px;color:#d7c1ae;font-weight:700;letter-spacing:.3px">STAND DER BAUSTELLE</div>'+
+      zeile(fertig, fertig? ('Alle '+pos.gesamt+' Positionen vollständig')
+        : (pos.offen+pos.teil)+' von '+pos.gesamt+' Positionen noch nicht vollständig'+(pos.teil?(' ('+pos.teil+' teilweise, '+pos.offen+' offen)'):''))+
+      zeile(sauber, sauber? 'Keine offenen Restarbeiten oder Mängel'
+        : ra.offen+' offene Restarbeiten'+(ra.maengel?(', davon '+ra.maengel+' als Mangel markiert'):''))+
+    '</div>'+
+    (fertig&&sauber? ''
+      : '<div style="font-size:12px;color:#e0a060;margin-top:10px">Übergeben lässt sich trotzdem – die Zählung kennt den Grund nicht, du schon. Offene Punkte bleiben sichtbar und bearbeitbar.</div>')+
+    '<label style="display:block;font-size:12px;color:#a8a8a8;margin:14px 0 5px;font-weight:700;letter-spacing:.3px">Übergabe am</label>'+
+    '<input id="kdUebDat" type="date" value="'+escapeHtml(p.kdSeit||kdHeute())+'" style="width:100%;box-sizing:border-box;padding:10px;border-radius:8px;border:1px solid #6a5433;background:#3a3530;color:#fff;font-size:16px;font-family:inherit">'+
+    '<div style="font-size:11px;color:#a8a8a8;margin-top:5px">Ab diesem Tag rechnet die App die erste Wartung, solange bei einem Gerät kein Inbetriebnahmedatum steht.</div>'+
+    '<div style="display:flex;gap:10px;margin-top:20px;justify-content:flex-end">'+
+      '<button onclick="kdUebClose()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
+      '<button onclick="kdUebBestaetigen()" style="background:#b8860b;border:none;color:#fff;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">Übergeben</button>'+
+    '</div></div>';
+}
+function kdUebClose(){ const o=document.getElementById('kdUebDlg'); if(o) o.remove(); }
+async function kdUebBestaetigen(){
+  const dat=((document.getElementById('kdUebDat')||{}).value||'').trim()||kdHeute();
+  try{ await kdUebergeben(PID, dat); }
+  catch(e){ alert('Übergabe fehlgeschlagen: '+(e.message||e)); return; }
+  kdUebClose(); kdRender(); showToast('Baustelle ist im Kundendienst');
+}
+async function kdUebergeben(pid, datum){
   const p=PROJECTS.find(x=>x.pid===pid); if(!p) return;
   const alt={phase:p.phase, kdSeit:p.kdSeit};
-  p.phase='kundendienst'; p.kdSeit=p.kdSeit||kdHeute();
+  p.phase='kundendienst'; p.kdSeit=datum||p.kdSeit||kdHeute();
   try{ await saveProjects(); }
   catch(e){ Object.assign(p,alt); throw e; }
   await loadKD(pid);
@@ -5477,7 +5543,7 @@ function kdRender(){
         '<span style="display:block;font-size:14px;font-weight:700;color:#fff">'+escapeHtml(g.bez||'(ohne Bezeichnung)')+'</span>'+
         '<span style="display:block;font-size:11px;color:#c0a780;margin-top:2px">'+escapeHtml([g.pos,g.fabrikat,g.typ].filter(Boolean).join(' · '))+'</span>'+
         (g.seriennr?'<span style="display:block;font-size:11px;color:#a8a8a8;margin-top:1px">SN '+escapeHtml(g.seriennr)+'</span>':'')+
-        '<span style="display:block;font-size:11px;color:'+s.f+';margin-top:2px">'+(s.n?('Wartung '+kdDatDE(s.n)+' · '):'')+escapeHtml(s.t)+'</span>'+
+        '<span style="display:block;font-size:11px;color:'+s.f+';margin-top:2px">'+(s.n?('Wartung '+kdDatDE(s.n)+' · '+kdTaktLabel(g.intervall)+' · '):'')+escapeHtml(s.t)+'</span>'+
       '</span><span style="color:#d7c1ae;font-size:18px">›</span></div>';
   };
   ov.innerHTML=
@@ -5563,8 +5629,15 @@ function kdEdit(gid){
     '<div style="font-size:12px;color:'+s.f+';margin-bottom:6px">'+(s.n?('Nächste Wartung: '+kdDatDE(s.n)+' — '):'')+escapeHtml(s.t)+'</div>'+
     '<label style="'+lbl+'">Seriennummer</label>'+
     '<input id="kdSn" type="text" value="'+escapeHtml(g.seriennr||'')+'" placeholder="steht auf dem Typenschild / im IBN-Protokoll" style="'+fld+'">'+
-    '<label style="'+lbl+'">Wartungsintervall (Monate) — 0 = keine Wartung</label>'+
-    '<input id="kdInt" type="number" inputmode="numeric" min="0" max="120" value="'+escapeHtml(String(g.intervall||0))+'" style="'+fld+'">'+
+    '<label style="'+lbl+'">Wartungstakt</label>'+
+    '<div style="display:flex;gap:7px;flex-wrap:wrap">'+
+      KD_TAKTE.map(t=>'<button type="button" data-m="'+t[0]+'" onclick="kdTaktWahl(this)" style="background:'+(Number(g.intervall||0)===t[0]?'#895500':'#3a3530')+';border:1px solid #895500;color:#fff;border-radius:16px;padding:7px 13px;font-size:14px;cursor:pointer;font-family:inherit">'+t[1]+'</button>').join('')+
+    '</div>'+
+    '<div style="display:flex;align-items:center;gap:9px;margin-top:8px">'+
+      '<span style="font-size:11px;color:#a8a8a8;flex:0 0 auto">oder alle</span>'+
+      '<input id="kdInt" type="number" inputmode="numeric" min="0" max="120" value="'+escapeHtml(String(g.intervall||0))+'" oninput="kdTaktSync()" style="'+fld+';flex:1;padding:7px 9px;font-size:14px">'+
+      '<span style="font-size:11px;color:#a8a8a8;flex:0 0 auto">Monate</span>'+
+    '</div>'+
     '<label style="'+lbl+'">Letzte Wartung</label>'+
     '<input id="kdLetzte" type="date" value="'+escapeHtml(g.letzte||'')+'" style="'+fld+'">'+
     '<label style="'+lbl+'">Inbetriebnahme (zählt, solange es keine Wartung gab)</label>'+
@@ -5584,6 +5657,18 @@ function kdEdit(gid){
       '</span></div></div>';
 }
 function kdEditClose(){ const o=document.getElementById('kdDlg'); if(o) o.remove(); }
+// Takt-Knopf und Monatsfeld zeigen immer denselben Wert – gespeichert wird nur
+// die Monatszahl, damit ein Vertrag mit anderem Rhythmus nicht ansteht.
+function kdTaktWahl(btn){
+  const m=btn.getAttribute('data-m');
+  const inp=document.getElementById('kdInt'); if(inp) inp.value=m;
+  [...btn.parentNode.children].forEach(b=>b.style.background=(b===btn)?'#895500':'#3a3530');
+}
+function kdTaktSync(){
+  const v=Number(((document.getElementById('kdInt')||{}).value)||0);
+  const box=document.querySelector('#kdDlg [data-m]'); if(!box) return;
+  [...box.parentNode.children].forEach(b=>b.style.background=(Number(b.getAttribute('data-m'))===v)?'#895500':'#3a3530');
+}
 async function kdSpeichern(gid){
   const g=KDG.find(x=>String(x.gid)===String(gid)); if(!g){ kdEditClose(); return; }
   const v=id=>((document.getElementById(id)||{}).value||'').trim();
