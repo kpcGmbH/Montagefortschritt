@@ -881,6 +881,12 @@ async function showProjectPicker(){
   let projects=[]; try{ projects=await loadProjectsList(); }catch(e){}
   hideLoader();
   const main=document.getElementById('main');
+  // „Nur für mich sichtbar" (Feld `privat` = UPN) – gesetzt wird es in der
+  // Montagefortschritt-App unter 🏢, geprüft wird es überall, wo eine Liste von
+  // Baustellen erscheint. Ohne diese Kopie stünde eine versteckte Baustelle hier
+  // wieder für alle in der Auswahl. Sichtschutz, keine Zugriffssperre.
+  const _konto=(()=>{ try{ return String((msalAccount&&msalAccount.username)||'').trim().toLowerCase(); }catch(e){ return ''; } })();
+  projects=projects.filter(p=>{ const pv=String((p&&p.privat)||'').trim().toLowerCase(); return !pv || pv===_konto; });
   projects.sort((a,b)=>((b.lastEdit||b.created)||'').localeCompare((a.lastEdit||a.created)||''));
   main.innerHTML='<h2 style="font-size:16px;color:var(--braun);margin:6px 2px 14px">Baustelle wählen</h2>'+
     (projects.length? projects.map(p=>'<button class="opt" onclick="openProject('+esc(JSON.stringify(p.pid))+','+esc(JSON.stringify(p.name||''))+')">'+esc(p.name||p.pid)+'<small>'+(p.lastEdit||p.created? 'Geändert: '+fmtDE(p.lastEdit||p.created):'')+'</small></button>').join('')
