@@ -1460,7 +1460,16 @@ function applyLoadState(){var raw;try{raw=localStorage.getItem('ibn:load');}catc
     if(st.plz!==undefined)PROJECT.plz=st.plz;
     if(st.auftrag!==undefined)PROJECT.auftrag=st.auftrag;
     saveProject();}
-  try{localStorage.setItem('ibn:'+o.mfr+':'+o.dev+(o.pos?(':'+o.pos):''),JSON.stringify(o.state||{}));}catch(e){}
+  // Ein bestehendes Protokoll wird NICHT neu vorbelegt. applyPrefills merkt sich in
+  // `__auto`, welche Felder es automatisch gefüllt hat, und darf genau die beim
+  // nächsten Öffnen überschreiben – bei einem frischen Formular richtig, bei einem
+  // abgelegten Protokoll falsch: Techniker, ALLE Datumsfelder (auch das
+  // Inbetriebnahmedatum), Ort/Datum der Unterschrift und sogar das Unterschriftsbild
+  // wurden auf heute und den aktuellen Ausführer umgeschrieben. Wer eine Seriennummer
+  // korrigiert, schreibt damit um, WER wann in Betrieb genommen hat.
+  // Ohne `__auto` füllt applyPrefills nur noch, was WIRKLICH leer ist.
+  var __st=o.state||{}; try{ delete __st.__auto; }catch(e){}
+  try{localStorage.setItem('ibn:'+o.mfr+':'+o.dev+(o.pos?(':'+o.pos):''),JSON.stringify(__st));}catch(e){}
   openForm(o.dev);toast('Protokoll zum Bearbeiten geladen');return true;}
 STD_MFRS=Object.keys(DB);loadCustom();mergeCustom();loadProject();loadUser();ensureMsal().catch(function(){});renderLoginState();renderAusfBtn();loadMySig();renderSigBtn();var __nav=applyLoadState()||applyUrlContext();initProjectBar();if(!__nav)goHome();
 </script>

@@ -1764,8 +1764,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 139;
+const APP_VERSION = 140;
 const CHANGELOG = [
+  { v:140, titel:'Protokoll überarbeiten ändert Datum und Techniker nicht mehr', punkte:[
+    'Wer ein abgelegtes Inbetriebnahme- oder DGUV-Protokoll über ✎ geöffnet hat, bei dem schrieb die App still um: <b>Techniker auf den aktuellen Ausführer</b>, <b>alle Datumsfelder auf heute</b> – auch das Inbetriebnahmedatum – dazu Ort, Datum, Name und sogar das <b>Unterschriftsbild</b> im Unterschriftsblock.',
+    'Wer eine Seriennummer korrigiert, schrieb damit um, wer wann in Betrieb genommen hat. Das ist jetzt vorbei: <b>Was im Protokoll steht, bleibt stehen.</b>',
+    'Nur wirklich <b>leere</b> Felder werden weiterhin gefüllt – etwa Kunde und Anschrift, wenn sie beim Anlegen noch nicht gepflegt waren.',
+    'Beim <b>neuen</b> Protokoll bleibt alles wie gewohnt: Techniker, Datum und Unterschrift werden vorbelegt, und ein Wechsel des Ausführers zieht mit, solange nichts von Hand geändert wurde.' ]},
   { v:139, titel:'Ausführer wählen – jetzt auch in der Inbetriebnahme', punkte:[
     'In der Inbetriebnahme-App stand unter „Name (Techniker)" bisher zwangsweise das <b>angemeldete Microsoft-Konto</b>. Angemeldet ist aber oft die Bauleitung, ausgeführt hat der Monteur – im Protokoll stand dann der Falsche.',
     'Jetzt gibt es dort denselben Knopf wie in der Montagefortschritt-App: <b>✎ Ausführer</b> neben dem Login, mit derselben Namensliste. Der gewählte Ausführer gilt in allen drei Apps gemeinsam – einmal umstellen genügt.',
