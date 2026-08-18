@@ -9588,17 +9588,33 @@ function meinKonto(){
 // UND schreibt mit dem Token des Angemeldeten, ein Entzug macht sie unbrauchbar.
 // Zweck ist, dass eine Baustelle im Aufbau (Pilot, Vorbereitung) die Liste des
 // Trupps nicht zumüllt.
-// PILOTBETRIEB: Solange Kundendienst und „nur für mich sichtbar" erprobt werden,
-// sieht davon NUR, wer hier steht – kein Menüeintrag, kein Häkchen, keine
-// Markierung, keine Versionsmeldung für alle anderen. Geprüft wird der UPN des
-// Microsoft-Kontos (stabil und eindeutig), nicht der Anzeigename.
-// Dieselbe Liste steht in `kundendienst.html` (KD_ZUGANG) – beide ändern.
-// Leere Liste = für alle offen; DANN gehören APP_VERSION und ein
-// CHANGELOG-Eintrag dazu, sonst taucht alles unangekündigt auf.
-const KD_ZUGANG=['johannes.wahl@kpc-project.com'];
+// Wer darf den Pilotbereich sehen? Einträge dürfen sein: Anmeldename (UPN),
+// nur der Teil vor dem @, oder der ANZEIGENAME des Kontos. Verglichen wird
+// gegen alle Formen, die Entra liefert – der erste Versuch scheiterte daran,
+// dass hier eine exakte UPN-Schreibweise erwartet wurde, das echte Konto aber
+// anders geschrieben ist (18.08.2026).
+// Das ist eine Leitplanke gegen versehentliches Sehen, KEINE Sicherheitsgrenze:
+// die App ist Single-Tenant, hereinkommen kann ohnehin nur ein kpc-Konto.
+const KD_ZUGANG=['johannes.wahl@kpc-project.com','Johannes WAHL'];
+// „WAHL, Johannes" / „johannes.wahl" / „Johannes Wahl" auf eine Form bringen:
+// klein, Trennzeichen zu Leerzeichen, Wörter sortiert.
+function kdNamensform(s){
+  return String(s||'').toLowerCase().replace(/[^a-z0-9äöüß]+/g,' ').trim().split(/\s+/).filter(Boolean).sort().join(' ');
+}
+function kdKontoFormen(v){
+  const s=String(v||'').trim().toLowerCase(); if(!s) return [];
+  const out=[s, kdNamensform(s)];
+  if(s.indexOf('@')>0){ const lokal=s.split('@')[0]; out.push(lokal, kdNamensform(lokal)); }
+  return out.filter(Boolean);
+}
 function pilotFreigegeben(){
-  const k=meinKonto();
-  return !KD_ZUGANG.length || (!!k && KD_ZUGANG.indexOf(k)>=0);
+  if(!KD_ZUGANG.length) return true;
+  const a=(typeof msalAccount!=='undefined'&&msalAccount)?msalAccount:null;
+  if(!a) return false;
+  const c=a.idTokenClaims||{};
+  const meine=new Set();
+  [a.username, a.name, c.preferred_username, c.upn, c.email, c.name].forEach(v=>kdKontoFormen(v).forEach(f=>meine.add(f)));
+  return KD_ZUGANG.some(e=>kdKontoFormen(e).some(f=>meine.has(f)));
 }
 function projSichtbar(p){
   const pv=String((p&&p.privat)||'').trim().toLowerCase();

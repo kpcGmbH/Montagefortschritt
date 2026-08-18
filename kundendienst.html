@@ -427,12 +427,38 @@ async function cacheGet(key){ return idbGet('cache',key); }
 let PID=null, PROJNAME='', PROJECTS=[], LV=[], KDG=[];
 let USER=(()=>{ try{ return localStorage.getItem('kpc_user')||''; }catch(e){ return ''; } })();
 
-// Pilotbetrieb: Nur diese Konten sehen die App. Leere Liste = für alle offen.
-// Geprüft wird der UPN des Microsoft-Kontos, nicht der Anzeigename – der ist
-// weder eindeutig noch stabil.
-const KD_ZUGANG=['johannes.wahl@kpc-project.com'];
+// Wer darf den Pilotbereich sehen? Einträge dürfen sein: Anmeldename (UPN),
+// nur der Teil vor dem @, oder der ANZEIGENAME des Kontos. Verglichen wird
+// gegen alle Formen, die Entra liefert – der erste Versuch scheiterte daran,
+// dass hier eine exakte UPN-Schreibweise erwartet wurde, das echte Konto aber
+// anders geschrieben ist (18.08.2026).
+// Das ist eine Leitplanke gegen versehentliches Sehen, KEINE Sicherheitsgrenze:
+// die App ist Single-Tenant, hereinkommen kann ohnehin nur ein kpc-Konto.
+const KD_ZUGANG=['johannes.wahl@kpc-project.com','Johannes WAHL'];
+// „WAHL, Johannes" / „johannes.wahl" / „Johannes Wahl" auf eine Form bringen:
+// klein, Trennzeichen zu Leerzeichen, Wörter sortiert.
+function kdNamensform(s){
+  return String(s||'').toLowerCase().replace(/[^a-z0-9äöüß]+/g,' ').trim().split(/\s+/).filter(Boolean).sort().join(' ');
+}
+function kdKontoFormen(v){
+  const s=String(v||'').trim().toLowerCase(); if(!s) return [];
+  const out=[s, kdNamensform(s)];
+  if(s.indexOf('@')>0){ const lokal=s.split('@')[0]; out.push(lokal, kdNamensform(lokal)); }
+  return out.filter(Boolean);
+}
+function darfKundendienst(){
+  if(!KD_ZUGANG.length) return true;
+  const a=(typeof msalAccount!=='undefined'&&msalAccount)?msalAccount:null;
+  if(!a) return false;
+  const c=a.idTokenClaims||{};
+  const meine=new Set();
+  [a.username, a.name, c.preferred_username, c.upn, c.email, c.name].forEach(v=>kdKontoFormen(v).forEach(f=>meine.add(f)));
+  return KD_ZUGANG.some(e=>kdKontoFormen(e).some(f=>meine.has(f)));
+}
+
+// Anmeldename (UPN) klein geschrieben – Schlüssel für „nur für mich sichtbar"
+// und für die Anzeige auf der Sperrseite.
 function meinKonto(){ try{ return String((msalAccount&&msalAccount.username)||'').trim().toLowerCase(); }catch(e){ return ''; } }
-function darfKundendienst(){ const k=meinKonto(); return !KD_ZUGANG.length || (!!k && KD_ZUGANG.indexOf(k)>=0); }
 // „Nur für mich sichtbar" – dieselbe Prüfung wie in der Haupt- und der
 // Einweisungs-App. Sichtschutz, keine Zugriffssperre.
 function projSichtbar(p){ const pv=String((p&&p.privat)||'').trim().toLowerCase(); return !pv || pv===meinKonto(); }
@@ -802,9 +828,17 @@ async function onLoggedIn(){
     document.getElementById('main').innerHTML='';
     PID=null; PROJECTS=[]; LV=[]; KDG=[];
     const ov=document.getElementById('loginOv'); ov.style.display='flex';
-    document.getElementById('loginMsStatus').innerHTML='Angemeldet als '+esc(meinKonto())+
-      '.<br>Der Kundendienst-Bereich ist noch im Pilotbetrieb und für dieses Konto nicht freigegeben.<br><br>'+
-      '<a href="./index.html" style="color:var(--accent)">‹ Zur Montagefortschritt-App</a>';
+    // Die Angaben aus dem Konto MIT ANZEIGEN: Beim ersten Anlauf am 18.08. stand
+    // hier nur „nicht freigegeben", und es kostete eine Rückfrage, um überhaupt
+    // zu erfahren, wie das Konto wirklich heißt. Wer gesperrt ist, soll ablesen
+    // können, was in KD_ZUGANG eingetragen werden muss.
+    const a=msalAccount||{}, c=a.idTokenClaims||{};
+    const formen=[a.username, a.name, c.preferred_username, c.upn, c.email].filter(Boolean);
+    document.getElementById('loginMsStatus').innerHTML=
+      'Der Kundendienst-Bereich ist noch im <b>Pilotbetrieb</b> und für dieses Konto nicht freigegeben.'+
+      '<br><br>Angemeldet als:<br>'+
+      (formen.length? formen.map(f=>'<b>'+esc(f)+'</b>').join('<br>') : '<i>(keine Kontoangaben erhalten)</i>')+
+      '<br><br><a href="./index.html" style="color:var(--accent)">‹ Zur Montagefortschritt-App</a>';
     return;
   }
   document.getElementById('loginOv').style.display='none';
