@@ -479,14 +479,17 @@ function kdPlusMonate(iso,monate){
   ziel.setDate(Math.min(+m[3], letzter));
   return localDay(ziel.toISOString());
 }
-function kdSeit(){ const p=PROJECTS.find(x=>x.pid===PID); return (p&&p.kdSeit)||''; }
-function kdNaechste(g){
+function kdSeit(pid){ const p=PROJECTS.find(x=>x.pid===(pid||PID)); return (p&&p.kdSeit)||''; }
+// `seit` explizit übergeben, wenn ein Gerät einer ANDEREN Baustelle gerechnet
+// wird (Fälligkeitsliste über alle Objekte) – sonst zöge es das Übergabedatum
+// der gerade geöffneten Baustelle heran und läge um Monate daneben.
+function kdNaechste(g, seit){
   if(!g||!g.intervall||g.aus) return '';
-  const start=g.letzte||g.ibnDatum||kdSeit();
+  const start=g.letzte||g.ibnDatum||(seit!==undefined?seit:kdSeit());
   return start? kdPlusMonate(start,g.intervall) : '';
 }
-function kdStatus(g){
-  const n=kdNaechste(g);
+function kdStatus(g, seit){
+  const n=kdNaechste(g, seit);
   if(g.aus) return {k:'aus', t:'stillgelegt', f:'var(--accent2)', n};
   if(!g.intervall) return {k:'ohne', t:'keine Wartung hinterlegt', f:'var(--accent2)', n};
   if(!n) return {k:'ohne', t:'Startdatum fehlt', f:'var(--braun)', n};
@@ -693,6 +696,7 @@ async function showProjectPicker(){
   document.getElementById('projName').textContent='–';
   document.getElementById('projSub').textContent='Baustelle';
   main.innerHTML='<h2 class="step-title">Objekt wählen</h2>'+
+    (kd.length? '<button class="chip" style="margin-bottom:12px" onclick="faelligkeiten()">📅 Fällige Wartungen aller Objekte</button>':'')+
     (kd.length? kd.map(p=>'<button class="opt" onclick="openProject('+esc(JSON.stringify(p.pid))+')">'+esc(p.name||p.pid)+
         '<small>'+esc([p.auftraggeber||'', p.kdSeit?('im Kundendienst seit '+kdDatDE(p.kdSeit)):''].filter(Boolean).join(' · ')||'—')+'</small></button>').join('')
       : '<div class="empty">Noch kein Objekt im Kundendienst.<br><br>Eine Baustelle wird in der <b>Montagefortschritt-App</b> übergeben:<br>Berichte &amp; Dokumente → 🛠 Kundendienst.<br>Dort steht auch, ob sie fertiggestellt und mängelfrei ist.</div>');
@@ -734,6 +738,7 @@ function renderKartei(){
     '<div class="toolbar">'+
       '<button class="btn-primary" onclick="showProjectPicker()">‹ Objekte</button>'+
       '<button class="chip" onclick="wartungsauftrag()">🔧 Wartung starten</button>'+
+      (KDW.filter(w=>w&&!w.geloescht).length?'<button class="chip" onclick="einsatzWaehlen()">📄 Einsatzbericht</button>':'')+
       '<button class="chip" onclick="seedDialog()">➕ Geräte aus der Stückliste</button>'+
       '<span class="summary">'+(liste.length? (liste.length+' Geräte'+(faellig?(' · '+faellig+' fällig'):'')+(bald?(' · '+bald+' bald'):'')) : '')+'</span>'+
     '</div>'+
@@ -1131,6 +1136,58 @@ function btbSvgToPng(dataUri,targetW){
   });
 }
 
+// ── Fälligkeiten über ALLE Objekte ──────────────────────────────────────────
+// „Was ist diesen Monat dran?" – die Frage, wegen der es Wartungsverträge gibt.
+// Geladen wird je Objekt die Gerätekartei; ohne Netz kommt der letzte bekannte
+// Stand aus dem lokalen Speicher, dann steht es auch dabei.
+async function faelligkeiten(){
+  showLoader('Fälligkeiten werden gesammelt …');
+  try{ PROJECTS=await loadProjectsList(); }catch(e){}
+  const objekte=PROJECTS.filter(p=>p&&p.phase==='kundendienst'&&projSichtbar(p));
+  const zeilen=[];
+  let ohneNetz=0;
+  for(const p of objekte){
+    let arr=[];
+    try{ arr=await kdLaden('kd', p.pid); }
+    catch(e){ arr=(await cacheGet('kd|'+p.pid))||[]; ohneNetz++; }
+    arr.filter(g=>g&&!g.geloescht&&!g.aus&&g.intervall).forEach(g=>{
+      const st=kdStatus(g, p.kdSeit||'');
+      if(!st.n) return;
+      zeilen.push({ pid:p.pid, objekt:p.name||p.pid, kunde:p.auftraggeber||'', g, datum:st.n, st });
+    });
+  }
+  hideLoader();
+  zeilen.sort((a,b)=>a.datum.localeCompare(b.datum));
+  const heute=kdHeute();
+  const monatsEnde=kdPlusMonate(heute.slice(0,8)+'01', 1);
+  const in3=kdPlusMonate(heute, 3);
+  const gruppen=[
+    ['Überfällig', zeilen.filter(z=>z.datum<heute)],
+    ['Diesen Monat', zeilen.filter(z=>z.datum>=heute && z.datum<monatsEnde)],
+    ['Nächste drei Monate', zeilen.filter(z=>z.datum>=monatsEnde && z.datum<in3)],
+    ['Später', zeilen.filter(z=>z.datum>=in3)]
+  ];
+  const zeile=z=>'<div class="prow" style="cursor:pointer" onclick="zuGeraet('+esc(JSON.stringify(z.pid))+','+esc(JSON.stringify(String(z.g.gid)))+')">'+
+    '<div class="pmain"><div class="pt">'+esc(z.g.bez||'')+'</div>'+
+    '<div class="pm">'+esc(z.objekt)+' · Pos. '+esc(z.g.pos||'')+' · '+esc(kdTaktLabel(z.g.intervall))+'</div></div>'+
+    '<span style="color:'+z.st.f+';font-size:12px;white-space:nowrap">'+kdDatDE(z.datum)+'</span>'+
+    '<span style="color:var(--accent2)">›</span></div>';
+  const main=document.getElementById('main');
+  document.getElementById('projName').textContent='Fälligkeiten';
+  document.getElementById('projSub').textContent=objekte.length+' Objekte';
+  main.innerHTML='<div class="toolbar"><button class="btn-primary" onclick="showProjectPicker()">‹ Objekte</button>'+
+      '<span class="summary">'+zeilen.length+' Geräte mit Wartungstakt in '+objekte.length+' Objekt'+(objekte.length===1?'':'en')+'</span></div>'+
+    (ohneNetz?'<div class="hint">Für '+ohneNetz+' Objekt(e) war kein Netz erreichbar – dort steht der zuletzt bekannte Stand.</div>':'')+
+    (zeilen.length? gruppen.filter(([,z])=>z.length).map(([titel,z])=>
+        '<div class="card"><div class="card-h">'+titel+' ('+z.length+')</div>'+z.map(zeile).join('')+'</div>').join('')
+      : '<div class="empty">Kein Gerät hat einen Wartungstakt hinterlegt.<br>Takt je Gerät in der Kartei setzen.</div>');
+}
+// Aus der Liste direkt ins Gerät springen – auch in ein anderes Objekt.
+async function zuGeraet(pid, gid){
+  if(pid!==PID) await openProject(pid);
+  editGeraet(gid);
+}
+
 // ── Wartungsauftrag: ein Einsatz, mehrere Geräte ────────────────────────────
 // Der Techniker fährt zur Baustelle und wartet mehrere Geräte. Statt jedes
 // einzeln zu suchen, hakt er sie hier an; die App führt ihn dann Protokoll für
@@ -1183,6 +1240,7 @@ function wlWeiter(){
     const n=WV_LAUF.liste.length; WV_LAUF=null;
     ovSchliessen(); renderKartei();
     showToast('Einsatz abgeschlossen · '+n+' Gerät'+(n===1?'':'e'));
+    setTimeout(()=>{ if(confirm('Einsatz abgeschlossen.\n\nJetzt den Einsatzbericht für den Betreiber erzeugen?')) einsatzPdf(kdHeute()); }, 500);
     return;
   }
   neueWartung(WV_LAUF.liste[WV_LAUF.i]);
@@ -1375,6 +1433,111 @@ async function wvPdf(w, nurBlob){
   window.open(url,'_blank');
   setTimeout(()=>URL.revokeObjectURL(url), 60000);
   return blob;
+}
+
+// ── Einsatzbericht: EIN Blatt über den ganzen Besuch ────────────────────────
+// Der Kunde bekommt sonst acht Einzel-PDFs. Dieses Blatt fasst zusammen, was an
+// einem Tag gewartet wurde, und nennt vor allem den Handlungsbedarf – danach
+// fragt der Betreiber zuerst.
+// BEWUSST KEIN Nachbau des kpc-Serviceberichts: den gibt es in der Hauptapp
+// (§1.6a) und noch einmal in `servicebericht.html`; eine dritte Kopie desselben
+// Papierlayouts würde bei der nächsten Änderung garantiert auseinanderlaufen.
+// Wer Einsatzzeiten und Material braucht, schreibt den Servicebericht dort.
+function einsatzTage(){
+  const t={};
+  KDW.filter(w=>w&&!w.geloescht&&w.datum).forEach(w=>{ t[w.datum]=(t[w.datum]||0)+1; });
+  return Object.keys(t).sort().reverse().map(d=>({datum:d, n:t[d]}));
+}
+function einsatzWaehlen(){
+  const tage=einsatzTage();
+  if(!tage.length){ alert('Noch keine Wartung erfasst.'); return; }
+  ovOeffnen('Einsatzbericht',
+    '<div class="hint">Ein Blatt über alle Wartungen eines Tages – für den Betreiber.</div>'+
+    tage.map(t=>'<button class="opt" onclick="einsatzPdf('+esc(JSON.stringify(t.datum))+')">'+kdDatDE(t.datum)+
+      '<small>'+t.n+' Protokoll'+(t.n===1?'':'e')+'</small></button>').join(''));
+}
+async function einsatzPdf(datum){
+  const jspdf=(window.jspdf&&window.jspdf.jsPDF)||window.jsPDF;
+  if(!jspdf){ alert('PDF-Bibliothek nicht geladen (Internetverbindung prüfen).'); return; }
+  const liste=KDW.filter(w=>w&&!w.geloescht&&w.datum===datum).sort((a,b)=>String(a.pos||'').localeCompare(String(b.pos||''),'de',{numeric:true}));
+  if(!liste.length) return;
+  ovSchliessen(); showLoader('Einsatzbericht wird erzeugt …');
+  try{
+    const p=PROJECTS.find(x=>x.pid===PID)||{};
+    const doc=new jspdf({unit:'mm',format:'a4'});
+    wvPdfSchrift(doc);
+    const logo=await btbSvgToPng(repLogo(),300).catch(()=>null);
+    const B=doc.internal.pageSize.getWidth(), H=doc.internal.pageSize.getHeight(), M=14, RAND=H-20;
+    let seite=1, y=38;
+    wvPdfRahmen(doc, logo, 'Einsatzbericht Wartung', kdDatDE(datum)+' · '+(p.name||''), seite);
+    const platz=h=>{ if(y+h>RAND){ doc.addPage(); seite++; wvPdfRahmen(doc, logo, 'Einsatzbericht Wartung', kdDatDE(datum)+' · '+(p.name||''), seite); y=38; } };
+
+    doc.setFontSize(9.5); doc.setTextColor.apply(doc,PDF_ANTHRAZIT);
+    [['Kunde', p.auftraggeber||'—'],['Objekt', p.name||'—'],
+     ['Anschrift', [p.strasse||'',[p.plz||'',p.ort||''].filter(Boolean).join(' ')].filter(Boolean).join(', ')||'—'],
+     ['Techniker', liste[0].techniker||'—'],['Gewartete Geräte', String(liste.reduce((a,w)=>a+wGids(w).length,0))]
+    ].forEach(([k,v])=>{
+      platz(6);
+      doc.setFontSize(7.5); doc.setTextColor.apply(doc,PDF_GRAU); doc.text(k, M, y);
+      doc.setFontSize(9.5); doc.setTextColor.apply(doc,PDF_ANTHRAZIT); doc.text(String(v), M+34, y);
+      y+=5.6;
+    });
+    y+=4;
+
+    doc.setFontSize(10.5); doc.setTextColor.apply(doc,PDF_KUPFER);
+    platz(12); doc.text('Durchgeführte Wartungen', M, y+3);
+    doc.setDrawColor.apply(doc,PDF_LINIE); doc.setLineWidth(0.2); doc.line(M, y+5, B-M, y+5); y+=10;
+    liste.forEach(w=>{
+      const pos=wPosText(w)||w.pos||'';
+      const bez=((w.bezListe||[]).filter(Boolean).join(', '))||w.bez||'';
+      const kopf=doc.splitTextToSize(pos+'  '+bez, B-2*M-46);
+      platz(kopf.length*4+7);
+      doc.setFontSize(9.5); doc.setTextColor.apply(doc,PDF_ANTHRAZIT);
+      doc.text(kopf, M+1, y);
+      doc.setFontSize(8.5); doc.setTextColor.apply(doc,PDF_GRAU);
+      doc.text(w.vorlage||'', B-M-1, y, {align:'right'});
+      y+=kopf.length*4+1;
+      doc.setFontSize(8.5);
+      doc.setTextColor.apply(doc, w.hbedarf==='ja'?[179,38,30]:PDF_GRAU);
+      doc.text((w.punkte!=null?(w.punkte+' von '+w.gesamt+' Punkten geprüft'):'')+
+        (w.hbedarf==='ja'?'  ·  Handlungsbedarf':''), M+1, y);
+      y+=4;
+      if(w.hbedarf==='ja'){
+        const txt=((w.hopts||[]).join(' · ')+(w.hbtext?('  –  '+w.hbtext):'')).trim();
+        if(txt){ const z=doc.splitTextToSize(txt, B-2*M-6); platz(z.length*3.9+2);
+          doc.setTextColor.apply(doc,PDF_ANTHRAZIT); doc.setFontSize(8.5);
+          doc.text(z, M+5, y); y+=z.length*3.9+1; }
+      }
+      if(w.bem){ const z=doc.splitTextToSize('Bemerkung: '+w.bem, B-2*M-6); platz(z.length*3.9+2);
+        doc.setTextColor.apply(doc,PDF_GRAU); doc.setFontSize(8.5); doc.text(z, M+5, y); y+=z.length*3.9+1; }
+      y+=2.5;
+      doc.setDrawColor.apply(doc,PDF_LINIE); doc.setLineWidth(0.1); doc.line(M, y-1, B-M, y-1);
+      // Abstand NACH der Trennlinie: Der nächste Eintrag setzt seine Grundlinie
+      // auf y, seine Buchstaben stehen also darüber – ohne diesen Sprung liefe
+      // die Linie mitten durch die erste Textzeile (im gerenderten PDF gesehen).
+      y+=4;
+    });
+
+    // Unterschrift des zuletzt erfassten Protokolls – es ist derselbe Techniker
+    const mitSig=liste.filter(w=>w.sig).pop();
+    platz(30); y+=6;
+    doc.setFontSize(8); doc.setTextColor.apply(doc,PDF_GRAU);
+    doc.text('Ort, Datum', M+1, y);
+    doc.text('Unterschrift Techniker', M+(B-2*M)/2+1, y);
+    doc.setFontSize(10); doc.setTextColor.apply(doc,PDF_ANTHRAZIT);
+    doc.text((liste[0].ort)||'', M+1, y+7);
+    if(mitSig){ try{ doc.addImage(mitSig.sig,'PNG', M+(B-2*M)/2+1, y-2, 55, 14); }catch(e){} }
+    doc.setDrawColor.apply(doc,PDF_LINIE); doc.setLineWidth(0.3);
+    doc.line(M, y+13, M+(B-2*M)/2-6, y+13);
+    doc.line(M+(B-2*M)/2+1, y+13, B-M, y+13);
+
+    const blob=doc.output('blob');
+    const fname=safeName(p.name||PID)+'/_Wartung/'+vaName([vaDatum(datum),'Einsatzbericht','Wartung'])+'.pdf';
+    await queueFile(fname, blob, 'application/pdf');
+    hideLoader(); flushOutbox();
+    showToast(navigator.onLine?'Einsatzbericht abgelegt':'Einsatzbericht gespeichert – geht online nach oben');
+    const url=URL.createObjectURL(blob); window.open(url,'_blank'); setTimeout(()=>URL.revokeObjectURL(url),60000);
+  }catch(e){ hideLoader(); alert('Einsatzbericht fehlgeschlagen: '+((e&&e.message)||e)); }
 }
 
 // Dateiname nach der kpc-Verfahrensanweisung (§1.18): JJMMTT_Dokumententyp_Bezeichnung
