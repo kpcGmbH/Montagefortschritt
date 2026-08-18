@@ -424,7 +424,7 @@ async function cacheGet(key){ return idbGet('cache',key); }
 //          gewBis, intervall (Monate), letzte (Datum), notiz, aus, geloescht }
 //   Gelöschte bleiben als Grabstein (`geloescht:true`) in der Datei stehen –
 //   sonst holt der Abgleich sie beim nächsten Mal zurück.
-let PID=null, PROJNAME='', PROJECTS=[], LV=[], KDG=[];
+let PID=null, PROJNAME='', PROJECTS=[], LV=[], KDG=[], KDW=[];   // KDW = Wartungsprotokolle
 let USER=(()=>{ try{ return localStorage.getItem('kpc_user')||''; }catch(e){ return ''; } })();
 
 // Wer darf den Pilotbereich sehen? Einträge dürfen sein: Anmeldename (UPN),
@@ -521,41 +521,65 @@ async function loadLV(pid){
     const lokal=await cacheGet('lv|'+pid); if(lokal) return lokal; throw e;
   }
 }
-// Wie in der Hauptapp: Serverstand holen, die eigenen noch nicht übertragenen
-// Einträge obenauf – sonst hält der Techniker seine Arbeit für verloren.
-async function loadKD(pid){
-  let arr=[];
-  try{
-    const txt=await spTryDownloadText('KD_GERAETE_'+pid+'.json');
-    const a=txt?JSON.parse(txt):[]; arr=Array.isArray(a)?a:[];
-  }catch(e){
-    const lokal=await cacheGet('kd|'+pid); return Array.isArray(lokal)?lokal:[];
-  }
-  try{
-    (await idbAll('outbox')).filter(e=>e.val&&e.val.kind==='kd'&&e.val.pid===pid)
-      .sort((a,b)=>(a.val.ts||0)-(b.val.ts||0))
-      .forEach(e=>kdUpsert(arr, e.val.daten));
-  }catch(e){}
-  arr.sort(kdSort);
-  await cacheSet('kd|'+pid, arr);
+// ── Sammel-Dateien des Kundendienstes ───────────────────────────────────────
+// Zwei Arten, EIN Weg: Gerätekartei und Wartungsprotokolle liegen je Baustelle
+// in einer eigenen JSON, und für beide gilt die Regel aus §1.19 der Übergabe –
+// in die Warteschlange kommt der EINZELNE Eintrag, nie die ganze Datei. Wer
+// eine dritte Art braucht (Wartungsauftrag), trägt sie NUR hier ein; Laden,
+// Speichern und Übertragen kennen sie dann automatisch.
+const KD_ARTEN={
+  kd:  { datei:pid=>'KD_GERAETE_'+pid+'.json', schluessel:'gid',
+         holen:()=>KDG, setzen:a=>{KDG=a;}, cache:pid=>'kd|'+pid,
+         sort:(a,b)=>String(a.pos||'').localeCompare(String(b.pos||''),'de',{numeric:true}) },
+  kdw: { datei:pid=>'KD_WARTUNG_'+pid+'.json', schluessel:'wid',
+         holen:()=>KDW, setzen:a=>{KDW=a;}, cache:pid=>'kdw|'+pid,
+         sort:(a,b)=>String(b.datum||'').localeCompare(String(a.datum||'')) }   // neueste zuerst
+};
+function kdUpsert(arr, eintrag, schluessel){
+  const k=schluessel||'gid';
+  const i=arr.findIndex(x=>x&&String(x[k])===String(eintrag[k]));
+  if(i>=0) arr[i]=eintrag; else arr.push(eintrag);
   return arr;
 }
-function kdSort(a,b){ return String(a.pos||'').localeCompare(String(b.pos||''),'de',{numeric:true}); }
-function kdUpsert(arr, g){ const i=arr.findIndex(x=>x&&String(x.gid)===String(g.gid)); if(i>=0) arr[i]=g; else arr.push(g); return arr; }
-// Ein Gerät speichern: sofort lokal, dann in die Warteschlange. Der Schlüssel
-// trägt die gid – wer dasselbe Gerät zweimal bearbeitet, hat EINEN offenen Posten.
-// `sofort=false` beim Übernehmen ganzer Listen: sonst startet mitten in der
+function kdSort(a,b){ return KD_ARTEN.kd.sort(a,b); }
+function nowMs(){ return Date.now(); }
+// Serverstand holen, die eigenen noch nicht übertragenen Einträge obenauf –
+// sonst hält der Techniker seine Arbeit für verloren.
+async function kdLaden(art, pid){
+  const cfg=KD_ARTEN[art]; let arr=[];
+  try{
+    const txt=await spTryDownloadText(cfg.datei(pid));
+    const a=txt?JSON.parse(txt):[]; arr=Array.isArray(a)?a:[];
+  }catch(e){
+    const lokal=await cacheGet(cfg.cache(pid)); return Array.isArray(lokal)?lokal:[];
+  }
+  try{
+    (await idbAll('outbox')).filter(e=>e.val&&e.val.art===art&&e.val.pid===pid)
+      .sort((a,b)=>(a.val.ts||0)-(b.val.ts||0))
+      .forEach(e=>kdUpsert(arr, e.val.daten, cfg.schluessel));
+  }catch(e){}
+  arr.sort(cfg.sort);
+  await cacheSet(cfg.cache(pid), arr);
+  return arr;
+}
+async function loadKD(pid){ KDG=await kdLaden('kd', pid); }
+async function loadWartung(pid){ KDW=await kdLaden('kdw', pid); }
+// Einen Eintrag speichern: sofort lokal, dann in die Warteschlange. Der Schlüssel
+// des Warteschlangen-Eintrags enthält den Eintragsschlüssel – wer denselben
+// Eintrag zweimal bearbeitet, hat EINEN offenen Posten, nicht zwei.
+// `sofort=false` beim Schreiben ganzer Listen: sonst startet mitten in der
 // Schleife ein Abgleich, lädt den erst halb gefüllten Stand vom Server und
-// ersetzt damit die Kartei, an der die Schleife noch schreibt – im Test kamen so
+// ersetzt damit die Liste, an der die Schleife noch schreibt – im Test kamen so
 // von 14 Geräten nur 3 an.
-async function kdSpeichernEintrag(g, sofort){
-  kdUpsert(KDG,g); KDG.sort(kdSort);
-  await cacheSet('kd|'+PID, KDG);
-  await idbSet('outbox','kd|'+PID+'|'+g.gid, { kind:'kd', pid:PID, gid:g.gid, daten:g, ts:nowMs() });
+async function kdSpeichernEintrag(daten, sofort, art){
+  art=art||'kd'; const cfg=KD_ARTEN[art];
+  const arr=cfg.holen(); kdUpsert(arr, daten, cfg.schluessel); arr.sort(cfg.sort);
+  await cacheSet(cfg.cache(PID), arr);
+  await idbSet('outbox', art+'|'+PID+'|'+daten[cfg.schluessel],
+    { kind:'kd', art, pid:PID, daten, ts:nowMs() });
   updSyncBadge();
   if(sofort!==false) flushOutbox();
 }
-function nowMs(){ return Date.now(); }
 
 // ══════════════════ Warteschlange übertragen ══════════════════
 async function flushOutbox(){
@@ -567,31 +591,33 @@ async function flushOutbox(){
   try{
     const all=await idbAll('outbox');
     before=all.length;
-    const kds=all.filter(e=>e.val&&e.val.kind==='kd').sort((a,b)=>(a.val.ts||0)-(b.val.ts||0));
-    // Je Baustelle gebündelt: EINMAL laden, alle Einträge anwenden, EINMAL
-    // schreiben. Grundlage ist der frisch geladene Stand – so bleibt erhalten,
-    // was andere in der Zwischenzeit eingetragen haben.
-    const proPid={};
-    kds.forEach(e=>{ (proPid[e.val.pid]=proPid[e.val.pid]||[]).push(e); });
-    for(const pid of Object.keys(proPid)){
+    // Je Baustelle UND Art gebündelt: EINMAL laden, alle Einträge anwenden,
+    // EINMAL schreiben. Grundlage ist der frisch geladene Stand – so bleibt
+    // erhalten, was andere in der Zwischenzeit eingetragen haben.
+    const gruppen={};
+    all.filter(e=>e.val&&e.val.kind==='kd').sort((a,b)=>(a.val.ts||0)-(b.val.ts||0))
+       .forEach(e=>{ const k=(e.val.art||'kd')+'::'+e.val.pid; (gruppen[k]=gruppen[k]||[]).push(e); });
+    for(const k of Object.keys(gruppen)){
+      const art=k.slice(0,k.indexOf('::')), pid=k.slice(k.indexOf('::')+2);
+      const cfg=KD_ARTEN[art]; if(!cfg) continue;
       try{
-        const txt=await spTryDownloadText('KD_GERAETE_'+pid+'.json');
+        const txt=await spTryDownloadText(cfg.datei(pid));
         let arr=[]; if(txt){ try{ const a=JSON.parse(txt); arr=Array.isArray(a)?a:[]; }catch(e){} }
-        proPid[pid].forEach(e=>kdUpsert(arr, e.val.daten));
-        arr.sort(kdSort);
-        await spUploadText('KD_GERAETE_'+pid+'.json', JSON.stringify(arr));
-        for(const e of proPid[pid]) await idbDel('outbox', e.key);
+        gruppen[k].forEach(e=>kdUpsert(arr, e.val.daten, cfg.schluessel));
+        arr.sort(cfg.sort);
+        await spUploadText(cfg.datei(pid), JSON.stringify(arr));
+        for(const e of gruppen[k]) await idbDel('outbox', e.key);
         // Was WÄHREND des Übertragens dazukam, liegt noch in der Warteschlange –
         // es muss auf den zusammengeführten Stand obendrauf, sonst verschwindet
         // es aus der Ansicht und der nächste Abgleich schreibt es wieder weg.
         try{
-          (await idbAll('outbox')).filter(e=>e.val&&e.val.kind==='kd'&&e.val.pid===pid)
+          (await idbAll('outbox')).filter(e=>e.val&&e.val.kind==='kd'&&(e.val.art||'kd')===art&&e.val.pid===pid)
             .sort((a,b)=>(a.val.ts||0)-(b.val.ts||0))
-            .forEach(e=>kdUpsert(arr, e.val.daten));
+            .forEach(e=>kdUpsert(arr, e.val.daten, cfg.schluessel));
         }catch(e){}
-        arr.sort(kdSort);
-        if(pid===PID){ KDG=arr; await cacheSet('kd|'+pid,arr); renderKartei(); }
-        else await cacheSet('kd|'+pid,arr);
+        arr.sort(cfg.sort);
+        await cacheSet(cfg.cache(pid), arr);
+        if(pid===PID){ cfg.setzen(arr); if(art==='kd') renderKartei(); }
       }catch(err){ if(isNetErr(err)) throw err; console.warn('Abgleich bleibt in der Warteschlange:',(err&&err.message)||err); }
     }
   }catch(err){ /* Netzfehler: Rest bleibt liegen */ }
@@ -599,6 +625,7 @@ async function flushOutbox(){
   try{ after=(await idbAll('outbox')).length; }catch(e){}
   if(after>0 && after<before && navigator.onLine) setTimeout(flushOutbox,300);
 }
+
 // Wortlaut wie in Haupt- und Einweisungs-App, damit alle dasselbe sagen.
 async function updSyncBadge(){
   const el=document.getElementById('syncStatus'); if(!el) return;
@@ -666,7 +693,9 @@ async function openProject(pid){
     const p=PROJECTS.find(x=>x.pid===pid)||{};
     PROJNAME=p.name||pid;
     LV=await loadLV(pid).catch(()=>[]);
-    KDG=await loadKD(pid);
+    await loadKD(pid);
+    await loadWartung(pid);
+
     document.getElementById('projName').textContent=PROJNAME;
     document.getElementById('projSub').textContent=p.auftraggeber||'Kundendienst';
     hideLoader(); renderKartei();
@@ -767,6 +796,20 @@ function editGeraet(gid){
     '<div class="fld"><label>Notiz</label><input id="fNotiz" type="text" value="'+esc(g.notiz||'')+'"></div>'+
     '<div class="sck'+(g.aus?' on':'')+'" id="fAus" onclick="this.classList.toggle(\'on\')" style="padding-left:0">'+
       '<div class="sckb">✓</div><div>Stillgelegt / ausgebaut<div class="gmeta">bleibt mit seiner Historie stehen, wird aber nicht mehr fällig</div></div></div>'+
+    // Wartung und Historie stehen ÜBER dem Speichern-Knopf: Wer das Gerät
+    // öffnet, will meistens warten, nicht Stammdaten pflegen.
+    '<div class="card" style="margin-top:16px"><div class="card-h">Wartung</div><div class="card-b">'+
+      '<button class="btn-primary" style="width:100%" onclick="neueWartung('+esc(JSON.stringify(g.gid))+')">🔧 Wartung durchführen</button>'+
+      (()=>{ const h=wartungenZu(g.gid);
+        if(!h.length) return '<div class="hint" style="margin:10px 2px 0">Noch kein Wartungsprotokoll für dieses Gerät.</div>';
+        return '<div style="margin-top:10px">'+h.map(w=>
+          '<div class="prow" style="cursor:pointer" onclick="wvOeffnen('+esc(JSON.stringify(w.wid))+')">'+
+            '<div class="pmain"><div class="pt">'+kdDatDE(w.datum)+' · '+esc(w.vorlage||'')+'</div>'+
+            '<div class="pm">'+esc(w.techniker||'')+(w.punkte!=null?(' · '+w.punkte+' von '+w.gesamt+' Punkten'):'')+
+            (w.hbedarf==='ja'?' · <b style="color:var(--rot)">Handlungsbedarf</b>':'')+'</div></div>'+
+            '<span style="color:var(--accent2)">›</span></div>').join('')+'</div>';
+      })()+
+    '</div></div>'+
     '<button class="finish" onclick="geraetSpeichern('+esc(JSON.stringify(g.gid))+')">Speichern</button>'+
     '<button class="entw" style="color:var(--rot);border-color:var(--rot)" onclick="geraetLoeschen('+esc(JSON.stringify(g.gid))+')">🗑 Aus der Kartei entfernen</button>');
 }
@@ -811,6 +854,225 @@ function ovOeffnen(titel, inhalt){
   ov.style.display='flex';
 }
 function ovSchliessen(){ const ov=document.getElementById('ov'); if(ov) ov.remove(); }
+
+const WV_ZUSTAENDE=["funktionsfähig", "teilw. funktionsfähig", "gereinigt", "gegeben", "nicht gegeben", "nicht vorhanden", "in Ordnung", "extern", "intern", "ja", "nein", "ausgetauscht (Wartung)", "defekt"];
+const WARTUNGSVORLAGEN=[{"n":"Kühl- Tiefkühlschrank","t":"Kühl-/ Tiefkühlschrank","s":[{"t":"Sicht- und Funktionsprüfung","i":[{"l":"Gehäuse (äußerer Schaden, Dellen o.a.)"},{"l":"Tür(en) schließt / dichtet ordnungsgemäß ab"},{"l":"Türdichtungen intakt, flexibel, hygienisch"},{"l":"Scharniere / Türanschlag sicher und spielfrei"},{"l":"Innenausstattung vollständig und funktionsfähig (Roste, Einschübe etc.)"},{"l":"Beleuchtung vorhanden und funktionstüchtig"},{"l":"Bedienelemente / Anzeigen lesbar und ohne Fehlfunktion"}]},{"t":"Kälte- und Betriebstechnik","i":[{"l":"Verdampfer frei zugänglich / nicht vereist"},{"l":"Kondensator (Luft / Wasser) gereinigt bzw. verschmutzungsfrei"},{"l":"Lüfter / Luftführung ohne Geräusche, ungehindert"},{"l":"Temperaturregelung arbeitet im Sollbereich"},{"l":"Kein Tauwasser sichtbar im Innenraum"},{"l":"Lüftungsgitter (Zustand, frei von Staub / Fett)"},{"l":"Anmerkung:"},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen:","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]},{"l":"Hinweis"}]}]},{"n":"Kühltisch","t":"Kühl-/ Tiefkühltisch","s":[{"t":"Sicht- und Funktionsprüfung","i":[{"l":"Gehäuse (äußerer Schaden, Dellen o.a.)"},{"l":"Tür(en)/ Schubladen schließen/ dichtet ordnungsgemäß ab"},{"l":"Tür-/Schubladendichtungen intakt, elastisch"},{"l":"Scharniere, Auszüge, Anschläge mechanisch stabil"},{"l":"Innenausstattung vollständig und funktionsfähig (Roste, Einschübe etc.)"},{"l":"Belüftungsöffnungen und Lüftungsgitter frei"},{"l":"Innenflächen hygienisch einwandfrei (kein Biofilm, keine Ablagerungen)"},{"l":"Bedienelemente / Anzeigen lesbar und ohne Fehlfunktion"}]},{"t":"Kälte- und Betriebstechnik","i":[{"l":"Verdampfer frei zugänglich / nicht vereist"},{"l":"Kondensator (Luft / Wasser) gereinigt bzw. verschmutzungsfrei"},{"l":"Lüfter / Luftführung ohne Geräusche, ungehindert"},{"l":"Temperaturregelung arbeitet im Sollbereich"},{"l":"Kein Tauwasser sichtbar im Innenraum"},{"l":"Lüftungsgitter (Zustand, frei von Staub / Fett)"}]},{"t":"Temperatur- und Betriebsdaten","i":[{"l":"Gemessene Gerätetemperatur bei Wartung (°C)"},{"l":"Angezeigte Solltemperatur (°C)"},{"l":"Betriebsstunden (falls abrufbar)"},{"l":"Automatische Abtauung vorhanden","o":["ja","nein","unbekannt"]},{"l":"Anmerkung:"},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen:","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]},{"l":"Hinweis"}]}]},{"n":"CNS Möbel + Becken","t":"CNS Möbel","s":[{"t":"Prüfung","i":[{"l":"Rahmen / Tragkonstruktion stabil und verzugsfrei"},{"l":"Edelstahlflächen unbeschädigt / hygienisch beurteilbar"},{"l":"Schweißnähte, Kanten und Fugen frei von Beschädigung /Korrosion"},{"l":"Verbindungen (Schrauben, Nieten, Stecksysteme) sicher und fest"},{"l":"Füße / Rollen (falls vorhanden): fest, beweglich, funktionstüchtig"},{"l":"Rollen (falls vorhanden)"},{"l":"Kippsicherung vorhanden (bei Regalen / Hochschränken)"},{"l":"Befestigungen (Wandhalter, Schrauben, Stecksystem) fest"},{"l":"bewegliche Teile (z. B. Schubladen, Türen): leichtgängig, vollständig"},{"l":"Steckdosen/ elektrische Anschlüsse"}]},{"t":"Elektrische Ausstattung","i":[{"l":"Steckdosen: Gehäuse und Befestigung unbeschädigt"},{"l":"Steckdosenfunktion"},{"l":"Leitungsführung intakt, keine sichtbare Beschädigung"},{"l":"Einhaltung IP-Schutzart im Einsatzbereich (Feuchtigkeitsschutz)"}]},{"t":"Becken","i":[{"l":"Becken und Ablauf sichtgeprüft"},{"l":"Anschlüsse unter dem Becken trocken / dicht"},{"l":"Silikonverfugung vollständig und sauber"},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen:","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]},{"l":"Sonstiges"}]}]},{"n":"Armatur","t":"Armatur","s":[{"t":"Mechanik und Dichtheit","i":[{"l":"Bedienelement leichtgängig / ohne Spiel"},{"l":"Beweglichkeit des Auslaufs ( z. B. Schwenkfunktion) gegeben"},{"l":"Kein Tropfen bei geschlossener Armatur"},{"l":"Dichtungen im sichtbaren Bereich unbeschädigt"},{"l":"Anschlussleitungen dicht, unbeschädigt"}]},{"t":"Durchfluss und Hygiene","i":[{"l":"Strahlbild / Durchfluss normal (kein Verspritzen)"},{"l":"Strahlregler / Perlator kalkfrei bzw. durchlässig"},{"l":"Sichtprüfung auf Biofilm / Kalkablagerung"}]},{"t":"Sensorarmatatur","i":[{"l":"Sensor reagiert zuverlässig / ohne Aussetzer"},{"l":"Wasserfluss bei Auslösung korrekt/ zeitlich begrenzt"},{"l":"Batterie- oder Netzversorgung in Ordnung"},{"l":"Sicherheitsabschaltung vorhanden / funktioniert"},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen:","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]}]}]},{"n":"Spülmaschine","t":"Spülmaschine","s":[{"t":"Sicht- und Funktionsprüfung","i":[{"l":"Spülraum (optisch, hygienisch)"},{"l":"Haube / Tür schließt sicher"},{"l":"Dichtungen (Tür, Haube) elastisch, intakt"},{"l":"Spülarme und Nachspülarme frei / drehbar"},{"l":"Sichtprüfung der elektr. Leitungen"},{"l":"Sicht - und Funktionsprüfung Wasserzu- und Ablauf"},{"l":"Siebe / Filter vollständig"},{"l":"Dosiersystem (Funktion / Dichtigkeit)"},{"l":"Bedieneinheit funktioniert, Display lesbar"},{"l":"keine Fehleranzeige vorhanden"}]},{"t":"Technische Prüfung","i":[{"l":"Boilerheizung erreicht Zieltemperatur"},{"l":"Tankheizung funktionsfähig"},{"l":"Tankheizung funktionsfähig"},{"l":"Zulauf / Ablauf (Sichtkontrolle, kein Leck)"},{"l":"Klarspültemperatur erreicht (z. B. > 82 °C)"},{"l":"Umwälzpumpe- Funktion- und Dichtigkeits"},{"l":"Dosierleitungen / Schläuche geprüft"},{"l":"Sichtprüfung elektrischer Leitungen"}]},{"t":"Temperatur- und Betriebsdaten","i":[{"l":"Boilertemperatur bei Klarspülung (°C)"},{"l":"Spülwassertemperatur (Tank) (°C)"},{"l":"Anzahl Spülvorgänge"},{"l":"Anzahl Betriebsstunden"},{"l":"Wasserhärte Gesamthärte (GH)"},{"l":"Wasserhärte Karbonathärte (KH)"},{"l":"Enthärtungsanlage vorhanden","o":["ja","nein","extern"]},{"l":"Wasserverbrauch lt. Gerät (sofern abrufbar)"},{"l":"Verwendeter Reiniger"},{"l":"Verwendeter Klarspüler"}]},{"t":"Herstellerspezifika Meiko","i":[{"l":"Wartungskit verwendet","o":["ja","nein","entfällt"]},{"l":"Wartungsanzeige quittiert"},{"l":"Wartungsintervall im Menü bestätigt"}]},{"t":"Herstellerspezifika Hobart","i":[{"l":"Schnittstelle SmartConnect vorhanden / aktiv"},{"l":"Wartungsintervall im Menü bestätigt"},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen:","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]},{"l":"Sonstiges"}]}]},{"n":"Klein-Elektrogerät","t":"Klein-Elektrogerät (Aufschnittmaschine)","s":[{"t":"Sicht- und Funktionsprüfung","i":[{"l":"Gehäuse unbeschädigt (keine Risse / Verformungen)"},{"l":"Gerät steht sicher / kippsicher"},{"l":"Anschlussleitung und Stecker unbeschädigt"},{"l":"Bedienelemente / Schalter intakt"},{"l":"Anzeigeelemente (z. B. Display, Kontrolllampen) funktionsfähig"},{"l":"Beleuchtung (falls vorhanden) funktioniert"},{"l":"Sicherheitsabdeckungen / Verriegelungen vorhanden & funktional"},{"l":"Schneid-/Misch-/Heizeinheit funktionsfähig (je nach Gerät)"}]},{"t":"Hygiene und allgemeiner Zustand","i":[{"l":"Gerät insgesamt sauber / hygienisch beurteilbar"},{"l":"Keine sichtbaren Ablagerungen an Lüftungsschlitzen"},{"l":"Silikonverfugung (falls vorhanden) intakt"},{"l":"Geräuschverhalten"},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen:","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]}]}]},{"n":"Kochgeräte","t":"Kochgeräte (Kochkessel)","s":[{"t":"Sicht und Funktionsprüfng","i":[{"l":"Gehäuse unbeschädigt / stabil"},{"l":"Befestigungen, Scharniere, Aufnahmen fest"},{"l":"Dichtungen intakt, elastisch"},{"l":"Sichtprüfung elektrischer Leitungen möglich / unauffällig"},{"l":"Keine sichtbaren Undichtigkeiten (z. B. Ablauf, Armatur)"},{"l":"Armaturen / Ablasshahn (falls vorhanden) funktionsfähig"},{"l":"Sauberkeit und hygienische Beurteilbarkeit gegeben"}]},{"t":"Funktion und Technik","i":[{"l":"Heizfunktion inkl. Stromaufnahme korrekt"},{"l":"Thermostate / Temperaturfühler reagieren plausibel"},{"l":"Sicherheitsabschaltung / Überhitzungsschutz geprüft"},{"l":"Topferkennung (falls vorhanden) funktioniert"},{"l":"Bedien- / Anzeigeelemente (z. B. Display, Leuchten) funktional"},{"l":"Beleuchtung (z. B. Kochfeldkontrollleuchte) intakt"}]},{"t":"Herstellerspezifika MKN","i":[{"l":"Display / Touchbedienung reagiert korrekt"},{"l":"Fehlerprotokoll / Störspeicher ausgelesen"},{"l":"Automatische Wasserbefüllung (AutoFill) funktional"},{"l":"Elektrisches Ablassventil funktionsfähig"},{"l":"Wartungskit verwendet:","o":["ja","nein","nicht vorgesehen"]},{"l":"Typ des Wartungskits","o":["Original-Service-Kit von MKN (Artikelnummer: __________)","Wartung gemäß Herstellerempfehlung, Teile einzeln bezogen"]},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen :","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]},{"l":"Sonstiges"}]}]},{"n":"Ablufthaube","t":"Ablufthaube","s":[{"t":"Prüfung","i":[{"l":"Allgemeinzustand Gehäuse / Verkleidung"},{"l":"Zustand und Funktion der Fettabscheider / Filtereinsätze"},{"l":"Sitz, Halt und Zustand der Filterhalterungen / Dichtungen"},{"l":"Ventilator: Laufruhe, Lager, Verschmutzungsgrad"},{"l":"Funktion und Zustand der Beleuchtungseinheiten"},{"l":"Reinigungszustand der Haube (optisch beurteilbar) ausreichend"},{"l":"Lüfterrad zugänglich / verschleißfrei / ohne Blockade"},{"l":"Übergang zur Abluftleitung dicht / sicher befestigt"},{"l":"Brandschutzeinrichtung vorhanden und optisch geprüft (sofern verbaut)"},{"l":"weiterer Handlungsbedarf","o":["wenn ja bitte angeben:","Reparatur notwendig","Ersatzteilbestellung erforderlich","Angebotserstellung gewünscht","Wartung konnte nur eingeschränkt durchgeführt werden Kurzbeschreibung der erforderlichen Maßnahme(n):"]},{"l":"Anmerkung"}]}]},{"n":"Eiswürfelbereiter","t":"Eiswürfelbereiter","s":[{"t":"Sicht- und Funktionsprüfung","i":[{"l":"Gehäuse unbeschädigt/ sauber"},{"l":"Einfüll--/ Entnahmebereich hygienisch beurteilbar"},{"l":"Tür / Klappe / Entnahmeklappe schließt einwandfrei"},{"l":"Kontrolle des Wasserzulaufs (Druck, Dichtigkeit)"},{"l":"Ablaufleitung frei und dicht"},{"l":"Lüftungsgitter / Luftkanäle frei von Staub / Fett"},{"l":"Sichtprüfung elektrischer Leitungen"}]},{"t":"Kältetechnik/ Eisprodukition","i":[{"l":"Kälteerzeugung ausreichend (Eisproduktion stabil)"},{"l":"Eiswürfeloptik (klar, vollständig, keine Ränder)"},{"l":"Wassertank sauber, keine Biofilmbildung sichtbar"},{"l":"Verdampfer / Produktionsfläche sauber / vereist?"},{"l":"Reinigungshinweis (automatisch oder visuell) aktiv?"}]},{"t":"Reinigung und Hygiene","i":[{"l":"Innenraum vollständig gereinigt / desinfiziert"},{"l":"Wassertank entkalkt / gespült"},{"l":"Verwendung von empfohlenem Reinigungsmittel"},{"l":"Wasserfilter (falls vorhanden) geprüft / ersetzt","o":["ja","nein"]},{"l":"Wird eine regelmäßige Reinigung durchgeführt?","o":["ja","nein","nicht bekannt"]},{"l":"Reinigungsintervall (laut Betreiber):","o":["täglich","wöchentlich","monatlich","unregelmäßig","nicht dokumentiert"]},{"l":"Reinigungsprotokoll intern dokumentiert?","o":["ja","nein"]},{"l":"Wer führt die Reinigung durch?","o":["internes Personal","externer Dienstleister","keine Angabe"]},{"l":"Verwendetes Reinigungsmittel:"}]},{"t":"Betriebsdaten","i":[{"l":"Gerätetemperatur (Innenraum) bei Kontrolle"},{"l":"Wasserenthärtungsanlage vorhanden","o":["ja","nein","extern"]},{"l":"Filtertyp / Wechselintervall"},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen:","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]},{"l":"Sonstiges"}]}]},{"n":"Kaffeemaschine","t":"Kaffeemaschine/ Mengenbrüher","s":[{"t":"Sicht- und Funktionsprüfung","i":[{"l":"Gehäuse und Verkleidung unbeschädigt"},{"l":"Bedienelemente (Tasten, Hebel, Sensorflächen) funktional"},{"l":"Anzeigeelemente (LED, Display) reagieren korrekt"},{"l":"Tropfschale und Ablauf überprüft und frei"},{"l":"Sichtprüfung elektrischer Leitungen unauffällig"},{"l":"Lüfter / Geräuschentwicklung unauffällig"},{"l":"Stand/ Befestigung/ Aufstellung"}]},{"t":"Technische Prüfung wasserführender Komponenten","i":[{"l":"Wasserfilter vorhanden/ Zustand geprüft"},{"l":"Wasserhärte Eingang"},{"l":"Wasserhärte nach Filter"},{"l":"Wasseranschlüsse/ Verschraubungen dicht"},{"l":"Entkalkungszähler Brühsystem geprüft"},{"l":"Entkalkung durchgeführt"},{"l":"Entkalkung Heißwassersystem durchgeführt (sofern vorhanden)","o":["ja","nein","nicht bekannt"]},{"l":"Wird eine regelmäßige Reinigung durchgeführt?","o":["ja","nein","nicht bekannt"]},{"l":"Reinigungsintervall laut Betreiber","o":["täglich","wöchentlich","monatlich","unregelmäßig","unbekannt"]},{"l":"Reinigung dokumentiert (z. B. Reinigungsplan)?"},{"l":"Verwendetes Reinigungs-/Desinfektionsmittel"},{"l":"Typ / Hersteller der Filterkartusche"},{"l":"Gerät betriebsbereit"},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen:","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]},{"l":"Sonstiges"}]}]},{"n":"Wasserspender","t":"Wasserspender","s":[{"t":"Sicht- und Funktionsprüfung","i":[{"l":"Gehäuse und Verkleidung unbeschädigt"},{"l":"Bedienelemente (Tasten, Hebel, Sensorflächen) funktional"},{"l":"Anzeigeelemente (LED, Display) reagieren korrekt"},{"l":"Tropfschale und Ablauf überprüft und frei"},{"l":"Sichtprüfung elektrischer Leitungen unauffällig"},{"l":"Lüfter / Geräuschentwicklung unauffällig"},{"l":"CO₂-Druckprüfung (falls zutreffend) ohne Auffälligkeit"}]},{"t":"Technische Prüfung wasserführender Komponenten","i":[{"l":"Auslaufhahn gereinigt / entkalkt"},{"l":"Schlauchverbindungen und Gummidichtungen geprüft"},{"l":"Pumpenleistung geprüft (Fördermenge konstant)"},{"l":"Kühlfunktion überprüft (Kaltwasserausgabe ausreichend)"},{"l":"Verflüssiger gereinigt (Staub entfernt)"},{"l":"Prüfung auf Undichtigkeit durchgeführt"},{"l":"Sprudelfunktion (falls vorhanden) getestet"},{"l":"Filtereinheit kontrolliert / gewechselt"}]},{"t":"Hygienestatus & Reinigung","i":[{"l":"Innenraum und Wasserausgabe hygienisch beurteilbar"},{"l":"Keine sichtbaren Ablagerungen oder Biofilmbildung"},{"l":"Tropfschale und Abtropfgitter gereinigt"},{"l":"Reinigung mit empfohlenem Mittel durchgeführt"},{"l":"Desinfektion erfolgt (z. B. nach Herstellerangabe oder HACCP-Plan)"},{"l":"Wird eine regelmäßige Reinigung durchgeführt?","o":["ja","nein","nicht bekannt"]},{"l":"Reinigungsintervall laut Betreiber","o":["täglich","wöchentlich","monatlich","unregelmäßig","unbekannt"]},{"l":"Reinigung dokumentiert (z. B. Reinigungsplan)?"},{"l":"Verwendetes Reinigungs-/Desinfektionsmittel"},{"l":"Typ / Hersteller der Filterkartusche"},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen:","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]},{"l":"Sonstiges"}]}]},{"n":"Combidämpfer","t":"Combidämpfer","s":[{"t":"Sicht- und Funktionsprüfung","i":[{"l":"Gehäuse und Verkleidung unbeschädigt"},{"l":"Tür, Scharniere, Griff, Verriegelung"},{"l":"Türdichtung elastisch und dicht"},{"l":"Innenraum hygienisch beurteilbar"},{"l":"Anzeige- und Bedienelemente reagieren korrekt"},{"l":"Beleuchtung in Garraum und Anzeige intakt"},{"l":"Tropfrinnen und Gestelle gereinigt und fest"},{"l":"Sichtprüfung elektrischer Leitungen unauffällig"},{"l":"Dichtungen / Übergänge geprüft"}]},{"t":"Technische Prüfung","i":[{"l":"Elektrischer Anschluss / Funktion"},{"l":"Dampferzeuger arbeitet korrekt"},{"l":"Heizleistung / Aufheizzeit plausibel"},{"l":"Stromaufnahme der Heizungen im Sollbereich"},{"l":"Thermostate und Temperaturfühler plausibel"},{"l":"Kerntemperaturfühler geprüft / kalibriert"},{"l":"Motor / Lüfterfunktion geprüft"},{"l":"Beschwadung und Ablöschung funktionsfähig"},{"l":"Niveauerkennung arbeitet korrekt"},{"l":"Softwareupdate durchgeführt"},{"l":"Funktion der Haube (falls vorhanden) geprüft"},{"l":"Handbrause und Schlauch funktional"}]},{"t":"Reinigungssystem und Wasseranschluss","i":[{"l":"Reinigungssystem (z. B. Care Control, WaveClean) aktiv und funktionsfähig"},{"l":"Reinigungslauf (Entkalkung / Spülung) durchgeführt"},{"l":"Reinigungsprodukt (Tab / Kartusche) korrekt eingesetzt"},{"l":"keine sichtbaren Rückstände oder Ablagerungen vorhanden?"},{"l":"Wasseranschluss, Schlauchverbindung dicht"},{"l":"Rückflussverhinderer vorhanden und geprüft"},{"l":"Wasserfilter / Enthärtungssystem vorhanden","o":["intern","extern","keine"]},{"l":"GH / KH dokumentiert","m":"GH: ______ °dH / KH: ______ °dH"}]},{"t":"Herstellerspezifika Rational","i":[{"l":"Überprüfung Garraum Beschwadungsdüse kalkfrei"},{"l":"Prüfung Ablufthaube"},{"l":"CareControl / Tabs erkannt"},{"l":"ActiveClean verfügbar / genutzt"},{"l":"Austausch Luftfilter","o":["ja","nein"]}]},{"t":"Herstellerspezifika MKN","i":[{"l":"WaveClean-System geprüft"},{"l":"SpaceClean-Düse funktionsfähig"},{"l":"Ablassvorrichtung / Entleerung geprüft"},{"l":"Softwarestand dokumentiert"},{"l":"Reinigungslauf durchgeführt (nur bei Kundenfreigabe)","o":["ja","nein"]},{"l":"Sonstiges"},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen:","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]}]}]},{"n":"fahrbare Hilfsmittel","t":"fahrbare Hilsmittel (Servierwagen)","s":[{"t":"Prüfung","i":[{"l":"Sicht- und Funktionsprüfung"},{"l":"Gehäuse / Rahmen unbeschädigt"},{"l":"Ablageflächen / Ebenen stabil"},{"l":"Schweißnähte, Schrauben, Verbindungen fest"},{"l":"Rollen frei beweglich"},{"l":"Feststellbremsen funktional (bei gebremsten Rollen)"},{"l":"Sichtprüfung auf Rost / Korrosion"},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen:","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]},{"l":"Sonstiges"}]}]},{"n":"Speisenausgabe","t":"Speisenausgabe","s":[{"t":"Sicht- und Funktionsprüfung","i":[{"l":"Verkleidung / Gehäuse ohne Beschädigung"},{"l":"Glashauben / Schutzscheiben intakt und fest"},{"l":"Tür / Scharniere funktionsfähig"},{"l":"Auflageflächen (CNS / Stein / Holz) stabil"},{"l":"Steckdosen (falls vorhanden) geprüft"},{"l":"Bedienelemente (z. B. Temperaturregler) funktionsfähig"},{"l":"Anzeigeelemente (Temperatur, Licht, Schalter) funktionsfähig"},{"l":"Sichtprüfung elektrischer Leitungen ohne Befund"}]},{"t":"Optional Bain Marie","i":[{"l":"Wasserbecken intakt, ohne Verformungen"},{"l":"Heizung / Aufheizung plausibel"},{"l":"Temperaturregelung funktioniert"},{"l":"Armatur / Wasserablauf / Ventil geprüft"},{"l":"Verkalkung","o":["keine Auffälligkeit","sichtbar"]}]},{"t":"Optional Kühlmodul","i":[{"l":"Kühlwanne / -fläche unbeschädigt"},{"l":"Temperaturregelung plausibel"},{"l":"Temperatur (Stichprobe) im Sollbereich"},{"l":"Geräuschentwicklung (z. B. Lüfter) unauffällig"},{"l":"Kondensatablauf geprüft"},{"l":"Verdampfergitter sauber"},{"l":"Tür / Klappen (z. B. Unterschrankkühlung) dicht"},{"l":"Dichtungen intakt"},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen:","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]},{"l":"Sonstiges"}]}]},{"n":"Kühlzelle","t":"Kühlzelle","s":[{"t":"Sicht- und Funktionsprüfung","i":[{"l":"Wandelemente, Decke, Boden intakt"},{"l":"Türschließmechanismus"},{"l":"Tür, Scharniere, Dichtung in Ordnung"},{"l":"Türheizung (nur bei TK-Zelle) funktional"},{"l":"Schalter / Bedienelemente (z. B. Licht, Ventilator) funktionsfähig"},{"l":"Anzeigeelemente (z. B. Temperaturanzeige) korrekt"},{"l":"Beleuchtung funktionsfähig"},{"l":"Sichtprüfung der elektrischen Leitungen ohne Befund"},{"l":"Verdampfer / Lüfter sichtbar sauber, läuft ruhig"},{"l":"Kondensatablauf geprüft (nur bei Kühlzelle)"},{"l":"Falls vorhanden: Notöffnungseinrichtung"},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen:","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]},{"l":"Sonstiges:"}]}]},{"n":"Multikochgerät","t":"Multikochgerät","s":[{"t":"Sicht- und Funktionsprüfung","i":[{"l":"Gehäuse Verkleidung unbeschädigt"},{"l":"Zwischenboden / Gestellverbindungen stabil"},{"l":"Tiegelkörper und Innenfläche geprüft (Verformung, Risse)"},{"l":"Anzeigeelemente (Temperatur, Status etc.) funktionieren"},{"l":"Bedienelemente (z. B. Drehregler, Touch) reagieren korrekt"},{"l":"Temperaturregelung"},{"l":"Thermostatfunktion und Befestigung geprüft"},{"l":"Deckelmechanik (Dämpfung, Griff, Lager) intakt"},{"l":"Hebe- und Senkvorrichtung läuft gleichmäßig"},{"l":"Sichtprüfung elektrischer Leitungen / Stecker"},{"l":"Dichtungen (Deckel, Übergänge) vollständig und elastisch"},{"l":"Handbrause und Schlauch (Dichtigkeit, Rückzug, Griff, Sauberkeit)"},{"l":"Wasserdruck gemessen","m":"Druck: ______ bar"},{"l":"Warmwassertemperatur","m":"Temperatur: ______ °C"}]},{"t":"Herstellerspezifika Rational","i":[{"l":"Automatische Hebefunktion (z. B. AutoLift)"},{"l":"Kippmechanik motorisch / hydraulisch"},{"l":"Temperaturregelung im Tiegelboden"},{"l":"Elektronisch gesteuerter Wasserzulauf"},{"l":"WaveClean-System einsatzbereit"},{"l":"Strahlregler am Wasserzulauf entkalkt durchlässig"},{"l":"Schnittstellenfunktion (USB/ WLAN) sichtbar / aktiv"},{"l":"Austausch Tiegelventil","o":["ja","nein"]},{"l":"Abdeckung Druckablass (Druckstutzen)","o":["ja","nein"]}]},{"t":"Herstellerspezifika MKN","i":[{"l":"Automatische Hebefunktion (z. B. AutoLift)"},{"l":"Temperaturregelung im Tiegelboden"},{"l":"Elektronisch gesteuerter Wasserzulauf"},{"l":"Weiterer Handlungsbedarf","o":["Falls „ja“, bitte zutreffendes ankreuzen:","Reparatur empfohlen","Ersatzteil erforderlich","Angebotserstellung notwendig","Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)","Nutzung derzeit eingeschränkt / nur bedingt möglich Kurzbeschreibung der Maßnahme/ Empfehlung:"]},{"l":"Sonstiges"}]}]},{"n":"fahrbare Warmgeräte","t":"fahrbare Warmgeräte (Bankettwagen)","s":[{"t":"Prüfung","i":[{"l":"Gehäuse"},{"l":"Tür / Scharniere"},{"l":"Zwischenboden und Befestigung"},{"l":"Anzeigeelemente"},{"l":"Bedienelemente"},{"l":"Sichtprüfung elektrischer Leitungen"},{"l":"Zustand der Dichtungen"},{"l":"Temperatur kontrollieren"},{"l":"Funktion"},{"l":"Sauberkeit"},{"l":"Signalleuchten"},{"l":"Rollen"},{"l":"Zuleitungskabel"},{"l":"Ramm- / Stoßschutz"},{"l":"Federn / Gestelle"},{"l":"Sonstiges"}]}]}];
+// ══════════════════ WARTUNGSPROTOKOLLE ══════════════════
+// Quelle: 20250526_Wartungsprotokolle.xlsx (17 Gerätetypen, 354 Prüfpunkte).
+// Aufbau je Vorlage: n = Name, t = Überschrift, s = Abschnitte mit Zeilen.
+// Zeilenarten: ohne Zusatz = Zustand aus WV_ZUSTAENDE · o = eigene Auswahl
+// (☐ ja ☐ nein …) · m = Messwert mit Platzhaltertext (GH/KH, Druck, Temperatur).
+// Wer die Blätter ändert: die Excel bleibt die Quelle, `Kundendienst/
+// wartung_lesen.py` erzeugt diese Struktur neu (Überschriften sind dort FETT –
+// daran, nicht am Text, hängt die Unterscheidung Abschnitt/Prüfzeile).
+
+// Abschlussblock, wortgleich aus dem Formular übernommen.
+const WV_HANDLUNG=['Reparatur empfohlen','Ersatzteil erforderlich','Angebotserstellung notwendig',
+  'Weiterführende Prüfung durch Fachpersonal erforderlich (z. B. Kältetechnik, Sanitär, Brandschutz etc.)',
+  'Nutzung derzeit eingeschränkt / nur bedingt möglich'];
+
+// Stichwort -> Vorlage. Reihenfolge zählt: das Speziellere zuerst, sonst
+// schluckt „herd" den Kombidämpfer und „tisch" jedes Möbelstück.
+// PFLEGBARE LISTE (wie MONTEURE in der Hauptapp): Wer eine Bezeichnung findet,
+// die danebengreift, ergänzt hier eine Zeile.
+// Gemessen an allen 14 Baustellen: 213 von 296 Elektro-Geräten werden getroffen.
+// Der Rest bleibt bewusst OHNE Vorschlag – der Techniker wählt vor Ort
+// (Entscheidung des Nutzers, 18.08.2026). Es wird nichts untergeschoben.
+const WV_REGELN=[
+  [/kombi.?d[aä]mpfer|combi.?d[aä]mpfer|hei[sß]luft.?(kombi|combi)|hei[sß]luftd[aä]mpfer|elektro.?kombi/i,'Combidämpfer'],
+  [/multifunktionsgar|multikoch|flexichef|ivario|druckkochkessel|kippbratpfanne/i,'Multikochgerät'],
+  [/sp[uü]lmaschine|sp[uü]ltechnik|geschirrsp[uü]l|haubensp[uü]l/i,'Spülmaschine'],
+  [/ablufthaube|dunstabzug|l[uü]ftungsdecke/i,'Ablufthaube'],
+  [/k[uü]hlzelle|tiefk[uü]hlzelle/i,'Kühlzelle'],
+  [/k[uü]hltisch/i,'Kühltisch'],
+  [/k[uü]hlschrank|tiefk[uü]hlschrank|k[uü]hlvitrine|k[uü]hlger[aä]t|schockk[uü]hler|schockfroster|tiefk[uü]hltruhe|milchdispenser/i,'Kühl- Tiefkühlschrank'],
+  [/eisw[uü]rfel|einw[uü]rfelbereiter|eismaschine/i,'Eiswürfelbereiter'],
+  [/kaffee|mengenbr[uü]her|hei[sß]getr/i,'Kaffeemaschine'],
+  [/wasserspender|trinkwasser/i,'Wasserspender'],
+  [/induktionsherd|herd|kochfeld|fritteuse|frittenwanne|wok|backofen|salamander|grillplatte|griddle|nudelkocher|kontakt.?grill|w[aä]rmeplatte|front cooking/i,'Kochgeräte'],
+  [/ausgabe|bain.?marie|warmhalte|thekenaufsatz|hustenschutz|speisenausgabe|suppenstation/i,'Speisenausgabe'],
+  [/armatur|mischbatterie|handbrause/i,'Armatur'],
+  [/becken|cns|edelstahlm|ausguss|installationswand|board|regal|schrank|wagen/i,'CNS Möbel + Becken'],
+  [/mikrowelle|insektenvernichter|toaster|waffel|stabmixer|handger[aä]t/i,'Klein-Elektrogerät'],
+  [/fahrbar.*(warm|therm)|thermoport|speisentransport/i,'fahrbare Warmgeräte'],
+  [/fahrbar|salatbar/i,'fahrbare Hilfsmittel']
+];
+function wvVorschlag(text){
+  const t=String(text||'');
+  for(const [re,name] of WV_REGELN){ if(re.test(t)) return name; }
+  return '';
+}
+function wvVorlage(name){ return WARTUNGSVORLAGEN.find(v=>v.n===name)||null; }
+
+// ── Wartung anlegen / bearbeiten ────────────────────────────────────────────
+let WV_FORM=null;
+function wartungenZu(gid){ return KDW.filter(w=>w&&!w.geloescht&&String(w.gid)===String(gid)).sort(KD_ARTEN.kdw.sort); }
+function neueWartung(gid){
+  const g=KDG.find(x=>String(x.gid)===String(gid)); if(!g) return;
+  const vorschlag=wvVorschlag((g.bez||'')+' '+(g.typ||''));
+  wvFormular({ wid:String(gid)+'|'+nowMs(), gid:String(gid), pos:g.pos||'', bez:g.bez||'',
+    vorlage:vorschlag, datum:kdHeute(), techniker:USER||'', seriennr:g.seriennr||'',
+    werte:{}, hbedarf:'nein', hopts:[], hbtext:'', ort:'', sig:'', neu:true });
+}
+function wvOeffnen(wid){
+  const w=KDW.find(x=>String(x.wid)===String(wid)); if(!w) return;
+  wvFormular(JSON.parse(JSON.stringify(w)));
+}
+// Schritt 1: Vorlage wählen. Sie steht auch später oben im Formular, damit ein
+// falscher Vorschlag nicht mitten in der Prüfung zum Neuanfang zwingt.
+function wvFormular(w){
+  WV_FORM=w;
+  if(!w.vorlage){ wvVorlagenwahl(); return; }
+  wvRenderFormular();
+}
+function wvVorlagenwahl(){
+  const w=WV_FORM; if(!w) return;
+  const vorschlag=wvVorschlag(w.bez+' '+(w.seriennr||''));
+  ovOeffnen('Prüfblatt wählen',
+    '<div class="hint"><b>'+esc(w.bez||'Gerät')+'</b>'+(w.pos?(' · '+esc(w.pos)):'')+
+      (vorschlag? '<br>Vorgeschlagen anhand der Bezeichnung. Passt es nicht, wähle ein anderes Blatt.'
+                : '<br>Für dieses Gerät gibt es keinen sicheren Vorschlag – bitte selbst wählen.')+'</div>'+
+    WARTUNGSVORLAGEN.map(v=>{
+      const n=v.s.reduce((a,s)=>a+s.i.length,0);
+      const ist=(v.n===vorschlag);
+      return '<button class="opt" onclick="wvVorlageWaehlen('+esc(JSON.stringify(v.n))+')"'+
+        (ist?' style="border-color:var(--braun)"':'')+'>'+(ist?'★ ':'')+esc(v.t||v.n)+
+        '<small>'+n+' Prüfpunkte · '+v.s.length+' Abschnitt'+(v.s.length===1?'':'e')+'</small></button>';
+    }).join(''));
+}
+function wvVorlageWaehlen(name){ if(!WV_FORM) return; WV_FORM.vorlage=name; wvRenderFormular(); }
+
+function wvRenderFormular(){
+  const w=WV_FORM; if(!w) return;
+  const v=wvVorlage(w.vorlage);
+  if(!v){ wvVorlagenwahl(); return; }
+  const stamm=PROJECTS.find(p=>p.pid===PID)||{};
+  const zeile=(si,ii,it)=>{
+    const key='s'+si+'i'+ii, wert=w.werte[key]||{};
+    let feld;
+    if(it.m){   // Messwert – Platzhalter zeigt die erwartete Einheit
+      feld='<input type="text" id="wv_'+key+'_z" value="'+esc(wert.z||'')+'" placeholder="'+esc(it.m)+'" '+
+        'style="width:100%;padding:8px 9px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--text);font-size:15px;font-family:inherit">';
+    } else {
+      const opts=it.o||WV_ZUSTAENDE;
+      feld='<select id="wv_'+key+'_z" style="width:100%;padding:8px 9px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--text);font-size:15px;font-family:inherit">'+
+        '<option value=""'+(wert.z?'':' selected')+'>— nicht geprüft —</option>'+
+        opts.map(o=>'<option'+(wert.z===o?' selected':'')+'>'+esc(o)+'</option>').join('')+'</select>';
+    }
+    return '<div style="padding:9px 0;border-top:1px solid var(--bg2)">'+
+      '<div style="font-size:13px;line-height:1.35;margin-bottom:5px">'+esc(it.l)+'</div>'+
+      '<div style="display:flex;gap:8px;flex-wrap:wrap">'+
+        '<div style="flex:1 1 46%;min-width:150px">'+feld+'</div>'+
+        '<div style="flex:1 1 46%;min-width:150px"><input type="text" id="wv_'+key+'_a" value="'+esc(wert.a||'')+'" placeholder="Anmerkung" '+
+          'style="width:100%;padding:8px 9px;border:1px solid var(--border);border-radius:8px;background:var(--white);color:var(--text);font-size:15px;font-family:inherit"></div>'+
+      '</div></div>';
+  };
+  ovOeffnen('Wartungsprotokoll',
+    '<div class="card"><div class="card-h">'+esc(v.t||v.n)+'</div><div class="card-b">'+
+      '<div class="hint" style="margin:0 0 8px"><b>'+esc(w.bez||'')+'</b>'+(w.pos?(' · Pos. '+esc(w.pos)):'')+
+        '<br>'+esc(stamm.name||'')+(stamm.auftraggeber?(' · '+esc(stamm.auftraggeber)):'')+
+        '<br><button class="chip" onclick="wvVorlagenwahl()" style="margin-top:6px">Anderes Prüfblatt wählen</button></div>'+
+      '<div class="fld"><label>Seriennummer</label><input id="wvSn" type="text" value="'+esc(w.seriennr||'')+'"></div>'+
+      '<div class="fld"><label>Datum</label><input id="wvDatum" type="date" value="'+esc(w.datum||kdHeute())+'"></div>'+
+      '<div class="fld"><label>Techniker</label><input id="wvTech" type="text" value="'+esc(w.techniker||USER||'')+'"></div>'+
+    '</div></div>'+
+    v.s.map((s,si)=>'<div class="card"><div class="card-h">'+esc(s.t)+'</div><div class="card-b">'+
+      s.i.map((it,ii)=>zeile(si,ii,it)).join('')+'</div></div>').join('')+
+    '<div class="card"><div class="card-h">Sonstiges</div><div class="card-b">'+
+      '<div class="fld"><label>Weiterer Handlungsbedarf</label><div class="selbar">'+
+        ['nein','ja'].map(x=>'<button class="chip" data-hb="'+x+'" onclick="wvHbWahl(this)"'+
+          (w.hbedarf===x?' style="background:var(--braun);color:#fff;border-color:var(--braun)"':'')+'>'+x+'</button>').join('')+
+      '</div></div>'+
+      '<div id="wvHbBlock" style="display:'+(w.hbedarf==='ja'?'block':'none')+'">'+
+        WV_HANDLUNG.map((o,i)=>'<div class="sck'+((w.hopts||[]).indexOf(o)>=0?' on':'')+'" data-hopt="'+i+'" onclick="this.classList.toggle(\'on\')" style="padding-left:0">'+
+          '<div class="sckb">✓</div><div>'+esc(o)+'</div></div>').join('')+
+        '<div class="fld" style="margin-top:10px"><label>Kurzbeschreibung der Maßnahme / Empfehlung</label>'+
+          '<input id="wvHbText" type="text" value="'+esc(w.hbtext||'')+'"></div>'+
+      '</div>'+
+      '<div class="fld"><label>Ort, Datum</label><input id="wvOrt" type="text" value="'+
+        esc(w.ort|| [ (stamm.ort||''), kdDatDE(w.datum||kdHeute()) ].filter(Boolean).join(', '))+'"></div>'+
+      '<div class="fld"><label>Unterschrift Techniker</label>'+
+        '<div class="sigwrap"><canvas id="wvSig"></canvas>'+
+          '<div class="sigtools"><button type="button" onclick="wvSigLeeren()">Leeren</button>'+
+          '<span class="summary">mit dem Finger unterschreiben</span></div></div></div>'+
+    '</div></div>'+
+    '<button class="finish" onclick="wvSpeichern()">Wartung speichern</button>'+
+    (w.neu?'':'<button class="entw" style="color:var(--rot);border-color:var(--rot)" onclick="wvLoeschen('+esc(JSON.stringify(w.wid))+')">🗑 Protokoll entfernen</button>'));
+  wvSigSetup(w.sig||'');
+}
+function wvHbWahl(btn){
+  if(!WV_FORM) return;
+  WV_FORM.hbedarf=btn.getAttribute('data-hb');
+  [...btn.parentNode.children].forEach(b=>{ const an=b===btn;
+    b.style.background=an?'var(--braun)':''; b.style.color=an?'#fff':''; b.style.borderColor=an?'var(--braun)':''; });
+  const bl=document.getElementById('wvHbBlock'); if(bl) bl.style.display=(WV_FORM.hbedarf==='ja')?'block':'none';
+}
+// ── Unterschrift ────────────────────────────────────────────────────────────
+function wvSigSetup(vorhanden){
+  const c=document.getElementById('wvSig'); if(!c) return;
+  const b=c.parentNode.getBoundingClientRect();
+  c.width=Math.max(280, Math.round(b.width))*2; c.height=320;      // 2x für scharfe Linien
+  c.style.width='100%'; c.style.height='160px'; c.style.touchAction='none';
+  const ctx=c.getContext('2d');
+  ctx.lineWidth=3; ctx.lineCap='round'; ctx.lineJoin='round'; ctx.strokeStyle='#1a1a1a';
+  if(vorhanden){ const img=new Image(); img.onload=()=>ctx.drawImage(img,0,0,c.width,c.height); img.src=vorhanden; }
+  let zeichnet=false;
+  const pos=e=>{ const r=c.getBoundingClientRect(); return [ (e.clientX-r.left)*(c.width/r.width), (e.clientY-r.top)*(c.height/r.height) ]; };
+  c.addEventListener('pointerdown',e=>{ zeichnet=true; c.setPointerCapture(e.pointerId); const [x,y]=pos(e); ctx.beginPath(); ctx.moveTo(x,y); e.preventDefault(); });
+  c.addEventListener('pointermove',e=>{ if(!zeichnet) return; const [x,y]=pos(e); ctx.lineTo(x,y); ctx.stroke(); e.preventDefault(); });
+  ['pointerup','pointercancel','pointerleave'].forEach(t=>c.addEventListener(t,()=>{ zeichnet=false; }));
+}
+function wvSigLeeren(){ const c=document.getElementById('wvSig'); if(!c) return; c.getContext('2d').clearRect(0,0,c.width,c.height); }
+function wvSigLeer(c){
+  const d=c.getContext('2d').getImageData(0,0,c.width,c.height).data;
+  for(let i=3;i<d.length;i+=4){ if(d[i]) return false; }
+  return true;
+}
+
+async function wvSpeichern(){
+  const w=WV_FORM; if(!w) return;
+  const v=wvVorlage(w.vorlage); if(!v) return;
+  const val=id=>((document.getElementById(id)||{}).value||'').trim();
+  w.seriennr=val('wvSn'); w.datum=val('wvDatum')||kdHeute(); w.techniker=val('wvTech');
+  w.ort=val('wvOrt'); w.hbtext=val('wvHbText');
+  w.hopts=[...document.querySelectorAll('[data-hopt].on')].map(el=>WV_HANDLUNG[+el.dataset.hopt]);
+  w.werte={};
+  let geprueft=0;
+  v.s.forEach((s,si)=>s.i.forEach((it,ii)=>{
+    const key='s'+si+'i'+ii;
+    const z=val('wv_'+key+'_z'), a=val('wv_'+key+'_a');
+    if(z||a){ w.werte[key]={z,a}; if(z) geprueft++; }
+  }));
+  const c=document.getElementById('wvSig');
+  if(c && !wvSigLeer(c)) w.sig=c.toDataURL('image/png');
+  // Nichts geprüft = vermutlich ein Fehlgriff. Nachfragen statt still ablegen.
+  if(!geprueft && !confirm('Es ist kein einziger Prüfpunkt ausgefüllt.\n\nTrotzdem speichern?')) return;
+  w.punkte=geprueft; w.gesamt=v.s.reduce((a,s)=>a+s.i.length,0);
+  w.geaendert=new Date().toISOString(); w.by=USER||w.by||'';
+  delete w.neu;
+  // Protokoll UND Gerät erst in die Warteschlange, dann EINMAL übertragen:
+  // Der zweite Aufruf fiele sonst in den noch laufenden Abgleich des ersten und
+  // bliebe bis zum nächsten Anlass liegen (im Test: ein Eintrag hing fest).
+  await kdSpeichernEintrag(w, false, 'kdw');
+  // Die Wartung schreibt die Frist fort: „letzte Wartung" am Gerät, daraus
+  // rechnet kdNaechste die nächste Fälligkeit. Nur vorrücken, nie zurück –
+  // ein nachgetragenes altes Protokoll darf die Frist nicht verjüngen.
+  const g=KDG.find(x=>String(x.gid)===String(w.gid));
+  if(g && (!g.letzte || w.datum>g.letzte)){
+    g.letzte=w.datum; g.geaendert=new Date().toISOString();
+    await kdSpeichernEintrag(g, false, 'kd');
+  }
+  flushOutbox();
+  ovSchliessen(); WV_FORM=null; renderKartei();
+  showToast('Wartung gespeichert'+(g&&g.intervall?(' · nächste '+kdDatDE(kdNaechste(g))):''));
+}
+async function wvLoeschen(wid){
+  const w=KDW.find(x=>String(x.wid)===String(wid)); if(!w) return;
+  if(!confirm('Dieses Wartungsprotokoll entfernen?\n\nDie Frist am Gerät bleibt stehen – sie lässt sich am Gerät ändern.')) return;
+  w.geloescht=true; w.geaendert=new Date().toISOString();
+  await kdSpeichernEintrag(w, true, 'kdw');
+  ovSchliessen(); WV_FORM=null; renderKartei(); showToast('Protokoll entfernt');
+}
 
 // ══════════════════ Start ══════════════════
 async function doLogin(){
