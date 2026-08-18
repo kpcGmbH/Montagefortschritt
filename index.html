@@ -1770,19 +1770,8 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 142;
+const APP_VERSION = 140;
 const CHANGELOG = [
-  { v:142, titel:'Kundendienst: Baustelle übergeben (Pilot)', punkte:[
-    'Nach der Abnahme war in der App Schluss – Wartungen und Serviceeinsätze der folgenden Jahre hatten keinen Ort. Der Kundendienst bekommt jetzt einen <b>eigenen Bereich</b>: die neue Seite <b>Kundendienst</b> mit Gerätekartei und Wartungsfristen.',
-    'Hier in der Montagefortschritt-App geht es nur um die <b>Übergabe</b>: „Berichte &amp; Dokumente" → <b>🛠 Kundendienst</b>. Bauleitung und Innendienst übergeben eine fertige Baustelle dorthin; sie bleibt <b>dieselbe Baustelle</b> – Stückliste, Protokolle, Fotos und Stammdaten bleiben, wo sie sind.',
-    'Übergeben wird <b>nach Fertigstellung und Mängelbearbeitung</b>. Der Dialog zeigt vorher, wie die Baustelle dasteht: wie viele Positionen noch nicht vollständig sind und wie viele Restarbeiten und Mängel offen sind. Eine Sperre ist das nicht – die Zählung kennt den Grund nicht.',
-    'In der Kundendienst-App entsteht die <b>Gerätekartei</b> aus der Stückliste, mit Seriennummer, Wartungstakt (1× oder 2× jährlich), letzter Wartung und Gewährleistung. Sie rechnet die nächste Fälligkeit aus und zeigt sie als Ampel.',
-    'Der Bereich ist noch im <b>Pilotbetrieb</b> und nur für einzelne Konten freigegeben.' ]},
-  { v:141, titel:'Baustelle im Aufbau: „nur für mich sichtbar"', punkte:[
-    'Eine Baustelle, die noch vorbereitet wird, stand bisher ab dem ersten Moment in der Liste aller – mitten zwischen den laufenden.',
-    'Unter 🏢 <b>Stammdaten</b> gibt es jetzt das Häkchen <b>„Nur für mich sichtbar"</b>. Die Baustelle verschwindet damit aus der Auswahl aller anderen – auch in der Einweisungs-App – und trägt bei dir ein 🔒. Häkchen wieder weg = für alle da.',
-    'Setzen dürfen das nur <b>Bauleitung und Innendienst</b>, wie beim Wechsel des Ausführers.',
-    'Zur Einordnung: Das ist ein <b>Sichtschutz</b>, keine Zugriffssperre. In SharePoint bleiben die Daten wie bisher für alle lesbar – es geht darum, die Liste des Trupps frei zu halten.' ]},
   { v:140, titel:'Protokoll überarbeiten ändert Datum und Techniker nicht mehr', punkte:[
     'Wer ein abgelegtes Inbetriebnahme- oder DGUV-Protokoll über ✎ geöffnet hat, bei dem schrieb die App still um: <b>Techniker auf den aktuellen Ausführer</b>, <b>alle Datumsfelder auf heute</b> – auch das Inbetriebnahmedatum – dazu Ort, Datum, Name und sogar das <b>Unterschriftsbild</b> im Unterschriftsblock.',
     'Wer eine Seriennummer korrigiert, schrieb damit um, wer wann in Betrieb genommen hat. Das ist jetzt vorbei: <b>Was im Protokoll steht, bleibt stehen.</b>',
@@ -5404,7 +5393,10 @@ function kdOffeneRA(){
 function openKundendienst(){
   if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
   if(kdPhase()==='kundendienst'){ kdZurApp(); return; }
-  if(!darfBenutzerWechseln()){ alert('Diese Baustelle ist noch in der Montage.\nDie Übergabe an den Kundendienst nimmt die Bauleitung oder der Innendienst vor.'); return; }
+  // Zweite Schranke: Der Eintrag ist zwar schon auf KD_ZUGANG beschränkt, aber
+  // die Funktion ist von der Konsole aus erreichbar – und eine versehentlich
+  // übergebene Baustelle wäre für den Trupp eine stille Zustandsänderung.
+  if(!darfKundendienstSehen()){ alert('Der Kundendienst-Bereich ist noch im Pilotbetrieb.'); return; }
   kdUebergabeDialog();
 }
 function kdZurApp(){ location.href='./kundendienst.html'; }
@@ -5482,11 +5474,10 @@ function openBerichteSheet(){
     {ic:'🔑', t:'Schlüsselübergabe', d:'Schlüsselprotokoll zum Unterschreiben', fn:'openSchluesselprotokoll()'},
     {ic:'📊', t:'Restarbeitenliste', d:'als Excel-Datei', fn:'expRestXlsx()'}
   ];
-  // Kundendienst erscheint erst, wenn die Baustelle übergeben ist – und für
-  // Bauleitung/Innendienst zusätzlich davor, denn die nehmen die Übergabe vor.
-  // Der Trupp bekommt auf einer laufenden Baustelle keinen Eintrag zu sehen,
-  // mit dem er nichts anfangen kann.
-  if(kdPhase()==='kundendienst' || darfBenutzerWechseln()){
+  // Kundendienst ist im Pilotbetrieb: Der Eintrag erscheint NUR für die Konten
+  // in KD_ZUGANG. Alle anderen sehen ihn nicht – auch nicht die Bauleitung, und
+  // auch nicht bei einer bereits übergebenen Baustelle.
+  if(darfKundendienstSehen()){
     items.splice(6, 0, {ic:'🛠', t:'Kundendienst', d: kdPhase()==='kundendienst'
       ? 'Gerätekartei und Wartungen – zur Kundendienst-App' : 'Baustelle an den Kundendienst übergeben', fn:'openKundendienst()'});
   }
@@ -9597,6 +9588,17 @@ function meinKonto(){
 // UND schreibt mit dem Token des Angemeldeten, ein Entzug macht sie unbrauchbar.
 // Zweck ist, dass eine Baustelle im Aufbau (Pilot, Vorbereitung) die Liste des
 // Trupps nicht zumüllt.
+// Pilotbetrieb Kundendienst: Solange der Bereich erprobt wird, sieht ihn NUR,
+// wer hier steht – kein Menüeintrag, keine Markierung, kein Hinweis für alle
+// anderen. Geprüft wird der UPN des Microsoft-Kontos (stabil und eindeutig),
+// nicht der Anzeigename. Dieselbe Liste steht in `kundendienst.html`
+// (KD_ZUGANG) – wer eine ändert, ändert beide.
+// Leere Liste = für alle offen; DANN gehört auch ein CHANGELOG-Eintrag dazu.
+const KD_ZUGANG=['johannes.wahl@kpc-project.com'];
+function darfKundendienstSehen(){
+  const k=meinKonto();
+  return !KD_ZUGANG.length || (!!k && KD_ZUGANG.indexOf(k)>=0);
+}
 function projSichtbar(p){
   const pv=String((p&&p.privat)||'').trim().toLowerCase();
   return !pv || pv===meinKonto();
@@ -9651,7 +9653,7 @@ function renderProjectPicker(){
           '<span style="display:block;font-size:11px;color:'+(p.auftraggeber?'#c0a780':'#e0a060')+';margin-top:2px">'+(p.auftraggeber?('👤 '+escapeHtml(p.auftraggeber)):'⚠ Auftraggeber fehlt')+'</span>'+
           (_l.filter(x=>x!=='Auftraggeber').length?('<span style="display:block;font-size:11px;color:#e0a060;margin-top:1px">⚠ Stammdaten fehlen: '+escapeHtml(_l.filter(x=>x!=='Auftraggeber').join(', '))+'</span>'):'')+
           (p.privat?'<span style="display:block;font-size:11px;color:#8fbf8f;margin-top:1px">🔒 Nur für dich sichtbar</span>':'')+
-          (p.phase==='kundendienst'?'<span style="display:block;font-size:11px;color:#9fb8d0;margin-top:1px">🛠 Kundendienst'+(p.kdSeit?(' seit '+kdDatDE(p.kdSeit)):'')+'</span>':'')+
+          (p.phase==='kundendienst'&&darfKundendienstSehen()?'<span style="display:block;font-size:11px;color:#9fb8d0;margin-top:1px">🛠 Kundendienst'+(p.kdSeit?(' seit '+kdDatDE(p.kdSeit)):'')+'</span>':'')+
           '<span style="display:block;font-size:11px;color:#a8a8a8;margin-top:1px">'+((p.lastEdit||p.created)?('Geändert: '+new Date(p.lastEdit||p.created).toLocaleDateString('de-DE')):'')+'</span></span>'+
           '<button onclick="editStammdaten(\''+p.pid+'\',event)" title="Stammdaten bearbeiten (Auftraggeber, Anschrift, Auftragsnummer)" style="background:none;border:none;color:'+(_l.length?'#e0a060':'#d7c1ae')+';font-size:15px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">🏢</button>'+
          '<button onclick="editBauleiter(\''+p.pid+'\',event)" title="Bauleiter zuordnen (für Aufgaben-Benachrichtigungen)" style="background:none;border:none;color:#d7c1ae;font-size:15px;cursor:pointer;padding:6px 8px;line-height:1;-webkit-tap-highlight-color:transparent;">👷</button>'+
