@@ -733,6 +733,7 @@ function renderKartei(){
   main.innerHTML=
     '<div class="toolbar">'+
       '<button class="btn-primary" onclick="showProjectPicker()">‹ Objekte</button>'+
+      '<button class="chip" onclick="wartungsauftrag()">🔧 Wartung starten</button>'+
       '<button class="chip" onclick="seedDialog()">➕ Geräte aus der Stückliste</button>'+
       '<span class="summary">'+(liste.length? (liste.length+' Geräte'+(faellig?(' · '+faellig+' fällig'):'')+(bald?(' · '+bald+' bald'):'')) : '')+'</span>'+
     '</div>'+
@@ -815,7 +816,7 @@ function editGeraet(gid){
         if(!h.length) return '<div class="hint" style="margin:10px 2px 0">Noch kein Wartungsprotokoll für dieses Gerät.</div>';
         return '<div style="margin-top:10px">'+h.map(w=>
           '<div class="prow" style="cursor:pointer" onclick="wvOeffnen('+esc(JSON.stringify(w.wid))+')">'+
-            '<div class="pmain"><div class="pt">'+kdDatDE(w.datum)+' · '+esc(w.vorlage||'')+'</div>'+
+            '<div class="pmain"><div class="pt">'+kdDatDE(w.datum)+' · '+esc(w.vorlage||'')+(wGids(w).length>1?(' · '+wGids(w).length+' Positionen'):'')+'</div>'+
             '<div class="pm">'+esc(w.techniker||'')+(w.punkte!=null?(' · '+w.punkte+' von '+w.gesamt+' Punkten'):'')+
             (w.hbedarf==='ja'?' · <b style="color:var(--rot)">Handlungsbedarf</b>':'')+'</div></div>'+
             '<button class="plink" onclick="event.stopPropagation();wvPdfAblegen('+esc(JSON.stringify(w.wid))+')">PDF</button>'+
@@ -918,11 +919,20 @@ function wvVorlage(name){ return WARTUNGSVORLAGEN.find(v=>v.n===name)||null; }
 
 // ── Wartung anlegen / bearbeiten ────────────────────────────────────────────
 let WV_FORM=null;
-function wartungenZu(gid){ return KDW.filter(w=>w&&!w.geloescht&&String(w.gid)===String(gid)).sort(KD_ARTEN.kdw.sort); }
+// EIN Protokoll kann MEHRERE Positionen abdecken – im Einsatz üblich bei Anlagen,
+// die aus mehreren Stücklistenzeilen bestehen (Edelstahlschrankanlage,
+// Ausgabelinie). Maßgeblich ist deshalb `gids` (Liste); `gid` bleibt als erste
+// Position stehen, damit ältere Einträge weiter gefunden werden.
+function wGids(w){ return (w&&w.gids&&w.gids.length)?w.gids:(w&&w.gid?[w.gid]:[]); }
+function wartungenZu(gid){
+  return KDW.filter(w=>w&&!w.geloescht&&wGids(w).some(x=>String(x)===String(gid))).sort(KD_ARTEN.kdw.sort);
+}
+function wPosText(w){ const p=(w.posListe||[]).filter(Boolean); return p.length?p.join(', '):(w.pos||''); }
 function neueWartung(gid){
   const g=KDG.find(x=>String(x.gid)===String(gid)); if(!g) return;
   const vorschlag=wvVorschlag((g.bez||'')+' '+(g.typ||''));
-  wvFormular({ wid:String(gid)+'|'+nowMs(), gid:String(gid), pos:g.pos||'', bez:g.bez||'',
+  wvFormular({ wid:String(gid)+'|'+nowMs(), gid:String(gid), gids:[String(gid)],
+    pos:g.pos||'', bez:g.bez||'', posListe:[g.pos||''], bezListe:[g.bez||''],
     vorlage:vorschlag, datum:kdHeute(), techniker:USER||'', seriennr:g.seriennr||'',
     werte:{}, hbedarf:'nein', hopts:[], hbtext:'', bem:'', ort:'', sig:'', neu:true });
 }
@@ -980,10 +990,22 @@ function wvRenderFormular(){
       '</div></div>';
   };
   ovOeffnen('Wartungsprotokoll',
+    wlFortschritt()+
     '<div class="card"><div class="card-h">'+esc(v.t||v.n)+'</div><div class="card-b">'+
       '<div class="hint" style="margin:0 0 8px"><b>'+esc(w.bez||'')+'</b>'+(w.pos?(' · Pos. '+esc(w.pos)):'')+
         '<br>'+esc(stamm.name||'')+(stamm.auftraggeber?(' · '+esc(stamm.auftraggeber)):'')+
         '<br><button class="chip" onclick="wvVorlagenwahl()" style="margin-top:6px">Anderes Prüfblatt wählen</button></div>'+
+      '<div class="fld"><label>Weitere Positionen in diesem Protokoll</label>'+
+        '<div id="wvGeraete">'+kdListe().map(x=>{
+          const drin=(w.gids||[]).some(y=>String(y)===String(x.gid));
+          const erste=String(x.gid)===String(w.gid);
+          return '<div class="sck'+(drin?' on':'')+'" data-gid="'+esc(String(x.gid))+'"'+
+            (erste?'':' onclick="this.classList.toggle(\'on\')"')+
+            ' style="padding-left:0'+(erste?';opacity:.65':'')+'">'+
+            '<div class="sckb">✓</div><div>'+esc(x.bez||'')+'<div class="gmeta">'+esc(x.pos||'')+
+            (erste?' · Ausgangsgerät':'')+'</div></div></div>';
+        }).join('')+'</div>'+
+        '<div class="hint" style="margin:6px 2px 0">Anlagen aus mehreren Stücklistenzeilen (z. B. Edelstahlschrankanlagen) in EIN Protokoll nehmen. Alle angehakten Positionen bekommen dasselbe Protokoll und dieselbe nächste Fälligkeit.</div></div>'+
       '<div class="fld"><label>Seriennummer</label><input id="wvSn" type="text" value="'+esc(w.seriennr||'')+'"></div>'+
       '<div class="fld"><label>Datum</label><input id="wvDatum" type="date" value="'+esc(w.datum||kdHeute())+'"></div>'+
       '<div class="fld"><label>Techniker</label><input id="wvTech" type="text" value="'+esc(w.techniker||USER||'')+'"></div>'+
@@ -1049,6 +1071,13 @@ async function wvSpeichern(){
   w.seriennr=val('wvSn'); w.datum=val('wvDatum')||kdHeute(); w.techniker=val('wvTech');
   w.ort=val('wvOrt'); w.hbtext=val('wvHbText'); w.bem=val('wvBem');
   w.hopts=[...document.querySelectorAll('[data-hopt].on')].map(el=>WV_HANDLUNG[+el.dataset.hopt]);
+  const gew=[...document.querySelectorAll('#wvGeraete .sck.on')].map(el=>el.dataset.gid);
+  if(gew.length){
+    w.gids=gew;
+    w.posListe=gew.map(id=>{ const g=KDG.find(x=>String(x.gid)===String(id)); return g?(g.pos||''):''; });
+    w.bezListe=gew.map(id=>{ const g=KDG.find(x=>String(x.gid)===String(id)); return g?(g.bez||''):''; });
+    w.pos=w.posListe[0]||w.pos; w.bez=w.bezListe[0]||w.bez;
+  }
   w.werte={};
   let geprueft=0;
   v.s.forEach((s,si)=>s.i.forEach((it,ii)=>{
@@ -1070,14 +1099,18 @@ async function wvSpeichern(){
   // Die Wartung schreibt die Frist fort: „letzte Wartung" am Gerät, daraus
   // rechnet kdNaechste die nächste Fälligkeit. Nur vorrücken, nie zurück –
   // ein nachgetragenes altes Protokoll darf die Frist nicht verjüngen.
-  const g=KDG.find(x=>String(x.gid)===String(w.gid));
-  if(g && (!g.letzte || w.datum>g.letzte)){
-    g.letzte=w.datum; g.geaendert=new Date().toISOString();
-    await kdSpeichernEintrag(g, false, 'kd');
+  for(const gid of wGids(w)){
+    const g=KDG.find(x=>String(x.gid)===String(gid));
+    if(g && (!g.letzte || w.datum>g.letzte)){
+      g.letzte=w.datum; g.geaendert=new Date().toISOString();
+      await kdSpeichernEintrag(g, false, 'kd');
+    }
   }
   flushOutbox();
+  const erst=KDG.find(x=>String(x.gid)===String(wGids(w)[0]));
   ovSchliessen(); WV_FORM=null; renderKartei();
-  showToast('Wartung gespeichert'+(g&&g.intervall?(' · nächste '+kdDatDE(kdNaechste(g))):''));
+  showToast('Wartung gespeichert'+(erst&&erst.intervall?(' · nächste '+kdDatDE(kdNaechste(erst))):''));
+  if(WV_LAUF){ WV_LAUF.i++; setTimeout(wlWeiter, 400); }
 }
 async function wvLoeschen(wid){
   const w=KDW.find(x=>String(x.wid)===String(wid)); if(!w) return;
@@ -1096,6 +1129,75 @@ function btbSvgToPng(dataUri,targetW){
     img.onerror=()=>resolve(null);
     img.src=dataUri;
   });
+}
+
+// ── Wartungsauftrag: ein Einsatz, mehrere Geräte ────────────────────────────
+// Der Techniker fährt zur Baustelle und wartet mehrere Geräte. Statt jedes
+// einzeln zu suchen, hakt er sie hier an; die App führt ihn dann Protokoll für
+// Protokoll durch und weiß nach jedem Speichern, was noch offen ist.
+// Der Auftrag ist bewusst KEINE eigene Datei: er lebt nur während des Einsatzes.
+// Was bleibt, sind die Protokolle – und die hängen an den Geräten.
+let WV_LAUF=null;   // {liste:[gid], i:0}
+function wartungsauftrag(){
+  const liste=kdListe();
+  if(!liste.length){ alert('Noch keine Geräte in der Kartei.'); return; }
+  // Fällige zuerst und vorausgewählt – das ist der Grund, warum man hinfährt.
+  const sortiert=liste.slice().sort((a,b)=>{
+    const r={faellig:0,bald:1,ok:2,ohne:3,aus:4};
+    return (r[kdStatus(a).k]-r[kdStatus(b).k]) || kdSort(a,b);
+  });
+  ovOeffnen('Wartung starten',
+    '<div class="hint">Welche Geräte werden bei diesem Einsatz gewartet? Fällige sind vorausgewählt. '+
+      'Anlagen aus mehreren Positionen fasst du später im Protokoll selbst zusammen.</div>'+
+    '<div class="selbar"><button class="chip" onclick="wlAlle(true)">Alle</button>'+
+      '<button class="chip" onclick="wlAlle(false)">Keine</button>'+
+      '<span class="summary" id="wlZahl"></span></div>'+
+    sortiert.map(g=>{ const st=kdStatus(g); const vor=(st.k==='faellig'||st.k==='bald');
+      return '<div class="selrow'+(vor?' on':'')+'" data-gid="'+esc(String(g.gid))+'" onclick="this.classList.toggle(\'on\');wlZahl()">'+
+        '<div class="selbox">✓</div><div class="gi"><div class="gbez">'+esc(g.bez||'')+'</div>'+
+        '<div class="gmeta">'+esc(g.pos||'')+' · '+esc(wvVorschlag((g.bez||'')+' '+(g.typ||''))||'Blatt wählen')+
+        '</div><div class="gmeta" style="color:'+st.f+'">'+esc(st.t)+'</div></div></div>';
+    }).join('')+
+    '<button class="finish" onclick="wlStarten()">Wartung beginnen</button>');
+  wlZahl();
+}
+function wlAlle(an){ document.querySelectorAll('.selrow').forEach(r=>r.classList.toggle('on',!!an)); wlZahl(); }
+function wlZahl(){ const n=document.querySelectorAll('.selrow.on').length; const el=document.getElementById('wlZahl'); if(el) el.textContent=n+' ausgewählt'; }
+function wlStarten(){
+  const gew=[...document.querySelectorAll('.selrow.on')].map(r=>r.dataset.gid);
+  if(!gew.length){ alert('Nichts ausgewählt.'); return; }
+  WV_LAUF={ liste:gew, i:0 };
+  wlWeiter();
+}
+// Nächstes Gerät des Laufs – und überspringen, was inzwischen schon in einem
+// gemeinsamen Protokoll miterledigt wurde (Edelstahlschrankanlage).
+function wlWeiter(){
+  if(!WV_LAUF){ return; }
+  while(WV_LAUF.i<WV_LAUF.liste.length){
+    const gid=WV_LAUF.liste[WV_LAUF.i];
+    const schon=KDW.some(w=>w&&!w.geloescht&&w.datum===kdHeute()&&wGids(w).some(x=>String(x)===String(gid)));
+    if(!schon) break;
+    WV_LAUF.i++;
+  }
+  if(WV_LAUF.i>=WV_LAUF.liste.length){
+    const n=WV_LAUF.liste.length; WV_LAUF=null;
+    ovSchliessen(); renderKartei();
+    showToast('Einsatz abgeschlossen · '+n+' Gerät'+(n===1?'':'e'));
+    return;
+  }
+  neueWartung(WV_LAUF.liste[WV_LAUF.i]);
+}
+// Gezählt wird, was WIRKLICH noch aussteht: Geräte, die heute schon in einem
+// gemeinsamen Protokoll miterledigt wurden, sind erledigt. Ein reiner
+// Index-Zähler behauptete sonst „Gerät 5 von 5 · noch 1 offen".
+function wlFortschritt(){
+  if(!WV_LAUF) return '';
+  const heute=kdHeute();
+  const erledigt=WV_LAUF.liste.filter(gid=>
+    KDW.some(w=>w&&!w.geloescht&&w.datum===heute&&wGids(w).some(x=>String(x)===String(gid)))).length;
+  const offen=Math.max(0, WV_LAUF.liste.length-erledigt);
+  return '<div class="hint" style="margin:0 0 10px;color:var(--braun)">Einsatz · '+erledigt+' von '+
+    WV_LAUF.liste.length+' Geräten erledigt, noch '+offen+' offen</div>';
 }
 
 // ══════════════════ PDF im kpc-Corporate-Design ══════════════════
@@ -1156,7 +1258,8 @@ async function wvPdf(w, nurBlob){
   // ── Kopfdaten, zwei Spalten wie auf dem Formular ──
   const links=[['Projektnummer', p.nummer||p.auftragsnr||''],['Kunde', p.auftraggeber||''],
     ['Objekt', p.name||''],['Anschrift', [p.strasse||'', [p.plz||'',p.ort||''].filter(Boolean).join(' ')].filter(Boolean).join(', ')]];
-  const rechts=[['Pos. Nummer (Gerät)', w.pos||''],['Bezeichnung', w.bez||''],
+  const rechts=[['Pos. Nummer (Gerät)', wPosText(w)||w.pos||''],
+    ['Bezeichnung', ((w.bezListe||[]).filter(Boolean).join(', '))||w.bez||''],
     ['Seriennummer', w.seriennr||''],['Datum', kdDatDE(w.datum)],['Techniker', w.techniker||'']];
   // Werte dürfen umbrechen: „Landesbetrieb Bau und Immobilien Hessen" passt
   // nicht in eine Zeile, und ein abgeschnittener Kundenname ist im Protokoll
@@ -1277,7 +1380,12 @@ async function wvPdf(w, nurBlob){
 // Dateiname nach der kpc-Verfahrensanweisung (§1.18): JJMMTT_Dokumententyp_Bezeichnung
 function wvDateiname(w){
   const p=PROJECTS.find(x=>x.pid===PID)||{};
-  const name=vaName([vaDatum(w.datum), 'Wartungsprotokoll', w.vorlage||'', String(w.pos||'').replace(/\./g,'-')])+'.pdf';
+  // Bei mehreren Positionen die erste plus Anzahl – sonst wird der Name endlos.
+  const posListe=(w.posListe||[]).filter(Boolean);
+  const posTeil=(posListe.length>1)
+    ? (String(posListe[0]).replace(/\./g,'-')+'-u-'+(posListe.length-1)+'-weitere')
+    : String(w.pos||'').replace(/\./g,'-');
+  const name=vaName([vaDatum(w.datum), 'Wartungsprotokoll', w.vorlage||'', posTeil])+'.pdf';
   return safeName(p.name||PID)+'/_Wartung/'+name;
 }
 // PDF erzeugen, ablegen und am Protokoll vermerken. Offline geht es in die
