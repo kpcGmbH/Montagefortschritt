@@ -5436,6 +5436,7 @@ async function kdUebergeben(pid, datum){
   const p=PROJECTS.find(x=>x.pid===pid); if(!p) return;
   const alt={phase:p.phase, kdSeit:p.kdSeit};
   p.phase='kundendienst'; p.kdSeit=datum||p.kdSeit||kdHeute();
+  p.stammEdit=new Date().toISOString();
   try{ await saveProjects(); }
   catch(e){ Object.assign(p,alt); throw e; }
 }
@@ -9521,8 +9522,24 @@ async function saveProjects(){
     const remote=txt? (JSON.parse(txt)||[]) : [];
     const byPid={}; remote.forEach(r=>{ if(r&&r.pid) byPid[r.pid]=r; });
     PROJECTS.forEach(p=>{ const r=byPid[p.pid]; if(!r) return;
-      // lokal unbekannte Felder vom Server übernehmen ('' bleibt bewusstes Leeren)
-      for(const k in r){ if(p[k]===undefined||p[k]===null) p[k]=r[k]; }
+      // `stammEdit` ist der Zeitstempel der letzten BEWUSSTEN Feldänderung
+      // (Stammdaten, Zuständige, Umbenennen, Übergabe an den Kundendienst).
+      // Ist der Server hier neuer, hat dort jemand nach uns etwas geändert –
+      // dann gewinnt SEIN Stand, nicht unser veralteter.
+      //
+      // Ohne diese Regel schrieb ein Gerät mit altem Stand die Änderung eines
+      // anderen still zurück: „nur für mich sichtbar" ließ sich nicht dauerhaft
+      // aufheben, weil das nächste Speichern irgendeines anderen Geräts den
+      // alten Wert wieder hochlud (18.08.2026 gemeldet und nachgestellt).
+      // `lastEdit` taugt dafür NICHT – das setzt schon jeder Haken über
+      // touchProject, ohne dass ein Stammdatenfeld angefasst wurde.
+      const rNeuer = r.stammEdit && (!p.stammEdit || r.stammEdit>p.stammEdit);
+      if(rNeuer){
+        for(const k in r){ if(k!=='lastEdit') p[k]=r[k]; }
+      } else {
+        // lokal unbekannte Felder vom Server übernehmen ('' bleibt bewusstes Leeren)
+        for(const k in r){ if(p[k]===undefined||p[k]===null) p[k]=r[k]; }
+      }
       if(r.lastEdit && (!p.lastEdit || r.lastEdit>p.lastEdit)) p.lastEdit=r.lastEdit;
     });
     // nur remote vorhandene Baustellen nicht verlieren
@@ -9565,7 +9582,7 @@ async function createProject(name, lv, auftraggeber, meta){
   const _now=new Date().toISOString();
   PROJECTS.push({pid, name, nummer:(meta.nummer||'').trim(), ort:(meta.ort||'').trim(), objekt:(meta.objekt||'').trim(),
     strasse:(meta.strasse||'').trim(), plz:(meta.plz||'').trim(), auftragsnr:(meta.auftragsnr||'').trim(),
-    auftraggeber:(auftraggeber||'').trim(), created:_now, lastEdit:_now, by:USER||''});
+    auftraggeber:(auftraggeber||'').trim(), created:_now, lastEdit:_now, stammEdit:_now, by:USER||''});
   await saveProjects();
   return pid;
 }
@@ -9748,6 +9765,7 @@ async function stammSave(pid){
   p.auftraggeber=v('stAg'); p.strasse=v('stStr'); p.plz=v('stPlz'); p.ort=v('stOrt'); p.auftragsnr=v('stAuftr');
   // Das Häkchen gibt es nur für Bauleitung/Innendienst; fehlt es, bleibt der
   // bisherige Stand stehen (nicht stillschweigend freigeben).
+  p.stammEdit=new Date().toISOString();   // bewusste Änderung -> schlägt ältere Stände
   const _cbP=document.getElementById('stPriv');
   if(_cbP){
     if(_cbP.checked){
@@ -9809,6 +9827,7 @@ async function zustSave(pid){
   const altBL=p.bauleiter, altB=p.buero;
   p.bauleiter=collect('zustBL','zustBLfrei');
   p.buero=collect('zustB','zustBfrei');
+  p.stammEdit=new Date().toISOString();
   try{ await saveProjects(); }
   catch(e){ p.bauleiter=altBL; p.buero=altB; alert('Speichern fehlgeschlagen: '+(e.message||e)); return; }
   zustClose(); renderProjectPicker();
@@ -9824,12 +9843,13 @@ async function renameProject(pid, ev){
   if(eingabe==null) return;                       // abgebrochen
   const name = eingabe.trim();
   if(!name || name===p.name) return;              // leer oder unverändert
-  const alt = p.name;
+  const alt = p.name, altStamp = p.stammEdit;
   p.name = name;
+  p.stammEdit = new Date().toISOString();
   try{
     await saveProjects();
   }catch(e){
-    p.name = alt;                                 // bei Fehler zurückrollen
+    p.name = alt; p.stammEdit = altStamp;         // bei Fehler zurückrollen
     alert('Umbenennen fehlgeschlagen: '+(e.message||e));
     return;
   }
