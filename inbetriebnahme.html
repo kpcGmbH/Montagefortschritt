@@ -259,9 +259,16 @@ const mElektro=()=>sec('Elektroanschluss',[
   chk('Fehlerstrom-Schutzeinrichtung diesem und anderen Geräten vorgeschaltet?'),
 ]);
 const mKLS=()=>sec('Küchenleitsystem',[chk('Küchenleitsystem fachgerecht angeschlossen?')]);
+// „Fließdruck" statt „Anschlussdruck", und nur noch bar (24.08.2026):
+// Maßgeblich ist der Druck bei LAUFENDER Entnahme – den geben die Hersteller
+// vor, und den misst der Techniker. Die Einheit „kPa (bar)" lud zu beidem ein;
+// im einzigen bereits gemessenen Protokoll stand „4,5", also bar.
+// NUR UMBENANNT, nichts verschoben: gespeicherte Stände hängen am INDEX
+// (s2i0, s2i1 …). Wer hier eine Zeile einfügt oder entfernt, verschiebt die
+// Werte aller älteren Protokolle dieser Vorlage.
 const mWasser=(extra=[])=>sec('Wasseranschluss',[
-  chk('Anschlussdruck im angegebenen Bereich?'),
-  mea('Anschlussdruck','kPa (bar)'),
+  chk('Fließdruck im vom Hersteller angegebenen Bereich?'),
+  mea('Fließdruck','bar'),
   chk('Wasseranschluss fachgerecht angeschlossen?'),
   chk('Leitungen und Verbindungen dicht?'),
   ...extra
@@ -299,7 +306,12 @@ function genSig(f){f=f||{};var r=['Elektroinstallation'];
   if(f.abluft)r.push('Abluftanschluss');
   r.push('Funktionsprüfung','Einweisung des Betreibers');
   return {mode:'ausgefuehrt',roles:r};}
-function genChemie(){return sec('Wasseraufbereitung & Chemie',[chk('Wasseraufbereitung vorhanden?'),opt('Art der Wasseraufbereitung',['Enthärtung integriert','Enthärtung extern','Teilentsalzung','Vollentsalzung / Osmose']),txt('Reiniger (Hersteller, Typ)'),txt('Klarspüler (Hersteller, Typ)'),mea('Gesamthärte Rohwasser','°dH'),mea('Leitwert Rohwasser','µS/cm'),mea('Fließdruck','bar'),mea('Spültemperatur','°C')]);}
+function genChemie(){return sec('Wasseraufbereitung & Chemie',[chk('Wasseraufbereitung vorhanden?'),opt('Art der Wasseraufbereitung',['Enthärtung integriert','Enthärtung extern','Teilentsalzung','Vollentsalzung / Osmose']),txt('Reiniger (Hersteller, Typ)'),txt('Klarspüler (Hersteller, Typ)'),mea('Gesamthärte Rohwasser','°dH'),mea('Leitwert Rohwasser','µS/cm'),mea('Spültemperatur','°C')]);}
+// Der Fließdruck stand hier ein zweites Mal und gehört zum Wasseranschluss
+// (mWasser), nicht zur Chemie. Entfernt am 24.08.2026 – geprüft, dass die
+// beiden betroffenen Vorlagen (Spülmaschine Unterbau/Haube, Band-/Korbtransport)
+// keinen gespeicherten Wert hinter dieser Stelle haben; sonst wäre die
+// Spültemperatur auf den frei gewordenen Index gerutscht.
 function genSpuelFunc(){return sec('Funktionsprüfung & Einweisung',[chk('Funktionsprüfung durchgeführt?'),chk('Dichtheitsprüfung durchgeführt?'),chk('Wasch-/Spülarme & Drehrichtung geprüft?'),chk('Dosiergeräte (Reiniger/Klarspüler) eingestellt?'),chk('Bedienung erklärt und Personal eingewiesen?'),chk('Bedienungsanleitung übergeben?')]);}
 function genKaelteFunc(extra){return sec('Funktionsprüfung',[chk('Gerät erreicht die Soll-Temperatur?'),mea('Soll-Temperatur','°C'),mea('Ist-Temperatur','°C'),chk('Türdichtung / Selbstschließung geprüft?'),chk('Abtauung & Kondensatablauf geprüft?'),chk('Temperaturanzeige / Alarm funktioniert?')].concat(extra||[]));}
 
