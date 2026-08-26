@@ -468,7 +468,14 @@ Meiko:{label:'Meiko',desc:'Spül- & Reinigungstechnik · Übergabeprotokoll',ico
          chk('Kunde in die Funktion des Gerätes eingewiesen?'),
          chk('Kunde auf Reinigung und Pflege hingewiesen?'),
          chk('Betriebsanleitung übergeben?')]),
-       sec('Wasseraufbereitung',[chk('Wasseraufbereitung vorhanden?'),opt('Art der Wasseraufbereitung',['GiO-Modul (vorgeschaltet)','Enthärtung integriert','Enthärtung extern']),txt('Typ / Modell'),txt('Serien-Nr. Wasseraufbereitung'),mea('Gesamthärte Rohwasser','°dH'),mea('Leitwert Rohwasser','µS/cm'),mea('Leitwert nach Aufbereitung','µS/cm'),mea('Temperatur Rohwasser','°C')])
+       sec('Wasseraufbereitung',[chk('Wasseraufbereitung vorhanden?'),opt('Art der Wasseraufbereitung',['GiO-Modul (vorgeschaltet)','Enthärtung integriert','Enthärtung extern']),txt('Typ / Modell'),txt('Serien-Nr. Wasseraufbereitung'),mea('Gesamthärte Rohwasser','°dH'),mea('Leitwert Rohwasser','µS/cm'),mea('Leitwert nach Aufbereitung','µS/cm'),mea('Temperatur Rohwasser','°C'),
+       // Fließdruck ergänzt (24.08.2026): Meikos eigenes Übergabeprotokoll fragt
+       // ihn nicht ab, für die Spültechnik ist er aber der entscheidende Wert –
+       // zu wenig Druck heißt schlechtes Spülergebnis, und ohne Messung im
+       // Protokoll steht bei einer Reklamation Aussage gegen Aussage.
+       // Die übrigen Spülmaschinen-Vorlagen (Allgemein, Hobart, Winterhalter)
+       // haben ihn längst.
+       mea('Fließdruck','bar')])
      ],sign:{mode:'unterschrift',roles:['Kunde','Techniker / Servicepartner']}}
   }},
 
