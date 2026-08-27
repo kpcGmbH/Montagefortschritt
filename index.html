@@ -172,6 +172,19 @@ main{display:block;padding-bottom:80px;}
 @media (min-width:1000px){
   .bhdr{position:sticky;top:var(--hh,0px);z-index:5;}
 }
+/* AM HANDY KLEBT DIE KOPFLEISTE NICHT MEHR. Sie ist dort 223 von 812 px hoch –
+   gut ein Viertel des Bildschirms, dauerhaft belegt von Logo-Zeile, Suche,
+   Gewerk-Umschalter, Bereichsreitern und Zählerzeile. Beim Abhaken braucht man
+   nichts davon; zum Suchen oder Filtern einmal nach oben wischen.
+   NICHT VERSUCHEN, die Logo-Zeile allein klebend zu lassen: `position:sticky`
+   wirkt nur, solange das Elternelement im Bild ist – sobald <header> hinausscrollt,
+   geht .h-top mit. Dafür bräuchte es `fixed` samt Ausgleichsabstand im Layout,
+   und das ist die 55px nicht wert.
+   AM GROSSEN BILDSCHIRM unverändert: dort stört die Höhe nicht, und die
+   Bereichs-Köpfe kleben mit --hh unter der ganzen Leiste. */
+@media (max-width:999px){
+  header{position:static;}
+}
 .bhdr h3{font-size:13px;font-weight:700;color:var(--chrome-accent);flex:1;}
 .bhdr .bpos{color:var(--accent2);}
 .bhdr .bcnt{color:var(--accent2);}
@@ -1496,6 +1509,19 @@ function syncPanels(alle){
 function setHeaderHeight(){
   const h=document.querySelector('header');
   if(h) document.documentElement.style.setProperty('--hh', Math.round(h.getBoundingClientRect().height)+'px');
+}
+
+// Wie hoch ist das, was oben WIRKLICH über dem Inhalt klebt? Am großen Bildschirm
+// die ganze Kopfleiste, am Handy nichts (siehe CSS oben). Wer dort trotzdem die
+// Kopfleiste misst, scrollt um deren 223px zu weit und lässt über der gesuchten
+// Karte eine Lücke stehen. Gemessen wird am berechneten Stil, nicht an der
+// Fensterbreite: so bleibt es richtig, wenn der Umbruchpunkt im CSS einmal
+// verschoben wird.
+function klebeHoehe(){
+  const h=document.querySelector('header'); if(!h) return 0;
+  try{ if(getComputedStyle(h).position!=='sticky') return 0; }
+  catch(e){ /* im Zweifel wie bisher rechnen */ }
+  return h.getBoundingClientRect().height;
 }
 
 function swTab(p){
@@ -6533,7 +6559,7 @@ function ibnGoToPos(pos){
   // bleibt in manchen Umgebungen wirkungslos -> selbst rechnen, mit Direkt-Fallback.
   setTimeout(()=>{
     const e2=document.getElementById('C'+sp(pos)); if(!e2) return;
-    const kopf=()=>(document.querySelector('header')||{}).offsetHeight||0;
+    const kopf=()=>klebeHoehe();
     const ziel=()=>Math.max(0, e2.getBoundingClientRect().top+window.scrollY-kopf()-16);
     try{ window.scrollTo({top:ziel(),behavior:'smooth'}); }catch(e){ window.scrollTo(0,ziel()); }
     // Nachkorrektur: die Kopfleiste ist beim Scrollen unterschiedlich hoch, dadurch
