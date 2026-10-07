@@ -581,6 +581,10 @@ body.lvadm .bhdr .lvonly{display:inline-block !important;}
 .cnotes .rasec .rarow.done, #ALLGBODY .rarow.done{background:var(--done-bg);}
 .cntgl.has{color:var(--ra);border-color:var(--ra);}
 .cntgl.has .cnbadge{background:var(--ra);}
+/* Titel ist Pflicht: hat die Zeile schon Inhalt (Foto), aber keinen Titel, wird
+   das Feld rot unterstrichen – sonst sieht der Platzhalter aus wie ein Eintrag. */
+.rarow[data-leer="0"] .ratxt:placeholder-shown{box-shadow:inset 0 -2px 0 var(--mg);}
+.rarow[data-leer="0"] .ratxt:placeholder-shown::placeholder{color:var(--mg);opacity:1;}
 .rarow.mangel, .cnotes .rasec .rarow.mangel, #ALLGBODY .rarow.mangel{border-left:3px solid var(--mg);}
 .ptype-hd{padding:8px 14px;color:var(--accent);font-size:10px;font-weight:700;letter-spacing:.6px;
   text-transform:uppercase;background:rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.08);}
@@ -7347,6 +7351,36 @@ function raDefaultGw(pos){
   if(tf && g.indexOf(tf)>=0) return tf;
   return '';
 }
+// Der TITEL ist Pflicht (07.10.2026). Ohne ihn übergeht die App den Eintrag an
+// vielen Stellen – Aufgaben-Mail ans Büro, „Offene Punkte", Excel, Zähler –, und
+// genau das ist passiert: der Text stand in der Beschreibung, der Titel war leer,
+// das Büro hat nie davon erfahren. Statt jede Auswertung einzeln nachzuziehen,
+// wird der Eintrag selbst berichtigt: die erste Zeile der Beschreibung wird zum
+// Titel, der Rest bleibt Beschreibung. Liefert true, wenn etwas geändert wurde.
+function raTitelHeilen(r){
+  if(!r || (r.txt||'').trim() || !(r.desc||'').trim()) return false;
+  const zeilen=String(r.desc).split(/\r?\n/);
+  const k=zeilen.findIndex(z=>z.trim());
+  r.txt=zeilen[k].trim();
+  r.desc=zeilen.slice(k+1).join('\n').trim();
+  if(!r.erstelltAm) r.erstelltAm=new Date().toISOString();
+  return true;
+}
+// Verlässt jemand das Beschreibungsfeld und der Titel ist leer, sofort berichtigen –
+// aber nicht, wenn er gerade in den Titel DERSELBEN Zeile wechselt (der Neuaufbau
+// nähme ihm den Cursor weg).
+document.addEventListener('focusout', function(e){
+  const t=e.target; if(!t || !t.classList || !t.classList.contains('radesc')) return;
+  const row=t.closest('.rarow'); if(!row) return;
+  const pos=row.getAttribute('data-pos'), i=row.getAttribute('data-i');
+  setTimeout(function(){
+    const r=(ST[pos]&&ST[pos].restarbeiten||[])[i];
+    if(!r || (r.txt||'').trim() || !(r.desc||'').trim()) return;
+    const a=document.activeElement, ar=a&&a.closest?a.closest('.rarow'):null;
+    if(ar && ar.getAttribute('data-pos')===pos && ar.getAttribute('data-i')===i) return;
+    updRA(pos);    // heilt und speichert (siehe dort)
+  },200);
+});
 function raEnsure(r){
   // txt = Titel (Feldname bleibt, damit Altbestand + alle Auswertungen unberührt sind),
   // desc = optionale mehrzeilige Beschreibung (ab v79).
@@ -7411,6 +7445,15 @@ function updRA(pos){
   // automatisch eine leere Eingabezeile; seit die Sektion an ALLEN Positionen
   // sichtbar ist (auch an unberührten), würde das die Liste massiv aufblähen.
   s.restarbeiten.forEach(raEnsure);
+  // Einträge ohne Titel, aber mit Beschreibung berichtigen (raTitelHeilen) – außer
+  // es wird gerade in einer Beschreibung dieser Liste getippt. Gespeichert wird über
+  // den normalen Weg; dabei geht auch eine bisher ausgebliebene Aufgabe ans Büro.
+  const tipptDesc = document.activeElement && g.contains(document.activeElement) && document.activeElement.classList.contains('radesc');
+  if(!tipptDesc){
+    let geheilt=false;
+    s.restarbeiten.forEach(r=>{ if(raTitelHeilen(r)){ geheilt=true; histAdd(pos,'ra-neu',r.txt); } });
+    if(geheilt) raDebouncedSave(pos);
+  }
   g.innerHTML=s.restarbeiten.map((r,i)=>{
     const tsErst=r.erstelltAm?raFmtTs(r.erstelltAm):'';
     const tsErl=r.done&&r.erledigtAm?raFmtTs(r.erledigtAm):'';
@@ -7435,7 +7478,7 @@ function updRA(pos){
     return `<div class="rarow${r.done?' done':''}${r.mangel?' mangel':''}" data-i="${i}" data-pos="${escapeHtml(pos)}" data-gw="${r.gw||'-'}" data-leer="${(r.txt||'').trim()||(r.fotos&&r.fotos.length)?'0':'1'}">
       <div class="ramain">
         <input type="checkbox" class="rachk" ${r.done?'checked':''} onchange="raToggle('${pos}',${i},this.checked)">
-        <textarea class="ratxt" rows="1" placeholder="Restarbeit ${i+1}…"
+        <textarea class="ratxt" rows="1" placeholder="${r.mangel?'Titel des Mangels':'Titel der Restarbeit'} (Pflicht) …"
           oninput="raSetTxt('${pos}',${i},this.value);raTxtFit(this)" onkeydown="raKey(event,'${pos}',${i})">${escapeHtml(r.txt||'')}</textarea>
         <span class="radonesum" onclick="raToggleExp(this)" title="Details ein-/ausblenden">${r.done?('&#10003; erledigt'+(tsErl?' '+tsErl:'')+(r.erledigtVon?' · '+escapeHtml(r.erledigtVon):'')):''}</span>
         <button type="button" class="raexp" onclick="raToggleExp(this)" title="Details ein-/ausblenden">&#9656;</button>
@@ -7790,9 +7833,15 @@ function raSetDesc(pos,i,val){
 function raDescOpen(pos,i){
   const row=document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+i+'"]'); if(!row) return;
   const btn=row.querySelector('.radescbtn'); if(!btn) return;
+  // Erst der Titel: die Beschreibung ist nur für das, was darüber hinausgeht.
+  const tit=row.querySelector('.ratxt');
+  if(tit && !tit.value.trim()){
+    showToast('Bitte zuerst den Titel eintragen – die Beschreibung ist nur für Zusätzliches');
+    tit.focus(); return;
+  }
   const ta=document.createElement('textarea');
   ta.className='radesc'; ta.rows=2;
-  ta.placeholder='Beschreibung (optional) – z. B. diktieren';
+  ta.placeholder='Weitere Beschreibung (optional) – z. B. diktieren';
   ta.addEventListener('input',function(){ raSetDesc(pos,i,this.value); raDescFit(this); });
   btn.replaceWith(ta);
   raDescFit(ta); ta.focus();
