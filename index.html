@@ -34,6 +34,8 @@
   --chrome-bg:#efeae3; --chrome-bg2:#e6dfd5; --chrome-accent:#895500;
   --bar-bg:#e9dfce; --bar-text:#6a5836; --bhdr-bg:#ebe4db;
   --bar-hover:rgba(0,0,0,.07); --bar-on:rgba(0,0,0,.13);
+  /* Restarbeiten-Bereich (eigener Ton, hebt sich von Kupfer/Gelb/Grün ab) */
+  --ra:#2f6f8f; --ra-bg:#e9f1f5; --ra-line:#bcd3df; --mg:#b3402e;
 }
 /* DUNKEL – folgt automatisch dem Geräte-Modus (Helligkeit), oder per data-theme erzwingbar */
 @media (prefers-color-scheme: dark){
@@ -45,6 +47,7 @@
     --chrome-bg:#2b2b2b; --chrome-bg2:#1e1b18; --chrome-accent:#d7c1ae;
     --bar-bg:#895500; --bar-text:rgba(255,255,255,.85); --bhdr-bg:#2b2b2b;
     --bar-hover:rgba(255,255,255,.10); --bar-on:rgba(255,255,255,.22);
+    --ra:#7fb6d1; --ra-bg:#1c2a31; --ra-line:#34505e; --mg:#e07a66;
   }
 }
 :root[data-theme="dark"]{
@@ -55,6 +58,7 @@
   --chrome-bg:#2b2b2b; --chrome-bg2:#1e1b18; --chrome-accent:#d7c1ae;
   --bar-bg:#895500; --bar-text:rgba(255,255,255,.85); --bhdr-bg:#2b2b2b;
   --bar-hover:rgba(255,255,255,.10); --bar-on:rgba(255,255,255,.22);
+  --ra:#7fb6d1; --ra-bg:#1c2a31; --ra-line:#34505e; --mg:#e07a66;
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:var(--font);background:var(--page);color:var(--text);font-size:14px;font-weight:300;}
@@ -551,7 +555,33 @@ body.lvadm .bhdr .lvonly{display:inline-block !important;}
 .rafum:active{background:var(--braun);}
 .rarow.done:not(.expanded) .rafgrp{display:none;}
 /* Vom Auftraggeber gemeldeter Mangel – ohne Aufklappen erkennbar */
-.rarow.mangel{border-left:3px solid var(--braun);}
+/* Restarbeiten heben sich farblich ab (07.10.2026). Vorher lag der Bereich in
+   Kupfer/Braun auf einer gelben („teilweise") Karte – Schritte, Knöpfe und
+   Restarbeiten liefen ineinander. Eigener Blauton --ra, in BEIDEN Dunkel-Blöcken
+   gepflegt. Ein Mangel des Auftraggebers trägt zusätzlich die rote Kante --mg. */
+.cnotes .rasec, #ALLGBODY .allg-grp{background:var(--ra-bg);border:1px solid var(--ra-line);
+  border-left:3px solid var(--ra);border-radius:var(--r);padding:8px 8px 6px;}
+.cnotes .rasec{margin-top:6px;border-top-style:solid;}
+/* Die Notiz hat einen EIGENEN Knopf neben Foto und Protokoll (.notebtn) und liegt
+   nicht mehr im Balken – vorher saß sie zwischen dem Balken und der Überschrift
+   „Restarbeiten" und trennte, was zusammengehört. Der Balken heißt jetzt
+   „Restarbeiten und Mängel" und ist selbst die Überschrift. Das Feld erscheint
+   beim Antippen oder sobald eine Notiz vorhanden ist (cnUpdate). */
+.rafoot{display:flex;align-items:center;gap:8px;}
+.rafoot .rai{margin-left:auto;font-size:10px;color:var(--accent2);}
+.notebtn{background:transparent;border:1px solid var(--line);color:var(--accent2);margin-left:6px;}
+.notebtn.has{border-color:var(--braun);color:var(--braun);}
+.anmwrap{display:none;margin-top:8px;}
+.anmwrap.open{display:block;}
+.anmlbl{font-size:11px;color:var(--accent2);letter-spacing:.5px;text-transform:uppercase;}
+.anmwrap .anm{margin-top:4px;}
+#ALLGBODY .allg-grp{margin:4px 0 10px;}
+.cnotes .rasec .rahd, #ALLGBODY .allg-gh, .cnotes .rasec .raadd, #ALLGBODY .raadd{color:var(--ra);}
+.cnotes .rasec .rarow, #ALLGBODY .rarow{background:var(--surface);border-color:var(--ra-line);}
+.cnotes .rasec .rarow.done, #ALLGBODY .rarow.done{background:var(--done-bg);}
+.cntgl.has{color:var(--ra);border-color:var(--ra);}
+.cntgl.has .cnbadge{background:var(--ra);}
+.rarow.mangel, .cnotes .rasec .rarow.mangel, #ALLGBODY .rarow.mangel{border-left:3px solid var(--mg);}
 .ptype-hd{padding:8px 14px;color:var(--accent);font-size:10px;font-weight:700;letter-spacing:.6px;
   text-transform:uppercase;background:rgba(255,255,255,.06);border-bottom:1px solid rgba(255,255,255,.08);}
 .rafth{position:relative;width:54px;height:54px;border-radius:4px;overflow:hidden;
@@ -1619,16 +1649,22 @@ function buildPanels(){
     <button class="fbtn" style="background:#4a3a28;margin-left:6px" onclick="trpdf('${item.pos}',this)">&#128196; Protokoll</button>
     <button class="fbtn histbtn" style="background:transparent;border:1px solid var(--line);color:var(--accent2);margin-left:6px" onclick="openHist('${item.pos}')" title="Änderungsverlauf dieser Position">&#128338; Verlauf</button>
     <button class="fbtn lvonly" style="background:transparent;border:1px solid var(--line);color:var(--accent2);margin-left:6px" onclick="openPosEdit('${item.pos}')" title="Position bearbeiten oder aus der Stückliste löschen">&#9998; Position</button>
+    <button class="fbtn notebtn" id="NB${id}" onclick="tgNote('${item.pos}')" title="Notiz zu dieser Position">&#9998; Notiz</button>
     <div class="fgrid" id="FG${id}"></div>
     <div class="pgrid" id="PG${id}"></div>
   </div>
-  <button class="cntgl" id="CNT${id}" onclick="tgNotes('${item.pos}')" title="Anmerkung und Restarbeiten dieser Position">&#128203; Restarbeit / Notiz <span class="cnbadge" id="CNB${id}"></span><span class="cnchev">&#9662;</span></button>
+  <div class="anmwrap" id="AW${id}">
+    <div class="anmlbl">&#9998; Notiz zur Position</div>
+    <textarea class="anm" rows="1" placeholder="Notiz &#8230;" oninput="noteEdit('${item.pos}',this)"></textarea>
+  </div>
+  <button class="cntgl" id="CNT${id}" onclick="tgNotes('${item.pos}')" title="Restarbeiten und M&#228;ngel dieser Position">&#128203; Restarbeiten und M&#228;ngel <span class="cnbadge" id="CNB${id}"></span><span class="cnchev">&#9662;</span></button>
   <div class="cnotes" id="CN${id}">
-    <textarea class="anm" rows="1" placeholder="Anmerkung &#8230;" oninput="noteEdit('${item.pos}',this)"></textarea>
     <div class="rasec">
-      <div class="rahd">&#128203; Restarbeiten <span class="rai" id="RAI${id}"></span></div>
       <div class="ragrp" id="RA${id}"></div>
-      <button class="raadd" onclick="raNeuMitArt('${item.pos}',this)">&#65291; Restarbeit / Mangel</button>
+      <div class="rafoot">
+        <button class="raadd" onclick="raNeuMitArt('${item.pos}',this)">&#65291; Restarbeit / Mangel</button>
+        <span class="rai" id="RAI${id}"></span>
+      </div>
     </div>
   </div>
 </div>`;
@@ -3596,7 +3632,7 @@ function restoreUI() {
     if(card && st !== 'open') card.className = 'card ' + st;
     // Restore note
     const anm = card ? card.querySelector('.anm') : null;
-    if(anm && s.note) { anm.value = s.note; autoR(anm); }
+    if(anm && s.note) { anm.value = s.note; cnUpdate(pos); autoR(anm); }
     // Restore fotos
     if(s.fotos && s.fotos.length) updFG(pos);
     // Restore restarbeiten
@@ -6163,7 +6199,7 @@ function raFlushPending(){
     RA_PENDING.delete(pos);
     if(document.getElementById('RA'+sp(pos))) updRA(pos);
     const anm=card?card.querySelector('.anm'):null;
-    if(anm && anm!==document.activeElement) anm.value=(ST[pos]&&ST[pos].note)||'';
+    if(anm && anm!==document.activeElement){ anm.value=(ST[pos]&&ST[pos].note)||''; cnUpdate(pos); autoR(anm); }
   });
 }
 // Sobald die Eingabe verlassen wird, sofort nachziehen – nicht erst beim nächsten
@@ -6217,7 +6253,7 @@ setInterval(async () => {
         const st = ist(row.pos, TF);
         if(card) card.className = 'card'+(st!=='open'?' '+st:'');
         const anm = card ? card.querySelector('.anm') : null;
-        if(anm && anm !== document.activeElement) anm.value = ST[row.pos].note;
+        if(anm && anm !== document.activeElement){ anm.value = ST[row.pos].note||''; cnUpdate(row.pos); autoR(anm); }   // Notiz von einem anderen Gerät: Feld zeigen
         else if(anm) RA_PENDING.add(row.pos);          // Anmerkung später nachziehen
         updProg(row.pos);
         // Restarbeiten nur rendern wenn diese Karte nicht gerade fokussiert ist –
@@ -7463,14 +7499,32 @@ function cnUpdate(pos){
   const btn=document.getElementById('CNT'+id), bd=document.getElementById('CNB'+id);
   const nRA=(s.restarbeiten||[]).filter(r=>(r.txt||'').trim()||(r.fotos&&r.fotos.length)).length;
   const hasNote=!!(s.note||'').trim();
-  const hasContent=nRA>0||hasNote;
+  const hasContent=nRA>0;      // der Balken trägt nur noch Restarbeiten und Mängel
   if(bd){
     if(nRA){ bd.textContent=nRA; bd.style.display='inline-block'; }
-    else if(hasNote){ bd.textContent='✎'; bd.style.display='inline-block'; }
     else { bd.textContent=''; bd.style.display='none'; }
+  }
+  // Notiz: eigener Knopf + eigenes Feld. Vorhandene Notiz -> Feld sichtbar und Knopf
+  // markiert; zugeklappt wird nie automatisch (dieselbe Regel wie beim Balken).
+  const nb=document.getElementById('NB'+id), aw=document.getElementById('AW'+id);
+  if(nb) nb.classList.toggle('has', hasNote);
+  if(aw && hasNote && !aw.classList.contains('open')){
+    aw.classList.add('open');
+    const anm=aw.querySelector('.anm');
+    if(anm){ if(anm!==document.activeElement && !anm.value) anm.value=s.note; autoR(anm); }
   }
   if(btn) btn.classList.toggle('has', hasContent);
   if(hasContent && !box.classList.contains('open')){ box.classList.add('open'); if(btn) btn.classList.add('act'); }
+}
+// Knopf „✎ Notiz": Feld zeigen und hineinspringen. Ein Feld MIT Inhalt bleibt
+// stehen – sonst wäre eine vorhandene Notiz mit einem Tipp unsichtbar.
+function tgNote(pos){
+  const id=sp(pos), aw=document.getElementById('AW'+id); if(!aw) return;
+  const anm=aw.querySelector('.anm');
+  const leer=!(anm&&anm.value.trim());
+  if(aw.classList.contains('open') && leer && document.activeElement!==anm){ aw.classList.remove('open'); return; }
+  aw.classList.add('open');
+  if(anm){ autoR(anm); anm.focus(); }
 }
 function tgNotes(pos){
   const id=sp(pos);
