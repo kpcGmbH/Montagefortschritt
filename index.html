@@ -1529,6 +1529,7 @@ function swTab(p){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
   syncPanels();
   upStats();   // Status-Zeile zählt im Kontext der gewählten Etage
+  updAllgRafVis();   // Sammel-Balken folgt bei aktivem Restarbeiten-Filter der Etage
   // Kein restoreUI - UI ist beim Initial-Load schon gesetzt, Lazy Observer kümmert sich um neue Bilder
   const at=document.querySelector('.tab.on');
   if(at)at.scrollIntoView({behavior:'smooth',block:'nearest',inline:'center'});
@@ -3334,8 +3335,11 @@ let RAF='all';
 // hängen, und genau den will man bei „Elektro + Mängel" sehen.
 function raOffen(key, nurMangel){
   const s=ST[key]; if(!s||!Array.isArray(s.restarbeiten)) return 0;
+  // Ein Eintrag nur mit Foto, ohne Text, ist auch einer – dieselbe Regel wie
+  // data-leer an der Zeile. Sonst blendet der Filter eine Karte aus, an der ein
+  // offener Mangel hängt.
   return s.restarbeiten.filter(r=>
-    (r.txt||'').trim() && !r.done &&
+    ((r.txt||'').trim() || (r.fotos&&r.fotos.length)) && !r.done &&
     (!nurMangel || r.mangel) &&
     (TF==='all' || (r.gw||'-')===TF)
   ).length;
@@ -3356,8 +3360,22 @@ function rafCount(modus){
   let sum=0; rafKeys().forEach(k=>{ sum+=raOffen(k, modus==='mangel'); });
   return sum;
 }
+// Zeilen, die der Filter eigentlich verbergen würde, die aber stehen bleiben, weil
+// gerade an ihnen gearbeitet wurde (abgehakt, Art oder Zuständigkeit geändert).
+// Ohne das verschwindet die Zeile unter dem Finger und die Karte steht leer da.
+// Schlüssel pos|Index; geleert, sobald ein Filter neu gewählt wird – und beim
+// Löschen einer Zeile, weil sich dort die Indizes verschieben.
+const RAF_HALTEN=new Set();
+function rafHalten(pos,i){ if(RAF!=='all' || TF!=='all') RAF_HALTEN.add(pos+'|'+i); }
+function rafGehalten(row){ return RAF_HALTEN.has(row.getAttribute('data-pos')+'|'+row.getAttribute('data-i')); }
+function rafHaeltPos(pos){ for(const k of RAF_HALTEN){ if(k.slice(0,k.lastIndexOf('|'))===pos) return true; } return false; }
+// Nach einer Änderung an einer Restarbeit: Zahl am Filterknopf nachziehen. Die
+// Karten bleiben bewusst stehen (kein applyF) – neu sortiert wird erst, wenn der
+// Filter neu gewählt wird.
+function rafNachAenderung(){ updRafBtn(); }
 function setRAF(modus){
   RAF = modus || 'all';
+  RAF_HALTEN.clear();
   updRafBtn();
   updRaGwVis();          // Zeilen in den Listen mitfiltern
   applyF();              // Karten der Positionen
@@ -3408,7 +3426,11 @@ function updAllgRafVis(){
   let sichtbar=0;
   body.querySelectorAll('.allg-grp').forEach(g=>{
     const n=[...g.querySelectorAll('.rarow')].filter(r=>r.style.display!=='none' && r.getAttribute('data-leer')!=='1').length;
-    const aus = RAF!=='all' && !n;
+    // Bei gewählter Etage nur diese Etage und das Projekt – so zählt auch der
+    // Filterknopf (rafKeys). Sonst stehen hier mehr Einträge, als er nennt.
+    const k=g.getAttribute('data-key');
+    const imKontext = ACT==='__all' || k===PRAKEY || k===EKEY(ACT);
+    const aus = RAF!=='all' && (!n || !imKontext);
     g.style.display = aus?'none':'';
     if(!aus) sichtbar++;
   });
@@ -3457,6 +3479,7 @@ function hatRA(pos,gw){ const s=ST[pos]; return !!(s&&(s.restarbeiten||[]).some(
 
 function setTF(t){
   TF=t;
+  RAF_HALTEN.clear();
   document.querySelectorAll('#gwbar .gw').forEach(b=>b.classList.toggle('on', b.dataset.t===TF));
   // Die Leiste scrollt horizontal – den gewählten Knopf sichtbar machen, sonst
   // sieht man am Handy nicht, welcher Filter aktiv ist.
@@ -3501,8 +3524,12 @@ function applyF(){
     const txtOk=!q||bez.includes(q)||met.includes(q)||pos.toLowerCase().includes(q);
     const done=c.classList.contains('done');
     const part=c.classList.contains('part');
+    // Der Restarbeiten-Filter übergeht auch den Statusfilter – wie Gewerk und
+    // „Fertige ausblenden" weiter unten: eine fertig montierte Position mit
+    // offener Restarbeit soll auftauchen, und der Zähler zählt sie ohnehin mit.
     let stOk=true;
-    if(SF==='done') stOk=done;
+    if(RAF!=='all') stOk=true;
+    else if(SF==='done') stOk=done;
     else if(SF==='part') stOk=part;
     else if(SF==='angeschl') stOk=angeschl(pos);
     // „Offen" = an dieser Position ist im gewählten Gewerk noch NICHTS erledigt.
@@ -3510,7 +3537,7 @@ function applyF(){
     // prüfung fehlt noch), gehört sie unter „Teilweise" – sonst stehen in der
     // Offen-Liste auch längst angeschlossene Geräte.
     else if(SF==='open') stOk=!done && !part;
-    const raOk = RAF==='all' || raOffen(pos, RAF==='mangel')>0;
+    const raOk = RAF==='all' || raOffen(pos, RAF==='mangel')>0 || rafHaeltPos(pos);
     // Bei aktivem Restarbeiten-Filter ist der Gewerk-Filter schon in raOffen
     // berücksichtigt – auf die Zuständigkeit der Restarbeit. Zusätzlich noch nach
     // dem Gewerk der POSITION zu filtern würde einen Elektro-Mangel an einer
@@ -7233,11 +7260,12 @@ function updRaGwVis(scope){
     const leer=r.getAttribute('data-leer')==='1';
     const gwOk=(TF==='all'||g===TF||leer||RA_ALLE_ZEIGEN.has(r.closest('.ragrp')?r.closest('.ragrp').id:''));
     const rafOk=rafRowOk(r);
-    r.style.display=(gwOk&&rafOk)?'':'none';
+    const halten=rafGehalten(r);   // gerade bearbeitet -> bleibt stehen
+    r.style.display=((gwOk&&rafOk)||halten)?'':'none';
     // Warum versteckt? Der Hinweis unten spricht von „anderer Zuständigkeit" –
     // er darf nur Zeilen zählen, die der GEWERK-Filter verbirgt, nicht die des
     // Restarbeiten-Filters. Sonst verspricht ein Klick etwas, das er nicht hält.
-    r.dataset.hidBy = (gwOk&&rafOk) ? '' : (gwOk ? 'raf' : 'gw');
+    r.dataset.hidBy = ((gwOk&&rafOk)||halten) ? '' : (gwOk ? 'raf' : 'gw');
   });
   updRaVersteckt(scope);
 }
@@ -7472,7 +7500,7 @@ function updAllgSection(){
   scopes.forEach(sc=>{
     const st=ST[sc.key]; const list=(st&&st.restarbeiten)||[];
     if(!list.length) return;
-    html+='<div class="allg-grp"><div class="allg-gh">'+escapeHtml(sc.label)+
+    html+='<div class="allg-grp" data-key="'+escapeHtml(sc.key)+'"><div class="allg-gh">'+escapeHtml(sc.label)+
           ' <span class="rai" id="RAI'+sp(sc.key)+'"></span></div>'+
           '<div class="ragrp" id="RA'+sp(sc.key)+'"></div></div>';
   });
@@ -7766,7 +7794,9 @@ function raSetMangel(pos,i,val){
   if(!s.restarbeiten[i])return;
   raEnsure(s.restarbeiten[i]);
   s.restarbeiten[i].mangel=!!val;
+  rafHalten(pos,i);
   updRA(pos);
+  rafNachAenderung();
   raDebouncedSave(pos);
 }
 function raSetGw(pos,i,val){
@@ -7784,8 +7814,15 @@ function raSetGw(pos,i,val){
     }
     else aufgEnqueue({op:'status', key:r.aufg, status:'zurückgezogen'});
   }
-  const sel=document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+i+'"] .ragw');
+  // Die Auswahl „Zust." ist das ZWEITE .ragw der Zeile (das erste ist „Art").
+  const row=document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+i+'"]');
+  const sel=row?row.querySelector('.ragw:not(.raart)'):null;
   if(sel) sel.classList.toggle('set',!!val);
+  // data-gw nachziehen: daran filtert updRaGwVis. Blieb es stehen, zeigte der
+  // Gewerk-Filter die Zeile weiter unter der alten Zuständigkeit.
+  if(row){ row.setAttribute('data-gw', val||'-'); rafHalten(pos,i); updRaGwVis(row.closest('.ragrp')); }
+  updRaCounts();
+  rafNachAenderung();
   raDebouncedSave(pos);
 }
 function raSetErledigtVon(pos,i,val){
@@ -8009,6 +8046,7 @@ function raToggle(pos,i,done){
   s.restarbeiten[i].erledigtAm=done?new Date().toISOString():null;
   if(done && !s.restarbeiten[i].erledigtVon) s.restarbeiten[i].erledigtVon=USER||'';   // wer abhakt, hat's erledigt
   if(!done) s.restarbeiten[i].erledigtVon='';
+  rafHalten(pos,i);
   histAdd(pos, done?'ra-erledigt':'ra-offen', (s.restarbeiten[i].txt||'').trim());
   if(s.restarbeiten[i].aufg) aufgEnqueue({op:'status', key:s.restarbeiten[i].aufg,
     status:done?'erledigt':'offen', von:done?(s.restarbeiten[i].erledigtVon||''):''});
@@ -8023,6 +8061,7 @@ function raToggle(pos,i,done){
     const el=raRowEl(pos,i);
     if(el){ el.classList.add('expanded'); const t=el.querySelector('textarea.ratxt'); if(t) raTxtFit(t); }
   });
+  rafNachAenderung();
   saveFotos(pos);
 }
 // Gelöschte Restarbeit für „Rückgängig" vorhalten. Ohne das ist ein Fehlgriff neben
@@ -8044,8 +8083,10 @@ function raDel(pos,i){
   if(r.aufg){ try{ aufgEnqueue({op:'status', key:r.aufg, status:'zurückgezogen'}); }catch(e){} }
   RA_UNDO={pos:pos, idx:i, eintrag:JSON.parse(JSON.stringify(r))};
   s.restarbeiten.splice(i,1);
+  RAF_HALTEN.clear();                 // Indizes verschieben sich
   updRA(pos);
   if(isEKey(pos)) updAllgSection();   // ggf. leer gewordene Bereichsgruppe entfernen
+  rafNachAenderung();
   saveFotos(pos);
   if(befuellt) raUndoToast();
 }
