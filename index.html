@@ -7386,10 +7386,10 @@ function updRA(pos){
       return `<div class="rafgrp"><span class="rafglbl" style="color:${farbe}">${lbl}</span>`+
         `<div class="rafg">${arr.map((src,fi)=>`<div class="rafth" onclick="raOlb('${pos}',${i},${fi},'${art}')"><img class="raimg" data-fref="${src}">`+
           `<button class="rafdel" onclick="event.stopPropagation();raFotoDel('${pos}',${i},${fi},'${art}')">&#10005;</button>`+
-          `<button class="rafum" title="Foto einordnen: Mangel oder Nachweis" onclick="event.stopPropagation();raFotoZuordnen('${pos}',${i},${fi},'${art}',this)">einordnen</button>`+
+          `<button class="rafum" title="Foto einordnen: ${raFotoLbl(r,'mangel')} oder ${raFotoLbl(r,'ok')}" onclick="event.stopPropagation();raFotoZuordnen('${pos}',${i},${fi},'${art}',this)">einordnen</button>`+
           `</div>`).join('')}</div></div>`;
     };
-    const fotosHtml=grp('mangel','Mangel / Erfassung','var(--accent2)')+grp('ok','Nachweis Erledigung','#3a7a3a');
+    const fotosHtml=grp('mangel',raFotoLbl(r,'mangel'),'var(--accent2)')+grp('ok',raFotoLbl(r,'ok'),'#3a7a3a');
     // Beschreibung nur anzeigen, wenn befüllt – sonst bleibt die Liste kompakt
     // und man klappt sie über „＋ Beschreibung" auf.
     const descHtml=(r.desc||'').trim()
@@ -7403,8 +7403,8 @@ function updRA(pos){
           oninput="raSetTxt('${pos}',${i},this.value);raTxtFit(this)" onkeydown="raKey(event,'${pos}',${i})">${escapeHtml(r.txt||'')}</textarea>
         <span class="radonesum" onclick="raToggleExp(this)" title="Details ein-/ausblenden">${r.done?('&#10003; erledigt'+(tsErl?' '+tsErl:'')+(r.erledigtVon?' · '+escapeHtml(r.erledigtVon):'')):''}</span>
         <button type="button" class="raexp" onclick="raToggleExp(this)" title="Details ein-/ausblenden">&#9656;</button>
-        <button class="rafbtn" onclick="raFoto('${pos}',${i},'mangel')" title="Foto vom Mangel / bei der Erfassung">&#128247;</button>
-        <button class="rafbtn rafok" onclick="raFoto('${pos}',${i},'ok')" title="Nachweisfoto nach der Erledigung – geht in die Freimeldung">&#10003;&#128247;</button>
+        <button class="rafbtn" onclick="raFoto('${pos}',${i},'mangel')" title="${r.mangel?'Foto vom Mangel':'Foto vorher – Zustand bei der Erfassung'}">&#128247;</button>
+        <button class="rafbtn rafok" onclick="raFoto('${pos}',${i},'ok')" title="${r.mangel?'Nachweisfoto nach der Erledigung – geht in die Freimeldung':'Foto nachher – nach der Erledigung'}">&#10003;&#128247;</button>
         <button class="radel" onclick="raDel('${pos}',${i})" title="Zeile löschen">&#10005;</button>
       </div>
       ${descHtml}
@@ -8200,6 +8200,15 @@ function raDebouncedSave(pos){
   },1000);
 }
 // art: 'mangel' (Zustand bei der Erfassung) oder 'ok' (Nachweis der Erledigung)
+// Beschriftung der beiden Fotogruppen – EINE Stelle für Liste, Menüs, Meldung und
+// Bericht. Sie hängt an der ART der Zeile: an einer Restarbeit von „Mangel" zu
+// sprechen ist falsch, dort heißt es vorher / nachher. Nur ein Mangel des
+// Auftraggebers hat ein Mangelfoto und einen Nachweis.
+function raFotoLbl(r, art){
+  const m=!!(r&&r.mangel);
+  return art==='ok' ? (m ? 'Nachweis der Erledigung' : 'Foto nachher')
+                    : (m ? 'Mangelfoto'              : 'Foto vorher');
+}
 function raFoto(pos,idx,art){
   RA_FOTO_TARGET={pos,idx,art:(art==='ok'?'ok':'mangel')};
   let menu=document.getElementById('raFsrcMenu');
@@ -8212,7 +8221,7 @@ function raFoto(pos,idx,art){
     document.addEventListener('click',e=>{if(!e.target.closest('#raFsrcMenu')&&!e.target.closest('.rafbtn'))menu.classList.remove('open');});
   }
   const hd=document.getElementById('raFsrcHd');
-  if(hd) hd.textContent = RA_FOTO_TARGET.art==='ok' ? 'Nachweis der Erledigung' : 'Mangel / Zustand bei Erfassung';
+  if(hd) hd.textContent = raFotoLbl((gs(pos).restarbeiten||[])[idx], RA_FOTO_TARGET.art);
   const id=sp(pos);
   const btn=document.querySelector(`#RA${id} .rarow[data-i="${idx}"] .rafbtn`+(RA_FOTO_TARGET.art==='ok'?'.rafok':''));
   if(btn){
@@ -8309,9 +8318,13 @@ function raFotoZuordnen(pos,idx,fi,art,btn){
   }
   const zeile=(k,ic,lbl,hint)=>'<div class="ptype-item'+(art===k?' akt':'')+'" onclick="raFotoZuWahl(\''+k+'\')">'+
     ic+'&nbsp; '+lbl+(art===k?' <span class="ptype-akt">aktuell</span>':'')+'<small>'+hint+'</small></div>';
+  const istM=!!((gs(pos).restarbeiten||[])[idx]||{}).mangel;
   menu.innerHTML='<div class="ptype-h">Dieses Foto zeigt &hellip;</div>'+
-    zeile('mangel','&#128247;','den Mangel','Zustand bei der Erfassung')+
-    zeile('ok','&#10003;','die Erledigung','Nachweis – geht in die M&auml;ngelfreimeldung');
+    (istM
+      ? zeile('mangel','&#128247;','den Mangel','Zustand bei der Erfassung')+
+        zeile('ok','&#10003;','die Erledigung','Nachweis – geht in die M&auml;ngelfreimeldung')
+      : zeile('mangel','&#128247;','den Zustand vorher','Bei der Erfassung')+
+        zeile('ok','&#10003;','den Zustand nachher','Nach der Erledigung'));
   const r=btn.getBoundingClientRect();
   menu.style.top=(r.bottom+window.scrollY+4)+'px';
   menu.style.left=Math.max(8,Math.min(r.left+window.scrollX-40, window.innerWidth-244))+'px';
@@ -8334,7 +8347,7 @@ async function raFotoUm(pos,idx,fi,art){
   von.splice(fi,1);
   ziel.push(alt);
   updRA(pos); saveFotos(pos);
-  showToast(nach==='ok' ? 'Als Nachweis der Erledigung übernommen' : 'Als Mangelfoto übernommen');
+  showToast('Eingeordnet als: '+raFotoLbl(r,nach));
   // Dateinamen nachziehen (RA_ ⇄ RA_OK_), sonst behauptet der SharePoint-Ordner
   // weiter das Gegenteil. Maßgeblich ist aber die Zuordnung in der App: schlägt das
   // Umbenennen fehl (offline, keine Rechte), bleibt der alte Name einfach stehen.
@@ -8578,7 +8591,7 @@ async function expOffenePunkte(){
       (arr||[]).forEach(src=>{ const d=fotoData[src]||''; if(!d) return; im+=`<img src="${d}" style="width:110px;height:82px;object-fit:cover;border-radius:4px;border:1px solid #eee;margin:0 6px 6px 0">`; });
       return im? `<div style="margin-bottom:2px"><div style="font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:${farbe};margin-bottom:3px">${lbl}</div>${im}</div>` : '';
     };
-    const bilder=bildGrp(r.fotos,'Mangel / Erfassung','#a8a8a8')+bildGrp(r.fotosOk,'Nachweis der Erledigung','#3a7a3a');
+    const bilder=bildGrp(r.fotos,raFotoLbl(r,'mangel'),'#a8a8a8')+bildGrp(r.fotosOk,raFotoLbl(r,'ok'),'#3a7a3a');
     if(bilder) raRows+=`<tr class="rafoto" data-done="${r.done?1:0}" data-gw="${r.gw||'-'}" style="background:${i%2===0?'#fff':'#faf9f7'}"><td colspan="7" style="padding:0 8px 8px 28px">${bilder}</td></tr>`;
   });
 
