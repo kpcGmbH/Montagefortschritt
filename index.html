@@ -36,6 +36,7 @@
   --bar-hover:rgba(0,0,0,.07); --bar-on:rgba(0,0,0,.13);
   /* Restarbeiten-Bereich (eigener Ton, hebt sich von Kupfer/Gelb/Grün ab) */
   --ra:#2f6f8f; --ra-bg:#e9f1f5; --ra-line:#bcd3df; --mg:#b3402e;
+  --ih-bg:rgba(43,43,43,.075); --ih-line:rgba(43,43,43,.30);
 }
 /* DUNKEL – folgt automatisch dem Geräte-Modus (Helligkeit), oder per data-theme erzwingbar */
 @media (prefers-color-scheme: dark){
@@ -47,7 +48,7 @@
     --chrome-bg:#2b2b2b; --chrome-bg2:#1e1b18; --chrome-accent:#d7c1ae;
     --bar-bg:#895500; --bar-text:rgba(255,255,255,.85); --bhdr-bg:#2b2b2b;
     --bar-hover:rgba(255,255,255,.10); --bar-on:rgba(255,255,255,.22);
-    --ra:#7fb6d1; --ra-bg:#1c2a31; --ra-line:#34505e; --mg:#e07a66;
+    --ra:#7fb6d1; --ra-bg:#1c2a31; --ra-line:#34505e; --mg:#e07a66; --ih-bg:rgba(255,255,255,.07); --ih-line:rgba(255,255,255,.28);
   }
 }
 :root[data-theme="dark"]{
@@ -58,7 +59,7 @@
   --chrome-bg:#2b2b2b; --chrome-bg2:#1e1b18; --chrome-accent:#d7c1ae;
   --bar-bg:#895500; --bar-text:rgba(255,255,255,.85); --bhdr-bg:#2b2b2b;
   --bar-hover:rgba(255,255,255,.10); --bar-on:rgba(255,255,255,.22);
-  --ra:#7fb6d1; --ra-bg:#1c2a31; --ra-line:#34505e; --mg:#e07a66;
+  --ra:#7fb6d1; --ra-bg:#1c2a31; --ra-line:#34505e; --mg:#e07a66; --ih-bg:rgba(255,255,255,.07); --ih-line:rgba(255,255,255,.28);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:var(--font);background:var(--page);color:var(--text);font-size:14px;font-weight:300;}
@@ -280,6 +281,13 @@ main{display:block;padding-bottom:80px;}
 .card.dragover::after{content:'\1F4F7  Foto hier ablegen';position:absolute;inset:0;display:flex;
   align-items:center;justify-content:center;background:rgba(43,43,43,.62);color:#f3ece5;
   font-weight:700;font-size:16px;letter-spacing:.3px;pointer-events:none;}
+/* Kopf jeder Position (Nummer, Bezeichnung, Fabrikat/Typ/Gewerk) als abgesetztes
+   Band über die volle Kartenbreite (07.10.2026). Vorher lief eine Position ohne
+   Kante in die nächste – bei langen Karten mit Restarbeiten sah man nicht, wo die
+   neue beginnt. Das Band ist eine TÖNUNG, keine eigene Farbe: so bleibt darunter
+   sichtbar, ob die Karte offen (weiß), teilweise (gelb) oder fertig (grün) ist. */
+.card .ih{margin:-10px -14px 10px;padding:9px 14px 8px;background:var(--ih-bg);
+  border-top:2px solid var(--ih-line);border-bottom:1px solid var(--line);}
 .card.done{background:var(--done-bg);}
 .card.part{background:var(--part-bg);}
 .ih{display:flex;align-items:flex-start;gap:9px;margin-bottom:8px;}
