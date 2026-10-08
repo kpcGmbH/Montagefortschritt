@@ -1561,10 +1561,15 @@ function etAlleMenu(album, btn){
     });
   }
   const feld = album==='bfotos' ? 'bfotos' : 'efotos';
-  menu.innerHTML='<div class="ptype-h">'+(feld==='bfotos'?'Bauphase':'Anlagenfotos')+' &ndash; welcher Bereich?</div>'+
-    DATA.map((sec,i)=>{ const e=ST[EKEY(sec)]; const n=(e&&e[feld])?e[feld].length:0;
-      return '<div class="ptype-item" onclick="etAlleWahl('+i+',\''+feld+'\')">'+escapeHtml(sec.label||('Etage '+sec.pos))+
-        '<small>'+(n?(n+' Foto'+(n>1?'s':'')):'noch keine Fotos')+'</small></div>'; }).join('');
+  // Baustelle ohne Stückliste: es gibt nur das Album der ganzen Baustelle
+  if(!DATA.length){ menu.classList.remove('open'); openEtageFotos(-1, feld); return; }
+  const zeile=(sec,i,hint)=>{ const e=ST[EKEY(sec)]; const n=(e&&e[feld])?e[feld].length:0;
+    return '<div class="ptype-item" onclick="etAlleWahl('+i+',\''+feld+'\')">'+escapeHtml(sec.label||('Etage '+sec.pos))+
+      '<small>'+(hint?hint+' · ':'')+(n?(n+' Foto'+(n>1?'s':'')):'noch keine Fotos')+'</small></div>'; };
+  menu.innerHTML='<div class="ptype-h">'+(feld==='bfotos'?'Bauphase':'Anlagenfotos')+' &ndash; wof&uuml;r?</div>'+
+    zeile(ET_PROJEKT,-1,'ohne Bereich: Zufahrt, Anlieferung, Gesamtansicht')+
+    '<div class="ptype-h" style="margin-top:4px">Bereich</div>'+
+    DATA.map((sec,i)=>zeile(sec,i,'')).join('');
   const r=btn.getBoundingClientRect();
   menu.style.top=(r.bottom+window.scrollY+4)+'px';
   menu.style.left=Math.max(8, Math.min(r.left+window.scrollX, window.innerWidth-292))+'px';
@@ -1646,14 +1651,15 @@ function buildPanels(){
   }
   // EINE Fotoleiste für die Ansicht „Alle" (08.10.2026). Vorher stand die Leiste
   // über JEDEM Bereich – bei acht Bereichen achtmal dieselben zwei Knöpfe. Hier
-  // wählt man den Bereich aus einem Menü (etAlleMenu). In der Ansicht EINES
-  // Bereichs bleibt dessen eigene Leiste; wer was zeigt, entscheidet updEtbarVis.
-  if(DATA.length>1){
+  // wählt man den Bereich – oder die ganze Baustelle – aus einem Menü (etAlleMenu).
+  // In der Ansicht EINES Bereichs bleibt dessen eigene Leiste; wer was zeigt,
+  // entscheidet updEtbarVis.
+  {
     const ea=document.createElement('div');
     ea.className='etbar etall'; ea.id='ETALL';
     ea.innerHTML='<button class="etbtn" onclick="etAlleMenu(\'efotos\',this)">&#128248; Anlagenfotos <span class="etcnt" id="ETCALL"></span> &#9662;</button>'+
       '<button class="etbtn" style="background:#5b4c2a" onclick="etAlleMenu(\'bfotos\',this)">&#127959; Bauphase <span class="etcnt" id="ETCBALL"></span> &#9662;</button>'+
-      '<span class="ethint">Anlagenfotos = Montageverlauf · Bauphase = Bauleiter (Bauzustand, Installationskontrolle, Aufmaß) · je Bereich</span>';
+      '<span class="ethint">Anlagenfotos = Montageverlauf · Bauphase = Bauleiter (Bauzustand, Installationskontrolle, Aufmaß) · je Bereich oder ganze Baustelle</span>';
     main.appendChild(ea);
   }
   DATA.forEach((sec,secIdx)=>{
@@ -3096,23 +3102,32 @@ function gsE(key){ if(!ST[key]) ST[key]={__etage:true, efotos:[], bfotos:[], res
 function secByEKey(key){ return DATA.find(s=>EKEY(s)===key)||null; }
 // Projektweite (etagenübergreifende) Restarbeiten: eigene synthetische Zeile, gleiche §E§-Sync-Mechanik
 const PRAKEY=EKEY('__projekt');
-function etageFolder(sec, album){ const a=ET_ALBUMS[album||'efotos']||ET_ALBUMS.efotos; return safeName(curProjName())+'/'+safeName(sec.label||sec.pos)+'/'+a.folder; }
+// Album der GANZEN BAUSTELLE (08.10.2026): Fotos ohne Bereich – Zufahrt, Anlieferung,
+// Außenansicht, Gesamtzustand. Kein eigener Mechanismus: ein Pseudo-Bereich mit dem
+// Index -1, dessen §E§-Schlüssel PRAKEY ist. Damit laufen Ablage, Abgleich zwischen
+// den Geräten (alle isEKey-Zweige) und das Umbenennen (konsolRefs kennt PRAKEY) von
+// selbst mit. Wer im Album-Code einen Bereich braucht, nimmt etSec(idx), nie DATA[idx].
+const ET_PROJEKT={pos:'__projekt', label:'Ganze Baustelle', __projekt:true};
+function etSec(idx){ return idx===-1 ? ET_PROJEKT : DATA[idx]; }
+function etageFolder(sec, album){ const a=ET_ALBUMS[album||'efotos']||ET_ALBUMS.efotos;
+  if(sec&&sec.__projekt) return safeName(curProjName())+'/'+a.folder;     // <Baustelle>/_Anlagenfotos
+  return safeName(curProjName())+'/'+safeName(sec.label||sec.pos)+'/'+a.folder; }
 function saveEtage(key){ persistCurrentState(); touchProject(PID); enqueuePos(key).then(()=>flushOutbox()); }
 
 function updEtageBar(idx){
-  const sec=DATA[idx]; if(!sec) return;
+  const sec=etSec(idx); if(!sec) return;
   const e=ST[EKEY(sec)];
   const ne=(e&&e.efotos)?e.efotos.length:0, nb=(e&&e.bfotos)?e.bfotos.length:0;
   const c=document.getElementById('ETC'+idx);  if(c)  c.textContent=ne?ne:'';
   const cb=document.getElementById('ETCB'+idx); if(cb) cb.textContent=nb?nb:'';
   // Summen an der Sammel-Leiste (Ansicht „Alle")
-  let se=0, sb=0; DATA.forEach(x=>{ const y=ST[EKEY(x)]; if(y){ se+=(y.efotos||[]).length; sb+=(y.bfotos||[]).length; } });
+  let se=0, sb=0; DATA.concat([ET_PROJEKT]).forEach(x=>{ const y=ST[EKEY(x)]; if(y){ se+=(y.efotos||[]).length; sb+=(y.bfotos||[]).length; } });
   const ca=document.getElementById('ETCALL'); if(ca) ca.textContent=se?se:'';
   const cba=document.getElementById('ETCBALL'); if(cba) cba.textContent=sb?sb:'';
   const b=document.getElementById('ETB_addcnt'); // (Overlay-Titel, falls offen)
   if(b && EF_IDX===idx){ const n=(EF_ALBUM==='bfotos')?nb:ne; b.textContent=n?(' · '+n+' Foto'+(n>1?'s':'')):''; }
 }
-function updAllEtageBars(){ DATA.forEach((s,i)=>updEtageBar(i)); }
+function updAllEtageBars(){ DATA.forEach((s,i)=>updEtageBar(i)); updEtageBar(-1); }
 
 let EF_IDX=null, EF_KAT='', EF_ALBUM='efotos';
 function ensureEtOv(){
@@ -3127,7 +3142,7 @@ function ensureEtOv(){
 function closeEtOv(){ const ov=document.getElementById('etOv'); if(ov) ov.style.display='none'; }
 
 function openEtageFotos(idx, album){
-  const sec=DATA[idx]; if(!sec) return;
+  const sec=etSec(idx); if(!sec) return;
   EF_IDX=idx; EF_ALBUM=(album==='bfotos')?'bfotos':'efotos'; ETF_FILTER='';
   const ov=ensureEtOv();
   ov.style.display='flex';
@@ -3136,7 +3151,7 @@ function openEtageFotos(idx, album){
 
 let ETF_FILTER='', ETF_VALS=[];
 function renderEtageOverlay(idx){
-  const sec=DATA[idx]; if(!sec) return;
+  const sec=etSec(idx); if(!sec) return;
   const ov=ensureEtOv();
   const e=gsE(EKEY(sec));
   const meta=ET_ALBUMS[EF_ALBUM]||ET_ALBUMS.efotos;
@@ -3199,7 +3214,7 @@ function etAddStart(idx){
 // Kategorie gefiltert, ist sie vorausgewählt – dann genügt ein Klick.
 let ET_DROP_FILES=null;
 function etDropStart(idx, album, files){
-  const sec=DATA[idx]; if(!sec) return;
+  const sec=etSec(idx); if(!sec) return;
   const bilder=(files||[]).filter(f=>f.type.startsWith('image/'));
   if(!bilder.length){ alert('Hierher lassen sich nur Bilddateien ziehen.'); return; }
   EF_IDX=idx; EF_ALBUM=(album==='bfotos')?'bfotos':'efotos';
@@ -3229,7 +3244,7 @@ function etPickFile(src){
   inp.click();
 }
 async function etDoUpload(idx, kat, files){
-  const sec=DATA[idx];
+  const sec=etSec(idx);
   if(!sec) return;
   if(files && !Array.isArray(files)) files=[files];         // Einzeldatei -> Liste
   files=(files||[]).filter(Boolean);
@@ -3256,7 +3271,7 @@ async function etDoUpload(idx, kat, files){
   if(ok<n) alert((n-ok)+' von '+n+' Foto(s) konnten nicht gespeichert werden.');
 }
 function etDel(idx, oi){
-  const sec=DATA[idx]; if(!sec) return;
+  const sec=etSec(idx); if(!sec) return;
   const key=EKEY(sec); const e=gsE(key); const list=e[EF_ALBUM]||[];
   const rec=list[oi]; if(!rec) return;
   if(!confirm('Dieses Foto löschen?')) return;
@@ -3266,7 +3281,7 @@ function etDel(idx, oi){
   renderEtageOverlay(idx);
 }
 function olbEt(idx, oi){
-  const sec=DATA[idx]; if(!sec) return;
+  const sec=etSec(idx); if(!sec) return;
   // In der Reihenfolge/Filterung des aktuellen Albums blättern
   const e=gsE(EKEY(sec)); const list=e[EF_ALBUM]||[];
   const shown=list.map((r,i)=>({r,i})).sort((a,b)=>(a.r.ts||0)-(b.r.ts||0))
@@ -7398,8 +7413,8 @@ function updRaCounts(){
 }
 // Gewerkeübergreifende Fotoleiste bei aktivem Gewerk-Filter ausblenden
 // Zusätzlich (08.10.2026): in der Ansicht „Alle" steht nur die Sammel-Leiste #ETALL,
-// in der Ansicht eines Bereichs nur dessen eigene. Baustellen mit EINEM Bereich
-// haben kein #ETALL und behalten ihre Leiste.
+// in der Ansicht eines Bereichs nur dessen eigene. #ETALL gibt es immer – auch bei
+// EINEM Bereich und ohne Stückliste, weil nur dort das Album der ganzen Baustelle hängt.
 function updEtbarVis(){
   const sammel = ETBAR_ALLE && !!document.getElementById('ETALL');
   document.querySelectorAll('.etbar').forEach(b=>{
