@@ -336,6 +336,10 @@ main{display:block;padding-bottom:80px;}
 .lvonly{display:none !important;}
 body.lvadm .lvonly{display:inline-flex !important;}
 body.lvadm .lvonly.blk{display:block !important;}
+/* .aus: vom Aufbau gerade nicht gebraucht (z. B. die Knöpfe je Bereich in der
+   Ansicht „Alle"). Eigene Klasse, weil ein Inline-Stil gegen das !important oben
+   nichts ausrichtet. */
+body.lvadm .lvonly.blk.aus{display:none !important;}
 .lvadd{background:transparent;border:1px dashed var(--line);border-radius:8px;color:var(--braun);font-size:12px;font-weight:700;padding:7px 13px;margin:8px 14px 12px;cursor:pointer;font-family:inherit;-webkit-tap-highlight-color:transparent;}
 .lvadd:active{background:var(--chrome-bg2);}
 /* frisch ergänzte Position kurz hervorheben, damit sie in 30 Karten auffindbar ist */
@@ -1576,6 +1580,30 @@ function etAlleMenu(album, btn){
   menu.style.maxWidth='284px';
   menu.classList.add('open');
 }
+// „＋ Anlage ergänzen" in der Ansicht „Alle": erst den Bereich wählen.
+function lvAnlageMenu(btn){
+  let menu=document.getElementById('lvAnlMenu');
+  if(!menu){
+    menu=document.createElement('div'); menu.id='lvAnlMenu'; menu.className='ptype-menu';
+    document.body.appendChild(menu);
+    document.addEventListener('click',function(e){
+      if(!e.target.closest('#lvAnlMenu')&&!e.target.closest('#LVSTALL .lvadd')) menu.classList.remove('open');
+    });
+  }
+  menu.innerHTML='<div class="ptype-h">Anlage erg&auml;nzen &ndash; in welchem Bereich?</div>'+
+    DATA.map((sec,i)=>'<div class="ptype-item" onclick="lvAnlageWahl('+i+')">'+escapeHtml(sec.label||('Etage '+sec.pos))+
+      '<small>'+sec.subsections.length+' Anlage'+(sec.subsections.length===1?'':'n')+'</small></div>').join('');
+  const r=btn.getBoundingClientRect();
+  // Der Knopf sitzt am Seitenende – das Menü öffnet deshalb nach OBEN.
+  menu.style.maxWidth='284px';
+  menu.classList.add('open');
+  menu.style.left=Math.max(8, Math.min(r.left+window.scrollX, window.innerWidth-292))+'px';
+  menu.style.top=Math.max(window.scrollY+8, r.top+window.scrollY-menu.offsetHeight-4)+'px';
+}
+function lvAnlageWahl(i){
+  const m=document.getElementById('lvAnlMenu'); if(m) m.classList.remove('open');
+  const sec=DATA[i]; if(sec) openAnlageNeu(sec.pos);
+}
 function etAlleWahl(idx, album){
   const m=document.getElementById('etAlleMenu'); if(m) m.classList.remove('open');
   openEtageFotos(idx, album);
@@ -1744,12 +1772,21 @@ function buildPanels(){
     });
     // Struktur von Hand erweitern – gleiche Rechte wie „＋ Position ergänzen".
     const lvst=document.createElement('div');
-    lvst.className='lvonly blk';
+    lvst.className='lvonly blk lvst-p';   // lvst-p: je Bereich; in „Alle" gilt #LVSTALL (updEtbarVis)
     lvst.innerHTML='<button class="lvadd" onclick="openAnlageNeu(\''+escapeHtml(sec.pos)+'\')" title="Weitere Anlage in dieser Etage anlegen">&#65291; Anlage erg&auml;nzen</button>'+
       '<button class="lvadd" onclick="openEtageNeu()" title="Weitere Etage / weiteren Bereich anlegen">&#65291; Etage anlegen</button>';
     panel.appendChild(lvst);
     main.appendChild(panel);
   });
+  // Dieselben zwei Knöpfe EINMAL für die Ansicht „Alle" – dort standen sie unter
+  // jedem Bereich. „Anlage ergänzen" fragt hier nach dem Bereich (lvAnlageMenu).
+  if(DATA.length>1){
+    const la=document.createElement('div');
+    la.className='lvonly blk'; la.id='LVSTALL';
+    la.innerHTML='<button class="lvadd" onclick="lvAnlageMenu(this)" title="Weitere Anlage anlegen – Bereich wählen">&#65291; Anlage erg&auml;nzen &#9662;</button>'+
+      '<button class="lvadd" onclick="openEtageNeu()" title="Weitere Etage / weiteren Bereich anlegen">&#65291; Etage anlegen</button>';
+    main.appendChild(la);
+  }
   // Dichtigkeitsprotokoll (Sanitär) = Abschluss → EIN Einstieg ganz unten,
   // öffnet die Umfang-Auswahl (Baustelle/Etage). Gefüllt von updDichtTasks.
   const dtb=document.createElement('div');
@@ -7437,6 +7474,14 @@ function updEtbarVis(){
     const zeigen = TF==='all' && (b.id==='ETALL' ? sammel : !sammel);
     b.style.display = zeigen ? '' : 'none';
   });
+  // Gleiches Prinzip für „＋ Anlage ergänzen / ＋ Etage anlegen": in „Alle" einmal
+  // (#LVSTALL), sonst je Bereich. Über die Klasse .aus, nicht über style.display:
+  // .lvonly setzt display mit !important, und es soll weiter entscheiden, ob die
+  // Knöpfe für diesen Benutzer überhaupt sichtbar sind.
+  const la=document.getElementById('LVSTALL');
+  const einmal = ETBAR_ALLE && !!la;
+  if(la) la.classList.toggle('aus', !einmal);
+  document.querySelectorAll('.lvst-p').forEach(b=>b.classList.toggle('aus', einmal));
 }
 function raDefaultGw(pos){
   const tf=(TF==='M'||TF==='E'||TF==='S')?TF:'';
