@@ -1545,6 +1545,35 @@ function syncPanels(alle){
     if(h) h.style.display = (on && erstes) ? '' : 'none';
     if(on) erstes=false;
   });
+  ETBAR_ALLE = !!all;
+  updEtbarVis();
+}
+// Zeigt syncPanels gerade ALLE Bereiche? Dann gilt die Sammel-Fotoleiste #ETALL.
+let ETBAR_ALLE=false;
+// Bereichsauswahl für die Sammel-Fotoleiste: je Bereich eine Zeile mit Fotozahl.
+function etAlleMenu(album, btn){
+  let menu=document.getElementById('etAlleMenu');
+  if(!menu){
+    menu=document.createElement('div'); menu.id='etAlleMenu'; menu.className='ptype-menu';
+    document.body.appendChild(menu);
+    document.addEventListener('click',function(e){
+      if(!e.target.closest('#etAlleMenu')&&!e.target.closest('#ETALL .etbtn')) menu.classList.remove('open');
+    });
+  }
+  const feld = album==='bfotos' ? 'bfotos' : 'efotos';
+  menu.innerHTML='<div class="ptype-h">'+(feld==='bfotos'?'Bauphase':'Anlagenfotos')+' &ndash; welcher Bereich?</div>'+
+    DATA.map((sec,i)=>{ const e=ST[EKEY(sec)]; const n=(e&&e[feld])?e[feld].length:0;
+      return '<div class="ptype-item" onclick="etAlleWahl('+i+',\''+feld+'\')">'+escapeHtml(sec.label||('Etage '+sec.pos))+
+        '<small>'+(n?(n+' Foto'+(n>1?'s':'')):'noch keine Fotos')+'</small></div>'; }).join('');
+  const r=btn.getBoundingClientRect();
+  menu.style.top=(r.bottom+window.scrollY+4)+'px';
+  menu.style.left=Math.max(8, Math.min(r.left+window.scrollX, window.innerWidth-292))+'px';
+  menu.style.maxWidth='284px';
+  menu.classList.add('open');
+}
+function etAlleWahl(idx, album){
+  const m=document.getElementById('etAlleMenu'); if(m) m.classList.remove('open');
+  openEtageFotos(idx, album);
 }
 
 // Höhe der Kopfleiste als --hh bereitstellen. Daran hängt der Klebe-Punkt der
@@ -1614,6 +1643,18 @@ function buildPanels(){
       '<button class="lvhint-b lvonly" style="background:transparent;color:var(--braun);border:1px solid var(--line);margin-left:8px" onclick="openEtageNeu()">&#65291; Etage von Hand anlegen</button>'+
       '<div class="lvhint-m" id="lvNachStat"></div>';
     main.appendChild(hint);
+  }
+  // EINE Fotoleiste für die Ansicht „Alle" (08.10.2026). Vorher stand die Leiste
+  // über JEDEM Bereich – bei acht Bereichen achtmal dieselben zwei Knöpfe. Hier
+  // wählt man den Bereich aus einem Menü (etAlleMenu). In der Ansicht EINES
+  // Bereichs bleibt dessen eigene Leiste; wer was zeigt, entscheidet updEtbarVis.
+  if(DATA.length>1){
+    const ea=document.createElement('div');
+    ea.className='etbar etall'; ea.id='ETALL';
+    ea.innerHTML='<button class="etbtn" onclick="etAlleMenu(\'efotos\',this)">&#128248; Anlagenfotos <span class="etcnt" id="ETCALL"></span> &#9662;</button>'+
+      '<button class="etbtn" style="background:#5b4c2a" onclick="etAlleMenu(\'bfotos\',this)">&#127959; Bauphase <span class="etcnt" id="ETCBALL"></span> &#9662;</button>'+
+      '<span class="ethint">Anlagenfotos = Montageverlauf · Bauphase = Bauleiter (Bauzustand, Installationskontrolle, Aufmaß) · je Bereich</span>';
+    main.appendChild(ea);
   }
   DATA.forEach((sec,secIdx)=>{
     const panel=document.createElement('div');
@@ -3064,6 +3105,10 @@ function updEtageBar(idx){
   const ne=(e&&e.efotos)?e.efotos.length:0, nb=(e&&e.bfotos)?e.bfotos.length:0;
   const c=document.getElementById('ETC'+idx);  if(c)  c.textContent=ne?ne:'';
   const cb=document.getElementById('ETCB'+idx); if(cb) cb.textContent=nb?nb:'';
+  // Summen an der Sammel-Leiste (Ansicht „Alle")
+  let se=0, sb=0; DATA.forEach(x=>{ const y=ST[EKEY(x)]; if(y){ se+=(y.efotos||[]).length; sb+=(y.bfotos||[]).length; } });
+  const ca=document.getElementById('ETCALL'); if(ca) ca.textContent=se?se:'';
+  const cba=document.getElementById('ETCBALL'); if(cba) cba.textContent=sb?sb:'';
   const b=document.getElementById('ETB_addcnt'); // (Overlay-Titel, falls offen)
   if(b && EF_IDX===idx){ const n=(EF_ALBUM==='bfotos')?nb:ne; b.textContent=n?(' · '+n+' Foto'+(n>1?'s':'')):''; }
 }
@@ -7352,7 +7397,16 @@ function updRaCounts(){
   });
 }
 // Gewerkeübergreifende Fotoleiste bei aktivem Gewerk-Filter ausblenden
-function updEtbarVis(){ document.querySelectorAll('.etbar').forEach(b=>{ b.style.display=(TF==='all')?'':'none'; }); }
+// Zusätzlich (08.10.2026): in der Ansicht „Alle" steht nur die Sammel-Leiste #ETALL,
+// in der Ansicht eines Bereichs nur dessen eigene. Baustellen mit EINEM Bereich
+// haben kein #ETALL und behalten ihre Leiste.
+function updEtbarVis(){
+  const sammel = ETBAR_ALLE && !!document.getElementById('ETALL');
+  document.querySelectorAll('.etbar').forEach(b=>{
+    const zeigen = TF==='all' && (b.id==='ETALL' ? sammel : !sammel);
+    b.style.display = zeigen ? '' : 'none';
+  });
+}
 function raDefaultGw(pos){
   const tf=(TF==='M'||TF==='E'||TF==='S')?TF:'';
   if(isEKey(pos)||pos===PRAKEY) return tf;
