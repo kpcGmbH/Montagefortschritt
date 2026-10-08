@@ -693,6 +693,10 @@ body.lvadm .bhdr .lvonly{display:inline-block !important;}
 .etbtn:active{opacity:.85;}
 .etcnt{background:var(--accent);color:var(--anthrazit);font-size:11px;min-width:18px;text-align:center;padding:0 6px;border-radius:10px;font-weight:700;}
 .ethint{font-size:11px;color:var(--accent2);}
+/* Bereichs-Marke an der Position (nur Ansicht „Alle"): bewusst umrandet statt
+   gefüllt, damit sie sich von den Gewerk-Marken daneben unterscheidet. */
+.gtag.gBER{display:none;background:transparent;color:var(--text);border:1px solid var(--tan-m);}
+body.alle-ber .gtag.gBER{display:inline-block;}
 @media (max-width:520px){.ethint{display:none;}}
 .ethdr{display:flex;align-items:center;gap:8px;padding:14px 12px 12px;background:var(--chrome-bg);border-bottom:1px solid var(--line);}
 .etclose{background:none;border:none;color:var(--chrome-accent);font-size:30px;line-height:1;cursor:pointer;padding:0 6px;}
@@ -1552,6 +1556,14 @@ function syncPanels(alle){
   ETBAR_ALLE = !!all;
   updEtbarVis();
 }
+// Marke mit dem Bereich an jeder Position – sichtbar NUR in der Ansicht „Alle" und
+// nur bei mehreren Bereichen (CSS: body.alle-ber). Vom Nutzer so gewählt statt
+// einer Überschrift zwischen den Bereichen: die Marke bleibt an der Position, auch
+// wenn ein Filter nur einzelne Positionen übrig lässt.
+function berBadge(sec){
+  if(!sec || DATA.length<2) return '';
+  return '<span class="gtag gBER">'+escapeHtml(sec.label||('Etage '+sec.pos))+'</span>';
+}
 // Zeigt syncPanels gerade ALLE Bereiche? Dann gilt die Sammel-Fotoleiste #ETALL.
 let ETBAR_ALLE=false;
 // Bereichsauswahl für die Sammel-Fotoleiste: je Bereich eine Zeile mit Fotozahl.
@@ -1718,7 +1730,7 @@ function buildPanels(){
     <span class="pb">${item.pos}</span>
     <div class="ii">
       <div class="ibez">${item.bez.trim()}</div>
-      <div class="imet">${item.fabrikat?'&#127981; '+item.fabrikat.trim():''}${item.typ?' &nbsp;&#128203; '+item.typ.trim():''}${ntBadge(item)}${gewBadgeEditable(item.pos,item.gew)}</div>
+      <div class="imet">${item.fabrikat?'&#127981; '+item.fabrikat.trim():''}${item.typ?' &nbsp;&#128203; '+item.typ.trim():''}${berBadge(sec)}${ntBadge(item)}${gewBadgeEditable(item.pos,item.gew)}</div>
     </div>
     <div class="img">${item.menge} ${item.einh}</div>
   </div>
@@ -7478,6 +7490,7 @@ function updEtbarVis(){
   // (#LVSTALL), sonst je Bereich. Über die Klasse .aus, nicht über style.display:
   // .lvonly setzt display mit !important, und es soll weiter entscheiden, ob die
   // Knöpfe für diesen Benutzer überhaupt sichtbar sind.
+  document.body.classList.toggle('alle-ber', ETBAR_ALLE && DATA.length>1);   // Bereichs-Marke an den Positionen
   const la=document.getElementById('LVSTALL');
   const einmal = ETBAR_ALLE && !!la;
   if(la) la.classList.toggle('aus', !einmal);
