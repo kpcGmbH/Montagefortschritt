@@ -589,6 +589,8 @@ body.lvadm .bhdr .lvonly{display:inline-block !important;}
 .cnotes .rasec .rarow.done, #ALLGBODY .rarow.done{background:var(--done-bg);}
 .cntgl.has{color:var(--ra);border-color:var(--ra);}
 .cntgl.has .cnbadge{background:var(--ra);}
+/* Bestellteil: braune Kante (Büro bestellt, danach Montage) */
+.rarow.best, .cnotes .rasec .rarow.best, #ALLGBODY .rarow.best{border-left:3px solid var(--braun);}
 /* Titel ist Pflicht: hat die Zeile schon Inhalt (Foto), aber keinen Titel, wird
    das Feld rot unterstrichen – sonst sieht der Platzhalter aus wie ein Eintrag. */
 .rarow[data-leer="0"] .ratxt:placeholder-shown{box-shadow:inset 0 -2px 0 var(--mg);}
@@ -7407,6 +7409,9 @@ function raEnsure(r){
   // mangel=true: vom Auftraggeber gemeldeter Mangel (Mängelliste/Abnahmeprotokoll) –
   // im Gegensatz zur eigenen Nacharbeit. Nur Mängel werden freigemeldet.
   if(typeof r.mangel==='undefined') r.mangel=false;
+  // best = Bestellteil (ab 08.10.2026): erst bestellt das Büro, beim Abhaken entsteht
+  // der Folgeeintrag für die Montage (raBestFolge). Schließt mangel aus.
+  if(typeof r.best==='undefined') r.best=false;
   return r;
 }
 // Fotoliste einer Restarbeit nach Art („mangel" = Erfassung, „ok" = Nachweis)
@@ -7483,12 +7488,12 @@ function updRA(pos){
       ? `<textarea class="radesc" rows="2" placeholder="Beschreibung (optional) – z. B. diktieren"
            oninput="raSetDesc('${pos}',${i},this.value);raDescFit(this)">${escapeHtml(r.desc||'')}</textarea>`
       : `<button type="button" class="radescbtn" onclick="raDescOpen('${pos}',${i})">＋ Beschreibung</button>`;
-    return `<div class="rarow${r.done?' done':''}${r.mangel?' mangel':''}" data-i="${i}" data-pos="${escapeHtml(pos)}" data-gw="${r.gw||'-'}" data-leer="${(r.txt||'').trim()||(r.fotos&&r.fotos.length)?'0':'1'}">
+    return `<div class="rarow${r.done?' done':''}${r.mangel?' mangel':''}${r.best?' best':''}" data-i="${i}" data-pos="${escapeHtml(pos)}" data-gw="${r.gw||'-'}" data-leer="${(r.txt||'').trim()||(r.fotos&&r.fotos.length)?'0':'1'}">
       <div class="ramain">
         <input type="checkbox" class="rachk" ${r.done?'checked':''} onchange="raToggle('${pos}',${i},this.checked)">
-        <textarea class="ratxt" rows="1" placeholder="${r.mangel?'Titel des Mangels':'Titel der Restarbeit'} (Pflicht) …"
+        <textarea class="ratxt" rows="1" placeholder="${r.mangel?'Titel des Mangels':(r.best?'Was muss bestellt werden?':'Titel der Restarbeit')} (Pflicht) …"
           oninput="raSetTxt('${pos}',${i},this.value);raTxtFit(this)" onkeydown="raKey(event,'${pos}',${i})">${escapeHtml(r.txt||'')}</textarea>
-        <span class="radonesum" onclick="raToggleExp(this)" title="Details ein-/ausblenden">${r.done?('&#10003; erledigt'+(tsErl?' '+tsErl:'')+(r.erledigtVon?' · '+escapeHtml(r.erledigtVon):'')):''}</span>
+        <span class="radonesum" onclick="raToggleExp(this)" title="Details ein-/ausblenden">${r.done?('&#10003; '+(r.best?'bestellt':'erledigt')+(tsErl?' '+tsErl:'')+(r.erledigtVon?' · '+escapeHtml(r.erledigtVon):'')):''}</span>
         <button type="button" class="raexp" onclick="raToggleExp(this)" title="Details ein-/ausblenden">&#9656;</button>
         <button class="rafbtn" onclick="raFoto('${pos}',${i},'mangel')" title="${r.mangel?'Foto vom Mangel':'Foto vorher – Zustand bei der Erfassung'}">&#128247;</button>
         <button class="rafbtn rafok" onclick="raFoto('${pos}',${i},'ok')" title="${r.mangel?'Nachweisfoto nach der Erledigung – geht in die Freimeldung':'Foto nachher – nach der Erledigung'}">&#10003;&#128247;</button>
@@ -7498,9 +7503,10 @@ function updRA(pos){
       <div class="rameta">
         <div class="rametacol">
           <span class="rametalbl">Art:</span>
-          <select class="ragw raart${r.mangel?' set':''}" onchange="raSetMangel('${pos}',${i},this.value)">
-            <option value=""${r.mangel?'':' selected'}>Restarbeit</option>
+          <select class="ragw raart${(r.mangel||r.best)?' set':''}" onchange="raSetMangel('${pos}',${i},this.value)">
+            <option value=""${(r.mangel||r.best)?'':' selected'}>Restarbeit</option>
             <option value="1"${r.mangel?' selected':''}>Mangel (AG)</option>
+            <option value="b"${r.best?' selected':''}>Bestellteil</option>
           </select>
         </div>
         <div class="rametacol">
@@ -7904,7 +7910,11 @@ function raSetMangel(pos,i,val){
   const s=gs(pos);
   if(!s.restarbeiten[i])return;
   raEnsure(s.restarbeiten[i]);
-  s.restarbeiten[i].mangel=!!val;
+  s.restarbeiten[i].mangel=(val==='1'||val===1||val===true);
+  s.restarbeiten[i].best=(val==='b');
+  // Ein Bestellteil gehört dem Büro – sonst erfährt dort niemand davon. Über
+  // raSetGw, damit ein vorhandener Aufgaben-Eintrag mitgezogen wird.
+  if(val==='b' && s.restarbeiten[i].gw!=='B') raSetGw(pos,i,'B');
   rafHalten(pos,i);
   updRA(pos);
   rafNachAenderung();
@@ -8158,6 +8168,7 @@ function raToggle(pos,i,done){
   if(done && !s.restarbeiten[i].erledigtVon) s.restarbeiten[i].erledigtVon=USER||'';   // wer abhakt, hat's erledigt
   if(!done) s.restarbeiten[i].erledigtVon='';
   rafHalten(pos,i);
+  const folgeTxt=raBestFolge(pos,i,done);
   histAdd(pos, done?'ra-erledigt':'ra-offen', (s.restarbeiten[i].txt||'').trim());
   if(s.restarbeiten[i].aufg) aufgEnqueue({op:'status', key:s.restarbeiten[i].aufg,
     status:done?'erledigt':'offen', von:done?(s.restarbeiten[i].erledigtVon||''):''});
@@ -8174,6 +8185,40 @@ function raToggle(pos,i,done){
   });
   rafNachAenderung();
   saveFotos(pos);
+  if(folgeTxt) showToast(folgeTxt);
+}
+// Bestellteil: zwei Schritte NACHEINANDER, nie zwei offene Einträge nebeneinander.
+// Erst bestellt das Büro; mit dem Abhaken entsteht direkt darunter der Folgeeintrag
+// „Montage: …" (Zuständigkeit Montage). So ist immer genau einer zuständig, und
+// die Zähler zählen die Blende nicht doppelt.
+// Verknüpft über folgeVon = erstelltAm des Bestell-Eintrags (kein Index – der
+// verschiebt sich beim Löschen). Fotos werden NICHT kopiert: zwei Einträge auf
+// dieselbe Datei hieße, dass das Löschen am einen dem anderen das Bild nimmt; der
+// Bestell-Eintrag bleibt ja eingeklappt direkt darüber stehen.
+// Wird der Bestell-Eintrag wieder geöffnet, verschwindet ein noch unberührter
+// Folgeeintrag; ist er schon erledigt oder trägt Fotos, bleibt er stehen.
+// Gibt den Meldungstext zurück (oder '').
+function raBestFolge(pos,i,done){
+  const list=gs(pos).restarbeiten, r=list[i];
+  if(!r || !r.best) return '';
+  if(!r.erstelltAm) r.erstelltAm=new Date().toISOString();
+  const k=list.findIndex(x=>x && x.folgeVon===r.erstelltAm);
+  if(done){
+    if(k>=0) return '';
+    const titel=(r.txt||'').trim(); if(!titel) return '';
+    const wann=new Date().toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});
+    list.splice(i+1,0,{txt:'Montage: '+titel,
+      desc:'Bestellt am '+wann+(USER?' von '+USER:'')+((r.desc||'').trim()?'\n'+r.desc.trim():''),
+      done:false,mangel:false,best:false,folgeVon:r.erstelltAm,ersteller:USER||'',
+      erstelltAm:new Date().toISOString(),erledigtVon:'',erledigtAm:null,gw:'M',fotos:[],fotosOk:[]});
+    histAdd(pos,'ra-neu','Montage: '+titel);
+    return 'Bestellt – Folgeeintrag für die Montage angelegt';
+  }
+  if(k>=0){
+    const f=list[k];
+    if(!f.done && !(f.fotos&&f.fotos.length) && !(f.fotosOk&&f.fotosOk.length)){ list.splice(k,1); RAF_HALTEN.clear(); return 'Bestellung wieder offen – Montage-Eintrag entfernt'; }
+  }
+  return '';
 }
 // Gelöschte Restarbeit für „Rückgängig" vorhalten. Ohne das ist ein Fehlgriff neben
 // dem Foto-Knopf endgültig – die Zeile verschwindet samt Fotos und Verlauf.
@@ -8236,8 +8281,8 @@ function raKey(ev,pos,i){
   const s=gs(pos);
   // Enter erbt die Art der Zeile darüber – beim Tippen einer Liste soll kein Menü
   // aufgehen, und die nächste Zeile ist fast immer dieselbe Sorte.
-  s.restarbeiten.splice(i+1,0,{txt:'',desc:'',done:false,mangel:!!(s.restarbeiten[i]&&s.restarbeiten[i].mangel),
-    ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[],fotosOk:[]});
+  s.restarbeiten.splice(i+1,0,{txt:'',desc:'',done:false,mangel:!!(s.restarbeiten[i]&&s.restarbeiten[i].mangel),best:!!(s.restarbeiten[i]&&s.restarbeiten[i].best),
+    ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:(s.restarbeiten[i]&&s.restarbeiten[i].best)?'B':raDefaultGw(pos),fotos:[],fotosOk:[]});
   updRA(pos);
   saveFotos(pos);
   setTimeout(()=>{
@@ -8267,7 +8312,8 @@ function raArtFragen(anchor, cb){
   }
   menu.innerHTML='<div class="ptype-h">Was wird erfasst?</div>'+
     '<div class="ptype-item" onclick="raArtWahl(0)">&#128295;&nbsp; Restarbeit<small>eigene Nacharbeit</small></div>'+
-    '<div class="ptype-item" onclick="raArtWahl(1)">&#9888;&#65039;&nbsp; Mangel (AG)<small>vom Auftraggeber gemeldet &ndash; wird freigemeldet</small></div>';
+    '<div class="ptype-item" onclick="raArtWahl(1)">&#9888;&#65039;&nbsp; Mangel (AG)<small>vom Auftraggeber gemeldet &ndash; wird freigemeldet</small></div>'+
+    '<div class="ptype-item" onclick="raArtWahl(\'b\')">&#128230;&nbsp; Bestellteil<small>B&uuml;ro bestellt &ndash; danach entsteht die Montage-Aufgabe</small></div>';
   const r=(anchor&&anchor.getBoundingClientRect)? anchor.getBoundingClientRect() : {bottom:80,left:16};
   menu.style.top=(r.bottom+window.scrollY+4)+'px';
   menu.style.left=Math.max(8,Math.min((r.left||0)+window.scrollX, window.innerWidth-244))+'px';
@@ -8276,7 +8322,7 @@ function raArtFragen(anchor, cb){
 function raArtWahl(m){
   const cb=RA_ART_CB; RA_ART_CB=null;
   const menu=document.getElementById('raArtMenu'); if(menu) menu.classList.remove('open');
-  if(cb) cb(!!m);
+  if(cb) cb(m==='b' ? 'b' : !!m);   // false = Restarbeit, true = Mangel, 'b' = Bestellteil
 }
 // Art abfragen und die Zeile anlegen (Knopf „＋ Restarbeit" an der Position)
 function raNeuMitArt(pos, anchor){ raArtFragen(anchor, m=>raAddNew(pos, m)); }
@@ -8287,11 +8333,12 @@ function raAddNew(pos, mangel){
   const s=gs(pos);
   s.restarbeiten.forEach(raEnsure);
   let idx=s.restarbeiten.findIndex(r=>!(r.txt&&r.txt.trim())&&!(r.desc&&r.desc.trim())&&!(r.fotos&&r.fotos.length)&&!(r.fotosOk&&r.fotosOk.length));
-  if(idx<0){ s.restarbeiten.push({txt:'',desc:'',done:false,mangel:!!mangel,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:raDefaultGw(pos),fotos:[],fotosOk:[]}); idx=s.restarbeiten.length-1; }
+  const istBest = mangel==='b'; if(istBest) mangel=false;
+  if(idx<0){ s.restarbeiten.push({txt:'',desc:'',done:false,mangel:!!mangel,best:istBest,ersteller:USER||'',erstelltAm:null,erledigtVon:'',erledigtAm:null,gw:istBest?'B':raDefaultGw(pos),fotos:[],fotosOk:[]}); idx=s.restarbeiten.length-1; }
   // Auch bei einer wiederverwendeten (noch leeren) Zeile den angemeldeten Benutzer
   // eintragen – sonst bliebe „Erst." leer, wenn die Zeile vor dem Login entstand.
   else { if(!s.restarbeiten[idx].ersteller && USER) s.restarbeiten[idx].ersteller=USER;
-         if(typeof mangel!=='undefined') s.restarbeiten[idx].mangel=!!mangel; }
+         if(typeof mangel!=='undefined'){ s.restarbeiten[idx].mangel=!!mangel; s.restarbeiten[idx].best=istBest; if(istBest) s.restarbeiten[idx].gw='B'; } }
   updRA(pos);
   setTimeout(()=>{
     const el=document.querySelector('#RA'+sp(pos)+' .rarow[data-i="'+idx+'"] .ratxt');
@@ -8509,7 +8556,7 @@ function collectRestRows(){
         geschoss:'Baustelle allgemein', bereich:'Etagenübergreifend', pos:'–', bez:'Baustellenweit',
         txt:r.txt, desc:r.desc||'', done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
         erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
-        fotos:(r.fotos||[]).slice(), fotosOk:(r.fotosOk||[]).slice(), mangel:!!r.mangel, fm:r.fm||null
+        fotos:(r.fotos||[]).slice(), fotosOk:(r.fotosOk||[]).slice(), mangel:!!r.mangel, best:!!r.best, fm:r.fm||null
       });
     });
   }
@@ -8524,7 +8571,7 @@ function collectRestRows(){
           geschoss:sec.label, bereich:'Etage allgemein', pos:'–', bez:'Etagenweit',
           txt:r.txt, desc:r.desc||'', done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
           erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
-          fotos:(r.fotos||[]).slice(), fotosOk:(r.fotosOk||[]).slice(), mangel:!!r.mangel, fm:r.fm||null
+          fotos:(r.fotos||[]).slice(), fotosOk:(r.fotosOk||[]).slice(), mangel:!!r.mangel, best:!!r.best, fm:r.fm||null
         });
       });
     }
@@ -8539,7 +8586,7 @@ function collectRestRows(){
             geschoss:sec.label, bereich:sub.bez, pos:item.pos, bez:item.bez.trim(),
             txt:r.txt, desc:r.desc||'', done:r.done, gw:r.gw||'', ersteller:r.ersteller, erstelltAm:r.erstelltAm,
             erledigtVon:r.erledigtVon, erledigtAm:r.erledigtAm,
-            fotos:(r.fotos||[]).slice(), fotosOk:(r.fotosOk||[]).slice(), mangel:!!r.mangel, fm:r.fm||null
+            fotos:(r.fotos||[]).slice(), fotosOk:(r.fotosOk||[]).slice(), mangel:!!r.mangel, best:!!r.best, fm:r.fm||null
           });
         });
       });
@@ -8587,7 +8634,7 @@ function expRestXlsx(){
     r.ersteller||'', raFmtTs(r.erstelltAm)||'',
     r.erledigtVon||'', raFmtTs(r.erledigtAm)||'',
     (r.fotos&&r.fotos.length)?r.fotos.length:0,
-    r.mangel?'Mangel (AG)':'Restarbeit',
+    r.mangel?'Mangel (AG)':(r.best?'Bestellteil':'Restarbeit'),
     (r.fotosOk&&r.fotosOk.length)?r.fotosOk.length:0,
     r.fm&&r.fm.nr? ('Nr. '+r.fm.nr+(r.fm.datum?' vom '+fmDatDE(r.fm.datum):'')) : ''
   ]));
