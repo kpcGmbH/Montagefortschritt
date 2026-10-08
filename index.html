@@ -1947,8 +1947,15 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 140;
+const APP_VERSION = 141;
 const CHANGELOG = [
+  { v:141, titel:'Restarbeiten und Mängel übersichtlicher – Notiz, Bestellteil, Bereiche', punkte:[
+    'Die <b>Notiz</b> hat einen eigenen Knopf <b>✎ Notiz</b> neben Foto und Protokoll. Der Balken darunter heißt jetzt <b>„Restarbeiten und Mängel"</b> und ist blau abgesetzt; jede Position beginnt mit einem getönten Kopf.',
+    'Der <b>Titel</b> einer Restarbeit ist Pflicht. Stand der Text bisher nur in der Beschreibung, ging keine Aufgabe ans Büro und der Eintrag fehlte in den Berichten – solche Einträge berichtigt die App jetzt selbst. Die Beschreibung ist nur für Zusätzliches.',
+    'Neue Art <b>„Bestellteil"</b> (z. B. eine Blende): Der Eintrag geht ans Büro. Hakt das Büro nach der Bestellung ab, entsteht darunter von selbst der Eintrag <b>„Montage: …"</b> für den Monteur.',
+    'Fotos an einer Restarbeit heißen jetzt <b>„vorher"</b> und <b>„nachher"</b>. „Mangelfoto" und „Nachweis" steht nur noch bei einem Mangel des Auftraggebers.',
+    'Der Filter <b>„Restarbeiten und Mängel"</b> zählt richtig: Nach dem Abhaken stimmt die Zahl sofort, und die Zeile verschwindet nicht mehr unter dem Finger.',
+    'In der Ansicht <b>„Alle"</b> stehen Anlagenfotos, Bauphase und „Anlage ergänzen" nur noch einmal – mit Auswahl des Bereichs. Neu ist das Album <b>„Ganze Baustelle"</b> für Fotos ohne Bereich. Anlagen und Positionen tragen dort eine Marke mit ihrem Bereich.' ]},
   { v:140, titel:'Protokoll überarbeiten ändert Datum und Techniker nicht mehr', punkte:[
     'Wer ein abgelegtes Inbetriebnahme- oder DGUV-Protokoll über ✎ geöffnet hat, bei dem schrieb die App still um: <b>Techniker auf den aktuellen Ausführer</b>, <b>alle Datumsfelder auf heute</b> – auch das Inbetriebnahmedatum – dazu Ort, Datum, Name und sogar das <b>Unterschriftsbild</b> im Unterschriftsblock.',
     'Wer eine Seriennummer korrigiert, schrieb damit um, wer wann in Betrieb genommen hat. Das ist jetzt vorbei: <b>Was im Protokoll steht, bleibt stehen.</b>',
