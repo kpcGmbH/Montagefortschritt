@@ -697,6 +697,10 @@ body.lvadm .bhdr .lvonly{display:inline-block !important;}
    gefüllt, damit sie sich von den Gewerk-Marken daneben unterscheidet. */
 .gtag.gBER{display:none;background:transparent;color:var(--text);border:1px solid var(--tan-m);}
 body.alle-ber .gtag.gBER{display:inline-block;}
+/* Dieselbe Marke im Kopf der Anlage – sonst sieht man bei ZUGEKLAPPTEN Anlagen
+   nicht, zu welchem Bereich sie gehören (die Positionen sind dann ja nicht da).
+   Etwas größer als an der Position und ohne linken Abstand: sie steht vorn. */
+.bhdr .gtag.gBER{margin-left:0;margin-right:4px;font-size:10px;padding:2px 8px;white-space:nowrap;flex-shrink:0;}
 @media (max-width:520px){.ethint{display:none;}}
 .ethdr{display:flex;align-items:center;gap:8px;padding:14px 12px 12px;background:var(--chrome-bg);border-bottom:1px solid var(--line);}
 .etclose{background:none;border:none;color:var(--chrome-accent);font-size:30px;line-height:1;cursor:pointer;padding:0 6px;}
@@ -1771,7 +1775,7 @@ function buildPanels(){
 </div>`;
       });
       div.innerHTML=`<div class="bhdr" onclick="tgB(this)">
-  <span class="bpos">${sub.pos}</span>
+  ${berBadge(sec)}<span class="bpos">${sub.pos}</span>
   <h3>${sub.bez}</h3>
   <button class="bedit lvonly" title="Anlage umbenennen, verschieben oder löschen" onclick="event.stopPropagation();openAnlageEdit('${escapeHtml(sec.pos)}','${escapeHtml(sub.pos)}')">&#9998;</button>
   <span class="bcnt">${sub.items.length}&nbsp;Pos.</span>
