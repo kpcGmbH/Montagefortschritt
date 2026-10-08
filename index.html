@@ -2494,11 +2494,16 @@ async function bilderEinordnen(dry, limit){
 function konsolAnwenden(s,m){
   if(!s) return;
   if(m.kind==='foto'){ if(s.fotos && s.fotos[m.i]===m.old) s.fotos[m.i]=m.neu; }
-  else if(m.kind==='efoto'){ if(s.efotos && s.efotos[m.i]===m.old) s.efotos[m.i]=m.neu; }
-  else if(m.kind==='bfoto'){ if(s.bfotos && s.bfotos[m.i]===m.old) s.bfotos[m.i]=m.neu; }
+  else if(m.kind==='efoto' || m.kind==='bfoto'){
+    // Eintrag ist ein Objekt -> nur den Pfad tauschen, Kategorie/Zeit/Name bleiben
+    const arr = m.kind==='efoto' ? s.efotos : s.bfotos, x = arr && arr[m.i];
+    if(x && typeof x==='object'){ if(x.fname===m.old) x.fname=m.neu; }
+    else if(arr && x===m.old) arr[m.i]=m.neu;
+  }
   else if(m.kind==='pdf'){ if(s.pdfs && s.pdfs[m.i] && s.pdfs[m.i].fname===m.old) s.pdfs[m.i].fname=m.neu; }
   else if(m.kind==='pdfdata'){ if(s.pdfs && s.pdfs[m.i] && s.pdfs[m.i].dataFname===m.old) s.pdfs[m.i].dataFname=m.neu; }
   else if(m.kind==='ra'){ const r=(s.restarbeiten||[])[m.ri]; if(r && r.fotos && r.fotos[m.fi]===m.old) r.fotos[m.fi]=m.neu; }
+  else if(m.kind==='raok'){ const r=(s.restarbeiten||[])[m.ri]; if(r && r.fotosOk && r.fotosOk[m.fi]===m.old) r.fotosOk[m.fi]=m.neu; }
 }
 function konsolReroot(ref, root){
   if(!ref || /^https?:/i.test(ref)) return null;    // externe URL (z.B. Altbestand) -> nie verschieben
@@ -2518,15 +2523,26 @@ function konsolRefs(){
     const pos=it.pos, s=ST[pos]; if(!s) continue;
     (s.fotos||[]).forEach((ref,i)=>out.push({pos,kind:'foto',i,old:ref}));
     (s.pdfs||[]).forEach((p,i)=>{ out.push({pos,kind:'pdf',i,old:p&&p.fname}); out.push({pos,kind:'pdfdata',i,old:p&&p.dataFname}); });
-    (s.restarbeiten||[]).forEach((r,ri)=>(r.fotos||[]).forEach((ref,fi)=>out.push({pos,kind:'ra',ri,fi,old:ref})));
+    (s.restarbeiten||[]).forEach((r,ri)=>{
+      (r.fotos||[]).forEach((ref,fi)=>out.push({pos,kind:'ra',ri,fi,old:ref}));
+      (r.fotosOk||[]).forEach((ref,fi)=>out.push({pos,kind:'raok',ri,fi,old:ref}));
+    });
   }}}
   // Etagen-Zeilen: Anlagenfotos (efotos), Bauphase (bfotos), allgemeine
   // Restarbeiten der Etage – dazu die Projekt-Ebene (PRAKEY).
   const etRow=(key)=>{
     const s=ST[key]; if(!s) return;
-    (s.efotos||[]).forEach((ref,i)=>out.push({pos:key,kind:'efoto',i,old:ref}));
-    (s.bfotos||[]).forEach((ref,i)=>out.push({pos:key,kind:'bfoto',i,old:ref}));
-    (s.restarbeiten||[]).forEach((r,ri)=>(r.fotos||[]).forEach((ref,fi)=>out.push({pos:key,kind:'ra',ri,fi,old:ref})));
+    // Album-Einträge sind OBJEKTE {fname,kat,ts,by}, keine Pfad-Strings. Bis 08.10.2026
+    // stand hier `old:ref` – konsolReroot bekam damit ein Objekt und warf beim ersten
+    // Albumfoto (`ref.indexOf is not a function`); das Zusammenführen nach einer
+    // Umbenennung kam für Baustellen mit Albumfotos gar nicht erst zustande.
+    const pfad=ref=>(ref&&typeof ref==='object')?ref.fname:ref;
+    (s.efotos||[]).forEach((ref,i)=>out.push({pos:key,kind:'efoto',i,old:pfad(ref)}));
+    (s.bfotos||[]).forEach((ref,i)=>out.push({pos:key,kind:'bfoto',i,old:pfad(ref)}));
+    (s.restarbeiten||[]).forEach((r,ri)=>{
+      (r.fotos||[]).forEach((ref,fi)=>out.push({pos:key,kind:'ra',ri,fi,old:ref}));
+      (r.fotosOk||[]).forEach((ref,fi)=>out.push({pos:key,kind:'raok',ri,fi,old:ref}));   // Nachweisfotos (ab v102) fehlten
+    });
   };
   for(const sec of DATA){ try{ etRow(EKEY(sec)); }catch(e){} }
   etRow(PRAKEY);
