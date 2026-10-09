@@ -1947,8 +1947,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 141;
+const APP_VERSION = 142;
 const CHANGELOG = [
+  { v:142, titel:'Servicebericht fertig – das Büro erfährt es', punkte:[
+    'Wird ein Servicebericht mit <b>„Einsatz beendet: Ja"</b> über <b>„Speichern & PDF"</b> abgeschlossen, geht jetzt von selbst eine <b>Aufgabe ans Büro</b> – damit der Einsatz berechnet werden kann.',
+    'Die Meldung nennt Kunde, Einsatzart, die Einsätze mit Zeiten, Fahrzeit und Kilometern sowie das Material. Der Link in der Mail öffnet die Baustelle mit der Liste der Serviceberichte; das PDF liegt dort.',
+    'Gemeldet wird <b>genau einmal</b> je Bericht. Zwischenspeichern meldet nichts, und wer einen Bericht später korrigiert, löst keine zweite Meldung aus.',
+    'Empfänger sind die bei der Baustelle über 👷 hinterlegten Büro-Zuständigen, sonst der Innendienst.' ]},
   { v:141, titel:'Restarbeiten und Mängel übersichtlicher – Notiz, Bestellteil, Bereiche', punkte:[
     'Die <b>Notiz</b> hat einen eigenen Knopf <b>✎ Notiz</b> neben Foto und Protokoll. Der Balken darunter heißt jetzt <b>„Restarbeiten und Mängel"</b> und ist blau abgesetzt; jede Position beginnt mit einem getönten Kopf.',
     'Der <b>Titel</b> einer Restarbeit ist Pflicht. Stand der Text bisher nur in der Beschreibung, ging keine Aufgabe ans Büro und der Eintrag fehlte in den Berichten – solche Einträge berichtigt die App jetzt selbst. Die Beschreibung ist nur für Zusätzliches.',
@@ -5367,8 +5372,39 @@ function svcGather(){
     sigOrt:val('svcSigOrt'), sigDatum:val('svcSigDatum'),
     sigKunde:btbSigData('svcSigKunde'), sigKpc:btbSigData('svcSigKpc'),
     erstelltAm:(b&&b.erstelltAm)||now, erstelltVon:(b&&b.erstelltVon)||USER||'',
-    geaendertAm:now, geaendertVon:USER||''
+    geaendertAm:now, geaendertVon:USER||'',
+    abrGemeldet:(b&&b.abrGemeldet)||''      // Zeitpunkt der Meldung ans Büro (svcAbrechnungMelden)
   };
+}
+// Fertiger Servicebericht -> Aufgabe ans Büro, damit der Einsatz berechnet wird
+// (09.10.2026). Derselbe Weg wie bei Büro-Restarbeiten: Eintrag in der Liste
+// „Aufgaben", die Mail verschickt der Flow. „Fertig" heißt: „Speichern & PDF" mit
+// „Einsatz beendet: Ja" – ein bloßes Zwischenspeichern meldet nichts, und beendet
+// steht bei einem neuen Formular schon auf Ja vorbelegt.
+// GENAU EINMAL je Bericht: der Merker abrGemeldet liegt im Bericht selbst und reist
+// mit in SERVICE_<pid>.json, gilt also auch auf anderen Geräten. Wer einen gemeldeten
+// Bericht später korrigiert und neu ablegt, löst keine zweite Meldung aus.
+function svcAbrechnungMelden(entry){
+  const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
+  const zeilen=[];
+  zeilen.push('Einsatzart: '+svcArtLabel(entry.art));
+  (entry.einsaetze||[]).forEach(e=>{
+    const t=[e.datum?svcDatShort(e.datum):'', e.monteur, (e.checkIn||e.checkOut)?((e.checkIn||'?')+'–'+(e.checkOut||'?')):'',
+             e.fahrzeit?('Fahrzeit '+e.fahrzeit):'', e.km?(e.km+' km'):''].filter(Boolean).join(' · ');
+    if(t) zeilen.push('Einsatz: '+t);
+  });
+  (entry.material||[]).forEach(m=>{ const t=[m.menge,m.text].filter(Boolean).join(' × '); if(t) zeilen.push('Material: '+t); });
+  const auftrag=(entry.arbeitsauftrag||'').trim().split('\n')[0];
+  if(auftrag) zeilen.push('Auftrag: '+auftrag.slice(0,200));
+  zeilen.push('PDF liegt im Ordner _Servicebericht der Baustelle.');
+  aufgEnqueue({op:'neu', key:PID+'|SVC|'+entry.nr,
+    titel:'Servicebericht Nr. '+entry.nr+' abrechnen'+(entry.kunde?(' – '+entry.kunde):''),
+    beschreibung:zeilen.join('\n'),
+    projekt:curProjName(), ort:entry.ort||'',
+    zustaendig:RA_GW_LBL.B, bauleiter:namesStr(proj.bauleiter), buero:namesStr(proj.buero),
+    lager:namesStr(LAGER), empfaenger:aufgEmpfaenger('B',proj),
+    erfasser:aufgErfasserText(entry.geaendertVon||USER||''),
+    link:location.origin+location.pathname+'#aufgabe='+encodeURIComponent(PID)+'|'+encodeURIComponent('§SVC§'+entry.nr)});
 }
 async function svcSave(thenPdf){
   if(!SVC_FORM) return;
@@ -5376,11 +5412,15 @@ async function svcSave(thenPdf){
   let win=null;
   if(thenPdf){ win=window.open('','_blank'); if(win){ try{ win.document.write('<title>Servicebericht</title><body style="font-family:Arial,sans-serif;padding:24px;color:#666">PDF wird erstellt …</body>'); }catch(e){} } }
   const entry=svcGather();
+  // Meldung ans Büro vormerken – der Merker muss VOR dem Speichern im Eintrag stehen
+  const melden = !!thenPdf && entry.beendet==='ja' && !entry.abrGemeldet;
+  if(melden) entry.abrGemeldet=new Date().toISOString();
   const i=SVC.findIndex(e=>e.nr===entry.nr);
   if(i>=0) SVC[i]=entry; else SVC.push(entry);
   SVC_FORM.base=entry;
   try{ await saveService(entry); }
   catch(e){ if(win) try{win.close();}catch(_){}; alert('Speichern fehlgeschlagen: '+(e.message||e)); return; }
+  if(melden){ try{ svcAbrechnungMelden(entry); }catch(e){ console.warn('Meldung ans Büro fehlgeschlagen:', e&&e.message); } }
   if(!thenPdf){ showToast('Servicebericht Nr. '+entry.nr+' gespeichert'); closeSvcForm(); openServiceDialog(); return; }
   try{
     const blob=await svcBuildPdf(entry);
@@ -5389,7 +5429,7 @@ async function svcSave(thenPdf){
               projStamm().auftrag||curProjCode(), String(entry.nr).padStart(3,'0')])+'.pdf';
     const url=URL.createObjectURL(blob);
     if(win) win.location=url; else window.open(url,'_blank');
-    try{ await queueUpload(fname, blob, 'application/pdf', ''); showToast(navigator.onLine? 'PDF erstellt & in _Servicebericht abgelegt' : 'PDF erstellt – wird mit Netz abgelegt'); }
+    try{ await queueUpload(fname, blob, 'application/pdf', ''); showToast((navigator.onLine? 'PDF erstellt & in _Servicebericht abgelegt' : 'PDF erstellt – wird mit Netz abgelegt')+(melden?' · Büro zur Abrechnung benachrichtigt':'')); }
     catch(e){ showToast('PDF erstellt, Ablage fehlgeschlagen: '+((e&&e.message)||e),{bg:'#8b6d22'}); }
     closeSvcForm();
   }catch(e){ if(win) try{win.close();}catch(_){}; alert('PDF-Erstellung fehlgeschlagen: '+(e.message||e)); }
@@ -10050,8 +10090,12 @@ async function openProjectFlow(){
     // Aus einer Aufgaben-Mail gekommen? Direkt in die Baustelle springen statt Picker.
     if(_aufgJump && PROJECTS.some(p=>p.pid===_aufgJump.pid)){
       const z=_aufgJump; _aufgJump=null;
-      if(z.pos && !isEKey(z.pos)) _ibnJumpPos=z.pos;   // Kartensprung über den vorhandenen Mechanismus
+      // Aus der Meldung „Servicebericht abrechnen": Baustelle öffnen und die Liste
+      // der Serviceberichte zeigen (dort liegt das PDF).
+      const svcSprung = !!z.pos && z.pos.indexOf('§SVC§')===0;
+      if(z.pos && !svcSprung && !isEKey(z.pos)) _ibnJumpPos=z.pos;   // Kartensprung über den vorhandenen Mechanismus
       await selectProject(z.pid);
+      if(svcSprung){ try{ openServiceDialog(); }catch(e){} }
       return;
     }
     renderProjectPicker();
