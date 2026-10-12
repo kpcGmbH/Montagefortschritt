@@ -1947,8 +1947,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 142;
+const APP_VERSION = 143;
 const CHANGELOG = [
+  { v:143, titel:'Meldungen ans Büro nur noch an die Zuständigen der Baustelle', punkte:[
+    'Aufgaben und Servicebericht-Meldungen gehen jetzt <b>nur an die Büro-Mitarbeiter, die bei der Baustelle über 👷 ausgewählt sind</b>. Bisher bekam der ganze Innendienst die Mail, wenn bei der Baustelle niemand eingetragen war.',
+    'Ist <b>niemand hinterlegt</b>, geht keine Mail raus. Wer die Restarbeit oder den Servicebericht anlegt, bekommt sofort einen Hinweis – und in der Baustellenliste steht <b>„Büro (👷)"</b> als fehlende Angabe.',
+    'Bitte bei jeder Baustelle einmal prüfen, ob unter 👷 die richtigen Büro-Zuständigen stehen.',
+    'Der Link in der Servicebericht-Mail öffnet jetzt <b>genau den gemeldeten Bericht</b> mit Einsätzen, Material und dem Knopf „PDF öffnen" – vorher erschien nur „Neuer Servicebericht".',
+    '<b>Bautagebuch:</b> Das Datum ist frei wählbar, auch für einen Tag ohne erfasste Tätigkeit. Das ging schon vorher, steht jetzt aber am Feld.' ]},
   { v:142, titel:'Servicebericht fertig – das Büro erfährt es', punkte:[
     'Wird ein Servicebericht mit <b>„Einsatz beendet: Ja"</b> über <b>„Speichern & PDF"</b> abgeschlossen, geht jetzt von selbst eine <b>Aufgabe ans Büro</b> – damit der Einsatz berechnet werden kann.',
     'Die Meldung nennt Kunde, Einsatzart, die Einsätze mit Zeiten, Fahrzeit und Kilometern sowie das Material. Der Link in der Mail öffnet die Baustelle mit der Liste der Serviceberichte; das PDF liegt dort.',
@@ -4198,8 +4204,8 @@ function openBautagebuchDialog(){
     : '';
   ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:22px;max-width:460px;width:100%;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
     '<div style="font-size:17px;font-weight:700;margin-bottom:4px">📓 Bautagebuch</div>'+
-    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:14px">Tag wählen – das Formular wird mit den Statusänderungen, Restarbeiten und beteiligten Monteuren dieses Tages vorbelegt. Alles bleibt frei änderbar, Zeilen lassen sich ergänzen.</div>'+
-    '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Datum</label>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:14px">Tag wählen – das Formular wird mit den Statusänderungen, Restarbeiten und beteiligten Monteuren dieses Tages vorbelegt. Gab es an dem Tag keine Einträge, startet es leer. Alles bleibt frei änderbar, Zeilen lassen sich ergänzen.</div>'+
+    '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Datum <span style="font-size:11px">– frei wählbar, auch ein Tag ohne erfasste Tätigkeit</span></label>'+
     '<input id="btbDate" type="date" value="'+def+'" max="'+today+'" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:16px;font-family:inherit;box-sizing:border-box">'+
     (days.length?'<div style="font-size:12px;color:#a8a8a8;margin-top:12px">Tage mit Aktivität:</div>':'')+chips+liste+
     '<div style="display:flex;gap:10px;margin-top:18px;justify-content:flex-end">'+
@@ -5432,14 +5438,16 @@ function svcAbrechnungMelden(entry){
   const auftrag=(entry.arbeitsauftrag||'').trim().split('\n')[0];
   if(auftrag) zeilen.push('Auftrag: '+auftrag.slice(0,200));
   zeilen.push('PDF liegt im Ordner _Servicebericht der Baustelle.');
+  const empf=aufgEmpfaenger('B',proj);
   aufgEnqueue({op:'neu', key:PID+'|SVC|'+entry.nr,
     titel:'Servicebericht Nr. '+entry.nr+' abrechnen'+(entry.kunde?(' – '+entry.kunde):''),
     beschreibung:zeilen.join('\n'),
     projekt:curProjName(), ort:entry.ort||'',
     zustaendig:RA_GW_LBL.B, bauleiter:namesStr(proj.bauleiter), buero:namesStr(proj.buero),
-    lager:namesStr(LAGER), empfaenger:aufgEmpfaenger('B',proj),
+    lager:namesStr(LAGER), empfaenger:empf,
     erfasser:aufgErfasserText(entry.geaendertVon||USER||''),
     link:location.origin+location.pathname+'#aufgabe='+encodeURIComponent(PID)+'|'+encodeURIComponent('§SVC§'+entry.nr)});
+  return !!empf;     // false = bei der Baustelle ist kein Büro hinterlegt
 }
 async function svcSave(thenPdf){
   if(!SVC_FORM) return;
@@ -5455,7 +5463,8 @@ async function svcSave(thenPdf){
   SVC_FORM.base=entry;
   try{ await saveService(entry); }
   catch(e){ if(win) try{win.close();}catch(_){}; alert('Speichern fehlgeschlagen: '+(e.message||e)); return; }
-  if(melden){ try{ svcAbrechnungMelden(entry); }catch(e){ console.warn('Meldung ans Büro fehlgeschlagen:', e&&e.message); } }
+  let bueroErreicht=false;
+  if(melden){ try{ bueroErreicht=svcAbrechnungMelden(entry); }catch(e){ console.warn('Meldung ans Büro fehlgeschlagen:', e&&e.message); } }
   if(!thenPdf){ showToast('Servicebericht Nr. '+entry.nr+' gespeichert'); closeSvcForm(); openServiceDialog(); return; }
   try{
     const blob=await svcBuildPdf(entry);
@@ -5464,7 +5473,7 @@ async function svcSave(thenPdf){
               projStamm().auftrag||curProjCode(), String(entry.nr).padStart(3,'0')])+'.pdf';
     const url=URL.createObjectURL(blob);
     if(win) win.location=url; else window.open(url,'_blank');
-    try{ await queueUpload(fname, blob, 'application/pdf', ''); showToast((navigator.onLine? 'PDF erstellt & in _Servicebericht abgelegt' : 'PDF erstellt – wird mit Netz abgelegt')+(melden?' · Büro zur Abrechnung benachrichtigt':'')); }
+    try{ await queueUpload(fname, blob, 'application/pdf', ''); showToast((navigator.onLine? 'PDF erstellt & in _Servicebericht abgelegt' : 'PDF erstellt – wird mit Netz abgelegt')+((melden&&bueroErreicht)?' · Büro zur Abrechnung benachrichtigt':'')); if(melden&&!bueroErreicht) setTimeout(()=>aufgOhneEmpfaenger('B'),2600); }
     catch(e){ showToast('PDF erstellt, Ablage fehlgeschlagen: '+((e&&e.message)||e),{bg:'#8b6d22'}); }
     closeSvcForm();
   }catch(e){ if(win) try{win.close();}catch(_){}; alert('PDF-Erstellung fehlgeschlagen: '+(e.message||e)); }
@@ -8212,13 +8221,24 @@ function mailFromName(n){
 }
 // Wer bekommt die Mail? B -> Büro der Baustelle (sonst Innendienst gesamt),
 // BL -> Bauleiter der Baustelle (sonst Auffangnetz Büro), L -> Lager (fest).
+// NUR wer bei der Baustelle über 👷 ausgewählt ist (ab v143, Entscheidung des Nutzers).
+// Bis v142 ging eine Meldung an den GANZEN Innendienst, wenn bei der Baustelle niemand
+// eingetragen war – als Auffangnetz gedacht, im Alltag hieß es „alle werden informiert".
+// Ohne Eintrag bleibt die Empfängerliste jetzt LEER: es geht keine Mail raus, dafür
+// sagt die App es demjenigen, der die Meldung auslöst (aufgOhneEmpfaenger), und die
+// Baustellenliste führt „Büro" als fehlende Angabe (projStammLuecken).
 function aufgEmpfaenger(gw, proj){
   let namen;
   if(gw==='L') namen=LAGER;
-  else if(gw==='BL'){ namen=namesArr(proj.bauleiter); if(!namen.length) namen=namesArr(proj.buero); if(!namen.length) namen=INNENDIENST; }
-  else { namen=namesArr(proj.buero); if(!namen.length) namen=INNENDIENST; }
+  else if(gw==='BL'){ namen=namesArr(proj.bauleiter); if(!namen.length) namen=namesArr(proj.buero); }
+  else { namen=namesArr(proj.buero); }
   const mails=namen.map(mailFromName).filter(Boolean);
   return [...new Set(mails)].join('; ');
+}
+// Hinweis für den, der eine Meldung auslöst, die niemanden erreicht.
+function aufgOhneEmpfaenger(gw){
+  const wer = gw==='BL' ? 'weder Bauleitung noch Büro' : 'kein Büro';
+  showToast('Für diese Baustelle ist '+wer+' hinterlegt – es wurde niemand benachrichtigt. Bitte über 👷 in der Baustellenliste eintragen.',{bg:'#8b6d22'});
 }
 async function aufgEnsureList(){
   if(AUFG_LIST_ID && AUFG_COLS) return AUFG_LIST_ID;
@@ -8355,6 +8375,7 @@ function aufgCheck(pos){
     r.aufg=PID+'|'+pos+'|'+r.erstelltAm;
     r.aufgErf=r.ersteller||'';
     const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
+    if(!aufgEmpfaenger(r.gw,proj)) aufgOhneEmpfaenger(r.gw);
     aufgEnqueue({op:'neu', key:r.aufg, titel:r.txt.trim(), beschreibung:(r.desc||'').trim(),
       projekt:curProjName(), ort:aufgOrtLabel(pos),
       zustaendig:RA_GW_LBL[r.gw]||r.gw, bauleiter:namesStr(proj.bauleiter), buero:namesStr(proj.buero),
@@ -9871,6 +9892,8 @@ function projStammLuecken(p){
   if(!s.strasse) f.push('Straße');
   if(!s.plz) f.push('PLZ');
   if(!(p&&(p.ort||'').trim())) f.push('Ort');
+  // Ohne Büro-Zuständige erreicht keine Meldung ans Büro jemanden (aufgEmpfaenger)
+  if(!namesArr(p&&p.buero).length) f.push('Büro (👷)');
   return f;
 }
 // Kurzcode aus dem Projektnamen (z.B. "Berlin Upbeat" -> "BU") für Dok.-Nummern
