@@ -2979,7 +2979,12 @@ async function doFotoUpload(file){
   showLoader('Foto wird gespeichert...');
   try {
     const uploadFile = await tryCompressImage(file);
-    const fname = folderFor(FPOS) + '/' + FPOS.replace(/\./g,'_') + '_' + uniqTs() + '.jpg';
+    // <Position>_<JJMMTT>_<ts>.jpg (ab 12.10.2026, vorher <Position>_<ts>.jpg): Position
+    // vorn, damit im Anlagen-Ordner die Fotos EINER Position beisammen stehen, dann ein
+    // lesbares Datum. Der Millisekunden-Stempel bleibt AM ENDE – fotoTimestamp() und
+    // der Bericht lesen ihn dort.
+    const _ts = uniqTs();
+    const fname = folderFor(FPOS) + '/' + fotoPosTeil(FPOS) + '_' + vaDatum(new Date(_ts)) + '_' + _ts + '.jpg';
     // Lokal ablegen + in die Warteschlange legen (funktioniert auch offline, kein Warten auf Upload)
     await queueUpload(fname, uploadFile, 'image/jpeg', FPOS);
     gs(FPOS).fotos.push(fname);
@@ -6260,7 +6265,11 @@ function vaDguvGeraet(pos, p){
 // Kategorie steht ohnehin im Ordner. Aufbau und Zeichenvorrat bleiben VA-konform.
 function vaProtoTeile(type, pos, p){
   const posT=vaSan(String(pos||'').replace(/\./g,'-'));
-  const ger=(p&&(p.von||0)>1&&(p.nr||0)) ? ('Geraet-'+p.nr) : '';
+  // Gerätenummer in den Namen, sobald es mehr als ein Gerät gibt – laut Stückliste
+  // (von>1) ODER weil an der Position ein weiteres angelegt wurde (nr>1 bei Menge 1).
+  // Bis 12.10.2026 nur bei von>1: das zweite Gerät einer Position mit Menge 1 bekam am
+  // selben Tag denselben Dateinamen und überschrieb das Protokoll des ersten.
+  const ger=(p&&(p.nr||0)&&((p.von||0)>1||(p.nr||0)>1)) ? ('Geraet-'+p.nr) : '';
   if(type==='IBN Protokoll')        return ['IBN_Protokoll', (p&&p.mfr)||'', (p&&p.dev)||'', posT, ger];
   if(type==='DGUV Protokoll')       return ['DGUV'].concat(vaDguvGeraet(pos,p), [posT, ger]);
   if(type==='Einweisungsprotokoll') return ['Einweisungsprotokoll', posT, ger];
@@ -6957,7 +6966,14 @@ document.getElementById('pi').addEventListener('change',async function(e){
   showLoader(PTYPE+' wird gespeichert...');
   try {
     const ext=file.name.split('.').pop();
-    const fname=protoDir(PTYPE,PPOS)+'/'+vaName([vaDatum()].concat(vaProtoTeile(PTYPE,PPOS,null)))+'.'+ext;
+    // Der Name trägt nur Tag, Art und Position. Zwei Dateien derselben Art am selben
+    // Tag an derselben Position (zwei Geräte, zwei Herstellerprotokolle) hießen gleich:
+    // die zweite überschrieb die erste in SharePoint, in der App standen zwei Einträge
+    // auf dieselbe Datei. Deshalb laufende Nummer, sobald der Name schon vergeben ist.
+    const basis=protoDir(PTYPE,PPOS)+'/'+vaName([vaDatum()].concat(vaProtoTeile(PTYPE,PPOS,null)));
+    const belegt=new Set((gs(PPOS).pdfs||[]).map(x=>String(x&&x.fname||'').toLowerCase()));
+    let fname=basis+'.'+ext, lfd=1;
+    while(belegt.has(fname.toLowerCase())){ lfd++; fname=basis+'_'+lfd+'.'+ext; }
     await queueUpload(fname, file, file.type||'application/pdf', PPOS);   // lokal + Warteschlange (offline-fähig)
     if(!gs(PPOS).pdfs) gs(PPOS).pdfs=[];
     gs(PPOS).pdfs.push({type:PTYPE,name:file.name,fname:fname});
@@ -8691,12 +8707,19 @@ function raSelectFsrc(src){
 // damit beide Wege nicht auseinanderlaufen.
 // Nachweisfotos tragen „_OK" im Namen – wer in SharePoint in den Ordner schaut,
 // sieht sonst nicht, welches Bild den Mangel und welches die Erledigung zeigt.
+// Ab 12.10.2026: [<Position>_]<JJMMTT>_Restarbeit-vorher|nachher_<ts>.jpg.
+// Vorher RA_[OK_]<Position>_<Zeilenindex>_<ts>.jpg – der Zeilenindex stimmte nicht
+// mehr, sobald darüber eine Zeile gelöscht wurde, und „RA"/„RA_OK" passt nicht zu
+// „vorher/nachher". idx bleibt Parameter (Aufrufer), geht aber nicht mehr in den Namen.
+// Bestandsfotos behalten ihren Namen; raFotoUm kennt beide Schemata.
+function fotoPosTeil(pos){ return vaSan(String(pos||'').replace(/\./g,'-')) || 'Pos'; }
 function raFotoName(pos, idx, art){
-  const tag=(art==='ok'?'OK_':'');
-  if(pos===PRAKEY) return safeName(curProjName())+'/_Restarbeiten/RA_'+tag+'Baustelle_'+idx+'_'+uniqTs()+'.jpg';
+  const ts=uniqTs();
+  const rest=vaDatum(new Date(ts))+'_Restarbeit-'+(art==='ok'?'nachher':'vorher')+'_'+ts+'.jpg';
+  if(pos===PRAKEY) return safeName(curProjName())+'/_Restarbeiten/'+rest;
   if(isEKey(pos)){ const sec=secByEKey(pos);
-    return safeName(curProjName())+'/'+safeName(sec?sec.label:'Etage')+'/_Restarbeiten/RA_'+tag+'Etage_'+idx+'_'+uniqTs()+'.jpg'; }
-  return folderFor(pos)+'/RA_'+tag+pos.replace(/\./g,'_')+'_'+idx+'_'+uniqTs()+'.jpg';
+    return safeName(curProjName())+'/'+safeName(sec?sec.label:'Etage')+'/_Restarbeiten/'+rest; }
+  return folderFor(pos)+'/'+fotoPosTeil(pos)+'_'+rest;
 }
 // Fotos, die am Rechner auf eine Restarbeiten-Zeile gezogen wurden. Läuft über
 // denselben Weg wie der Dateidialog (Komprimierung + Outbox), mehrere nacheinander.
@@ -8798,7 +8821,10 @@ async function raFotoUm(pos,idx,fi,art){
   // Umbenennen fehl (offline, keine Rechte), bleibt der alte Name einfach stehen.
   const i=alt.lastIndexOf('/');
   const dir=i>0?alt.slice(0,i+1):'', name=alt.slice(i+1);
-  const neuName = nach==='ok' ? name.replace(/^RA_(?!OK_)/,'RA_OK_') : name.replace(/^RA_OK_/,'RA_');
+  // Zwei Namensschemata: Altbestand RA_ ⇄ RA_OK_, neu …_Restarbeit-vorher_ ⇄ …-nachher_
+  let neuName = nach==='ok' ? name.replace(/^RA_(?!OK_)/,'RA_OK_') : name.replace(/^RA_OK_/,'RA_');
+  if(neuName===name) neuName = nach==='ok' ? name.replace('_Restarbeit-vorher_','_Restarbeit-nachher_')
+                                           : name.replace('_Restarbeit-nachher_','_Restarbeit-vorher_');
   if(neuName===name) return;
   // Liegt die Datei noch in der Warteschlange, wäre sie in SharePoint gar nicht da –
   // und ein Umbenennen dort würde später eine zweite Datei unter dem alten Namen
