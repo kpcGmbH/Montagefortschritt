@@ -5160,6 +5160,41 @@ function openServiceDialog(){
     '</div></div>';
 }
 function svcCloseDlg(){ const o=document.getElementById('svcDlg'); if(o) o.remove(); }
+// Ziel des Links aus der Meldung „Servicebericht abrechnen": GENAU dieser Bericht –
+// Kopfdaten, Einsätze, Material und der Knopf zum PDF. Bewusst nicht die allgemeine
+// Liste: dort steht oben „＋ Neuer Servicebericht", und wer aus der Mail kommt, will
+// abrechnen, nicht anlegen. Das PDF öffnet erst der Klick (Popup-Blocker, §9).
+function svcZeigeBericht(nr){
+  const en=SVC.find(e=>e.nr===nr);
+  if(!en){
+    openServiceDialog();
+    showToast('Servicebericht Nr. '+nr+' wurde nicht gefunden – bitte in der Liste nachsehen',{bg:'#8b6d22'});
+    return;
+  }
+  let ov=document.getElementById('svcDlg');
+  if(!ov){ ov=document.createElement('div'); ov.id='svcDlg'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) svcCloseDlg(); };
+  const z=[];
+  const zeile=(l,v)=>{ if(v) z.push('<div style="display:flex;gap:10px;padding:5px 0;border-bottom:1px solid #3a3530"><span style="flex:0 0 92px;color:#a8a8a8;font-size:12px">'+l+'</span><span style="flex:1;font-size:13px;white-space:pre-wrap">'+escapeHtml(v)+'</span></div>'); };
+  zeile('Kunde', en.kunde);
+  zeile('Ort', [en.strasse,en.ort].filter(Boolean).join(', '));
+  zeile('Einsatzart', svcArtLabel(en.art));
+  zeile('Einsätze', (en.einsaetze||[]).map(e=>[e.datum?svcDatShort(e.datum):'', e.monteur,
+    (e.checkIn||e.checkOut)?((e.checkIn||'?')+'–'+(e.checkOut||'?')):'', e.fahrzeit?('Fahrzeit '+e.fahrzeit):'', e.km?(e.km+' km'):''].filter(Boolean).join(' · ')).filter(Boolean).join('\n'));
+  zeile('Material', (en.material||[]).map(m=>[m.menge,m.text].filter(Boolean).join(' × ')).filter(Boolean).join('\n'));
+  zeile('Auftrag', (en.arbeitsauftrag||'').trim());
+  zeile('Beendet', en.beendet==='ja'?'Ja':'Nein');
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:22px;max-width:520px;width:100%;max-height:86vh;overflow:auto;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:17px;margin-bottom:2px">&#128295; Servicebericht Nr. '+en.nr+' – zur Abrechnung</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:12px">'+escapeHtml(curProjName())+'</div>'+
+    z.join('')+
+    '<button type="button" onclick="svcOpenPdf('+en.nr+')" style="width:100%;margin-top:16px;background:#b8860b;border:none;color:#fff;border-radius:8px;padding:12px;font-size:15px;cursor:pointer;font-family:inherit">&#128196; PDF öffnen</button>'+
+    '<div style="display:flex;gap:10px;margin-top:12px;justify-content:space-between;flex-wrap:wrap">'+
+      '<button type="button" onclick="svcCloseDlg();openServiceDialog()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;font-family:inherit">Alle Serviceberichte</button>'+
+      '<button type="button" onclick="svcPick('+en.nr+')" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;font-family:inherit">&#9998; Bericht bearbeiten</button>'+
+      '<button type="button" onclick="svcCloseDlg()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:10px 14px;font-size:13px;cursor:pointer;font-family:inherit">Schließen</button>'+
+    '</div></div>';
+}
 function svcPick(nr){ svcCloseDlg(); openSvcForm(nr); }
 
 // ---- Formular ----
@@ -10095,7 +10130,14 @@ async function openProjectFlow(){
       const svcSprung = !!z.pos && z.pos.indexOf('§SVC§')===0;
       if(z.pos && !svcSprung && !isEKey(z.pos)) _ibnJumpPos=z.pos;   // Kartensprung über den vorhandenen Mechanismus
       await selectProject(z.pid);
-      if(svcSprung){ try{ openServiceDialog(); }catch(e){} }
+      // selectProject lädt die Serviceberichte NICHT blockierend nach – hier erst darauf
+      // warten. Ohne das war die Liste beim Öffnen noch leer, und der Link aus der Mail
+      // zeigte nur „＋ Neuer Servicebericht" (gemeldet 12.10.2026).
+      if(svcSprung){
+        const nr=parseInt(z.pos.slice(5),10)||0;
+        try{ await loadService(z.pid); }catch(e){}
+        try{ svcZeigeBericht(nr); }catch(e){ console.warn(e); }
+      }
       return;
     }
     renderProjectPicker();
