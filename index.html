@@ -325,6 +325,7 @@ main{display:block;padding-bottom:80px;}
 .ibnz:empty{display:none;}
 .ibnz .ib-b{border-radius:9px;padding:2px 8px;font-weight:700;color:#fff;background:var(--red,#b3402e);}
 .ibnz .ib-b.ok{background:var(--green);}
+.ibnz .ib-a{border:1px solid var(--line);border-radius:9px;padding:1px 8px;color:var(--text);cursor:pointer;}
 .ibnz .ib-l{color:var(--braun);text-decoration:underline;cursor:pointer;font-weight:700;}
 .ck-ts{font-size:8.5px;font-weight:400;opacity:.8;letter-spacing:0.2px;white-space:nowrap;display:none;padding-left:18px;}
 .ck.on .ck-ts,.ck.na .ck-ts{display:block;}
@@ -2011,8 +2012,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 151;
+const APP_VERSION = 152;
 const CHANGELOG = [
+  { v:152, titel:'Stecker oder Festanschluss – DGUV-Prüfung', punkte:[
+    'Beim Abhaken von <b>„Elektroanschluss"</b> fragt die App einmal je Position: <b>🔌 Stecker</b> oder <b>⚡ Festanschluss</b>. Die Antwort steht danach unter den Schritten und lässt sich dort per Tipp ändern.',
+    'Bei <b>Festanschluss</b> ist eine <b>DGUV-Prüfung Pflicht</b>: „Inbetriebnahme" lässt sich erst abhaken, wenn das DGUV-Prüfprotokoll an der Position liegt (bei mehreren Geräten eines je Gerät). Ein Tipp auf „Prüfprotokoll anlegen" öffnet es direkt.',
+    'Fehlende Prüfungen stehen in den <b>Offenen Punkten</b> und im Reiter <b>Dokumente</b> („DGUV-Prüfungen"). Büro und Bauleitung können dort einzelne Geräte oder die ganze Baustelle auf „nicht erforderlich" setzen.',
+    'Geräte, deren Elektroanschluss schon abgehakt ist, werden nicht nachträglich gefragt.' ]},
   { v:151, titel:'Einweisungen nicht abwählbar', punkte:[
     'Geräte- und Grundlagen-Einweisung lassen sich im Reiter Dokumente nicht mehr als „nicht erforderlich" markieren. Die Geräte-Einweisung erscheint nur, wenn es auf der Baustelle Elektrogeräte gibt.' ]},
   { v:150, titel:'IBN-Pflicht je Gerät abwählen', punkte:[
@@ -2788,7 +2794,7 @@ function histAdd(pos,art,txt){
 const HIST_TXT={set:'abgehakt','set-auto':'automatisch mitgesetzt','set-proto':'durch Protokoll gesetzt',unset:'Haken entfernt',notiz:'Anmerkung geändert',
   'notiz-weg':'Anmerkung gelöscht','ra-neu':'Restarbeit erfasst','ra-erledigt':'Restarbeit erledigt',
   'ra-offen':'Restarbeit wieder offen','na-set':'entfällt','na-unset':'entfällt aufgehoben',
-  'ts-neu':'Typenschild fotografiert','ts-weg':'Typenschild-Foto gelöscht'};
+  'ts-neu':'Typenschild fotografiert','ts-weg':'Typenschild-Foto gelöscht','anschl':'Anschlussart'};
 function histFmt(t){ try{ const d=new Date(t);
   return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+d.getFullYear()+
     ' · '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }catch(e){ return ''; } }
@@ -2876,7 +2882,11 @@ function tc(pos,f){
   // Typenschild-Foto ist Pflicht vor „Inbetriebnahme" bzw. bei reinen Sanitär-Geräten
   // vor „Sanitäranschluss" (ab v145). Gilt auch für spätere Schritte, die diesen über
   // die Chronologie-Automatik mitsetzen würden (Einweisung, Dichtigkeitsprüfung).
+  // Stecker oder Festanschluss? Einmal je Position, beim Elektroanschluss (ab v152)
+  if(!s[f] && anschlFragen(pos,f)){ anschlDialog(pos, function(){ tc(pos,f); }); return; }
   if(!s[f] && tsBetrifft(pos,f) && tsFehlt(pos)){ tsSperreMelden(pos); return; }
+  // Festanschluss: DGUV-Prüfung vor „Inbetriebnahme" (ab v152)
+  if(!s[f] && ibnBetrifft(pos,f) && dguvFehlt(pos)){ dguvSperreMelden(pos); return; }
   // IBN-Protokoll ist Pflicht vor „Inbetriebnahme" bei den Geräten aus IBN_KAT (ab v148)
   if(!s[f] && ibnBetrifft(pos,f) && ibnFehlt(pos)){ ibnSperreMelden(pos); return; }
   s[f]=!s[f];
@@ -2926,6 +2936,12 @@ function protoHinweis(auto){
 // Widerspruch zwischen Protokoll und „entfällt" gehört vor Augen, nicht in einen
 // Toast, der nach drei Sekunden weg ist.
 function protoWarnen(pos, auto){
+  if(auto && auto.stand==='dguv'){
+    alert('Hinweis zu '+posLabel(pos)+'\n\nDas Protokoll ist abgelegt. „Inbetriebnahme" wird erst abgehakt, '+
+          'wenn die DGUV-Prüfung dokumentiert ist (Festanschluss, '+dguvIst(pos)+' von '+dguvSoll(pos)+').\n\n'+
+          'Über „Prüfprotokoll anlegen" an der Position – danach setzt die App den Haken von selbst.');
+    return;
+  }
   if(auto && auto.stand==='typenschild'){
     alert('Hinweis zu '+posLabel(pos)+'\n\nDas Protokoll ist abgelegt. „Inbetriebnahme" wird erst abgehakt, '+
           'wenn das Typenschild fotografiert ist ('+tsIst(pos)+' von '+tsSoll(pos)+').\n\n'+
@@ -2955,6 +2971,7 @@ function schrittAusProtokoll(pos, type){
   // Haken nach (tsNachholen).
   // Bei mehreren Geräten erst mit dem letzten Pflicht-Protokoll (ibnNachholen nicht
   // nötig: jedes neue Protokoll ruft diese Funktion erneut auf).
+  if(f==='ib' && dguvFehlt(pos)) return {stand:'dguv', feld:f};
   if(f==='ib' && ibnFehlt(pos)) return {stand:'ibn-teil', feld:f};
   if(f===tsSchritt(pos) && tsFehlt(pos)) return {stand:'typenschild', feld:f};
   s[f]=true; s.ts[f]=new Date().toISOString(); s.by[f]=USER;
@@ -3071,9 +3088,9 @@ async function dokuSchalten(k, aus){
   const m=Object.assign({}, p.dokuAus||{});
   if(aus) m[k]={von:USER||'', am:new Date().toISOString()}; else delete m[k];
   p.dokuAus=m; p.stammEdit=new Date().toISOString();
-  dokuRender(); updDokuTab(); if(k==='ibn') updAllTG();
+  dokuRender(); updDokuTab(); if(k==='ibn'||k==='dguv') updAllTG();
   try{ await saveProjects(); }
-  catch(e){ p.dokuAus=alt; dokuRender(); updDokuTab(); if(k==='ibn') updAllTG(); alert('Speichern fehlgeschlagen: '+((e&&e.message)||e)); }
+  catch(e){ p.dokuAus=alt; dokuRender(); updDokuTab(); if(k==='ibn'||k==='dguv') updAllTG(); alert('Speichern fehlgeschlagen: '+((e&&e.message)||e)); }
 }
 let DOKU_AUS_AUF=false;
 function dokuFertig(e, sigB){ return !!(e && (e.pdfAm || e.abrGemeldet || (e.sigKpc && e[sigB]))); }
@@ -3101,6 +3118,13 @@ function dokuStand(){
   // die Abwahl nicht mehr zurücknehmen.
   const ibnWeg=dokuIstAus('ibn')?0:ibnAbgewaehlt().length;
   if(!ibnOff && ibnWeg) fertig.push({ic:'&#9881;&#65039;', t:'Inbetriebnahmeprotokolle', m:(ibnTot?('alle '+ibnTot+' Pflicht-Geräte versorgt · '):'')+ibnWeg+' Gerät'+(ibnWeg===1?'':'e')+' nicht erforderlich', knopf:'Liste', fn:'ibnListe()', leicht:true});
+  // DGUV-Prüfungen der Festanschluss-Geräte (ab v152)
+  const dgL=pflFehlende('dguv'), dgOff=dgL.filter(x=>x.ist<x.soll).length;
+  let dgTot=0; DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ if(dguvPflicht(it.pos)) dgTot++; })));
+  if(dgOff) off.push({k:'dguv', ic:'&#9889;', t:'DGUV-Prüfungen', m:(dgTot-dgOff)+' von '+dgTot+' Festanschluss-Geräten · '+dgOff+(dgOff===1?' fehlt':' fehlen'),
+    quote:(dgTot-dgOff)/dgTot, knopf:'Liste', fn:'pflListe(\'dguv\')'});
+  const dgWeg=dokuIstAus('dguv')?0:pflAbgewaehlt('dguv').length;
+  if(!dgOff && dgWeg) fertig.push({ic:'&#9889;', t:'DGUV-Prüfungen', m:(dgTot?('alle '+dgTot+' Festanschluss-Geräte geprüft · '):'')+dgWeg+' Gerät'+(dgWeg===1?'':'e')+' nicht erforderlich', knopf:'Liste', fn:'pflListe(\'dguv\')', leicht:true});
   // Schlüsselübergabe: gehört immer dazu
   const schlP=ew.protokolle.filter(p=>p.typ==='schluessel'), schlE=ew.entwuerfe.filter(p=>p.typ==='schluessel');
   if(!schlP.length && !schlE.length) off.push({k:'schluessel', ic:'&#128273;', t:'Schlüsselübergabe', m:'noch kein Protokoll', knopf:'Anlegen', fn:'openSchluesselprotokoll()'});
@@ -3117,7 +3141,7 @@ function dokuStand(){
   // Einweisungen sind NICHT abwählbar (Nutzer 28.10.2026): die Grundlagen-Einweisung
   // gehört zu jeder Baustelle, die Geräte-Einweisung entfällt nur von selbst,
   // wenn es keine Elektrogeräte gibt (dann erscheint sie gar nicht erst).
-  const DOKU_NAMEN={'ibn':['&#9881;&#65039;','Inbetriebnahmeprotokolle'],
+  const DOKU_NAMEN={'ibn':['&#9881;&#65039;','Inbetriebnahmeprotokolle'],'dguv':['&#9889;','DGUV-Prüfungen'],
     'schluessel':['&#128273;','Schlüsselübergabe'],'dicht':['&#128167;','Dichtigkeitsprotokoll'],'fm':['&#128228;','Mängelfreimeldung']};
   const ausM=dokuAusMap(), aus=[];
   Object.keys(ausM).forEach(k=>{ const n=DOKU_NAMEN[k]; if(!n) return; const a=ausM[k]||{};
@@ -3484,68 +3508,165 @@ function ibnAnlegen(pos){
     '<button type="button" onclick="document.getElementById(\'fsrcOv\').remove()" style="width:100%;background:none;border:1px solid #555;color:#ccc;border-radius:10px;padding:11px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
   '</div>';
 }
-// Schloss am Schritt und Zeile „IBN-Protokoll x von y" unter den Schritten
+// Schloss am Schritt und Statuszeile unter den Schritten: Anschlussart (v152),
+// DGUV-Protokoll bei Festanschluss (v152), IBN-Protokoll (v148)
 function ibnRender(pos){
   const id=sp(pos), s=gs(pos), z=document.getElementById('IZ'+id), k=document.getElementById('Kib'+id);
-  const pfl=ibnPflicht(pos), offen=pfl && !s.ib && !entf(s,'ib'), fehlt=offen && ibnFehlt(pos);
-  if(k){ k.classList.toggle('ck-lock', fehlt); const i=k.querySelector('.cki'); if(i && fehlt) i.innerHTML='&#128274;'; else if(i && !s.ib && !entf(s,'ib')) i.innerHTML='&#9675;'; }
+  const offen=!s.ib && !entf(s,'ib');
+  const ibnF=offen && ibnFehlt(pos), dgF=offen && dguvFehlt(pos), fehlt=ibnF||dgF;
+  if(k){ k.classList.toggle('ck-lock', fehlt); const i=k.querySelector('.cki'); if(i && fehlt) i.innerHTML='&#128274;'; else if(i && offen) i.innerHTML='&#9675;'; }
   if(!z) return;
-  if(!pfl || entf(s,'ib') || (s.ib && ibnFehlt(pos))){ z.innerHTML=''; return; }   // Altbestand: kein Hinweis
+  const teile=[];
+  if(relFields(pos).includes('ea') && s.anschl)
+    teile.push('<span class="ib-a" onclick="anschlDialog(\''+pos+'\')" title="Anschlussart ändern">'+(s.anschl==='fest'?'&#9889; Festanschluss':'&#128268; Stecker')+'</span>');
+  // DGUV: solange offen; Altbestand (schon in Betrieb) ohne Hinweis
+  if(dguvPflicht(pos) && !entf(s,'ib') && !(s.ib && dguvFehlt(pos))){
+    const ist=Math.min(dguvIst(pos),dguvSoll(pos)), soll=dguvSoll(pos);
+    teile.push('<span class="ib-b'+(dgF?'':' ok')+'">DGUV-Protokoll '+ist+' von '+soll+'</span>'+
+      (dgF?'<span class="ib-l" onclick="dguvAnlegen(\''+pos+'\')">Prüfprotokoll anlegen</span>':''));
+  }
   // Die erkannte Kategorie steht bewusst NICHT hier (Wunsch des Nutzers) – Schloss
   // und roter Zähler sagen genug; nachzulesen ist sie im Dialog „✎ Gewerk".
-  const ist=Math.min(ibnIst(pos),ibnSoll(pos)), soll=ibnSoll(pos);
-  z.innerHTML='<span class="ib-b'+(fehlt?'':' ok')+'">IBN-Protokoll '+ist+' von '+soll+'</span>'+
-    (fehlt?'<span class="ib-l" onclick="ibnAnlegen(\''+pos+'\')">Protokoll anlegen</span>':'');
+  if(ibnPflicht(pos) && !entf(s,'ib') && !(s.ib && ibnFehlt(pos))){
+    const ist=Math.min(ibnIst(pos),ibnSoll(pos)), soll=ibnSoll(pos);
+    teile.push('<span class="ib-b'+(ibnF?'':' ok')+'">IBN-Protokoll '+ist+' von '+soll+'</span>'+
+      (ibnF?'<span class="ib-l" onclick="ibnAnlegen(\''+pos+'\')">Protokoll anlegen</span>':''));
+  }
+  z.innerHTML=teile.join('');
 }
-function ibnFehlende(){
-  const r=[];
+
+// ── Stecker oder Festanschluss → DGUV-Prüfung (ab v152) ──────────────────
+// Idee des Nutzers (28.10.2026): beim Elektroanschluss wird gefragt, wie das Gerät
+// angeschlossen ist. Bei Festanschluss ist eine DGUV-Prüfung Pflicht, und zwar VOR
+// der Inbetriebnahme (Sperre wie beim IBN-Protokoll). Gespeichert als s.anschl =
+// 'stecker' | 'fest' im data-Blob der Position. Altbestand (Elektroanschluss schon
+// gesetzt) wird nicht nachträglich gefragt.
+function anschlFragen(pos, f){
+  const s=gs(pos);
+  if(s.anschl || s.ea || entf(s,'ea') || !relFields(pos).includes('ea')) return false;
+  return f==='ea' || (VORSTUFEN[f]||[]).includes('ea');
+}
+function anschlDialog(pos, weiter){
+  let ov=document.getElementById('fsrcOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='fsrcOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  const s=gs(pos), bs='width:100%;background:#3a3530;border:1px solid #895500;color:#fff;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;text-align:left';
+  const an=v=>s.anschl===v?';background:#895500':'';
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:20px;max-width:360px;width:100%;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:16px;font-weight:700;margin-bottom:4px">Wie ist das Gerät angeschlossen?</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:14px">'+escapeHtml(posLabel(pos))+'</div>'+
+    '<button type="button" id="anSt" style="'+bs+an('stecker')+'">&#128268; Stecker<br><span style="font-size:11px;font-weight:400;color:#ccc">steckerfertig, an Steckdose</span></button>'+
+    '<button type="button" id="anFe" style="'+bs+an('fest')+'">&#9889; Festanschluss<br><span style="font-size:11px;font-weight:400;color:#ccc">fest verdrahtet – DGUV-Prüfung vor der Inbetriebnahme</span></button>'+
+    '<button type="button" id="anAb" style="width:100%;background:none;border:1px solid #555;color:#ccc;border-radius:10px;padding:11px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
+  '</div>';
+  const setz=v=>{ ov.remove();
+    if(s.anschl!==v){ const alt=s.anschl; s.anschl=v; histAdd(pos,'anschl',(v==='fest'?'Festanschluss':'Stecker')+(alt?(' (vorher '+(alt==='fest'?'Festanschluss':'Stecker')+')'):'')); savePos(pos); }
+    ibnRender(pos); if(ACT==='__doku'){ dokuRender(); updDokuTab(); }
+    if(weiter) weiter(); };
+  document.getElementById('anSt').onclick=()=>setz('stecker');
+  document.getElementById('anFe').onclick=()=>setz('fest');
+  document.getElementById('anAb').onclick=()=>ov.remove();
+}
+function dguvPflicht(pos){
+  const s=gs(pos);
+  if(s.anschl!=='fest' || !relFields(pos).includes('ea')) return false;
+  if(dokuIstAus('dguv')) return false;
+  const it=tsItem(pos); return !(it && it.dguv===false);
+}
+function dguvSoll(pos){ return tsSoll(pos); }
+function dguvIst(pos){
+  const l=(gs(pos).pdfs||[]).filter(p=>p&&p.type==='DGUV Protokoll');
+  if(l.some(p=>p.alle)) return dguvSoll(pos);
+  return l.length;
+}
+function dguvFehlt(pos){ return dguvPflicht(pos) && dguvIst(pos) < dguvSoll(pos); }
+function dguvSperreMelden(pos){
+  if(confirm('Festanschluss: Vor der „Inbetriebnahme" ist die DGUV-Prüfung zu dokumentieren ('+dguvIst(pos)+' von '+dguvSoll(pos)+').\n\n'+posLabel(pos)+
+             '\n\nJetzt Prüfprotokoll anlegen?')) dguvAnlegen(pos);
+}
+function dguvAnlegen(pos){
+  PPOS=pos;
+  let ov=document.getElementById('fsrcOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='fsrcOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  const bs='width:100%;background:#3a3530;border:1px solid #895500;color:#fff;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px';
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:20px;max-width:360px;width:100%;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:16px;font-weight:700;margin-bottom:4px">&#9889; DGUV-Prüfprotokoll</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:14px">'+escapeHtml(posLabel(pos))+' · '+dguvIst(pos)+' von '+dguvSoll(pos)+'</div>'+
+    '<button type="button" onclick="document.getElementById(\'fsrcOv\').remove();openDguvDigital()" style="'+bs+'">&#128221; Digital ausfüllen</button>'+
+    '<button type="button" onclick="document.getElementById(\'fsrcOv\').remove();selectPtype(\'DGUV Protokoll\')" style="'+bs+'">&#128196; PDF hochladen</button>'+
+    '<button type="button" onclick="document.getElementById(\'fsrcOv\').remove()" style="width:100%;background:none;border:1px solid #555;color:#ccc;border-radius:10px;padding:11px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
+  '</div>';
+}
+// Kommt die DGUV-Prüfung nach dem IBN-Protokoll, holt sie die Inbetriebnahme nach –
+// genau das, was das IBN-Protokoll vorher nicht durfte.
+function dguvNachholen(pos){
+  const s=gs(pos); ibnRender(pos);
+  if(s.ib || entf(s,'ib') || dguvFehlt(pos)) return null;
+  if(!(s.pdfs||[]).some(p=>p&&p.type==='IBN Protokoll')) return null;
+  return schrittAusProtokoll(pos,'IBN Protokoll');
+}
+
+// Pflicht-Protokolle je Art – für Liste, Dokumente und Abwahl je Gerät
+const PFL_ART={
+  ibn:{typ:'IBN Protokoll', ic:'&#9881;&#65039;', titel:'Fehlende Inbetriebnahmeprotokolle', pfl:ibnPflicht, ist:ibnIst, soll:ibnSoll, auto:ibnAuto, rel:'ib',
+       hint:'„nicht erforderlich" hebt die Pflicht für dieses Gerät auf – „Inbetriebnahme" ist dann ohne Protokoll abhakbar.'},
+  dguv:{typ:'DGUV Protokoll', ic:'&#9889;', titel:'Fehlende DGUV-Prüfungen (Festanschluss)', pfl:dguvPflicht, ist:dguvIst, soll:dguvSoll, auto:p=>gs(p).anschl==='fest', rel:'ea',
+       hint:'„nicht erforderlich" hebt die DGUV-Pflicht für dieses Gerät auf.'}
+};
+function pflFehlende(art){
+  const A=PFL_ART[art], r=[];
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
-    const s=gs(it.pos); if(!ibnPflicht(it.pos) || s.ib || entf(s,'ib')) return;
-    r.push({pos:it.pos, bez:(it.bez||'').trim(), etage:sec.label||sec.pos, anlage:sub.bez||sub.pos, ist:Math.min(ibnIst(it.pos),ibnSoll(it.pos)), soll:ibnSoll(it.pos)});
+    const s=gs(it.pos); if(!A.pfl(it.pos) || s.ib || entf(s,'ib')) return;
+    r.push({pos:it.pos, bez:(it.bez||'').trim(), etage:sec.label||sec.pos, anlage:sub.bez||sub.pos, ist:Math.min(A.ist(it.pos),A.soll(it.pos)), soll:A.soll(it.pos)});
   })));
   return r;
 }
+function ibnFehlende(){ return pflFehlende('ibn'); }
 // Liste für den Reiter „Dokumente": noch nicht in Betrieb genommene Pflicht-Geräte.
 // Büro und Bauleitung können hier je Gerät „nicht erforderlich" setzen (ab v150,
 // Wunsch des Nutzers) – das ist dieselbe Übersteuerung wie im Dialog „✎ Gewerk"
-// (item.ibn=false), nur ohne jede Position einzeln aufzusuchen.
-function ibnAbgewaehlt(){
-  const r=[];
+// (item.ibn=false bzw. item.dguv=false), nur ohne jede Position einzeln aufzusuchen.
+function pflAbgewaehlt(art){
+  const A=PFL_ART[art], r=[];
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
-    if(it.ibn!==false || !relFields(it.pos).includes('ib')) return;
-    r.push({pos:it.pos, bez:(it.bez||'').trim(), etage:sec.label||sec.pos, anlage:sub.bez||sub.pos, von:it.ibnAusVon||'', am:it.ibnAusAm||''});
+    if(it[art]!==false || !relFields(it.pos).includes(A.rel)) return;
+    r.push({pos:it.pos, bez:(it.bez||'').trim(), etage:sec.label||sec.pos, anlage:sub.bez||sub.pos, von:it[art+'AusVon']||'', am:it[art+'AusAm']||''});
   })));
   return r;
 }
-function ibnPosSchalten(pos, pflicht){
+function ibnAbgewaehlt(){ return pflAbgewaehlt('ibn'); }
+function pflPosSchalten(art, pos, pflicht){
   if(!dokuDarfSchalten()) return;
   const it=tsItem(pos); if(!it) return;
-  if(pflicht){ delete it.ibnAusVon; delete it.ibnAusAm; if(ibnAuto(pos)) delete it.ibn; else it.ibn=true; }
-  else { it.ibn=false; it.ibnAusVon=USER||''; it.ibnAusAm=new Date().toISOString(); }
+  if(pflicht){ delete it[art+'AusVon']; delete it[art+'AusAm']; if(PFL_ART[art].auto(pos)) delete it[art]; else it[art]=true; }
+  else { it[art]=false; it[art+'AusVon']=USER||''; it[art+'AusAm']=new Date().toISOString(); }
   ibnRender(pos); saveLV();
   if(ACT==='__doku'){ dokuRender(); updDokuTab(); }
-  ibnListe();
+  pflListe(art);
 }
-let IBN_LS_AUS=false;
-function ibnListe(){
-  const l=ibnFehlende().filter(x=>x.ist<x.soll), weg=ibnAbgewaehlt(), darf=dokuDarfSchalten();
+function ibnPosSchalten(pos, pflicht){ pflPosSchalten('ibn', pos, pflicht); }
+const PFL_LS_AUS={};
+function pflListe(art){
+  const A=PFL_ART[art], l=pflFehlende(art).filter(x=>x.ist<x.soll), weg=pflAbgewaehlt(art), darf=dokuDarfSchalten();
   let ov=document.getElementById('ibnLsOv');
   const scroll=ov?((ov.firstElementChild||{}).scrollTop||0):0;
   if(!ov){ ov=document.createElement('div'); ov.id='ibnLsOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-  const knopf=(pos,pfl)=>darf?('<button onclick="event.stopPropagation();ibnPosSchalten(\''+pos+'\','+pfl+')" style="flex-shrink:0;border:'+(pfl?'1px solid var(--braun)':'none')+';background:none;color:'+(pfl?'var(--braun)':'var(--accent2)')+';border-radius:14px;padding:'+(pfl?'5px 10px':'4px')+';font-family:inherit;font-size:11px;text-decoration:'+(pfl?'none':'underline')+';cursor:pointer;white-space:nowrap">'+(pfl?'wieder aktivieren':'nicht erforderlich')+'</button>'):'';
+  const knopf=(pos,pfl)=>darf?('<button onclick="event.stopPropagation();pflPosSchalten(\''+art+'\',\''+pos+'\','+pfl+')" style="flex-shrink:0;border:'+(pfl?'1px solid var(--braun)':'none')+';background:none;color:'+(pfl?'var(--braun)':'var(--accent2)')+';border-radius:14px;padding:'+(pfl?'5px 10px':'4px')+';font-family:inherit;font-size:11px;text-decoration:'+(pfl?'none':'underline')+';cursor:pointer;white-space:nowrap">'+(pfl?'wieder aktivieren':'nicht erforderlich')+'</button>'):'';
   const zeile=(x,aus)=>'<div onclick="document.getElementById(\'ibnLsOv\').remove();ibnGoToPos(\''+x.pos+'\')" style="display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-left:4px solid '+(aus?'var(--line)':'var(--red,#b3402e)')+';border-radius:8px;padding:8px 10px;margin-bottom:6px;cursor:pointer;font-size:13px'+(aus?';opacity:.75':'')+'">'+
     '<div style="flex:1;min-width:0"><span style="'+(aus?'text-decoration:line-through':'')+'">'+escapeHtml(x.pos)+' '+escapeHtml(x.bez)+'</span><div style="font-size:11px;color:var(--accent2)">'+escapeHtml(x.etage)+' · '+escapeHtml(x.anlage)+' · '+
     (aus?('abgewählt'+(x.von?(' von '+escapeHtml(x.von)):'')+(x.am?(' · '+dokuDat(x.am)):'')):(x.ist+' von '+x.soll+' vorhanden'))+'</div></div>'+knopf(x.pos,aus)+'</div>';
   ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);color:var(--text);border-radius:12px;max-width:520px;width:100%;max-height:80vh;overflow:auto;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.45)">'+
-    '<div style="font-size:16px;font-weight:700;margin-bottom:4px">&#9881;&#65039; Fehlende Inbetriebnahmeprotokolle ('+l.length+')</div>'+
-    (darf?'<div style="font-size:11px;color:var(--accent2);margin-bottom:10px">„nicht erforderlich" hebt die Pflicht für dieses Gerät auf – „Inbetriebnahme" ist dann ohne Protokoll abhakbar.</div>':'<div style="margin-bottom:6px"></div>')+
+    '<div style="font-size:16px;font-weight:700;margin-bottom:4px">'+A.ic+' '+A.titel+' ('+l.length+')</div>'+
+    (darf?'<div style="font-size:11px;color:var(--accent2);margin-bottom:10px">'+A.hint+'</div>':'<div style="margin-bottom:6px"></div>')+
     (l.length?l.map(x=>zeile(x,false)).join(''):'<div style="font-size:13px;color:var(--accent2)">Alle Pflicht-Protokolle liegen vor.</div>')+
-    (weg.length?('<div onclick="IBN_LS_AUS=!IBN_LS_AUS;ibnListe()" style="font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--accent2);margin:12px 0 8px;cursor:pointer">'+(IBN_LS_AUS?'&#9662;':'&#9656;')+' Nicht erforderlich ('+weg.length+')</div>'+
-      (IBN_LS_AUS?weg.map(x=>zeile(x,true)).join(''):'')):'')+
+    (weg.length?('<div onclick="PFL_LS_AUS[\''+art+'\']=!PFL_LS_AUS[\''+art+'\'];pflListe(\''+art+'\')" style="font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--accent2);margin:12px 0 8px;cursor:pointer">'+(PFL_LS_AUS[art]?'&#9662;':'&#9656;')+' Nicht erforderlich ('+weg.length+')</div>'+
+      (PFL_LS_AUS[art]?weg.map(x=>zeile(x,true)).join(''):'')):'')+
     '<div style="text-align:right;margin-top:8px"><button onclick="document.getElementById(\'ibnLsOv\').remove()" style="padding:8px 16px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-family:inherit">Schließen</button></div></div>';
   if(scroll) ov.firstElementChild.scrollTop=scroll;
 }
+function ibnListe(){ pflListe('ibn'); }
 
 // FOTO
 function trf(pos){ FPOS=pos; openFotoSrcDialog(); }
@@ -6810,7 +6931,8 @@ function buildPosData(pos){
     usr: JSON.stringify(s.by||{}),
     na: JSON.stringify(s.na||{}),
     hist: JSON.stringify(s.hist||[]),
-    typenschild: JSON.stringify(s.typenschild||[])
+    typenschild: JSON.stringify(s.typenschild||[]),
+    anschl: s.anschl||''
   });
 }
 
@@ -7018,7 +7140,8 @@ async function loadState() {
           note: row.note||'', fotos: fotos, pdfs: pdfs, restarbeiten: rest, ts: tsObj, by: byObj,
           na: (naObj&&typeof naObj==='object')?naObj:{},
           hist: Array.isArray(histArr)?histArr:[],
-          typenschild: Array.isArray(tsch)?tsch:[]
+          typenschild: Array.isArray(tsch)?tsch:[],
+          anschl: row.anschl||''
         };
         if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at;
       });
@@ -7167,8 +7290,11 @@ setInterval(async () => {
       const tschChanged = JSON.stringify(cur?(cur.typenschild||[]):[])!==JSON.stringify(newTsch);
       const tsChanged = JSON.stringify(cur?(cur.ts||{}):{})!==JSON.stringify(newTs);
       const naChanged = JSON.stringify(cur?(cur.na||{}):{})!==JSON.stringify(newNa);
+      // Anschlussart und Protokolle: beide entscheiden über die Sperre an „Inbetriebnahme"
+      const anschlChanged = (cur?(cur.anschl||''):'')!==(row.anschl||'');
+      const pdfsChanged = !!row.pdfs && JSON.stringify(cur?(cur.pdfs||[]):[])!==row.pdfs;
       if (!cur || cur.g!==row.g || cur.m!==row.m || cur.nu!==row.nu || cur.a!==row.a ||
-          cur.sa!==row.sa || cur.dp!==row.dp || cur.ea!==row.ea || cur.pa!==row.pa || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged || naChanged || tschChanged) {
+          cur.sa!==row.sa || cur.dp!==row.dp || cur.ea!==row.ea || cur.pa!==row.pa || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged || naChanged || tschChanged || anschlChanged || pdfsChanged) {
         let pdfs = cur ? cur.pdfs : [];
         try { if(row.pdfs) pdfs = JSON.parse(row.pdfs); } catch(e) {}
         // Verlauf: den längeren der beiden Stände behalten. Ohne das würde das
@@ -7179,9 +7305,10 @@ setInterval(async () => {
         ST[row.pos] = { g:row.g||false, m:row.m||false, nu:row.nu||false, a:row.a||false,
           sa:row.sa||false, dp:row.dp||false, ea:row.ea||false, pa:row.pa||false, ib:row.ib||false, ew:row.ew||false,
           note:row.note||'', fotos:cur?cur.fotos:[], pdfs:pdfs, restarbeiten:newRest, ts:newTs, by:newBy,
-          na:newNa, hist:newHist, typenschild:newTsch };
+          na:newNa, hist:newHist, typenschild:newTsch, anschl:row.anschl||'' };
         changed = true;
         if(tschChanged) updTG(row.pos);
+        if(pdfsChanged) updPG(row.pos); else if(anschlChanged) ibnRender(row.pos);
         const id = row.pos.replace(/\./g,'_');
         ['g','m','nu','a','sa','dp','ea','pa','ib','ew'].forEach(f => ckRender(row.pos,f));
         const card = document.getElementById('C'+id);
@@ -7513,7 +7640,7 @@ async function ibnReceive(p){
     puAuto();                       // Übersicht in SharePoint nachziehen
     // Beim ERSETZEN eines Protokolls nichts nachsetzen – der Haken steht dann längst,
     // und ein „entfällt" wäre schon beim ersten Ablegen gemeldet worden.
-    const auto = replaced ? null : schrittAusProtokoll(pos, type);
+    const auto = replaced ? null : (type==='DGUV Protokoll' ? dguvNachholen(pos) : schrittAusProtokoll(pos, type));
     showToast('✓ '+type+' bei Position '+pos+(replaced?' aktualisiert':' abgelegt')+
               protoHinweis(auto));
     protoWarnen(pos, auto);
@@ -7637,6 +7764,8 @@ document.getElementById('pi').addEventListener('change',async function(e){
     // Inbetriebnahme dauerhaft gesperrt.
     if(PTYPE==='IBN Protokoll' && ibnPflicht(PPOS) && ibnSoll(PPOS)-ibnIst(PPOS)>1 &&
        confirm('Enthält diese Datei die Inbetriebnahmeprotokolle für ALLE '+ibnSoll(PPOS)+' Geräte dieser Position?\n\nOK = ja, für alle\nAbbrechen = nur für ein Gerät')) pe.alle=true;
+    if(PTYPE==='DGUV Protokoll' && dguvPflicht(PPOS) && dguvSoll(PPOS)-dguvIst(PPOS)>1 &&
+       confirm('Enthält diese Datei die DGUV-Prüfprotokolle für ALLE '+dguvSoll(PPOS)+' Geräte dieser Position?\n\nOK = ja, für alle\nAbbrechen = nur für ein Gerät')) pe.alle=true;
     gs(PPOS).pdfs.push(pe);
     saveFotos(PPOS);
     updPG(PPOS);
@@ -7644,7 +7773,7 @@ document.getElementById('pi').addEventListener('change',async function(e){
     puAuto();                       // Übersicht in SharePoint nachziehen
     // Gleicher Automatismus wie beim digital ausgefüllten Protokoll: ein hier
     // hochgeladenes Inbetriebnahmeprotokoll ist derselbe Nachweis.
-    const auto=schrittAusProtokoll(PPOS, PTYPE);
+    const auto=PTYPE==='DGUV Protokoll' ? dguvNachholen(PPOS) : schrittAusProtokoll(PPOS, PTYPE);
     if(auto && (auto.stand==='gesetzt'||auto.stand==='ibn-teil')) showToast('✓ '+PTYPE+' abgelegt'+protoHinweis(auto)+(auto.stand==='ibn-teil'?(' ('+ibnIst(PPOS)+' von '+ibnSoll(PPOS)+')'):''));
     protoWarnen(PPOS, auto);
   } catch(err){
@@ -9573,7 +9702,7 @@ function collectRestRows(){
 // Anders als die Restarbeitenliste (= Mängel/Nacharbeiten) listet das die noch
 // NICHT erbrachten Leistungen aus dem LV: fehlender Anschluss, Inbetriebnahme,
 // Einweisung, Dichtigkeitsprüfung.
-const FLD_LBL={g:'Geliefert',m:'Montiert',nu:'Ausgeführt',sa:'Sanitäranschluss',dp:'Dichtigkeitsprüfung',ea:'Elektroanschluss',pa:'Potentialausgleich',ib:'Inbetriebnahme',ew:'Einweisung',typenschild:'Typenschild-Foto',ibnproto:'IBN-Protokoll'};
+const FLD_LBL={g:'Geliefert',m:'Montiert',nu:'Ausgeführt',sa:'Sanitäranschluss',dp:'Dichtigkeitsprüfung',ea:'Elektroanschluss',pa:'Potentialausgleich',ib:'Inbetriebnahme',ew:'Einweisung',typenschild:'Typenschild-Foto',ibnproto:'IBN-Protokoll',dguvproto:'DGUV-Prüfung'};
 function collectOffeneLeistungen(gw){
   const rows=[];
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(item=>{
@@ -9587,6 +9716,7 @@ function collectOffeneLeistungen(gw){
     const offen=felder.filter(f=>!s[f] && !entf(s,f));
     // Fehlendes Typenschild-Foto als eigener offener Punkt (nur im Elektro-Kontext)
     if(felder.includes(tsSchritt(item.pos)) && tsFehlt(item.pos)) offen.push('typenschild');
+    if(felder.includes('ib') && !s.ib && !entf(s,'ib') && dguvFehlt(item.pos)) offen.push('dguvproto');
     if(felder.includes('ib') && !s.ib && !entf(s,'ib') && ibnFehlt(item.pos)) offen.push('ibnproto');
     if(!offen.length) return;                         // hier ist alles erledigt
     rows.push({
