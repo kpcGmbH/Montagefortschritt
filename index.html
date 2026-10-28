@@ -1111,7 +1111,12 @@ async function enqueuePos(pos){
   // Basis = der zuletzt vom Server bekannte Stand VOR der ersten eigenen Änderung.
   // Liegt schon ein Eintrag in der Warteschlange, bleibt dessen Basis (v158).
   const key='pos|'+PID+'|'+pos;
-  let base=null; try{ const alt=await idbGet('outbox', key); base = alt ? (alt.base!==undefined?alt.base:null) : (BASE[PID+'|'+pos]!==undefined?BASE[PID+'|'+pos]:null); }catch(e){}
+  // Ohne bekannten Serverstand: hat die Position noch keinen Listeneintrag, ist die
+  // Basis leer (alles vom Server bleibt erhalten); sonst unbekannt (null).
+  let base=null; try{ const alt=await idbGet('outbox', key);
+    if(alt) base = alt.base!==undefined ? alt.base : null;
+    else if(BASE[PID+'|'+pos]!==undefined) base = BASE[PID+'|'+pos];
+    else if(!ITEMID[itemKey(pos)]) base = ''; }catch(e){}
   if(!await idbSet('outbox', key, { kind:'pos', pid:PID, pos:pos, fields:fields, id: ITEMID[itemKey(pos)]||null, ts: nowMs(), base:base })){
     // Änderung steht nur im Arbeitsspeicher – beim Schließen der App wäre sie weg
     speicherWarnung();
@@ -1274,6 +1279,18 @@ async function spListWriteFields(pos, fields, knownId, pid){
 // habe, gewinnt; alles andere kommt vom Server. Listen (Fotos, Protokolle,
 // Restarbeiten, Typenschild, Verlauf) werden je Eintrag zusammengeführt.
 const BASE={};   // 'pid|pos' -> zuletzt vom Server gelesener data-Blob (String)
+// Mit dem Stand im Gerätespeicher sichern – sonst fehlte die Basis nach einem
+// Start ohne Netz, und der eigene Stand überschriebe wieder alles.
+let _baseTimer=null;
+function baseMerken(){
+  if(!PID) return; const pid=PID;
+  clearTimeout(_baseTimer);
+  _baseTimer=setTimeout(()=>{ const m={}; Object.keys(BASE).forEach(k=>{ if(k.indexOf(pid+'|')===0) m[k]=BASE[k]; });
+    idbSet('state', pid+'|__base', m).catch(()=>{}); }, 1500);
+}
+async function baseLaden(pid){
+  try{ const m=await idbGet('state', pid+'|__base'); if(m && typeof m==='object') Object.keys(m).forEach(k=>{ if(BASE[k]===undefined) BASE[k]=m[k]; }); }catch(e){}
+}
 const MERGE_INNER=['fotos','pdfs','restarbeiten','ts','usr','na','hist','typenschild','ovr'];
 function mergeKey(liste, x){
   if(typeof x==='string') return x;
@@ -1285,13 +1302,17 @@ function mergeKey(liste, x){
 }
 function merge3Liste(liste, b, l, s){
   b=Array.isArray(b)?b:[]; l=Array.isArray(l)?l:[]; s=Array.isArray(s)?s:[];
-  const K=x=>mergeKey(liste,x), bm=new Map(b.map(x=>[K(x),x])), lm=new Map(l.map(x=>[K(x),x]));
+  // Gleiche Schlüssel kommen vor (Sammelimport: alle Restarbeiten mit derselben
+  // Zeit; leere Zeilen) – deshalb das Vorkommen mitzählen: „…#0", „…#1".
+  const mitNr=arr=>{ const n={}; return arr.map(x=>{ const k=mergeKey(liste,x); n[k]=(n[k]||0)+1; return [k+'#'+(n[k]-1), x]; }); };
+  const bk=mitNr(b), lk=mitNr(l), sk=mitNr(s);
+  const bm=new Map(bk), lm=new Map(lk);
   const out=[], da=new Set();
-  s.forEach(x=>{ const k=K(x); da.add(k);
+  sk.forEach(([k,x])=>{ da.add(k);
     if(bm.has(k) && !lm.has(k)) return;                                   // bei mir gelöscht
     if(lm.has(k) && JSON.stringify(lm.get(k))!==JSON.stringify(bm.get(k))) out.push(lm.get(k));   // bei mir geändert
     else out.push(x); });
-  l.forEach(x=>{ const k=K(x); if(da.has(k)) return;
+  lk.forEach(([k,x])=>{ if(da.has(k)) return;
     if(!bm.has(k)) out.push(x);                                           // bei mir neu
     else if(JSON.stringify(x)!==JSON.stringify(bm.get(k))) out.push(x);   // drüben gelöscht, bei mir geändert: behalten
   });
@@ -1319,7 +1340,10 @@ function mergeDaten(baseRaw, lokalRaw, serverRaw){
       const m = listig ? merge3Liste(k,bv,lv,sv) : merge3Obj(bv,lv,sv);
       out[k] = istString||typeof s[k]==='string' ? JSON.stringify(m) : m;
     } else {
-      const v = (JSON.stringify(l[k])!==JSON.stringify(b[k])) ? l[k] : s[k];
+      // Fehlt das Feld in der Basis (älterer Blob), zählt der leere Standardwert
+      // nicht als „von mir geändert" – sonst überschriebe z. B. anschl:'' ein 'fest'.
+      const bv = (k in b) ? b[k] : ((l[k]===''||l[k]===false||l[k]==null) ? l[k] : undefined);
+      const v = (JSON.stringify(l[k])!==JSON.stringify(bv)) ? l[k] : s[k];
       if(v!==undefined) out[k]=v;
     }
   });
@@ -1344,25 +1368,34 @@ function posNeuZeichnen(pos){
     const card=document.getElementById('C'+sp(pos));
     if(card){ const st=ist(pos,TF); card.className='card'+(st!=='open'?' '+st:'');
       const anm=card.querySelector('.anm'); if(anm && anm!==document.activeElement){ anm.value=ST[pos].note||''; cnUpdate(pos); autoR(anm); } }
-    updProg(pos); updRA(pos); updTG(pos); updPG(pos);
+    updProg(pos); updTG(pos); updPG(pos);
+    if(card && card.contains(document.activeElement)) RA_PENDING.add(pos); else updRA(pos);
     try{ updFG(pos); }catch(e){}
   }catch(e){ console.warn('Neuzeichnen', pos, e); }
 }
 // Nach dem Zusammenführen: Serverneuigkeiten auch lokal zeigen – aber nur, wenn
 // ich die Position seit dem Absenden nicht schon wieder geändert habe.
 async function nachMerge(e, gemerged){
-  const key=e.key, pid=e.val.pid, pos=e.val.pos;
-  BASE[pid+'|'+pos]=gemerged;
+  const key=e.key, pid=e.val.pid, pos=e.val.pos, gesendet=e.val.fields.data;
+  BASE[pid+'|'+pos]=gemerged; baseMerken();
   const jetzt=await idbGet('outbox', key);
-  if(jetzt && jetzt.ts!==e.val.ts){                    // inzwischen neu geändert
-    jetzt.base=gemerged; await idbSet('outbox', key, jetzt); return false;
-  }
-  await idbDel('outbox', key);
-  if(pid===PID && gemerged!==e.val.fields.data){
-    ST[pos]=stAusRaw(gemerged); posNeuZeichnen(pos);
-    try{ await idbSet('state', PID, JSON.parse(JSON.stringify(ST))); }catch(_){}
-  }
-  return true;
+  const neuer = jetzt && jetzt.ts!==e.val.ts;               // inzwischen neu in die Warteschlange
+  if(!neuer) await idbDel('outbox', key);
+  else if(gemerged===gesendet){ jetzt.base=gemerged; await idbSet('outbox', key, jetzt); }
+  // Brachte der Server Neues (Kollege), die alte Basis des wartenden Eintrags
+  // BEHALTEN: er kennt diese Neuigkeiten nicht, und mit der neuen Basis sähen sie
+  // beim nächsten Senden wie „von mir gelöscht" aus.
+  if(pid!==PID || !ST[pos]) return !neuer;
+  if(gemerged===gesendet) return !neuer && !SAVE_TIMERS[pos];
+  // Serverneuigkeiten lokal zeigen, ohne eigene neuere Eingaben zu verlieren:
+  // Drei-Wege-Abgleich gesendet → aktueller Stand → zusammengeführt.
+  const aktuell=buildPosData(pos);
+  ST[pos] = stAusRaw(aktuell===gesendet ? gemerged : mergeDaten(gesendet, aktuell, gemerged));
+  posNeuZeichnen(pos);
+  try{ await idbSet('state', PID, JSON.parse(JSON.stringify(ST))); }catch(_){}
+  // Eine noch ausstehende Eingabe (savePos wartet 400 ms) legt gleich einen neuen
+  // Eintrag an – solange bleibt die Position „schmutzig".
+  return !neuer && !SAVE_TIMERS[pos];
 }
 // Aktuellen Serverstand einer Position holen (id bekannt oder per Filter suchen)
 async function serverPosHolen(pos, pid, id){
@@ -1393,6 +1426,7 @@ async function flushOutbox(){
     const files = all.filter(e=>e.val && e.val.kind==='file');
     const poss  = all.filter(e=>e.val && e.val.kind==='pos');
     const jsons = all.filter(e=>e.val && e.val.kind==='json').sort((a,b)=>(a.val.ts||0)-(b.val.ts||0));
+    const lvfelder = all.filter(e=>e.val && e.val.kind==='lvfeld');
     for(const e of files){
       try{
         const blob = await idbGet('photos', e.val.fname);
@@ -1427,7 +1461,7 @@ async function flushOutbox(){
           if(srv.raw && srv.raw!==fields.data && srv.raw!==e.val.base){
             // Basis unbekannt (Altbestand der Warteschlange): Serverstand als Basis –
             // dann gewinnt der eigene Stand überall, wo er abweicht (= bisheriges Verhalten)
-            const base = (e.val.base!==null && e.val.base!==undefined) ? e.val.base : srv.raw;
+            const base = (e.val.base!==null && e.val.base!==undefined) ? e.val.base : srv.raw;   // '' = neue Position: alles vereinigen
             fields=Object.assign({}, fields, {data: mergeDaten(base, fields.data, srv.raw)});
           }
         }
@@ -1460,6 +1494,17 @@ async function flushOutbox(){
       }catch(err){
         if(isNetErr(err)) throw err;
         console.warn('Bericht bleibt in der Warteschlange:', (err&&err.message)||err);
+      }
+    }
+    // Stücklisten-Felder (Gewerk für Einweisungs-/Kundendienst-App), je Baustelle gebündelt
+    const lvProPid={}; lvfelder.forEach(e=>{ (lvProPid[e.val.pid]=lvProPid[e.val.pid]||[]).push(e); });
+    for(const pid of Object.keys(lvProPid)){
+      try{
+        await lvFelderSenden(pid, lvProPid[pid]);
+        for(const e of lvProPid[pid]){ const j=await idbGet('outbox', e.key); if(j && j.ts===e.val.ts) await idbDel('outbox', e.key); }
+      }catch(err){
+        if(isNetErr(err)) throw err;
+        console.warn('Stückliste bleibt in der Warteschlange:', (err&&err.message)||err);
       }
     }
   }catch(err){
@@ -2189,8 +2234,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 158;
+const APP_VERSION = 159;
 const CHANGELOG = [
+  { v:159, titel:'Korrekturen Synchronisierung', punkte:[
+    'Zusammenführen beim Nachsenden in Sonderfällen abgesichert: Eingaben während des Sendens, gleichzeitig angelegte Restarbeiten (Sammelimport), Start ohne Netz, neue Positionen.',
+    'Läuft die Microsoft-Anmeldung ab, fordert die App wieder eine Anmeldung an – statt die Synchronisierung dauerhaft hängen zu lassen.',
+    'Große Dateien bei schwachem Netz bekommen mehr Zeit zum Hochladen.',
+    'Offline geänderte Gewerke werden mit Netz auch in der Stückliste nachgetragen (für Einweisungs- und Kundendienst-App).' ]},
   { v:158, titel:'Zwei Geräte an derselben Position', punkte:[
     'Beim Nachsenden führt die App jetzt den eigenen Stand mit dem aktuellen Stand in SharePoint zusammen – Feld für Feld. Wer offline Haken gesetzt hat, überschreibt damit nicht mehr, was ein Kollege inzwischen an derselben Position eingetragen hat (Fotos, Restarbeiten, Protokolle, Haken).',
     'Nach dem Neuladen bleiben noch nicht übertragene eigene Änderungen sichtbar, statt kurz zu verschwinden.',
@@ -7090,8 +7140,11 @@ async function getToken(){
     // die App wäre weg und offene Eingaben verloren. Fehler weiterreichen: die
     // Warteschlange behält alles, und mit Netz klappt das stille Erneuern wieder.
     // Alle anderen Fehler wie bisher: Anmeldung anfordern.
+    // NICHT dazu: monitor_window_timeout / timed_out – das ist eine abgelaufene
+    // Sitzung (stilles Erneuern scheitert), die eine Anmeldung braucht. Als Netz-
+    // fehler behandelt, hinge die Synchronisierung sonst dauerhaft.
     const netz = !navigator.onLine || (e && e.name!=='InteractionRequiredAuthError' &&
-      /network|fetch|timed?_?out|timeout|no_network|endpoints_resolution|post_request_failed|load failed/i.test((e.errorCode||'')+' '+(e.message||'')));
+      /no_network|network_error|networkerror|failed to fetch|load failed|endpoints_resolution|post_request_failed|network request failed/i.test((e.errorCode||'')+' '+(e.message||'')));
     if(netz){ const n=new Error('Keine Verbindung zur Anmeldung ('+((e&&(e.errorCode||e.message))||e)+')'); n.name='TypeError'; throw n; }
     if(USE_REDIRECT){ await msalApp.acquireTokenRedirect({ scopes: GRAPH_SCOPES }); throw e; }
     const res = await msalApp.acquireTokenPopup({ scopes: GRAPH_SCOPES });
@@ -7106,7 +7159,9 @@ async function graph(path, opts){
   const headers = Object.assign({ 'Authorization': 'Bearer ' + token }, opts.headers || {});
   // Zeitgrenze: bei einem Balken ohne Daten hing der Abruf sonst minutenlang
   // (Ladebildschirm blockiert, Synchronisierung steht). Lesen 25 s, Schreiben 120 s.
-  const ms = opts.timeout || ((!opts.method || opts.method==='GET') ? 25000 : 120000);
+  // Hochladen: mindestens 2 min, bei großen Dateien so lange, wie es mit 10 KB/s dauert
+  const groesse = (opts.body && (opts.body.size || opts.body.length)) || 0;
+  const ms = opts.timeout || ((!opts.method || opts.method==='GET') ? 25000 : Math.max(120000, Math.round(groesse/10)));
   const ctl = (typeof AbortController!=='undefined') ? new AbortController() : null;
   const tmr = ctl ? setTimeout(()=>ctl.abort(), ms) : null;
   let res;
@@ -7415,6 +7470,7 @@ async function loadState() {
       if (ci) Object.assign(ITEMID, ci);
     }
   }
+  await baseLaden(PID); baseMerken();
   // Noch nicht übertragene eigene Änderungen wieder obenauf legen – sonst
   // zeigte die App nach dem Laden den Serverstand und die eigenen Haken
   // „verschwanden" bis zum nächsten Abgleich (v158).
@@ -11792,13 +11848,18 @@ function ovrSetzen(pos, patch){
 // Einzelnes Feld in der Stückliste nachtragen: frisch laden, nur dieses Feld
 // ändern, zurückschreiben – nicht den eigenen (womöglich alten) Gesamtstand.
 async function lvFeldNachtragen(pos, felder){
+  // Über die Warteschlange (v159): offline gemacht, wird es später nachgetragen.
   const pid=PID; if(!pid) return;
-  try{
-    const txt=await spTryDownloadTextStrict('LV_'+pid+'.json'); if(!txt) return;
-    const lv=JSON.parse(txt); let hit=false;
-    lv.forEach(sec=>(sec.subsections||[]).forEach(sub=>(sub.items||[]).forEach(it=>{ if(it.pos===pos){ Object.assign(it,felder); hit=true; } })));
-    if(hit) await spUploadText('LV_'+pid+'.json', JSON.stringify(lv));
-  }catch(e){ console.warn('Stückliste nachtragen:', e&&e.message); }   // in der App gilt s.ovr ohnehin
+  await idbSet('outbox', 'lvfeld|'+pid+'|'+pos, {kind:'lvfeld', pid, pos, felder, ts:nowMs()});
+  updSyncBadge(); flushOutbox();
+}
+// Wartende Stücklisten-Felder einer Baustelle gebündelt nachtragen: frisch laden,
+// nur diese Felder setzen, zurückschreiben.
+async function lvFelderSenden(pid, eintraege){
+  const txt=await spTryDownloadTextStrict('LV_'+pid+'.json'); if(!txt) throw new Error('Stückliste fehlt');
+  const lv=JSON.parse(txt), byPos={}; eintraege.forEach(e=>{ byPos[e.val.pos]=Object.assign(byPos[e.val.pos]||{}, e.val.felder); });
+  lv.forEach(sec=>(sec.subsections||[]).forEach(sub=>(sub.items||[]).forEach(it=>{ if(byPos[it.pos]) Object.assign(it, byPos[it.pos]); })));
+  await spUploadText('LV_'+pid+'.json', JSON.stringify(lv));
 }
 // Stückliste in eine BESTEHENDE Baustelle nachtragen (der Anlage-Assistent legt immer
 // eine neue an). Nur erlaubt, solange es noch keine Positionen gibt – ein Ersetzen
