@@ -350,6 +350,12 @@ body:not(.doku-an) #DOKU{display:none;}
 .dk-btn.voll{background:var(--braun);color:#fff;}
 .dk-hint,.dk-leer{font-size:12px;color:var(--accent2);margin:-2px 0 10px 2px;}
 @media (max-width:600px){ .dk-z{display:none;} .dk-neu{margin-left:0;width:100%;} .dk-row{flex-wrap:wrap;} .dk-btn{margin-left:38px;} }
+.fzeile{display:flex;flex-wrap:wrap;gap:9px;margin-top:7px;}
+.fzeile > .fgrid{display:contents;}
+.fth.ts-da{border-color:var(--braun);}
+.fth.ts-leer{border:2px dashed var(--mg);background:transparent;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--mg);text-align:center;}
+.ts-ic{font-size:20px;line-height:1;} .ts-tx{font-size:10.5px;line-height:1.1;padding:0 3px;}
+.ts-lbl{color:var(--braun)!important;} .ts-fehlt{color:var(--mg)!important;}
 .fbtn.tsbtn{background:transparent;color:var(--accent2);border:1px solid var(--line);margin-left:6px;}
 .fbtn.tsbtn.fehlt{color:var(--mg);border-color:var(--mg);}
 .fbtn{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;
@@ -1794,13 +1800,11 @@ function buildPanels(){
   </div>
   <div class="fsec">
     <button class="fbtn" id="FB${id}" onclick="trf('${item.pos}')">&#128247; Foto</button>
-    <button class="fbtn tsbtn" id="TB${id}" onclick="tsFoto('${item.pos}')" title="Foto vom Typenschild – Pflicht vor Inbetriebnahme bzw. Sanitäranschluss" style="display:none">&#127991; Typenschild</button>
     <button class="fbtn" style="background:#4a3a28;margin-left:6px" onclick="trpdf('${item.pos}',this)">&#128196; Protokoll</button>
     <button class="fbtn histbtn" style="background:transparent;border:1px solid var(--line);color:var(--accent2);margin-left:6px" onclick="openHist('${item.pos}')" title="Änderungsverlauf dieser Position">&#128338; Verlauf</button>
     <button class="fbtn lvonly" style="background:transparent;border:1px solid var(--line);color:var(--accent2);margin-left:6px" onclick="openPosEdit('${item.pos}')" title="Position bearbeiten oder aus der Stückliste löschen">&#9998; Position</button>
     <button class="fbtn notebtn" id="NB${id}" onclick="tgNote('${item.pos}')" title="Notiz zu dieser Position">&#9998; Notiz</button>
-    <div class="fgrid tgrid" id="TG${id}"></div>
-    <div class="fgrid" id="FG${id}"></div>
+    <div class="fzeile"><div class="fgrid tgrid" id="TG${id}"></div><div class="fgrid" id="FG${id}"></div></div>
     <div class="pgrid" id="PG${id}"></div>
   </div>
   <div class="anmwrap" id="AW${id}">
@@ -1994,8 +1998,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 146;
+const APP_VERSION = 147;
 const CHANGELOG = [
+  { v:147, titel:'Typenschild als Fotokasten', punkte:[
+    'Das Typenschild hat keinen eigenen Knopf mehr, sondern einen <b>Fotokasten ganz links in der Fotozeile</b>. Fehlt das Foto, ist der Kasten <b>rot gestrichelt</b> – ein Tipp darauf öffnet die Kamera.',
+    'Ist das Typenschild fotografiert, steht es braun umrandet vorn, die übrigen Fotos der Position folgen daneben. Bei mehreren Geräten gibt es einen Kasten je Gerät.' ]},
   { v:146, titel:'Neuer Reiter „Dokumente" je Baustelle', punkte:[
     'Rechts neben den Bereichen gibt es jetzt den Reiter <b>📄 Dokumente</b>: alle Protokolle und Berichte der Baustelle auf einen Blick – Einweisung, Schlüsselübergabe, Dichtigkeitsprotokoll, Bautagebuch, Serviceberichte, Mängelfreimeldung.',
     '<b>Auszufüllen</b> zeigt, was zur Baustelle gehört und noch fehlt – z. B. ein Dichtigkeitsprotokoll, sobald es Sanitär-Positionen gibt, oder wie viele Elektrogeräte noch nicht eingewiesen sind.',
@@ -3169,21 +3176,25 @@ function tsSperreMelden(pos){
              posLabel(pos)+'\n\nJetzt fotografieren?')) tsFoto(pos);
 }
 // Knopf und Vorschaubilder einer Position nachziehen
+// Typenschild als FOTOKASTEN ganz links in der Fotozeile (Wunsch des Nutzers,
+// ab v147): fehlt das Foto, steht dort ein gestrichelter Kasten „Typenschild", ein
+// Tipp darauf öffnet die Kamera. Danach folgen die übrigen Positionsfotos.
+// Bei mehreren Geräten ein Kasten je Gerät.
 function updTG(pos){
-  const id=sp(pos), s=gs(pos), b=document.getElementById('TB'+id), g=document.getElementById('TG'+id);
-  const pfl=tsPflicht(pos), n=(s.typenschild||[]).length, soll=tsSoll(pos);
-  if(b){
-    b.style.display=(pfl||n)?'':'none';
-    b.classList.toggle('fehlt', pfl && n<soll);
-    b.innerHTML='&#127991; Typenschild <span class="fcnt">'+n+'/'+(pfl?soll:n)+'</span>';
-  }
-  if(g){
-    g.innerHTML=(s.typenschild||[]).map((t,i)=>
-      '<div class="fth-wrap"><div class="fth" onclick="tsOlb(\''+pos+'\','+i+')"><img class="fth-img" data-src="'+escapeHtml(t.fname)+'" id="TSIMG_'+id+'_'+i+'" alt="Typenschild">'+
-      '<button class="fdel" onclick="event.stopPropagation();tsDel(\''+pos+'\','+i+')">&#10005;</button></div>'+
-      '<div class="fts">Typenschild'+(soll>1?(' '+(i+1)):'')+'</div></div>').join('');
-    (s.typenschild||[]).forEach((t,i)=>{ const img=document.getElementById('TSIMG_'+id+'_'+i); if(img) imgObserver.observe(img); });
-  }
+  const id=sp(pos), s=gs(pos), g=document.getElementById('TG'+id);
+  if(!g) return;
+  const liste=s.typenschild||[], pfl=tsPflicht(pos), soll=tsSoll(pos);
+  const nr=i=>(pfl&&soll>1)?(' '+(i+1)):'';
+  let html=liste.map((t,i)=>
+    '<div class="fth-wrap"><div class="fth ts-da" onclick="tsOlb(\''+pos+'\','+i+')"><img class="fth-img" data-src="'+escapeHtml(t.fname)+'" id="TSIMG_'+id+'_'+i+'" alt="Typenschild">'+
+    '<button class="fdel" onclick="event.stopPropagation();tsDel(\''+pos+'\','+i+')">&#10005;</button></div>'+
+    '<div class="fth-date ts-lbl">Typenschild'+nr(i)+'</div></div>').join('');
+  if(pfl) for(let i=liste.length;i<soll;i++)
+    html+='<div class="fth-wrap"><div class="fth ts-leer" onclick="tsFoto(\''+pos+'\')" title="Typenschild fotografieren – Pflicht vor „'+(FLD_LBL[tsSchritt(pos)]||'')+'“">'+
+      '<span class="ts-ic">&#127991;</span><span class="ts-tx">Typen&shy;schild'+nr(i)+'</span></div>'+
+      '<div class="fth-date ts-fehlt">fehlt</div></div>';
+  g.innerHTML=html;
+  liste.forEach((t,i)=>{ const img=document.getElementById('TSIMG_'+id+'_'+i); if(img) imgObserver.observe(img); });
 }
 function updAllTG(){ DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>updTG(it.pos)))); }
 function tsOlb(pos,i){ lbOpen(gs(pos).typenschild||[], i, x=>x.fname); }
