@@ -3361,9 +3361,11 @@ function ibnRender(pos){
   if(k){ k.classList.toggle('ck-lock', fehlt); const i=k.querySelector('.cki'); if(i && fehlt) i.innerHTML='&#128274;'; else if(i && !s.ib && !entf(s,'ib')) i.innerHTML='&#9675;'; }
   if(!z) return;
   if(!pfl || entf(s,'ib') || (s.ib && ibnFehlt(pos))){ z.innerHTML=''; return; }   // Altbestand: kein Hinweis
-  const ist=Math.min(ibnIst(pos),ibnSoll(pos)), soll=ibnSoll(pos), kat=ibnKat(pos);
+  // Die erkannte Kategorie steht bewusst NICHT hier (Wunsch des Nutzers) – Schloss
+  // und roter Zähler sagen genug; nachzulesen ist sie im Dialog „✎ Gewerk".
+  const ist=Math.min(ibnIst(pos),ibnSoll(pos)), soll=ibnSoll(pos);
   z.innerHTML='<span class="ib-b'+(fehlt?'':' ok')+'">IBN-Protokoll '+ist+' von '+soll+'</span>'+
-    (fehlt?'<span>Pflicht'+(kat?(' · '+escapeHtml(kat)):'')+'</span><span class="ib-l" onclick="ibnAnlegen(\''+pos+'\')">Protokoll anlegen</span>':'');
+    (fehlt?'<span class="ib-l" onclick="ibnAnlegen(\''+pos+'\')">Protokoll anlegen</span>':'');
 }
 function ibnFehlende(){
   const r=[];
