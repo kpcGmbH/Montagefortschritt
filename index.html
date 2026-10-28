@@ -2012,8 +2012,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 154;
+const APP_VERSION = 155;
 const CHANGELOG = [
+  { v:155, titel:'Korrekturen je Position statt in der Stückliste', punkte:[
+    'Gewerk-Korrekturen sowie „nicht erforderlich" bei Typenschild, Inbetriebnahme- und DGUV-Protokoll werden jetzt <b>je Position</b> gespeichert – wie die Haken.',
+    'Dadurch erscheinen sie nach spätestens 30 Sekunden auf allen Geräten, und ein Handy mit älterem Stand kann sie nicht mehr überschreiben.' ]},
   { v:154, titel:'Weitere Korrekturen', punkte:[
     'Dialog „✎ Gewerk": Wer Elektro ergänzt hat, hat damit ungewollt die IBN-Pflicht des Geräts abgewählt. Jetzt zählt nur noch ein Kästchen, das man selbst umgestellt hat.',
     'Die Stückliste wird beim Übernehmen im Gewerk-Dialog nur noch einmal gespeichert. Schlägt das Speichern fehl, zeigt die App das an.',
@@ -3659,10 +3662,11 @@ function pflAbgewaehlt(art){
 function ibnAbgewaehlt(){ return pflAbgewaehlt('ibn'); }
 function pflPosSchalten(art, pos, pflicht){
   if(!dokuDarfSchalten()) return;
-  const it=tsItem(pos); if(!it) return;
-  if(pflicht){ delete it[art+'AusVon']; delete it[art+'AusAm']; if(PFL_ART[art].auto(pos)) delete it[art]; else it[art]=true; }
-  else { it[art]=false; it[art+'AusVon']=USER||''; it[art+'AusAm']=new Date().toISOString(); }
-  ibnRender(pos); saveLV();
+  if(!tsItem(pos)) return;
+  const o={};
+  if(pflicht){ o[art+'AusVon']=null; o[art+'AusAm']=null; o[art]=PFL_ART[art].auto(pos)?null:true; }
+  else { o[art]=false; o[art+'AusVon']=USER||''; o[art+'AusAm']=new Date().toISOString(); }
+  ovrSetzen(pos, o);                 // je Position, nicht in der Stückliste (v155)
   if(ACT==='__doku'){ dokuRender(); updDokuTab(); }
   pflListe(art);
 }
@@ -4602,6 +4606,10 @@ document.getElementById('srch').addEventListener('input',applyF);
 
 
 function restoreUI() {
+  // Übersteuerungen je Position auf die Stückliste legen (v155) – vor allem anderen,
+  // denn Gewerk und Pflichten bestimmen, welche Schritte und Sperren gelten.
+  try{ let gw=false; Object.keys(ST).forEach(p=>{ if(ST[p] && ST[p].ovr && ovrAnwenden(p,true)){ gw=true; const it=tsItem(p); if(it) gewUI(p,it,true); } });
+    if(gw){ applyFieldVisibility(); applyF(); } }catch(e){ console.warn('ovr:', e); }
   try{ updAllTG(); }catch(e){}
   Object.keys(ST).forEach(pos => {
     if(isEKey(pos)) return;             // Etagen-Fotozeilen haben keine Positions-UI
@@ -6953,7 +6961,8 @@ function buildPosData(pos){
     na: JSON.stringify(s.na||{}),
     hist: JSON.stringify(s.hist||[]),
     typenschild: JSON.stringify(s.typenschild||[]),
-    anschl: s.anschl||''
+    anschl: s.anschl||'',
+    ovr: JSON.stringify(s.ovr||{})
   });
 }
 
@@ -7162,7 +7171,8 @@ async function loadState() {
           na: (naObj&&typeof naObj==='object')?naObj:{},
           hist: Array.isArray(histArr)?histArr:[],
           typenschild: Array.isArray(tsch)?tsch:[],
-          anschl: row.anschl||''
+          anschl: row.anschl||'',
+          ovr: (()=>{ try{ const o=row.ovr?JSON.parse(row.ovr):null; return (o&&typeof o==='object')?o:undefined; }catch(e){ return undefined; } })()
         };
         if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at;
       });
@@ -7314,8 +7324,10 @@ setInterval(async () => {
       // Anschlussart und Protokolle: beide entscheiden über die Sperre an „Inbetriebnahme"
       const anschlChanged = (cur?(cur.anschl||''):'')!==(row.anschl||'');
       const pdfsChanged = !!row.pdfs && JSON.stringify(cur?(cur.pdfs||[]):[])!==row.pdfs;
+      // Übersteuerungen (Gewerk, Typenschild-/IBN-/DGUV-Pflicht) je Position (v155)
+      const ovrChanged = (row.ovr||'{}')!==JSON.stringify(cur?(cur.ovr||{}):{});
       if (!cur || cur.g!==row.g || cur.m!==row.m || cur.nu!==row.nu || cur.a!==row.a ||
-          cur.sa!==row.sa || cur.dp!==row.dp || cur.ea!==row.ea || cur.pa!==row.pa || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged || naChanged || tschChanged || anschlChanged || pdfsChanged) {
+          cur.sa!==row.sa || cur.dp!==row.dp || cur.ea!==row.ea || cur.pa!==row.pa || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged || naChanged || tschChanged || anschlChanged || pdfsChanged || ovrChanged) {
         let pdfs = cur ? cur.pdfs : [];
         try { if(row.pdfs) pdfs = JSON.parse(row.pdfs); } catch(e) {}
         // Verlauf: den längeren der beiden Stände behalten. Ohne das würde das
@@ -7327,6 +7339,9 @@ setInterval(async () => {
           sa:row.sa||false, dp:row.dp||false, ea:row.ea||false, pa:row.pa||false, ib:row.ib||false, ew:row.ew||false,
           note:row.note||'', fotos:cur?cur.fotos:[], pdfs:pdfs, restarbeiten:newRest, ts:newTs, by:newBy,
           na:newNa, hist:newHist, typenschild:newTsch, anschl:row.anschl||'' };
+        if(row.ovr){ try{ const o=JSON.parse(row.ovr); if(o&&typeof o==='object') ST[row.pos].ovr=o; }catch(e){} }
+        else if(cur && cur.ovr) ST[row.pos].ovr=cur.ovr;
+        if(ovrChanged) ovrAnwenden(row.pos);
         changed = true;
         if(tschChanged) updTG(row.pos);
         if(pdfsChanged) updPG(row.pos); else if(anschlChanged) ibnRender(row.pos);
@@ -11478,25 +11493,27 @@ function confirmGewerk(pos){
   const box=c=>{ const b=ov.querySelector('input.'+c); return (b && b.checked!==(b.dataset.def==='1')) ? b.checked : null; };
   const tsWunsch=box('gwts'), ibWunsch=box('gwibn');
   ov.remove();
-  setPosGewerk(pos, sel, true);        // gespeichert wird EINMAL am Ende
-  // Typenschild: nur eine ABWEICHUNG von der Automatik speichern – sonst bliebe eine
-  // Position an einer alten Entscheidung hängen, wenn sich das Gewerk später ändert.
-  const it=tsItem(pos);
-  if(it && tsWunsch!==null){
-    const vorher=it.ts;
-    if(tsWunsch===tsAuto(pos)) delete it.ts; else it.ts=tsWunsch;
-    if(vorher!==it.ts) updTG(pos);
+  // Ab v155 je POSITION gespeichert (s.ovr im data-Blob), nicht mehr in der
+  // Stückliste: die wird als ganze Datei geschrieben, und ein Gerät mit altem Stand
+  // überschrieb damit die Korrekturen anderer. Je Position gleicht das Polling ab.
+  const it=tsItem(pos); if(!it) return;
+  const s=gs(pos), o=Object.assign({}, s.ovr||{});
+  const gewNeu=JSON.stringify(sel)!==JSON.stringify(it.gew||[]);
+  const ibnVorher=it.ibn;
+  if(gewNeu){ o.gew=sel.slice(); s.ovr=o; ovrAnwenden(pos,true); }   // Automatik danach mit NEUEM Gewerk
+  // Typenschild/IBN: nur eine ABWEICHUNG von der Automatik festhalten (null = Automatik)
+  if(tsWunsch!==null) o.ts=(tsWunsch===tsAuto(pos))?null:tsWunsch;
+  if(ibWunsch!==null){
+    o.ibn=(ibWunsch===ibnAuto(pos))?null:ibWunsch;
+    if(o.ibn===false){ if(ibnVorher!==false){ o.ibnAusVon=USER||''; o.ibnAusAm=new Date().toISOString(); } }
+    else { o.ibnAusVon=null; o.ibnAusAm=null; }
   }
-  if(it && ibWunsch!==null){
-    const vorher=it.ibn;
-    if(ibWunsch===ibnAuto(pos)) delete it.ibn; else it.ibn=ibWunsch;
-    if(it.ibn!==false){ delete it.ibnAusVon; delete it.ibnAusAm; }
-    else if(vorher!==false){ it.ibnAusVon=USER||''; it.ibnAusAm=new Date().toISOString(); }
-  }
-  ibnRender(pos);
-  // Ein Speichervorgang statt bis zu drei gleichzeitiger: die überholten sich und
-  // konnten die Übersteuerung wieder herausschreiben.
-  saveLV();
+  s.ovr=o; ovrAnwenden(pos,true);
+  if(gewNeu) gewUI(pos,it);
+  updTG(pos); ibnRender(pos); savePos(pos);
+  // Die Einweisungs- und die Kundendienst-App lesen das Gewerk aus der Stückliste:
+  // dort gezielt nur dieses Feld nachtragen (frisch geladen, nicht der eigene Stand).
+  if(gewNeu) lvFeldNachtragen(pos,{gew:sel.slice()});
 }
 function setPosGewerk(pos, gewArr, ohneSpeichern){
   let item=null;
@@ -11504,20 +11521,55 @@ function setPosGewerk(pos, gewArr, ohneSpeichern){
   if(!item) return;
   item.gew=gewArr.slice();
   POSGEW[pos]=item.gew;
-  const id=sp(pos);
-  const card=document.getElementById('C'+id);
+  gewUI(pos,item);
+  if(!ohneSpeichern) saveLV();
+}
+// Karte nach einer Gewerk-Änderung nachziehen (Kennzeichen, Felder, Filter)
+function gewUI(pos, item, nurKarte){
+  const card=document.getElementById('C'+sp(pos));
   if(card){
     card.dataset.gew=gewAttr(item.gew);
     const imet=card.querySelector('.imet');
     const _sec=DATA.find(sc=>sc.subsections.some(sb=>sb.items.includes(item)));
     if(imet) imet.innerHTML=(item.fabrikat?'&#127981; '+item.fabrikat.trim():'')+(item.typ?' &nbsp;&#128203; '+item.typ.trim():'')+berBadge(_sec)+ntBadge(item)+gewBadgeEditable(item.pos,item.gew);
   }
+  if(nurKarte) return;
   applyFieldVisibility(); rc(pos); updProg(pos); upStats(); applyF();
   updTG(pos);   // Elektro dazu/weg -> Typenschild-Pflicht ändert sich
   // Gewerk-Umschalter einblenden, falls die Baustelle dadurch erstmals Gewerke bekommt
   const bar=document.getElementById('gwbar');
   if(bar && bar.style.display==='none' && DATA.some(s=>s.subsections.some(sub=>sub.items.some(it=>it.gew&&it.gew.length)))) bar.style.display='flex';
-  if(!ohneSpeichern) saveLV();
+}
+// ── Übersteuerungen je Position (ab v155) ──
+// s.ovr = {gew:[…], ts, ibn, ibnAusVon, ibnAusAm, dguv, dguvAusVon, dguvAusAm}. Ein
+// vorhandener Schlüssel gewinnt gegen den Wert aus der Stückliste; null heißt
+// „zurück zur Automatik" (der Stücklisten-Wert wird dann ignoriert). Altbestand
+// ohne s.ovr behält die Werte aus der Stückliste – keine Umstellung nötig.
+const OVR_KEYS=['gew','ts','ibn','ibnAusVon','ibnAusAm','dguv','dguvAusVon','dguvAusAm'];
+function ovrAnwenden(pos, ohneUI){
+  const it=tsItem(pos), o=ST[pos]&&ST[pos].ovr; if(!it || !o) return false;
+  let gewNeu=false;
+  OVR_KEYS.forEach(k=>{ if(!(k in o)) return;
+    if(k==='gew'){ const g=Array.isArray(o.gew)?o.gew:[];
+      if(JSON.stringify(g)!==JSON.stringify(it.gew||[])){ it.gew=g.slice(); POSGEW[pos]=it.gew; gewNeu=true; } return; }
+    if(o[k]===null || o[k]===undefined) delete it[k]; else it[k]=o[k]; });
+  if(!ohneUI){ if(gewNeu) gewUI(pos,it); updTG(pos); ibnRender(pos); }
+  return gewNeu;
+}
+function ovrSetzen(pos, patch){
+  const s=gs(pos); s.ovr=Object.assign({}, s.ovr||{}, patch);
+  ovrAnwenden(pos); savePos(pos);
+}
+// Einzelnes Feld in der Stückliste nachtragen: frisch laden, nur dieses Feld
+// ändern, zurückschreiben – nicht den eigenen (womöglich alten) Gesamtstand.
+async function lvFeldNachtragen(pos, felder){
+  const pid=PID; if(!pid) return;
+  try{
+    const txt=await spTryDownloadTextStrict('LV_'+pid+'.json'); if(!txt) return;
+    const lv=JSON.parse(txt); let hit=false;
+    lv.forEach(sec=>(sec.subsections||[]).forEach(sub=>(sub.items||[]).forEach(it=>{ if(it.pos===pos){ Object.assign(it,felder); hit=true; } })));
+    if(hit) await spUploadText('LV_'+pid+'.json', JSON.stringify(lv));
+  }catch(e){ console.warn('Stückliste nachtragen:', e&&e.message); }   // in der App gilt s.ovr ohnehin
 }
 // Stückliste in eine BESTEHENDE Baustelle nachtragen (der Anlage-Assistent legt immer
 // eine neue an). Nur erlaubt, solange es noch keine Positionen gibt – ein Ersetzen
