@@ -319,6 +319,13 @@ main{display:block;padding-bottom:80px;}
    damit man ihn nicht mit „erledigt" oder „offen" verwechselt. */
 .ck.na{border-color:var(--line);background:transparent;color:#8f8a85;border-style:dashed;}
 .ck.na .ckn{text-decoration:line-through;}
+/* Inbetriebnahme gesperrt, weil das Pflicht-Protokoll fehlt (ab v148) */
+.ck.ck-lock{border:1.5px dashed var(--red,#b3402e);color:var(--red,#b3402e);background:transparent;}
+.ibnz{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:11px;color:var(--accent2);margin:6px 0 0;}
+.ibnz:empty{display:none;}
+.ibnz .ib-b{border-radius:9px;padding:2px 8px;font-weight:700;color:#fff;background:var(--red,#b3402e);}
+.ibnz .ib-b.ok{background:var(--green);}
+.ibnz .ib-l{color:var(--braun);text-decoration:underline;cursor:pointer;font-weight:700;}
 .ck-ts{font-size:8.5px;font-weight:400;opacity:.8;letter-spacing:0.2px;white-space:nowrap;display:none;padding-left:18px;}
 .ck.on .ck-ts,.ck.na .ck-ts{display:block;}
 
@@ -1798,6 +1805,7 @@ function buildPanels(){
     <div class="ck ck-ib" data-f="ib" id="Kib${id}" onclick="tc('${item.pos}','ib')" oncontextmenu="tcNA('${item.pos}','ib');return false" ontouchstart="ckHoldStart(event,'${item.pos}','ib')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Inbetriebnahme</span></span><span class="ck-ts" id="Tib${id}"></span></div>
     <div class="ck ck-ew" data-f="ew" id="Kew${id}" onclick="tc('${item.pos}','ew')" oncontextmenu="tcNA('${item.pos}','ew');return false" ontouchstart="ckHoldStart(event,'${item.pos}','ew')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Einweisung</span></span><span class="ck-ts" id="Tew${id}"></span></div>
   </div>
+  <div class="ibnz" id="IZ${id}"></div>
   <div class="fsec">
     <button class="fbtn" id="FB${id}" onclick="trf('${item.pos}')">&#128247; Foto</button>
     <button class="fbtn" style="background:#4a3a28;margin-left:6px" onclick="trpdf('${item.pos}',this)">&#128196; Protokoll</button>
@@ -1998,8 +2006,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 147;
+const APP_VERSION = 148;
 const CHANGELOG = [
+  { v:148, titel:'Inbetriebnahmeprotokoll als Pflicht', punkte:[
+    'Bei Geräten, die angeschlossen und eingestellt werden, ist das <b>Inbetriebnahmeprotokoll jetzt Pflicht</b>: Spültechnik, Gartechnik, Eiswürfelbereiter und Wasserspender, Kaffeemaschinen und Zapfanlagen, Kühlzellen und Schockkühler, Lüftungshauben, Gemüsewasch- und Waschmaschinen. Die App erkennt das an der Bezeichnung.',
+    '„Inbetriebnahme" lässt sich dort erst abhaken, wenn das Protokoll an der Position liegt – digital ausgefüllt oder als PDF, bei mehreren Geräten <b>eines je Gerät</b>. Mit dem letzten Protokoll setzt sich der Haken von selbst.',
+    'Unter den Schritten steht, wie viele Protokolle da sind (z. B. „IBN-Protokoll 1 von 2"), mit Link <b>„Protokoll anlegen"</b>. Steckerfertige Kühlgeräte, Wärmetechnik und Kleingeräte bleiben wie bisher.',
+    'Liegt die Erkennung daneben, lässt sich die Pflicht im Dialog <b>„✎ Gewerk"</b> je Position ein- oder ausschalten. Fehlende Protokolle stehen in den <b>Offenen Punkten</b> und im Reiter <b>Dokumente</b>. Bereits in Betrieb genommene Geräte bleiben unberührt.' ]},
   { v:147, titel:'Typenschild als Fotokasten', punkte:[
     'Das Typenschild hat keinen eigenen Knopf mehr, sondern einen <b>Fotokasten ganz links in der Fotozeile</b>. Fehlt das Foto, ist der Kasten <b>rot gestrichelt</b> – ein Tipp darauf öffnet die Kamera.',
     'Ist das Typenschild fotografiert, steht es braun umrandet vorn, die übrigen Fotos der Position folgen daneben. Bei mehreren Geräten gibt es einen Kasten je Gerät.' ]},
@@ -2811,6 +2824,7 @@ function ckRender(pos,f){
   }
   const tsEl=document.getElementById('T'+f+id);
   if(tsEl) tsEl.textContent = entf(s,f) ? 'entfällt' : (s[f]?ckLabel(s,f):'');
+  if(f==='ib') ibnRender(pos);
 }
 // Kurzform einer Position für Rückfragen: „05.02.00.00.03. Arbeitstisch mit HWB"
 function posLabel(pos){
@@ -2848,6 +2862,8 @@ function tc(pos,f){
   // vor „Sanitäranschluss" (ab v145). Gilt auch für spätere Schritte, die diesen über
   // die Chronologie-Automatik mitsetzen würden (Einweisung, Dichtigkeitsprüfung).
   if(!s[f] && tsBetrifft(pos,f) && tsFehlt(pos)){ tsSperreMelden(pos); return; }
+  // IBN-Protokoll ist Pflicht vor „Inbetriebnahme" bei den Geräten aus IBN_KAT (ab v148)
+  if(!s[f] && ibnBetrifft(pos,f) && ibnFehlt(pos)){ ibnSperreMelden(pos); return; }
   s[f]=!s[f];
   if(s[f]){ s.ts[f]=new Date().toISOString(); s.by[f]=USER; }
   else { delete s.ts[f]; delete s.by[f]; }
@@ -2889,6 +2905,7 @@ function autoFillVorstufen(pos,f){
 const PROTO_SCHRITT={'IBN Protokoll':'ib'};
 // Zusatz für die Erfolgsmeldung: nur wenn wirklich etwas gesetzt wurde.
 function protoHinweis(auto){
+  if(auto && auto.stand==='ibn-teil') return ' · „Inbetriebnahme" folgt mit dem letzten Protokoll';
   return (auto && auto.stand==='gesetzt') ? (' · „'+(FLD_LBL[auto.feld]||auto.feld)+'" mit abgehakt') : '';
 }
 // Widerspruch zwischen Protokoll und „entfällt" gehört vor Augen, nicht in einen
@@ -2921,6 +2938,9 @@ function schrittAusProtokoll(pos, type){
   // Ohne Typenschild-Foto wird die Inbetriebnahme auch über das Protokoll nicht
   // gesetzt; das Protokoll bleibt abgelegt. Kommt das Foto, holt tsFotoUpload den
   // Haken nach (tsNachholen).
+  // Bei mehreren Geräten erst mit dem letzten Pflicht-Protokoll (ibnNachholen nicht
+  // nötig: jedes neue Protokoll ruft diese Funktion erneut auf).
+  if(f==='ib' && ibnFehlt(pos)) return {stand:'ibn-teil', feld:f};
   if(f===tsSchritt(pos) && tsFehlt(pos)) return {stand:'typenschild', feld:f};
   s[f]=true; s.ts[f]=new Date().toISOString(); s.by[f]=USER;
   histAdd(pos,'set-proto',(FLD_LBL[f]||f)+' · '+type);
@@ -3031,6 +3051,11 @@ function dokuStand(){
     quote:eIst/eTot, knopf:'Einweisen', fn:'dokuEwNeu(\'geraete\')'});
   if(!ew.protokolle.some(p=>p.typ==='allgemein') && !ew.entwuerfe.some(p=>p.typ==='allgemein'))
     off.push({ic:'&#128203;', t:'Grundlagen-Einweisung', m:'Hygiene, Sicherheit, Reinigung – noch kein Protokoll', knopf:'Einweisen', fn:'dokuEwNeu(\'allgemein\')'});
+  // Inbetriebnahmeprotokolle der Pflicht-Geräte (ab v148)
+  const ibnL=ibnFehlende(), ibnOff=ibnL.filter(x=>x.ist<x.soll).length;
+  let ibnTot=0; DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ if(ibnPflicht(it.pos)) ibnTot++; })));
+  if(ibnOff) off.push({ic:'&#9881;&#65039;', t:'Inbetriebnahmeprotokolle', m:(ibnTot-ibnOff)+' von '+ibnTot+' Pflicht-Geräten · '+ibnOff+(ibnOff===1?' fehlt':' fehlen'),
+    quote:(ibnTot-ibnOff)/ibnTot, knopf:'Liste', fn:'ibnListe()'});
   // Schlüsselübergabe: gehört immer dazu
   const schlP=ew.protokolle.filter(p=>p.typ==='schluessel'), schlE=ew.entwuerfe.filter(p=>p.typ==='schluessel');
   if(!schlP.length && !schlE.length) off.push({ic:'&#128273;', t:'Schlüsselübergabe', m:'noch kein Protokoll', knopf:'Anlegen', fn:'openSchluesselprotokoll()'});
@@ -3206,7 +3231,7 @@ function updTG(pos){
   g.innerHTML=html;
   liste.forEach((t,i)=>{ const img=document.getElementById('TSIMG_'+id+'_'+i); if(img) imgObserver.observe(img); });
 }
-function updAllTG(){ DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>updTG(it.pos)))); }
+function updAllTG(){ DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ updTG(it.pos); ibnRender(it.pos); }))); }
 function tsOlb(pos,i){ lbOpen(gs(pos).typenschild||[], i, x=>x.fname); }
 function tsDel(pos,i){
   const s=gs(pos), t=(s.typenschild||[])[i]; if(!t) return;
@@ -3264,6 +3289,102 @@ function tsNachholen(pos){
   if(!(s.pdfs||[]).some(p=>p&&p.type==='IBN Protokoll')) return false;
   const a=schrittAusProtokoll(pos,'IBN Protokoll');
   return !!(a && a.stand==='gesetzt');
+}
+
+// ── Inbetriebnahmeprotokoll als Pflicht (ab v148) ─────────────────────────
+// Pflicht dort, wo der Monteur das Gerät nicht nur hinstellt, sondern anschließt
+// und einstellt (Wasser, Abwasser, Festanschluss, Programmierung) – Kategorien
+// vom Nutzer am 28.10.2026 bestätigt. Steckerfertige Kühlgeräte, Wärmetechnik,
+// Kleingeräte, Möbel: keine Pflicht. Erkannt an der Bezeichnung, je Position
+// übersteuerbar im Dialog „✎ Gewerk" (item.ibn = true/false). Gesperrt wird nur
+// „Inbetriebnahme", Altbestand mit gesetztem Haken bleibt unberührt.
+// Pflegbar wie TS_OHNE: Reihenfolge = Vorrang.
+const IBN_KAT=[
+  ['Spültechnik',/spülmasch|spuelmasch|geschirrspül|geschirrspuel|bandspül|korbtransport|haubenspül|haubenmasch|durchschub|gläserspül|glaeserspuel|topfspül|universalspül|osmose|wärmerückgew|waermerueckgew/i],
+  ['Gartechnik',/kombidämpf|kombidaempf|dämpfer|heißluft|heissluft|konvektomat|multifunktion|vario|fritteuse|friteuse|induktion|\bwok|herd|backofen|griddle|grillplatte|bratplatte|kontaktgrill|pizzaofen|nudelkoch|pastakoch|kippbrat|kochkessel|druckgar|front.?cooking|cooking.?station|salamander|kochfeld|kochstelle/i],
+  ['Eis/Wasser',/eiswürfel|eiswuerfel|eisbereit|scherbeneis|flockeneis|wasserspender|wassersprudler/i],
+  ['Kaffee/Bier',/kaffee|siebträger|siebtraeger|espresso|vollautomat|mengenbrüh|mengenbrueh|\bbier|zapf|schankanl/i],
+  ['Kühlzelle/Schockkühler',/kühlzelle|kuehlzelle|tiefkühlzelle|kälteaggregat|kaelteaggregat|kühlaggregat|verflüssiger|verdampfer|schockkühl|schockkuehl|schockfrost|schnellkühl|schnellkuehl/i],
+  ['Lüftung',/stützstrahl|stuetzstrahl|zuluft|abluft|lüftungsdecke|lüftungshaube|lueftungs|abzugshaube|dunstabzug|kochhaube|dunsthaube|magic.?hood/i],
+  ['Wasch-/Reinigungsmaschine',/salatwasch|gemüsewasch|gemuesewasch|sohlenrein|waschtrockner|waschmaschine/i],
+];
+// … außer Wärmetechnik und Ausgabe, auch wenn ein Stichwort oben passt
+// („Induktions-Warmhalteplatte", „Bainmarie mit Induktion")
+const IBN_NEIN=/warmhalt|bain.?marie|wärmeplatte|waermeplatte|warmplatte|wärmestrahl|hustenschutz|vitrine|wärmebrücke/i;
+function ibnKat(pos){
+  if(!relFields(pos).includes('ib')) return null;          // ohne Elektro keine Inbetriebnahme
+  const bez=String((tsItem(pos)||{}).bez||'');
+  if(IBN_NEIN.test(bez)) return null;
+  const k=IBN_KAT.find(([,re])=>re.test(bez)); return k?k[0]:null;
+}
+function ibnAuto(pos){ return !!ibnKat(pos); }
+function ibnPflicht(pos){
+  if(!relFields(pos).includes('ib')) return false;
+  const it=tsItem(pos);
+  if(it && (it.ibn===true || it.ibn===false)) return it.ibn;
+  return ibnAuto(pos);
+}
+function ibnSoll(pos){ return tsSoll(pos); }                 // ein Protokoll je Gerät
+function ibnIst(pos){
+  const l=(gs(pos).pdfs||[]).filter(p=>p&&p.type==='IBN Protokoll');
+  if(l.some(p=>p.alle)) return ibnSoll(pos);                  // Sammel-PDF für alle Geräte
+  return l.length;
+}
+function ibnFehlt(pos){ return ibnPflicht(pos) && ibnIst(pos) < ibnSoll(pos); }
+// Würde f die Inbetriebnahme setzen – direkt oder über die Chronologie (Einweisung)?
+function ibnBetrifft(pos, f){
+  const s=gs(pos); if(s.ib || entf(s,'ib')) return false;
+  return f==='ib' || (VORSTUFEN[f]||[]).includes('ib');
+}
+function ibnSperreMelden(pos){
+  if(confirm('Für „Inbetriebnahme" fehlt das IBN-Protokoll ('+ibnIst(pos)+' von '+ibnSoll(pos)+').\n\n'+posLabel(pos)+
+             '\n\nBei diesem Gerät ist ein Inbetriebnahmeprotokoll Pflicht. Jetzt anlegen (digital ausfüllen oder PDF hochladen)?')) ibnAnlegen(pos);
+}
+function ibnAnlegen(pos){
+  PPOS=pos;
+  let ov=document.getElementById('fsrcOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='fsrcOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  const bs='width:100%;background:#3a3530;border:1px solid #895500;color:#fff;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px';
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:20px;max-width:360px;width:100%;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:16px;font-weight:700;margin-bottom:4px">&#9881;&#65039; Inbetriebnahmeprotokoll</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:14px">'+escapeHtml(posLabel(pos))+' · '+ibnIst(pos)+' von '+ibnSoll(pos)+'</div>'+
+    '<button type="button" onclick="document.getElementById(\'fsrcOv\').remove();openIbnDigital()" style="'+bs+'">&#128221; Digital ausfüllen</button>'+
+    '<button type="button" onclick="document.getElementById(\'fsrcOv\').remove();selectPtype(\'IBN Protokoll\')" style="'+bs+'">&#128196; PDF hochladen</button>'+
+    '<button type="button" onclick="document.getElementById(\'fsrcOv\').remove()" style="width:100%;background:none;border:1px solid #555;color:#ccc;border-radius:10px;padding:11px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
+  '</div>';
+}
+// Schloss am Schritt und Zeile „IBN-Protokoll x von y" unter den Schritten
+function ibnRender(pos){
+  const id=sp(pos), s=gs(pos), z=document.getElementById('IZ'+id), k=document.getElementById('Kib'+id);
+  const pfl=ibnPflicht(pos), offen=pfl && !s.ib && !entf(s,'ib'), fehlt=offen && ibnFehlt(pos);
+  if(k){ k.classList.toggle('ck-lock', fehlt); const i=k.querySelector('.cki'); if(i && fehlt) i.innerHTML='&#128274;'; else if(i && !s.ib && !entf(s,'ib')) i.innerHTML='&#9675;'; }
+  if(!z) return;
+  if(!pfl || entf(s,'ib') || (s.ib && ibnFehlt(pos))){ z.innerHTML=''; return; }   // Altbestand: kein Hinweis
+  const ist=Math.min(ibnIst(pos),ibnSoll(pos)), soll=ibnSoll(pos), kat=ibnKat(pos);
+  z.innerHTML='<span class="ib-b'+(fehlt?'':' ok')+'">IBN-Protokoll '+ist+' von '+soll+'</span>'+
+    (fehlt?'<span>Pflicht'+(kat?(' · '+escapeHtml(kat)):'')+'</span><span class="ib-l" onclick="ibnAnlegen(\''+pos+'\')">Protokoll anlegen</span>':'');
+}
+function ibnFehlende(){
+  const r=[];
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+    const s=gs(it.pos); if(!ibnPflicht(it.pos) || s.ib || entf(s,'ib')) return;
+    r.push({pos:it.pos, bez:(it.bez||'').trim(), etage:sec.label||sec.pos, anlage:sub.bez||sub.pos, ist:Math.min(ibnIst(it.pos),ibnSoll(it.pos)), soll:ibnSoll(it.pos)});
+  })));
+  return r;
+}
+// Liste für den Reiter „Dokumente": noch nicht in Betrieb genommene Pflicht-Geräte
+function ibnListe(){
+  const l=ibnFehlende().filter(x=>x.ist<x.soll);
+  let ov=document.getElementById('ibnLsOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='ibnLsOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);color:var(--text);border-radius:12px;max-width:480px;width:100%;max-height:80vh;overflow:auto;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.45)">'+
+    '<div style="font-size:16px;font-weight:700;margin-bottom:10px">&#9881;&#65039; Fehlende Inbetriebnahmeprotokolle ('+l.length+')</div>'+
+    (l.length?l.map(x=>'<div onclick="document.getElementById(\'ibnLsOv\').remove();ibnGoToPos(\''+x.pos+'\')" style="border:1px solid var(--line);border-left:4px solid var(--red,#b3402e);border-radius:8px;padding:8px 10px;margin-bottom:6px;cursor:pointer;font-size:13px">'+
+      escapeHtml(x.pos)+' '+escapeHtml(x.bez)+'<div style="font-size:11px;color:var(--accent2)">'+escapeHtml(x.etage)+' · '+escapeHtml(x.anlage)+' · '+x.ist+' von '+x.soll+' vorhanden</div></div>').join('')
+      :'<div style="font-size:13px;color:var(--accent2)">Alle Pflicht-Protokolle liegen vor.</div>')+
+    '<div style="text-align:right;margin-top:8px"><button onclick="document.getElementById(\'ibnLsOv\').remove()" style="padding:8px 16px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-family:inherit">Schließen</button></div></div>';
 }
 
 // FOTO
@@ -7350,7 +7471,13 @@ document.getElementById('pi').addEventListener('change',async function(e){
     while(belegt.has(fname.toLowerCase())){ lfd++; fname=basis+'_'+lfd+'.'+ext; }
     await queueUpload(fname, file, file.type||'application/pdf', PPOS);   // lokal + Warteschlange (offline-fähig)
     if(!gs(PPOS).pdfs) gs(PPOS).pdfs=[];
-    gs(PPOS).pdfs.push({type:PTYPE,name:file.name,fname:fname});
+    const pe={type:PTYPE,name:file.name,fname:fname};
+    // Eine hochgeladene Datei enthält oft die Protokolle ALLER Geräte der Position
+    // (Sammel-PDF des Herstellers) – dann zählt sie für alle, sonst bliebe die
+    // Inbetriebnahme dauerhaft gesperrt.
+    if(PTYPE==='IBN Protokoll' && ibnPflicht(PPOS) && ibnSoll(PPOS)-ibnIst(PPOS)>1 &&
+       confirm('Enthält diese Datei die Inbetriebnahmeprotokolle für ALLE '+ibnSoll(PPOS)+' Geräte dieser Position?\n\nOK = ja, für alle\nAbbrechen = nur für ein Gerät')) pe.alle=true;
+    gs(PPOS).pdfs.push(pe);
     saveFotos(PPOS);
     updPG(PPOS);
     hideLoader();
@@ -7358,7 +7485,7 @@ document.getElementById('pi').addEventListener('change',async function(e){
     // Gleicher Automatismus wie beim digital ausgefüllten Protokoll: ein hier
     // hochgeladenes Inbetriebnahmeprotokoll ist derselbe Nachweis.
     const auto=schrittAusProtokoll(PPOS, PTYPE);
-    if(auto && auto.stand==='gesetzt') showToast('✓ '+PTYPE+' abgelegt'+protoHinweis(auto));
+    if(auto && (auto.stand==='gesetzt'||auto.stand==='ibn-teil')) showToast('✓ '+PTYPE+' abgelegt'+protoHinweis(auto)+(auto.stand==='ibn-teil'?(' ('+ibnIst(PPOS)+' von '+ibnSoll(PPOS)+')'):''));
     protoWarnen(PPOS, auto);
   } catch(err){
     hideLoader();
@@ -7370,6 +7497,7 @@ function updPG(pos){
   const id=sp(pos);
   const s=gs(pos);
   const g=document.getElementById('PG'+id);
+  ibnRender(pos);
   if(!g) return;
   if(!s.pdfs||!s.pdfs.length){g.innerHTML='';return;}
   g.innerHTML=s.pdfs.map((p,i)=>{
@@ -9285,7 +9413,7 @@ function collectRestRows(){
 // Anders als die Restarbeitenliste (= Mängel/Nacharbeiten) listet das die noch
 // NICHT erbrachten Leistungen aus dem LV: fehlender Anschluss, Inbetriebnahme,
 // Einweisung, Dichtigkeitsprüfung.
-const FLD_LBL={g:'Geliefert',m:'Montiert',nu:'Ausgeführt',sa:'Sanitäranschluss',dp:'Dichtigkeitsprüfung',ea:'Elektroanschluss',pa:'Potentialausgleich',ib:'Inbetriebnahme',ew:'Einweisung',typenschild:'Typenschild-Foto'};
+const FLD_LBL={g:'Geliefert',m:'Montiert',nu:'Ausgeführt',sa:'Sanitäranschluss',dp:'Dichtigkeitsprüfung',ea:'Elektroanschluss',pa:'Potentialausgleich',ib:'Inbetriebnahme',ew:'Einweisung',typenschild:'Typenschild-Foto',ibnproto:'IBN-Protokoll'};
 function collectOffeneLeistungen(gw){
   const rows=[];
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(item=>{
@@ -9299,6 +9427,7 @@ function collectOffeneLeistungen(gw){
     const offen=felder.filter(f=>!s[f] && !entf(s,f));
     // Fehlendes Typenschild-Foto als eigener offener Punkt (nur im Elektro-Kontext)
     if(felder.includes(tsSchritt(item.pos)) && tsFehlt(item.pos)) offen.push('typenschild');
+    if(felder.includes('ib') && !s.ib && !entf(s,'ib') && ibnFehlt(item.pos)) offen.push('ibnproto');
     if(!offen.length) return;                         // hier ist alles erledigt
     rows.push({
       geschoss:sec.label, bereich:sub.bez, pos:item.pos, bez:(item.bez||'').trim(),
@@ -11010,6 +11139,12 @@ function openGewerkChooser(pos){
     +'<input type="checkbox" class="gwts" style="width:18px;height:18px"'+(tsPflicht(pos)?' checked':'')+'>'
     +'<span>&#127991; Typenschild-Foto erforderlich<br><span style="font-size:11px;color:var(--accent2)">automatisch bei Geräten mit Elektro oder Sanitär'
     +((tsItem(pos)||{}).ts!==undefined?' · <b>hier von Hand festgelegt</b>':'')+'</span></span></label>'
+    // IBN-Protokoll-Pflicht übersteuern – gleiche Logik wie beim Typenschild
+    +'<label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px dashed var(--line);border-radius:8px;margin:0 0 8px;cursor:pointer">'
+    +'<input type="checkbox" class="gwibn" style="width:18px;height:18px"'+(ibnPflicht(pos)?' checked':'')+'>'
+    +'<span>&#9881;&#65039; IBN-Protokoll erforderlich<br><span style="font-size:11px;color:var(--accent2)">automatisch: '
+    +(ibnKat(pos)?('ja – erkannt als „'+escapeHtml(ibnKat(pos))+'“'):'nein')
+    +((tsItem(pos)||{}).ibn!==undefined?' · <b>hier von Hand festgelegt</b>':'')+' · nur mit Elektroanschluss</span></span></label>'
     +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">'
     +'<button onclick="(document.getElementById(\'gwOv\')||{}).remove&&document.getElementById(\'gwOv\').remove()" style="padding:9px 16px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-family:inherit">Abbrechen</button>'
     +'<button onclick="confirmGewerk(\''+pos+'\')" style="padding:9px 18px;border:none;background:var(--accent);color:#2b2b2b;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Übernehmen</button>'
@@ -11018,8 +11153,9 @@ function openGewerkChooser(pos){
 }
 function confirmGewerk(pos){
   const ov=document.getElementById('gwOv'); if(!ov) return;
-  const sel=[...ov.querySelectorAll('input[type=checkbox]:not(.gwts):checked')].map(c=>c.value);
+  const sel=[...ov.querySelectorAll('input[type=checkbox]:not(.gwts):not(.gwibn):checked')].map(c=>c.value);
   const tsBox=ov.querySelector('input.gwts'), tsWunsch=tsBox?tsBox.checked:null;
+  const ibBox=ov.querySelector('input.gwibn'), ibWunsch=ibBox?ibBox.checked:null;
   ov.remove();
   setPosGewerk(pos, sel);
   // Typenschild: nur eine ABWEICHUNG von der Automatik speichern – sonst bliebe eine
@@ -11030,6 +11166,12 @@ function confirmGewerk(pos){
     if(tsWunsch===tsAuto(pos)) delete it.ts; else it.ts=tsWunsch;
     if(vorher!==it.ts){ updTG(pos); saveLV(); }
   }
+  if(it && ibWunsch!==null){
+    const vorher=it.ibn;
+    if(ibWunsch===ibnAuto(pos)) delete it.ibn; else it.ibn=ibWunsch;
+    if(vorher!==it.ibn) saveLV();
+  }
+  ibnRender(pos);
 }
 function setPosGewerk(pos, gewArr){
   let item=null;
