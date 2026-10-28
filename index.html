@@ -3025,8 +3025,12 @@ function dokuStand(){
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
     if(!relFields(it.pos).includes('ew')) return; const st=gs(it.pos); if(entf(st,'ew')) return;
     eTot++; if(st.ew) eIst++; })));
-  if(eTot && eIst<eTot) off.push({ic:'&#128203;', t:'Einweisungsprotokoll', m:(eTot-eIst)+' von '+eTot+' Elektrogeräten noch nicht eingewiesen',
-    quote:eIst/eTot, knopf:'Einweisen', fn:'openEinweisung()'});
+  // Zwei Einweisungen gehören dazu (Wunsch des Nutzers): die Geräte-Einweisung
+  // (je Gerät, mit Fortschritt) und die Grundlagen-Einweisung (einmal je Baustelle).
+  if(eTot && eIst<eTot) off.push({ic:'&#128203;', t:'Geräte-Einweisung', m:(eTot-eIst)+' von '+eTot+' Elektrogeräten noch nicht eingewiesen',
+    quote:eIst/eTot, knopf:'Einweisen', fn:'dokuEwNeu(\'geraete\')'});
+  if(!ew.protokolle.some(p=>p.typ==='allgemein') && !ew.entwuerfe.some(p=>p.typ==='allgemein'))
+    off.push({ic:'&#128203;', t:'Grundlagen-Einweisung', m:'Hygiene, Sicherheit, Reinigung – noch kein Protokoll', knopf:'Einweisen', fn:'dokuEwNeu(\'allgemein\')'});
   // Schlüsselübergabe: gehört immer dazu
   const schlP=ew.protokolle.filter(p=>p.typ==='schluessel'), schlE=ew.entwuerfe.filter(p=>p.typ==='schluessel');
   if(!schlP.length && !schlE.length) off.push({ic:'&#128273;', t:'Schlüsselübergabe', m:'noch kein Protokoll', knopf:'Anlegen', fn:'openSchluesselprotokoll()'});
@@ -3038,7 +3042,7 @@ function dokuStand(){
   if(nFm) off.push({ic:'&#128228;', t:'Mängelfreimeldung', m:nFm+' erledigte Mängel noch nicht freigemeldet', knopf:'Freimelden', fn:'openFreimeldung()'});
 
   // Entwürfe der Einweisungs-App
-  const EWT={geraete:'Einweisungsprotokoll', allgemein:'Einweisung allgemein', schluessel:'Schlüsselübergabe'};
+  const EWT={geraete:'Geräte-Einweisung', allgemein:'Grundlagen-Einweisung', schluessel:'Schlüsselübergabe'};
   ew.entwuerfe.forEach(e=>vorb.push({ic:e.typ==='schluessel'?'&#128273;':'&#128203;', t:(EWT[e.typ]||'Einweisung')+(e.titel?(' – '+e.titel):''), tag:'ohne Unterschrift',
     m:'vorbereitet '+dokuDat(e.ts?new Date(e.ts).toISOString():e.datum)+(e.von?(' von '+e.von):'')+((e.positions||[]).length?(' · '+e.positions.length+' Positionen'):''),
     knopf:'Vervollständigen', fn:'dokuEwEntwurf('+escapeHtml(JSON.stringify(e.id))+')'}));
@@ -3059,7 +3063,7 @@ function dokuStand(){
     fertig.push({ic:'&#128211;', t:'Bautagebuch', tag:btbF.length+(btbF.length===1?' Tag':' Tage'), m:'zuletzt '+dokuDat(z.datum)+' · Nr. '+z.nr, knopf:'Alle anzeigen', fn:'openBautagebuchDialog()', leicht:true}); }
   // Einweisungs- und Schlüsselprotokolle
   ew.protokolle.slice().sort((a,b)=>String(b.datum||'').localeCompare(String(a.datum||''))).forEach(p=>fertig.push({ic:p.typ==='schluessel'?'&#128273;':'&#128203;',
-    t:(EWT[p.typ]||'Einweisungsprotokoll')+((p.etagen&&p.etagen.length)?(' – '+p.etagen.join(', ')):''),
+    t:(EWT[p.typ]||'Geräte-Einweisung')+((p.etagen&&p.etagen.length)?(' – '+p.etagen.join(', ')):''),
     m:[dokuDat(p.datum), p.einweiser, p.typ==='schluessel'?((p.schluessel||0)+' Schlüssel'):((p.positions||[]).length?(p.positions.length+' Geräte'):'')].filter(Boolean).join(' · '),
     knopf:p.pdf?'&#128196; PDF':'', fn:p.pdf?('dokuEwPdf('+escapeHtml(JSON.stringify(p.pdf))+')'):''}));
   // Freimeldungen und Protokoll-Übersicht
@@ -3103,7 +3107,8 @@ function dokuNeuMenu(btn){
     document.addEventListener('click',e=>{ if(!e.target.closest('#dokuNeuMenu')&&!e.target.closest('.dk-neu')) menu.classList.remove('open'); }); }
   const z=(ic,t,h,fn)=>'<div class="ptype-item" onclick="document.getElementById(\'dokuNeuMenu\').classList.remove(\'open\');'+fn+'">'+ic+'&nbsp; '+t+'<small>'+h+'</small></div>';
   menu.innerHTML='<div class="ptype-h">Dokument vorbereiten</div>'+
-    z('&#128203;','Einweisungsprotokoll','Geräte wählen, „Zwischenspeichern – ohne Unterschrift"','openEinweisung()')+
+    z('&#128203;','Geräte-Einweisung','Geräte wählen, „Zwischenspeichern – ohne Unterschrift"','dokuEwNeu(\'geraete\')')+
+    z('&#128203;','Grundlagen-Einweisung','Themen abhaken, zwischenspeichern','dokuEwNeu(\'allgemein\')')+
     z('&#128273;','Schlüsselübergabe','Schlüssel eintragen, zwischenspeichern','openSchluesselprotokoll()')+
     z('&#128295;','Servicebericht','Kunde, Auftrag, Material – „Speichern" ohne PDF','svcPick(0)')+
     z('&#128167;','Dichtigkeitsprotokoll','Umfang wählen, „Speichern" ohne PDF','openDichtDialog()')+
@@ -3112,6 +3117,11 @@ function dokuNeuMenu(btn){
   menu.style.maxWidth='300px'; menu.classList.add('open');
   menu.style.left=Math.max(8, Math.min(r.right+window.scrollX-300, window.innerWidth-308))+'px';
   menu.style.top=(r.bottom+window.scrollY+4)+'px';
+}
+// Einweisungs-App direkt in der gewünschten Protokollart öffnen
+function dokuEwNeu(typ){
+  if(!PID) return;
+  window.open(EINWEISUNG_URL+'#pid='+encodeURIComponent(PID)+'&projekt='+encodeURIComponent(curProjName())+'&neu='+encodeURIComponent(typ),'_blank','noopener');
 }
 // Entwurf der Einweisungs-App direkt zum Vervollständigen öffnen
 function dokuEwEntwurf(id){

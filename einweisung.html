@@ -872,7 +872,8 @@ async function onLoggedIn(){
   hideLoader();
   // Direkteinstieg aus der Hauptapp („🔑 Schlüsselübergabe" in Berichte & Dokumente):
   // Protokollart überspringen und gleich die Auswahl zeigen.
-  if(pid && h.get('neu')==='schluessel'){ startSession(); sessionType('schluessel'); }
+  // Auch aus dem Reiter „Dokumente": Geräte- oder Grundlagen-Einweisung direkt.
+  if(pid && ['schluessel','geraete','allgemein'].includes(h.get('neu'))){ startSession(); sessionType(h.get('neu')); }
   // Aus dem Reiter „Dokumente" der Hauptapp: einen vorbereiteten Entwurf direkt öffnen
   if(pid && h.get('entwurf')){ const eid=h.get('entwurf');
     if(EW && (EW.entwuerfe||[]).some(e=>e.id===eid)) editEntwurf(eid);
