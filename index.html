@@ -2012,8 +2012,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 153;
+const APP_VERSION = 154;
 const CHANGELOG = [
+  { v:154, titel:'Weitere Korrekturen', punkte:[
+    'Dialog „✎ Gewerk": Wer Elektro ergänzt hat, hat damit ungewollt die IBN-Pflicht des Geräts abgewählt. Jetzt zählt nur noch ein Kästchen, das man selbst umgestellt hat.',
+    'Die Stückliste wird beim Übernehmen im Gewerk-Dialog nur noch einmal gespeichert. Schlägt das Speichern fehl, zeigt die App das an.',
+    'Wird ein Protokoll ersetzt, setzt die App „Inbetriebnahme" nach, falls das beim ersten Ablegen noch gesperrt war.',
+    'Die Antwort Stecker/Festanschluss geht nicht mehr verloren, wenn währenddessen ein anderes Gerät die Position aktualisiert.' ]},
   { v:153, titel:'Korrekturen IBN- und DGUV-Pflicht', punkte:[
     'Wird die Inbetriebnahme über ein abgelegtes IBN-Protokoll gesetzt, fragt die App jetzt auch dort nach <b>Stecker oder Festanschluss</b> – vorher wurde die Frage und damit die DGUV-Prüfung übersprungen.',
     'Dialog „✎ Gewerk": War die IBN-Pflicht für die ganze Baustelle abgewählt, wurde beim Übernehmen das Gerät zusätzlich einzeln abgewählt. Behoben.' ]},
@@ -3455,6 +3460,7 @@ function tsNachholen(pos){
   if(tsFehlt(pos) || s.ib || entf(s,'ib')) return false;
   if(!(s.pdfs||[]).some(p=>p&&p.type==='IBN Protokoll')) return false;
   const a=schrittAusProtokoll(pos,'IBN Protokoll');
+  if(a && (a.stand==='anschl' || a.stand==='dguv')) protoWarnen(pos, a);   // Frage bzw. Hinweis statt stillem Ausbleiben
   return !!(a && a.stand==='gesetzt');
 }
 
@@ -3574,6 +3580,7 @@ function anschlDialog(pos, weiter){
     '<button type="button" id="anAb" style="width:100%;background:none;border:1px solid #555;color:#ccc;border-radius:10px;padding:11px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
   '</div>';
   const setz=v=>{ ov.remove();
+    const s=gs(pos);     // frisch holen: das Polling kann ST[pos] inzwischen ersetzt haben
     if(s.anschl!==v){ const alt=s.anschl; s.anschl=v; histAdd(pos,'anschl',(v==='fest'?'Festanschluss':'Stecker')+(alt?(' (vorher '+(alt==='fest'?'Festanschluss':'Stecker')+')'):'')); savePos(pos); }
     ibnRender(pos); if(ACT==='__doku'){ dokuRender(); updDokuTab(); }
     if(weiter) weiter(); };
@@ -7654,7 +7661,9 @@ async function ibnReceive(p){
     puAuto();                       // Übersicht in SharePoint nachziehen
     // Beim ERSETZEN eines Protokolls nichts nachsetzen – der Haken steht dann längst,
     // und ein „entfällt" wäre schon beim ersten Ablegen gemeldet worden.
-    const auto = replaced ? null : (type==='DGUV Protokoll' ? dguvNachholen(pos) : schrittAusProtokoll(pos, type));
+    // Beim ERSETZEN nur dann nichts nachsetzen, wenn der Haken schon steht – seit den
+    // Pflicht-Sperren (v148–152) kann das erste Ablegen den Haken auch verweigert haben.
+    const auto = (replaced && gs(pos).ib) ? null : (type==='DGUV Protokoll' ? dguvNachholen(pos) : schrittAusProtokoll(pos, type));
     showToast('✓ '+type+' bei Position '+pos+(replaced?' aktualisiert':' abgelegt')+
               protoHinweis(auto));
     protoWarnen(pos, auto);
@@ -11440,7 +11449,7 @@ function openGewerkChooser(pos){
     // Typenschild-Pflicht übersteuern. Vorbelegt mit dem, was gerade gilt; beim
     // Übernehmen wird nur gespeichert, was von der Automatik abweicht (confirmGewerk).
     +'<label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px dashed var(--line);border-radius:8px;margin:4px 0 8px;cursor:pointer">'
-    +'<input type="checkbox" class="gwts" style="width:18px;height:18px"'+(tsPflicht(pos)?' checked':'')+'>'
+    +'<input type="checkbox" class="gwts" style="width:18px;height:18px" data-def="'+(tsPflicht(pos)?1:0)+'"'+(tsPflicht(pos)?' checked':'')+'>'
     +'<span>&#127991; Typenschild-Foto erforderlich<br><span style="font-size:11px;color:var(--accent2)">automatisch bei Geräten mit Elektro oder Sanitär'
     +((tsItem(pos)||{}).ts!==undefined?' · <b>hier von Hand festgelegt</b>':'')+'</span></span></label>'
     // IBN-Protokoll-Pflicht übersteuern – gleiche Logik wie beim Typenschild
@@ -11448,7 +11457,8 @@ function openGewerkChooser(pos){
     // Vorbelegt mit dem Wert der POSITION (Übersteuerung oder Automatik) – nicht mit
     // ibnPflicht(): ist die IBN-Pflicht für die ganze Baustelle abgewählt, wäre die
     // Box sonst leer, und „Übernehmen" machte daraus eine Einzel-Abwahl.
-    +'<input type="checkbox" class="gwibn" style="width:18px;height:18px"'+(((tsItem(pos)||{}).ibn===true||((tsItem(pos)||{}).ibn!==false&&ibnAuto(pos)))?' checked':'')+'>'
+    +(function(){ const it=tsItem(pos)||{}, v=it.ibn===true||(it.ibn!==false&&ibnAuto(pos));
+        return '<input type="checkbox" class="gwibn" style="width:18px;height:18px" data-def="'+(v?1:0)+'"'+(v?' checked':'')+'>'; })()
     +'<span>&#9881;&#65039; IBN-Protokoll erforderlich<br><span style="font-size:11px;color:var(--accent2)">automatisch: '
     +(ibnKat(pos)?('ja – erkannt als „'+escapeHtml(ibnKat(pos))+'“'):'nein')
     +((tsItem(pos)||{}).ibn!==undefined?' · <b>hier von Hand festgelegt</b>':'')+' · nur mit Elektroanschluss'
@@ -11462,28 +11472,33 @@ function openGewerkChooser(pos){
 function confirmGewerk(pos){
   const ov=document.getElementById('gwOv'); if(!ov) return;
   const sel=[...ov.querySelectorAll('input[type=checkbox]:not(.gwts):not(.gwibn):checked')].map(c=>c.value);
-  const tsBox=ov.querySelector('input.gwts'), tsWunsch=tsBox?tsBox.checked:null;
-  const ibBox=ov.querySelector('input.gwibn'), ibWunsch=ibBox?ibBox.checked:null;
+  // Nur ein ANGEFASSTES Kästchen ist eine Entscheidung. Sonst würde z. B. beim
+  // Ergänzen von Elektro das (vorher mangels Elektro leere) Kästchen nach der
+  // Gewerk-Änderung als „Pflicht abgewählt" gespeichert.
+  const box=c=>{ const b=ov.querySelector('input.'+c); return (b && b.checked!==(b.dataset.def==='1')) ? b.checked : null; };
+  const tsWunsch=box('gwts'), ibWunsch=box('gwibn');
   ov.remove();
-  setPosGewerk(pos, sel);
+  setPosGewerk(pos, sel, true);        // gespeichert wird EINMAL am Ende
   // Typenschild: nur eine ABWEICHUNG von der Automatik speichern – sonst bliebe eine
   // Position an einer alten Entscheidung hängen, wenn sich das Gewerk später ändert.
   const it=tsItem(pos);
   if(it && tsWunsch!==null){
     const vorher=it.ts;
     if(tsWunsch===tsAuto(pos)) delete it.ts; else it.ts=tsWunsch;
-    if(vorher!==it.ts){ updTG(pos); saveLV(); }
+    if(vorher!==it.ts) updTG(pos);
   }
   if(it && ibWunsch!==null){
     const vorher=it.ibn;
     if(ibWunsch===ibnAuto(pos)) delete it.ibn; else it.ibn=ibWunsch;
     if(it.ibn!==false){ delete it.ibnAusVon; delete it.ibnAusAm; }
     else if(vorher!==false){ it.ibnAusVon=USER||''; it.ibnAusAm=new Date().toISOString(); }
-    if(vorher!==it.ibn) saveLV();
   }
   ibnRender(pos);
+  // Ein Speichervorgang statt bis zu drei gleichzeitiger: die überholten sich und
+  // konnten die Übersteuerung wieder herausschreiben.
+  saveLV();
 }
-function setPosGewerk(pos, gewArr){
+function setPosGewerk(pos, gewArr, ohneSpeichern){
   let item=null;
   DATA.forEach(s=>s.subsections.forEach(sub=>sub.items.forEach(it=>{ if(it.pos===pos) item=it; })));
   if(!item) return;
@@ -11502,7 +11517,7 @@ function setPosGewerk(pos, gewArr){
   // Gewerk-Umschalter einblenden, falls die Baustelle dadurch erstmals Gewerke bekommt
   const bar=document.getElementById('gwbar');
   if(bar && bar.style.display==='none' && DATA.some(s=>s.subsections.some(sub=>sub.items.some(it=>it.gew&&it.gew.length)))) bar.style.display='flex';
-  saveLV();
+  if(!ohneSpeichern) saveLV();
 }
 // Stückliste in eine BESTEHENDE Baustelle nachtragen (der Anlage-Assistent legt immer
 // eine neue an). Nur erlaubt, solange es noch keine Positionen gibt – ein Ersetzen
@@ -11530,7 +11545,10 @@ async function lvNachtragen(file){
 async function saveLV(){
   if(!PID) return;
   try{ await spUploadText('LV_'+PID+'.json', JSON.stringify(DATA)); }
-  catch(e){ console.warn('Stückliste speichern fehlgeschlagen:', e); }
+  catch(e){ console.warn('Stückliste speichern fehlgeschlagen:', e);
+    // Sichtbar machen: Gewerk, Typenschild-/IBN-/DGUV-Abwahl stehen in der Stückliste
+    // und wären nach dem nächsten Laden still wieder weg.
+    try{ showToast('⚠ Stückliste nicht gespeichert (offline?) – Änderung bitte wiederholen'); }catch(_){} }
 }
 
 // ══ Stückliste ändern: Position ergänzen / bearbeiten / löschen ══════════════
