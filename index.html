@@ -355,6 +355,11 @@ body:not(.doku-an) #DOKU{display:none;}
 .dk-tag{display:inline-block;font-size:10px;padding:1px 7px;border-radius:8px;background:var(--part-bg);color:#7a5c1d;margin-left:4px;vertical-align:middle;}
 .dk-btn{border:1px solid var(--braun);color:var(--braun);background:transparent;border-radius:16px;padding:6px 12px;font-family:inherit;font-size:13px;white-space:nowrap;cursor:pointer;flex-shrink:0;}
 .dk-btn.voll{background:var(--braun);color:#fff;}
+.dk-aus{border:none;background:none;color:var(--accent2);font-family:inherit;font-size:11px;text-decoration:underline;white-space:nowrap;padding:4px;cursor:pointer;flex-shrink:0;}
+.dk-ausg .dk-gh{color:var(--accent2);cursor:pointer;} .dk-ausg .dk-n{background:var(--accent2);}
+.dk-ausg .dk-row{opacity:.75;background:transparent;} .dk-ausg .dk-t{text-decoration:line-through;}
+.fth.ts-frag{border-color:#b8860b;} .ts-warn{position:absolute;top:3px;left:3px;z-index:2;background:#b8860b;color:#fff;border-radius:50%;width:20px;height:20px;line-height:20px;text-align:center;font-size:12px;font-weight:700;pointer-events:none;}
+.ts-fraglbl{color:#b8860b!important;}
 .dk-hint,.dk-leer{font-size:12px;color:var(--accent2);margin:-2px 0 10px 2px;}
 @media (max-width:600px){ .dk-z{display:none;} .dk-neu{margin-left:0;width:100%;} .dk-row{flex-wrap:wrap;} .dk-btn{margin-left:38px;} }
 .fzeile{display:flex;flex-wrap:wrap;gap:9px;margin-top:7px;}
@@ -2006,8 +2011,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 148;
+const APP_VERSION = 149;
 const CHANGELOG = [
+  { v:149, titel:'Dokumente abwählbar · Typenschild-Prüfung', punkte:[
+    'Im Reiter <b>Dokumente</b> können Büro und Bauleitung einen Eintrag als <b>„nicht erforderlich"</b> markieren – z. B. die Schlüsselübergabe, wenn es auf der Baustelle keine Schlüssel gibt. Er rutscht dann in die Gruppe „Nicht erforderlich" und lässt sich dort wieder aktivieren.',
+    'Sind die <b>Inbetriebnahmeprotokolle</b> auf einer Baustelle abgewählt, entfällt dort auch die Sperre an „Inbetriebnahme".',
+    'Das <b>Typenschild-Foto</b> wird direkt nach der Aufnahme geprüft: unscharf, zu dunkel, überbelichtet oder Schild zu klein im Bild. Dann fragt die App „Neu aufnehmen" oder „Trotzdem verwenden".',
+    'Ein trotzdem verwendetes Foto bekommt am Fotokasten ein <b>gelbes Ausrufezeichen</b> („fraglich") – auch der Kundendienst sieht das.' ]},
   { v:148, titel:'Inbetriebnahmeprotokoll als Pflicht', punkte:[
     'Bei Geräten, die angeschlossen und eingestellt werden, ist das <b>Inbetriebnahmeprotokoll jetzt Pflicht</b>: Spültechnik, Gartechnik, Eiswürfelbereiter und Wasserspender, Kaffeemaschinen und Zapfanlagen, Kühlzellen und Schockkühler, Lüftungshauben, Gemüsewasch- und Waschmaschinen. Die App erkennt das an der Bezeichnung.',
     '„Inbetriebnahme" lässt sich dort erst abhaken, wenn das Protokoll an der Position liegt – digital ausgefüllt oder als PDF, bei mehreren Geräten <b>eines je Gerät</b>. Mit dem letzten Protokoll setzt sich der Haken von selbst.',
@@ -3035,6 +3045,32 @@ function dokuPdfMerken(art, entry){
   entry.pdfAm=new Date().toISOString();
   Promise.resolve().then(()=>queueJsonEintrag(art, entry)).then(()=>flushOutbox()).catch(e=>console.warn('PDF-Merker:', e&&e.message));
 }
+// ── „nicht erforderlich" je Baustelle (ab v149) ──
+// Gespeichert in __projects.json als dokuAus = {schluessel:{von,am}, ibn:{…}, …}.
+// Schalten dürfen die an der Baustelle eingetragenen Büro- und Bauleitungs-
+// Personen sowie der Innendienst; ist niemand eingetragen, jeder (Entscheidung
+// des Nutzers 28.10.2026).
+function dokuProj(){ return (PROJECTS||[]).find(x=>x.pid===PID)||null; }
+function dokuAusMap(){ const p=dokuProj(); return (p&&p.dokuAus&&typeof p.dokuAus==='object')?p.dokuAus:{}; }
+function dokuIstAus(k){ return !!dokuAusMap()[k]; }
+function dokuDarfSchalten(){
+  const p=dokuProj(); if(!p) return false;
+  const namen=namesArr(p.buero).concat(namesArr(p.bauleiter));
+  if(!namen.length) return true;
+  const u=String(USER||'').trim().toLowerCase(); if(!u) return false;
+  return namen.concat(INNENDIENST).some(n=>String(n).trim().toLowerCase()===u);
+}
+async function dokuSchalten(k, aus){
+  const p=dokuProj(); if(!p || !dokuDarfSchalten()) return;
+  const alt=JSON.parse(JSON.stringify(p.dokuAus||{}));
+  const m=Object.assign({}, p.dokuAus||{});
+  if(aus) m[k]={von:USER||'', am:new Date().toISOString()}; else delete m[k];
+  p.dokuAus=m; p.stammEdit=new Date().toISOString();
+  dokuRender(); updDokuTab(); if(k==='ibn') updAllTG();
+  try{ await saveProjects(); }
+  catch(e){ p.dokuAus=alt; dokuRender(); updDokuTab(); if(k==='ibn') updAllTG(); alert('Speichern fehlgeschlagen: '+((e&&e.message)||e)); }
+}
+let DOKU_AUS_AUF=false;
 function dokuFertig(e, sigB){ return !!(e && (e.pdfAm || e.abrGemeldet || (e.sigKpc && e[sigB]))); }
 function dokuDat(iso){ if(!iso) return ''; const d=String(iso).slice(0,10).split('-'); return d.length===3?(d[2]+'.'+d[1]+'.'+d[0]):iso; }
 // Was zur Baustelle gehört und was davon fehlt
@@ -3047,25 +3083,34 @@ function dokuStand(){
     eTot++; if(st.ew) eIst++; })));
   // Zwei Einweisungen gehören dazu (Wunsch des Nutzers): die Geräte-Einweisung
   // (je Gerät, mit Fortschritt) und die Grundlagen-Einweisung (einmal je Baustelle).
-  if(eTot && eIst<eTot) off.push({ic:'&#128203;', t:'Geräte-Einweisung', m:(eTot-eIst)+' von '+eTot+' Elektrogeräten noch nicht eingewiesen',
+  if(eTot && eIst<eTot) off.push({k:'ew-geraete', ic:'&#128203;', t:'Geräte-Einweisung', m:(eTot-eIst)+' von '+eTot+' Elektrogeräten noch nicht eingewiesen',
     quote:eIst/eTot, knopf:'Einweisen', fn:'dokuEwNeu(\'geraete\')'});
   if(!ew.protokolle.some(p=>p.typ==='allgemein') && !ew.entwuerfe.some(p=>p.typ==='allgemein'))
-    off.push({ic:'&#128203;', t:'Grundlagen-Einweisung', m:'Hygiene, Sicherheit, Reinigung – noch kein Protokoll', knopf:'Einweisen', fn:'dokuEwNeu(\'allgemein\')'});
+    off.push({k:'ew-allgemein', ic:'&#128203;', t:'Grundlagen-Einweisung', m:'Hygiene, Sicherheit, Reinigung – noch kein Protokoll', knopf:'Einweisen', fn:'dokuEwNeu(\'allgemein\')'});
   // Inbetriebnahmeprotokolle der Pflicht-Geräte (ab v148)
   const ibnL=ibnFehlende(), ibnOff=ibnL.filter(x=>x.ist<x.soll).length;
   let ibnTot=0; DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ if(ibnPflicht(it.pos)) ibnTot++; })));
-  if(ibnOff) off.push({ic:'&#9881;&#65039;', t:'Inbetriebnahmeprotokolle', m:(ibnTot-ibnOff)+' von '+ibnTot+' Pflicht-Geräten · '+ibnOff+(ibnOff===1?' fehlt':' fehlen'),
+  if(ibnOff) off.push({k:'ibn', ic:'&#9881;&#65039;', t:'Inbetriebnahmeprotokolle', m:(ibnTot-ibnOff)+' von '+ibnTot+' Pflicht-Geräten · '+ibnOff+(ibnOff===1?' fehlt':' fehlen'),
     quote:(ibnTot-ibnOff)/ibnTot, knopf:'Liste', fn:'ibnListe()'});
   // Schlüsselübergabe: gehört immer dazu
   const schlP=ew.protokolle.filter(p=>p.typ==='schluessel'), schlE=ew.entwuerfe.filter(p=>p.typ==='schluessel');
-  if(!schlP.length && !schlE.length) off.push({ic:'&#128273;', t:'Schlüsselübergabe', m:'noch kein Protokoll', knopf:'Anlegen', fn:'openSchluesselprotokoll()'});
+  if(!schlP.length && !schlE.length) off.push({k:'schluessel', ic:'&#128273;', t:'Schlüsselübergabe', m:'noch kein Protokoll', knopf:'Anlegen', fn:'openSchluesselprotokoll()'});
   // Dichtigkeit: sobald es Sanitär-Positionen gibt
   let nS=0; try{ nS=dichtCollect('__all').length; }catch(e){}
-  if(nS && !DICHT.length) off.push({ic:'&#128167;', t:'Dichtigkeitsprotokoll', m:nS+' Sanitär-Positionen · noch kein Protokoll', knopf:'Anlegen', fn:'openDichtDialog()'});
+  if(nS && !DICHT.length) off.push({k:'dicht', ic:'&#128167;', t:'Dichtigkeitsprotokoll', m:nS+' Sanitär-Positionen · noch kein Protokoll', knopf:'Anlegen', fn:'openDichtDialog()'});
   // Mängelfreimeldung: erledigte Mängel ohne Vermerk
   let nFm=0; try{ nFm=fmErledigte().filter(x=>x.r.mangel && !(x.r.fm&&x.r.fm.nr)).length; }catch(e){}
-  if(nFm) off.push({ic:'&#128228;', t:'Mängelfreimeldung', m:nFm+' erledigte Mängel noch nicht freigemeldet', knopf:'Freimelden', fn:'openFreimeldung()'});
+  if(nFm) off.push({k:'fm', ic:'&#128228;', t:'Mängelfreimeldung', m:nFm+' erledigte Mängel noch nicht freigemeldet', knopf:'Freimelden', fn:'openFreimeldung()'});
 
+  // Abgewählte Einträge: aus „Auszufüllen" heraus, in die eigene Gruppe. Auch
+  // abgewählte, die gerade nichts Offenes hätten, bleiben sichtbar – sonst fände
+  // man den Schalter zum Zurückholen nicht mehr.
+  const DOKU_NAMEN={'ibn':['&#9881;&#65039;','Inbetriebnahmeprotokolle'],'ew-geraete':['&#128203;','Geräte-Einweisung'],'ew-allgemein':['&#128203;','Grundlagen-Einweisung'],
+    'schluessel':['&#128273;','Schlüsselübergabe'],'dicht':['&#128167;','Dichtigkeitsprotokoll'],'fm':['&#128228;','Mängelfreimeldung']};
+  const ausM=dokuAusMap(), aus=[];
+  Object.keys(ausM).forEach(k=>{ const n=DOKU_NAMEN[k]; if(!n) return; const a=ausM[k]||{};
+    aus.push({k, ic:n[0], t:n[1], m:'abgewählt'+(a.von?(' von '+a.von):'')+(a.am?(' · '+dokuDat(a.am)):''), knopf:'wieder aktivieren', fn:'dokuSchalten(\''+k+'\',false)', leicht:true}); });
+  for(let i=off.length-1;i>=0;i--) if(off[i].k && ausM[off[i].k]) off.splice(i,1);
   // Entwürfe der Einweisungs-App
   const EWT={geraete:'Geräte-Einweisung', allgemein:'Grundlagen-Einweisung', schluessel:'Schlüsselübergabe'};
   ew.entwuerfe.forEach(e=>vorb.push({ic:e.typ==='schluessel'?'&#128273;':'&#128203;', t:(EWT[e.typ]||'Einweisung')+(e.titel?(' – '+e.titel):''), tag:'ohne Unterschrift',
@@ -3095,7 +3140,7 @@ function dokuStand(){
   try{ fmBisher().forEach(f=>fertig.push({ic:'&#128228;', t:'Mängelfreimeldung Nr. '+f.nr, m:[dokuDat(f.datum), f.n+' Mängel freigemeldet', f.von].filter(Boolean).join(' · '), knopf:'Öffnen', fn:'openFreimeldung()', leicht:true})); }catch(e){}
   let nProt=0; DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ nProt+=(gs(it.pos).pdfs||[]).length; })));
   if(nProt) fertig.push({ic:'&#128450;', t:'Protokoll-Übersicht', m:nProt+' Geräte-Protokolle · hält sich selbst aktuell', knopf:'Anzeigen', fn:'expProtokollUebersicht()', leicht:true});
-  return {off, vorb, fertig};
+  return {off, vorb, fertig, aus};
 }
 function updDokuTab(){
   const el=document.getElementById('TNO___doku'); if(!el) return;
@@ -3113,10 +3158,12 @@ function dokuRender(){
   const box=document.getElementById('DOKU'); if(!box) return;
   if(!DOKU_EW){ box.innerHTML='<div class="dk-leer">Dokumente werden geladen …</div>'; return; }
   const s=dokuStand();
+  const darf=dokuDarfSchalten();
   const zeile=(x,cls)=>'<div class="dk-row '+cls+'"><span class="dk-ic">'+x.ic+'</span><div class="dk-mt"><div class="dk-t">'+escapeHtml(x.t).replace(/&amp;(#\d+;)/g,'&$1')+
     (x.tag?' <span class="dk-tag">'+escapeHtml(x.tag)+'</span>':'')+'</div><div class="dk-m">'+escapeHtml(x.m||'')+'</div>'+
     (x.quote!=null?'<div class="dk-bar"><i style="width:'+Math.round(x.quote*100)+'%"></i></div>':'')+'</div>'+
-    (x.knopf?'<button class="dk-btn'+(x.leicht||cls==='dk-fertig'?'':' voll')+'" onclick="'+x.fn+'">'+x.knopf+'</button>':'')+'</div>';
+    (darf && x.k && cls==='dk-offen'?'<button class="dk-aus" onclick="dokuSchalten(\''+x.k+'\',true)">nicht erforderlich</button>':'')+
+    (cls==='dk-ausg' && !darf ? '' : x.knopf?'<button class="dk-btn'+(x.leicht||cls==='dk-fertig'?'':' voll')+'" onclick="'+x.fn+'">'+x.knopf+'</button>':'')+'</div>';
   const grp=(titel,cls,arr,hinweis,leer)=>'<div class="dk-grp '+cls+'"><div class="dk-gh">'+titel+' <span class="dk-n">'+arr.length+'</span></div>'+
     (hinweis&&arr.length?'<div class="dk-hint">'+hinweis+'</div>':'')+
     (arr.length?arr.map(x=>zeile(x,cls)).join(''):'<div class="dk-hint">'+leer+'</div>')+'</div>';
@@ -3124,7 +3171,9 @@ function dokuRender(){
       '<button class="dk-neu" onclick="dokuNeuMenu(this)">&#65291; Dokument vorbereiten</button></div>'+
     grp('Auszufüllen','dk-offen',s.off,'','Nichts offen – alles, was zu dieser Baustelle gehört, ist angelegt.')+
     grp('In Vorbereitung','dk-vorb',s.vorb,'Angelegt, aber noch ohne PDF bzw. Unterschrift – vor Ort vervollständigen.','Nichts in Vorbereitung.')+
-    grp('Abgeschlossen','dk-fertig',s.fertig,'','Noch nichts abgeschlossen.');
+    grp('Abgeschlossen','dk-fertig',s.fertig,'','Noch nichts abgeschlossen.')+
+    (s.aus.length?('<div class="dk-grp dk-ausg"><div class="dk-gh" onclick="DOKU_AUS_AUF=!DOKU_AUS_AUF;dokuRender()">'+(DOKU_AUS_AUF?'&#9662;':'&#9656;')+' Nicht erforderlich <span class="dk-n">'+s.aus.length+'</span></div>'+
+      (DOKU_AUS_AUF?s.aus.map(x=>zeile(x,'dk-ausg')).join(''):'')+'</div>'):'');
 }
 function dokuNeuMenu(btn){
   let menu=document.getElementById('dokuNeuMenu');
@@ -3221,9 +3270,9 @@ function updTG(pos){
   const liste=s.typenschild||[], pfl=tsPflicht(pos), soll=tsSoll(pos);
   const nr=i=>(pfl&&soll>1)?(' '+(i+1)):'';
   let html=liste.map((t,i)=>
-    '<div class="fth-wrap"><div class="fth ts-da" onclick="tsOlb(\''+pos+'\','+i+')"><img class="fth-img" data-src="'+escapeHtml(t.fname)+'" id="TSIMG_'+id+'_'+i+'" alt="Typenschild">'+
+    '<div class="fth-wrap"><div class="fth ts-da'+(t.fraglich?' ts-frag':'')+'" onclick="tsOlb(\''+pos+'\','+i+')"'+(t.fraglich?' title="Foto fraglich: '+escapeHtml(t.fraglich.join(', '))+'"':'')+'>'+(t.fraglich?'<span class="ts-warn">!</span>':'')+'<img class="fth-img" data-src="'+escapeHtml(t.fname)+'" id="TSIMG_'+id+'_'+i+'" alt="Typenschild">'+
     '<button class="fdel" onclick="event.stopPropagation();tsDel(\''+pos+'\','+i+')">&#10005;</button></div>'+
-    '<div class="fth-date ts-lbl">Typenschild'+nr(i)+'</div></div>').join('');
+    '<div class="fth-date '+(t.fraglich?'ts-fraglbl':'ts-lbl')+'">Typenschild'+nr(i)+(t.fraglich?' · fraglich':'')+'</div></div>').join('');
   if(pfl) for(let i=liste.length;i<soll;i++)
     html+='<div class="fth-wrap"><div class="fth ts-leer" onclick="tsFoto(\''+pos+'\')" title="Typenschild fotografieren – Pflicht vor „'+(FLD_LBL[tsSchritt(pos)]||'')+'“">'+
       '<span class="ts-ic">&#127991;</span><span class="ts-tx">Typen&shy;schild'+nr(i)+'</span></div>'+
@@ -3241,7 +3290,66 @@ function tsDel(pos,i){
   histAdd(pos,'ts-weg','');
   updTG(pos); saveFotos(pos);
 }
-let TS_POS=null;
+let TS_POS=null, TS_SRC='cam';
+// ── Typenschild-Prüfung (ab v149) ──
+// Prüft das Foto VOR dem Hochladen auf drei häufige Fehler: unscharf, zu dunkel /
+// überbelichtet, Schild zu klein im Bild. Keine Texterkennung (offline, schnell):
+// erkannt werden schlechte Fotos, nicht ob die Seriennummer wirklich draufsteht.
+// Schwellen bewusst vorsichtig – lieber einmal zu wenig warnen als jedes Foto.
+async function tsBildPruefen(file){
+  const fehler=[];
+  try{
+    const url=URL.createObjectURL(file);
+    const img=await new Promise((ok,nok)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=nok; i.src=url; });
+    const sk=Math.min(1, 640/Math.max(img.naturalWidth,img.naturalHeight));
+    const w=Math.max(8,Math.round(img.naturalWidth*sk)), h=Math.max(8,Math.round(img.naturalHeight*sk));
+    const c=document.createElement('canvas'); c.width=w; c.height=h;
+    const cx=c.getContext('2d',{willReadFrequently:true}); cx.drawImage(img,0,0,w,h); URL.revokeObjectURL(url);
+    const d=cx.getImageData(0,0,w,h).data, g=new Float32Array(w*h);
+    let sum=0, hell=0;
+    for(let i=0,j=0;i<d.length;i+=4,j++){ const v=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; g[j]=v; sum+=v; if(v>=250) hell++; }
+    const mittel=sum/(w*h), anteilHell=hell/(w*h);
+    // Laplace je Kachel (8×8 Raster): Schärfe = Mittel der schärfsten Kacheln,
+    // Größe = Anteil der Kacheln mit erkennbarer Struktur.
+    const N=8, kv=[];
+    for(let ky=0;ky<N;ky++) for(let kx=0;kx<N;kx++){
+      const x0=Math.max(1,Math.floor(kx*w/N)), x1=Math.min(w-1,Math.floor((kx+1)*w/N));
+      const y0=Math.max(1,Math.floor(ky*h/N)), y1=Math.min(h-1,Math.floor((ky+1)*h/N));
+      let s=0,s2=0,n=0;
+      for(let y=y0;y<y1;y++) for(let x=x0;x<x1;x++){ const o=y*w+x; const l=4*g[o]-g[o-1]-g[o+1]-g[o-w]-g[o+w]; s+=l; s2+=l*l; n++; }
+      kv.push(n?(s2/n-(s/n)*(s/n)):0);
+    }
+    kv.sort((a,b)=>b-a);
+    const top=kv.slice(0,Math.max(4,Math.round(kv.length/8))), schaerfe=top.reduce((a,b)=>a+b,0)/top.length;
+    const mitStruktur=kv.filter(v=>v>=40).length/kv.length;
+    if(mittel<45) fehler.push({k:'dunkel', t:'zu dunkel', h:'mehr Licht oder Taschenlampe eines zweiten Handys'});
+    else if(anteilHell>0.25) fehler.push({k:'hell', t:'überbelichtet / Spiegelung', h:'schräg fotografieren, ohne Blitz'});
+    if(schaerfe<120) fehler.push({k:'unscharf', t:'unscharf', h:'Handy ruhig halten, auf das Schild tippen zum Scharfstellen'});
+    else if(mitStruktur<0.12) fehler.push({k:'klein', t:'Schild zu klein im Bild', h:'näher heran, Schild soll das Bild füllen'});
+    return {fehler, werte:{mittel:Math.round(mittel), hell:Math.round(anteilHell*100), schaerfe:Math.round(schaerfe), struktur:Math.round(mitStruktur*100)}};
+  }catch(e){ return {fehler:[], werte:null}; }        // Prüfung darf das Speichern nie verhindern
+}
+function tsPruefDialog(pos, pr){
+  return new Promise(res=>{
+    let ov=document.getElementById('fsrcOv');
+    if(!ov){ ov=document.createElement('div'); ov.id='fsrcOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+    ov.onclick=null;
+    const bs='width:100%;border:1px solid #895500;color:#fff;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px;';
+    const alle=[['unscharf','Schärfe'],['dunkel','Helligkeit'],['klein','Schild groß genug im Bild']];
+    const zeilen=pr.fehler.map(f=>'<div style="color:#ff8a75">&#10005; '+escapeHtml(f.t)+' <span style="color:#ccc">– '+escapeHtml(f.h)+'</span></div>').join('')+
+      alle.filter(([k])=>!pr.fehler.some(f=>f.k===k||(k==='dunkel'&&f.k==='hell'))).map(([,l])=>'<div style="color:#9fd49f">&#10003; '+l+'</div>').join('');
+    ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:20px;max-width:380px;width:100%;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+      '<div style="font-size:16px;font-weight:700;margin-bottom:4px">&#127991; Typenschild vermutlich nicht lesbar</div>'+
+      '<div style="font-size:12px;color:#a8a8a8;margin-bottom:12px">'+escapeHtml(posLabel(pos))+' · Gerät '+(tsIst(pos)+1)+' von '+tsSoll(pos)+'</div>'+
+      '<div style="font-size:13px;line-height:1.7;margin-bottom:14px">'+zeilen+'</div>'+
+      '<button type="button" id="tsPrNeu" style="'+bs+'background:#895500">&#128247; Neu aufnehmen</button>'+
+      '<button type="button" id="tsPrOk" style="'+bs+'background:#3a3530">Trotzdem verwenden</button>'+
+    '</div>';
+    // „Neu aufnehmen" öffnet die Kamera direkt im Klick (sonst blockt der Browser)
+    document.getElementById('tsPrNeu').onclick=function(){ ov.remove(); res('neu'); tsQuelle(TS_SRC); };
+    document.getElementById('tsPrOk').onclick=function(){ ov.remove(); res('ok'); };
+  });
+}
 function tsFoto(pos){
   TS_POS=pos;
   let ov=document.getElementById('fsrcOv');
@@ -3258,6 +3366,7 @@ function tsFoto(pos){
   '</div>';
 }
 function tsQuelle(src){
+  TS_SRC=src;
   const ov=document.getElementById('fsrcOv'); if(ov) ov.remove();
   const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
   if(src==='cam') inp.setAttribute('capture','environment');
@@ -3267,14 +3376,22 @@ function tsQuelle(src){
 }
 async function tsFotoUpload(pos, file){
   if(!pos||!file) return;
+  const pr=await tsBildPruefen(file);
+  let fraglich=null;
+  if(pr.fehler.length){
+    if(await tsPruefDialog(pos, pr)==='neu') return;          // Kamera ist schon wieder offen
+    fraglich=pr.fehler.map(f=>f.t);
+  }
   showLoader('Typenschild wird gespeichert…');
   try{
     const uf=await tryCompressImage(file);
     const ts=uniqTs();
     const fname=folderFor(pos)+'/'+fotoPosTeil(pos)+'_'+vaDatum(new Date(ts))+'_Typenschild_'+ts+'.jpg';
     await queueUpload(fname, uf, 'image/jpeg', pos);
-    const s=gs(pos); s.typenschild.push({fname, ts, by:USER||''});
-    histAdd(pos,'ts-neu','');
+    const s=gs(pos), e={fname, ts, by:USER||''};
+    if(fraglich) e.fraglich=fraglich;
+    s.typenschild.push(e);
+    histAdd(pos,'ts-neu',fraglich?('fraglich: '+fraglich.join(', ')):'');
     updTG(pos); saveFotos(pos);
     hideLoader();
     const nach=tsNachholen(pos);
@@ -3320,6 +3437,7 @@ function ibnKat(pos){
 function ibnAuto(pos){ return !!ibnKat(pos); }
 function ibnPflicht(pos){
   if(!relFields(pos).includes('ib')) return false;
+  if(dokuIstAus('ibn')) return false;          // auf dieser Baustelle abgewählt (v149)
   const it=tsItem(pos);
   if(it && (it.ibn===true || it.ibn===false)) return it.ibn;
   return ibnAuto(pos);

@@ -850,7 +850,9 @@ async function kdTypenschild(gid){
     if(!box()) return;
     if(!liste.length){ box().textContent='Noch kein Foto vom Typenschild – wird in der Montage-App bei der Inbetriebnahme aufgenommen.'; return; }
     box().innerHTML=liste.map((t,i)=>'<a id="kdTsA'+i+'" target="_blank" rel="noopener" style="display:inline-block;margin:0 8px 8px 0">'+
-      '<img id="kdTsI'+i+'" alt="Typenschild" style="width:140px;height:105px;object-fit:cover;border-radius:6px;border:1px solid var(--border);background:var(--bg2)"></a>').join('');
+      '<img id="kdTsI'+i+'" alt="Typenschild" style="width:140px;height:105px;object-fit:cover;border-radius:6px;border:'+(t.fraglich?'2px solid #b8860b':'1px solid var(--border)')+';background:var(--bg2)">'+
+      // In der Montage-App als „fraglich" übernommen (Bildprüfung, ab v149)
+      (t.fraglich?'<div style="font-size:11px;color:#b8860b">&#9888; Foto fraglich: '+String(t.fraglich.join(', ')).replace(/[<>&]/g,'')+'</div>':'')+'</a>').join('');
     liste.forEach(async (t,i)=>{
       try{ const b=await spDownloadBlob(t.fname); const u=URL.createObjectURL(b);
         const img=document.getElementById('kdTsI'+i), a=document.getElementById('kdTsA'+i);
