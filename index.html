@@ -2012,8 +2012,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 152;
+const APP_VERSION = 153;
 const CHANGELOG = [
+  { v:153, titel:'Korrekturen IBN- und DGUV-Pflicht', punkte:[
+    'Wird die Inbetriebnahme über ein abgelegtes IBN-Protokoll gesetzt, fragt die App jetzt auch dort nach <b>Stecker oder Festanschluss</b> – vorher wurde die Frage und damit die DGUV-Prüfung übersprungen.',
+    'Dialog „✎ Gewerk": War die IBN-Pflicht für die ganze Baustelle abgewählt, wurde beim Übernehmen das Gerät zusätzlich einzeln abgewählt. Behoben.' ]},
   { v:152, titel:'Stecker oder Festanschluss – DGUV-Prüfung', punkte:[
     'Beim Abhaken von <b>„Elektroanschluss"</b> fragt die App einmal je Position: <b>🔌 Stecker</b> oder <b>⚡ Festanschluss</b>. Die Antwort steht danach unter den Schritten und lässt sich dort per Tipp ändern.',
     'Bei <b>Festanschluss</b> ist eine <b>DGUV-Prüfung Pflicht</b>: „Inbetriebnahme" lässt sich erst abhaken, wenn das DGUV-Prüfprotokoll an der Position liegt (bei mehreren Geräten eines je Gerät). Ein Tipp auf „Prüfprotokoll anlegen" öffnet es direkt.',
@@ -2936,6 +2939,14 @@ function protoHinweis(auto){
 // Widerspruch zwischen Protokoll und „entfällt" gehört vor Augen, nicht in einen
 // Toast, der nach drei Sekunden weg ist.
 function protoWarnen(pos, auto){
+  if(auto && auto.stand==='anschl'){
+    anschlDialog(pos, function(){
+      const a=schrittAusProtokoll(pos,'IBN Protokoll');
+      if(a && a.stand==='gesetzt') showToast('✓ „Inbetriebnahme" abgehakt');
+      protoWarnen(pos, a);
+    });
+    return;
+  }
   if(auto && auto.stand==='dguv'){
     alert('Hinweis zu '+posLabel(pos)+'\n\nDas Protokoll ist abgelegt. „Inbetriebnahme" wird erst abgehakt, '+
           'wenn die DGUV-Prüfung dokumentiert ist (Festanschluss, '+dguvIst(pos)+' von '+dguvSoll(pos)+').\n\n'+
@@ -2971,6 +2982,9 @@ function schrittAusProtokoll(pos, type){
   // Haken nach (tsNachholen).
   // Bei mehreren Geräten erst mit dem letzten Pflicht-Protokoll (ibnNachholen nicht
   // nötig: jedes neue Protokoll ruft diese Funktion erneut auf).
+  // Setzt das Protokoll „Inbetriebnahme", zieht die Chronologie den Elektroanschluss
+  // mit – ohne Antwort auf Stecker/Festanschluss fiele die DGUV-Prüfung durchs Raster.
+  if(f==='ib' && anschlFragen(pos,'ib')) return {stand:'anschl', feld:f};
   if(f==='ib' && dguvFehlt(pos)) return {stand:'dguv', feld:f};
   if(f==='ib' && ibnFehlt(pos)) return {stand:'ibn-teil', feld:f};
   if(f===tsSchritt(pos) && tsFehlt(pos)) return {stand:'typenschild', feld:f};
@@ -11431,10 +11445,14 @@ function openGewerkChooser(pos){
     +((tsItem(pos)||{}).ts!==undefined?' · <b>hier von Hand festgelegt</b>':'')+'</span></span></label>'
     // IBN-Protokoll-Pflicht übersteuern – gleiche Logik wie beim Typenschild
     +'<label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px dashed var(--line);border-radius:8px;margin:0 0 8px;cursor:pointer">'
-    +'<input type="checkbox" class="gwibn" style="width:18px;height:18px"'+(ibnPflicht(pos)?' checked':'')+'>'
+    // Vorbelegt mit dem Wert der POSITION (Übersteuerung oder Automatik) – nicht mit
+    // ibnPflicht(): ist die IBN-Pflicht für die ganze Baustelle abgewählt, wäre die
+    // Box sonst leer, und „Übernehmen" machte daraus eine Einzel-Abwahl.
+    +'<input type="checkbox" class="gwibn" style="width:18px;height:18px"'+(((tsItem(pos)||{}).ibn===true||((tsItem(pos)||{}).ibn!==false&&ibnAuto(pos)))?' checked':'')+'>'
     +'<span>&#9881;&#65039; IBN-Protokoll erforderlich<br><span style="font-size:11px;color:var(--accent2)">automatisch: '
     +(ibnKat(pos)?('ja – erkannt als „'+escapeHtml(ibnKat(pos))+'“'):'nein')
-    +((tsItem(pos)||{}).ibn!==undefined?' · <b>hier von Hand festgelegt</b>':'')+' · nur mit Elektroanschluss</span></span></label>'
+    +((tsItem(pos)||{}).ibn!==undefined?' · <b>hier von Hand festgelegt</b>':'')+' · nur mit Elektroanschluss'
+    +(dokuIstAus('ibn')?' · <b>auf dieser Baustelle derzeit abgewählt</b>':'')+'</span></span></label>'
     +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">'
     +'<button onclick="(document.getElementById(\'gwOv\')||{}).remove&&document.getElementById(\'gwOv\').remove()" style="padding:9px 16px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-family:inherit">Abbrechen</button>'
     +'<button onclick="confirmGewerk(\''+pos+'\')" style="padding:9px 18px;border:none;background:var(--accent);color:#2b2b2b;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Übernehmen</button>'
