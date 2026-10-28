@@ -1011,7 +1011,7 @@ async function idbGet(store,key){
   catch(e){ return undefined; }
 }
 async function idbSet(store,key,val){
-  try{ const db=await idb(); return await new Promise((res,rej)=>{ const tx=db.transaction(store,'readwrite'); tx.objectStore(store).put(val,key); tx.oncomplete=()=>res(true); tx.onerror=()=>rej(tx.error); }); }
+  try{ const db=await idb(); return await new Promise((res,rej)=>{ const tx=db.transaction(store,'readwrite'); tx.objectStore(store).put(val,key); tx.oncomplete=()=>res(true); tx.onerror=()=>rej(tx.error); tx.onabort=()=>rej(tx.error||new Error('abort')); }); }
   catch(e){ return false; }
 }
 async function idbDel(store,key){
@@ -1059,17 +1059,26 @@ async function speicherPruefen(){
 // Datei ablegen, die NICHT verloren gehen darf. Scheitert das Schreiben, wird
 // Platz geschaffen: zuerst fliegen zwischengespeicherte Downloads raus (die
 // holt die App bei Bedarf wieder), niemals etwas aus der Warteschlange.
+// ACHTUNG: idbSet wirft nie, es gibt false zurück (bis v156 hier übersehen – die
+// Aufräum-Logik und der Direkt-Upload liefen dadurch nie, ein Foto bei vollem
+// Speicher ging still verloren).
 async function photosSetGeschuetzt(fname, blob){
-  try{ await idbSet('photos', fname, blob); return true; }catch(e){}
+  if(await idbSet('photos', fname, blob)){ return true; }
   const behalten=new Set([fname]);
   try{ (await idbAll('outbox')).forEach(e=>{ if(e.val&&e.val.kind==='file'&&e.val.fname) behalten.add(e.val.fname); }); }catch(e){}
   let keys=[];
   try{ keys=(await idbAll('photos')).map(e=>e.key).filter(k=>!behalten.has(k)); }catch(e){}
   for(let i=0;i<keys.length;i+=20){
     for(const k of keys.slice(i,i+20)){ try{ await idbDel('photos', k); }catch(e){} }
-    try{ await idbSet('photos', fname, blob); _QUOTA.ts=0; return true; }catch(e){}
+    if(await idbSet('photos', fname, blob)){ _QUOTA.ts=0; return true; }
   }
   return false;
+}
+let _speicherWarnZeit=0;
+function speicherWarnung(){
+  const t=nowMs(); if(t-_speicherWarnZeit<60000) return; _speicherWarnZeit=t;
+  alert('Achtung: Die Änderung konnte auf dem Gerät NICHT gesichert werden (Speicher voll oder vom Browser gesperrt).\n\n'+
+        'Bitte App nicht schließen, Platz auf dem Gerät schaffen oder ins Netz gehen, damit übertragen werden kann.');
 }
 const DIRTY=new Set();        // Positionen mit lokalen, noch nicht synchronisierten Änderungen
 let _flushing=false;
@@ -1078,9 +1087,9 @@ let _flushing=false;
 function isNetErr(err){
   if(!navigator.onLine) return true;
   if(!err) return false;
-  if(err.name==='TypeError') return true;
+  if(err.name==='TypeError' || err.name==='AbortError' || err.name==='TimeoutError') return true;
   const m=((err.message||'')+'');
-  return /failed to fetch|networkerror|load failed|network request failed|err_internet|interaction_required|no_network/i.test(m);
+  return /failed to fetch|networkerror|load failed|network request failed|err_internet|interaction_required|no_network|zeitüberschreitung|timed_out|endpoints_resolution|post_request_failed/i.test(m);
 }
 
 // Ganzen aktuellen Stand lokal sichern (für Offline-Lesen nach Neuladen)
@@ -1099,7 +1108,10 @@ async function enqueuePos(pos){
   if(!PID) return;
   DIRTY.add(pos);
   const fields = { pos: pos, projekt: PID, data: buildPosData(pos) };
-  await idbSet('outbox', 'pos|'+PID+'|'+pos, { kind:'pos', pid:PID, pos:pos, fields:fields, id: ITEMID[itemKey(pos)]||null, ts: nowMs() });
+  if(!await idbSet('outbox', 'pos|'+PID+'|'+pos, { kind:'pos', pid:PID, pos:pos, fields:fields, id: ITEMID[itemKey(pos)]||null, ts: nowMs() })){
+    // Änderung steht nur im Arbeitsspeicher – beim Schließen der App wäre sie weg
+    speicherWarnung();
+  }
   updSyncBadge();
 }
 
@@ -1119,11 +1131,18 @@ async function queueUpload(fname, blob, contentType, pos){
   // statt still zu verlieren. Typische Ursache: der Browser hat den lokalen
   // Speicher geräumt oder das Kontingent ist voll (2,5-MB-Protokolle).
   if(!lokal){
+    // Ohne Netz geht auch das nicht: dann laut scheitern (der Aufrufer meldet es),
+    // statt „gespeichert" zu sagen und die Datei zu verlieren.
+    if(!navigator.onLine) throw new Error('Der Speicher des Geräts ist voll – die Datei konnte nicht gesichert werden. Bitte Platz schaffen (alte Fotos/Videos löschen) oder ins Netz gehen.');
     await spUpload(fname, blob, contentType||'application/octet-stream');
     updSyncBadge();
     return fname;
   }
-  await idbSet('outbox', 'file|'+fname, { kind:'file', pid:PID, pos:pos, fname:fname, contentType: contentType||'application/octet-stream', ts: nowMs() });
+  if(!await idbSet('outbox', 'file|'+fname, { kind:'file', pid:PID, pos:pos, fname:fname, contentType: contentType||'application/octet-stream', ts: nowMs() })){
+    // Datei liegt lokal, aber der Auftrag fehlt: sofort versuchen, sonst laut melden
+    if(navigator.onLine){ await spUpload(fname, blob, contentType||'application/octet-stream'); updSyncBadge(); return fname; }
+    throw new Error('Der Speicher des Geräts ist voll – die Datei konnte nicht zur Übertragung vorgemerkt werden.');
+  }
   updSyncBadge();
   // Kein eigener flushOutbox() hier: nach jedem queueUpload folgt saveFotos(pos),
   // das die Positionsdaten enqueued und EINEN Sync für Datei + Daten gemeinsam auslöst.
@@ -1347,13 +1366,21 @@ async function rebuildDirty(){
 async function updSyncBadge(){
   const el=document.getElementById('syncStatus');
   if(!el) return;
-  let n=0;
-  try{ n=(await idbAll('outbox')).length; }catch(e){}
+  let n=0, aeltester=0;
+  try{ const all=await idbAll('outbox'); n=all.length; all.forEach(e=>{ const ts=e.val&&e.val.ts; if(ts && (!aeltester || ts<aeltester)) aeltester=ts; }); }catch(e){}
   const online = navigator.onLine;
   el.style.display='inline-flex';
+  el.style.cursor='pointer';
+  el.onclick=syncInfo;
+  // Hängt etwas länger als 15 min trotz Netz? Dann sichtbar warnen (v157) – bisher
+  // stand dort endlos „wird synchronisiert…".
+  const haengt = online && n && aeltester && (nowMs()-aeltester > 15*60000);
   if(!online){
     el.textContent = '⚠ Offline' + (n? (' · '+n+' ausstehend'):'');
     el.style.color = '#e0a060';
+  } else if(haengt){
+    el.textContent = '⚠ '+n+' nicht übertragen';
+    el.style.color = '#e08a8a';
   } else if(n){
     el.textContent = '↻ '+n+' wird synchronisiert…';
     el.style.color = '#d7c1ae';
@@ -1361,6 +1388,7 @@ async function updSyncBadge(){
     el.textContent = '✓ Synchron';
     el.style.color = '#7faa6a';
   }
+  if(_PERSIST===false && !n && online) el.textContent='✓ Synchron ⓘ';
   // Ob der Browser den lokalen Bestand dauerhaft behält, entscheidet er selbst.
   // Sagt er nein, ist das kein Fehler – aber es erklärt, warum Unversendetes
   // nach längerer Zeit ohne Netz verschwinden kann. Deshalb im Tooltip nennen.
@@ -1371,6 +1399,23 @@ async function updSyncBadge(){
 }
 
 window.addEventListener('online', ()=>{ updSyncBadge(); flushOutbox(); });
+// iPhones melden „wieder online" unzuverlässig: beim Zurückholen der App immer
+// einen Versuch machen (v157).
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='visible'){ updSyncBadge(); flushOutbox(); } });
+// Antippen der Statusanzeige: Erklärung + sofortiger Versuch (der Tooltip ist auf
+// dem Handy unsichtbar)
+async function syncInfo(){
+  let all=[]; try{ all=await idbAll('outbox'); }catch(e){}
+  const n=all.length; let aeltester=0; all.forEach(e=>{ const ts=e.val&&e.val.ts; if(ts&&(!aeltester||ts<aeltester)) aeltester=ts; });
+  const seit=aeltester?new Date(aeltester).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'';
+  let txt = !navigator.onLine ? 'Keine Netzverbindung.\n\n' : '';
+  txt += n ? (n+' Änderung(en)/Datei(en) liegen auf diesem Gerät und warten auf die Übertragung'+(seit?(' (älteste seit '+seit+')'):'')+'.\nSie werden automatisch gesendet, sobald Netz da ist. App bis dahin bitte nicht deinstallieren und Browserdaten nicht löschen.')
+           : 'Alles ist übertragen.';
+  if(_PERSIST===false) txt+='\n\nHinweis: Der Browser sichert den Gerätespeicher nicht dauerhaft zu. Bei längerer Zeit ohne Netz bitte zeitnah in Netzreichweite synchronisieren'+(/iPhone|iPad/.test(navigator.userAgent)?' – auf dem iPhone die App am besten über „Zum Home-Bildschirm" installieren.':'.');
+  if(OFFLINE_START) txt+='\n\nDie App wurde ohne Netz gestartet und arbeitet mit dem zuletzt geladenen Stand.';
+  alert(txt);
+  if(n && navigator.onLine) flushOutbox();
+}
 window.addEventListener('offline', ()=>{ updSyncBadge(); });
 // ── Service Worker + Update-Erkennung ───────────────────────────────────────
 // Android (und die installierte PWA) BEENDEN die App beim Wegwischen nicht, sie
@@ -1996,7 +2041,7 @@ async function doMsLogin(){
 async function onLoggedIn(){
   const status=document.getElementById('loginMsStatus');
   if(status) status.textContent='Verbinde mit SharePoint …';
-  await resolveIds();
+  await resolveIdsOderGemerkt();
   // Name automatisch aus der Microsoft-Anmeldung übernehmen (Login ist maßgeblich)
   const fromLogin = deriveName(msalAccount);
   if(fromLogin){ USER = fromLogin; localStorage.setItem('kpc_user', USER); localStorage.setItem('kpc_user_typ','monteur'); }
@@ -2012,8 +2057,15 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 156;
+const APP_VERSION = 157;
 const CHANGELOG = [
+  { v:157, titel:'Offline-Betrieb verbessert', punkte:[
+    'Die App startet jetzt auch <b>ohne Netz</b> – mit den zuletzt geladenen Baustellen und Ständen. Bisher blieb sie an der Anmeldung hängen.',
+    'Im Funkloch leitet die App nicht mehr zur Microsoft-Anmeldeseite um. Änderungen warten auf dem Gerät, bis wieder Netz da ist.',
+    'Bei schwachem Netz bricht die App nach einer Zeitgrenze ab, statt minutenlang zu hängen.',
+    'Ist der Speicher des Geräts voll, meldet die App das sofort – bisher konnte ein Foto still verloren gehen.',
+    'Die Protokoll-App (Inbetriebnahme/DGUV), die Kundendienst-App und der Servicebericht funktionieren jetzt auch offline.',
+    'Beim Zurückholen der App wird sofort synchronisiert. Ein Tipp auf die Statusanzeige oben zeigt, was noch wartet; hängt etwas länger als 15 Minuten, wird sie rot.' ]},
   { v:156, titel:'IBN-Pflicht: Erkennung nachgeschärft', punkte:[
     'Keine IBN-Pflicht mehr für Geschirrspülbrausen, Kühlzellen-Türen, bauseitige Geräte und Biertheken.',
     'Neu erkannt: Eiswürfelbereiter auch bei abweichender Schreibweise, Kontaktgrills auch mit Bindestrich („Doppel-Kontakt-Grill").' ]},
@@ -6898,6 +6950,13 @@ async function getToken(){
     const res = await msalApp.acquireTokenSilent({ scopes: GRAPH_SCOPES, account: msalAccount });
     return res.accessToken;
   }catch(e){
+    // Kein Netz / Funkloch: NICHT zur Anmeldeseite umleiten – die lädt dann nicht,
+    // die App wäre weg und offene Eingaben verloren. Fehler weiterreichen: die
+    // Warteschlange behält alles, und mit Netz klappt das stille Erneuern wieder.
+    // Alle anderen Fehler wie bisher: Anmeldung anfordern.
+    const netz = !navigator.onLine || (e && e.name!=='InteractionRequiredAuthError' &&
+      /network|fetch|timed?_?out|timeout|no_network|endpoints_resolution|post_request_failed|load failed/i.test((e.errorCode||'')+' '+(e.message||'')));
+    if(netz){ const n=new Error('Keine Verbindung zur Anmeldung ('+((e&&(e.errorCode||e.message))||e)+')'); n.name='TypeError'; throw n; }
     if(USE_REDIRECT){ await msalApp.acquireTokenRedirect({ scopes: GRAPH_SCOPES }); throw e; }
     const res = await msalApp.acquireTokenPopup({ scopes: GRAPH_SCOPES });
     msalAccount = res.account;
@@ -6909,7 +6968,15 @@ async function graph(path, opts){
   opts = opts || {};
   const token = await getToken();
   const headers = Object.assign({ 'Authorization': 'Bearer ' + token }, opts.headers || {});
-  const res = await fetch(GRAPH + path, Object.assign({}, opts, { headers }));
+  // Zeitgrenze: bei einem Balken ohne Daten hing der Abruf sonst minutenlang
+  // (Ladebildschirm blockiert, Synchronisierung steht). Lesen 25 s, Schreiben 120 s.
+  const ms = opts.timeout || ((!opts.method || opts.method==='GET') ? 25000 : 120000);
+  const ctl = (typeof AbortController!=='undefined') ? new AbortController() : null;
+  const tmr = ctl ? setTimeout(()=>ctl.abort(), ms) : null;
+  let res;
+  try{ res = await fetch(GRAPH + path, Object.assign({}, opts, { headers }, ctl?{signal:ctl.signal}:{})); }
+  catch(e){ if(e && e.name==='AbortError'){ const n=new Error('Zeitüberschreitung – keine Antwort vom Server'); n.name='AbortError'; throw n; } throw e; }
+  finally{ if(tmr) clearTimeout(tmr); }
   if(!res.ok){ const t = await res.text(); throw new Error('Graph '+res.status+': '+t.substring(0,300)); }
   return res;
 }
@@ -6925,7 +6992,21 @@ async function resolveIds(){
   const drive = (drives.value||[]).find(d => d.name === MS_CONFIG.libName) || (drives.value||[])[0];
   if(!drive) throw new Error('Bibliothek "'+MS_CONFIG.libName+'" nicht gefunden');
   SPIDS.driveId = drive.id;
+  try{ localStorage.setItem('kpc_spids', JSON.stringify(SPIDS)); }catch(e){}
 }
+// Start ohne Netz (v157): die SharePoint-IDs ändern sich nicht – die zuletzt
+// bekannten reichen, um Baustellen und Stände aus dem Gerätespeicher zu öffnen.
+// Bis v156 blieb die App ohne Netz an der Anmeldung hängen.
+async function resolveIdsOderGemerkt(){
+  try{ await resolveIds(); return true; }
+  catch(e){
+    let c=null; try{ c=JSON.parse(localStorage.getItem('kpc_spids')||'null'); }catch(_){}
+    if(c && c.siteId && c.listId && c.driveId && isNetErr(e)){ Object.assign(SPIDS,c); OFFLINE_START=true; return false; }
+    if(isNetErr(e)) throw new Error('Keine Verbindung. Die App muss auf diesem Gerät einmal mit Netz gestartet worden sein, um offline zu arbeiten.');
+    throw e;
+  }
+}
+let OFFLINE_START=false;
 
 // ---- Liste (Positionen): laden + upsert ----
 async function spListLoadRows(){
