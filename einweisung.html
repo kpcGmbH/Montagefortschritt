@@ -873,6 +873,10 @@ async function onLoggedIn(){
   // Direkteinstieg aus der Hauptapp („🔑 Schlüsselübergabe" in Berichte & Dokumente):
   // Protokollart überspringen und gleich die Auswahl zeigen.
   if(pid && h.get('neu')==='schluessel'){ startSession(); sessionType('schluessel'); }
+  // Aus dem Reiter „Dokumente" der Hauptapp: einen vorbereiteten Entwurf direkt öffnen
+  if(pid && h.get('entwurf')){ const eid=h.get('entwurf');
+    if(EW && (EW.entwuerfe||[]).some(e=>e.id===eid)) editEntwurf(eid);
+    else toast('Der Entwurf wurde nicht gefunden – evtl. schon abgeschlossen.'); }
 }
 
 // ══════════════════ Projektauswahl ══════════════════

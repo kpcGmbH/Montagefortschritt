@@ -324,6 +324,32 @@ main{display:block;padding-bottom:80px;}
 
 /* FOTO */
 .fsec{margin-top:8px;}
+/* Reiter „Dokumente" (ab v146) */
+body.doku-an #main > *:not(#DOKU){display:none !important;}
+/* Statuszeile und Gewerk-Filter beziehen sich auf Positionen – im Reiter Dokumente ohne Bedeutung */
+body.doku-an .sbar, body.doku-an #gwbar{display:none !important;}
+body:not(.doku-an) #DOKU{display:none;}
+#DOKU{padding:14px 14px 110px;max-width:980px;}
+.dk-kopf{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:2px 0 12px;}
+.dk-kopf h2{font-size:19px;color:var(--text);}
+.dk-z{font-size:12px;color:var(--accent2);}
+.dk-neu{margin-left:auto;background:var(--braun);color:#fff;border:none;border-radius:18px;padding:8px 14px;font-family:inherit;font-size:13px;cursor:pointer;}
+.dk-grp{margin-bottom:18px;}
+.dk-gh{display:flex;align-items:center;gap:8px;font-size:12px;letter-spacing:.6px;text-transform:uppercase;padding:6px 2px;border-bottom:2px solid var(--line);margin-bottom:8px;}
+.dk-n{border-radius:9px;padding:0 7px;font-size:11px;letter-spacing:0;color:#fff;}
+.dk-offen .dk-gh{color:var(--mg);}  .dk-offen .dk-n{background:var(--mg);}
+.dk-vorb .dk-gh{color:#b8860b;}     .dk-vorb .dk-n{background:#b8860b;}
+.dk-fertig .dk-gh{color:var(--green);} .dk-fertig .dk-n{background:var(--green);}
+.dk-row{display:flex;align-items:center;gap:12px;background:var(--surface);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:7px;}
+.dk-row.dk-offen{border-left-color:var(--mg);} .dk-row.dk-vorb{border-left-color:#b8860b;} .dk-row.dk-fertig{border-left-color:var(--green);}
+.dk-ic{font-size:20px;width:26px;text-align:center;flex-shrink:0;}
+.dk-mt{flex:1;min-width:0;} .dk-t{font-size:15px;color:var(--text);} .dk-m{font-size:12px;color:var(--accent2);margin-top:2px;}
+.dk-bar{height:5px;background:var(--line);border-radius:3px;margin-top:6px;overflow:hidden;max-width:260px;} .dk-bar i{display:block;height:100%;background:#b8860b;}
+.dk-tag{display:inline-block;font-size:10px;padding:1px 7px;border-radius:8px;background:var(--part-bg);color:#7a5c1d;margin-left:4px;vertical-align:middle;}
+.dk-btn{border:1px solid var(--braun);color:var(--braun);background:transparent;border-radius:16px;padding:6px 12px;font-family:inherit;font-size:13px;white-space:nowrap;cursor:pointer;flex-shrink:0;}
+.dk-btn.voll{background:var(--braun);color:#fff;}
+.dk-hint,.dk-leer{font-size:12px;color:var(--accent2);margin:-2px 0 10px 2px;}
+@media (max-width:600px){ .dk-z{display:none;} .dk-neu{margin-left:0;width:100%;} .dk-row{flex-wrap:wrap;} .dk-btn{margin-left:38px;} }
 .fbtn.tsbtn{background:transparent;color:var(--accent2);border:1px solid var(--line);margin-left:6px;}
 .fbtn.tsbtn.fehlt{color:var(--mg);border-color:var(--mg);}
 .fbtn{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;
@@ -1507,7 +1533,15 @@ function buildTabs(){
     b.onclick=()=>swTab(sec.pos);
     w.appendChild(b);
   });
+  // Dokumente der Baustelle (ab v146) – eigener Reiter rechts neben den Bereichen
+  const bd=document.createElement('button');
+  bd.className='tab tab-doku'+(ACT==='__doku'?' on':'');
+  bd.dataset.p='__doku';
+  bd.innerHTML='&#128196; Dokumente<span class="tno" id="TNO___doku"></span>';
+  bd.onclick=()=>swTab('__doku');
+  w.appendChild(bd);
   updTabBadges();
+  updDokuTab();
 }
 // Offene Arbeiten je Etage in den Tabs (berücksichtigt den Gewerk-Filter).
 // „offen" = noch gar nichts erledigt – wie Filter und Zähler.
@@ -1565,6 +1599,8 @@ function syncPanels(alle){
   });
   ETBAR_ALLE = !!all;
   updEtbarVis();
+  // Reiter „Dokumente": alles Übrige im Hauptbereich ausblenden (CSS body.doku-an)
+  document.body.classList.toggle('doku-an', ACT==='__doku' && !alle);
 }
 // Marke mit dem Bereich an jeder Position – sichtbar NUR in der Ansicht „Alle" und
 // nur bei mehreren Bereichen (CSS: body.alle-ber). Vom Nutzer so gewählt statt
@@ -1654,6 +1690,7 @@ function klebeHoehe(){
 
 function swTab(p){
   ACT=p;
+  if(p==='__doku') dokuZeigen();
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
   syncPanels();
   upStats();   // Status-Zeile zählt im Kontext der gewählten Etage
@@ -1816,6 +1853,7 @@ function buildPanels(){
   const dtb=document.createElement('div');
   dtb.className='rasec dtsec'; dtb.id='DT_bottom';
   main.appendChild(dtb);
+  const dk=document.createElement('div'); dk.id='DOKU'; main.appendChild(dk);
   updGewerkSwitcher();
   updAllgSection();   // Sammel-Balken für allgemeine Restarbeiten füllen
   syncPanels();       // sichtbar machen, was zum aktiven Tab gehört (auch „Alle")
@@ -1956,8 +1994,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 145;
+const APP_VERSION = 146;
 const CHANGELOG = [
+  { v:146, titel:'Neuer Reiter „Dokumente" je Baustelle', punkte:[
+    'Rechts neben den Bereichen gibt es jetzt den Reiter <b>📄 Dokumente</b>: alle Protokolle und Berichte der Baustelle auf einen Blick – Einweisung, Schlüsselübergabe, Dichtigkeitsprotokoll, Bautagebuch, Serviceberichte, Mängelfreimeldung.',
+    '<b>Auszufüllen</b> zeigt, was zur Baustelle gehört und noch fehlt – z. B. ein Dichtigkeitsprotokoll, sobald es Sanitär-Positionen gibt, oder wie viele Elektrogeräte noch nicht eingewiesen sind.',
+    '<b>In Vorbereitung</b> zeigt, was angelegt, aber noch nicht abgeschlossen ist – etwa im Büro vorbereitete Protokolle ohne Unterschrift. Ein Tipp auf „Vervollständigen" öffnet sie vor Ort.',
+    '<b>Abgeschlossen</b> listet alles mit fertigem PDF, mit Knopf zum Öffnen.',
+    'Mit <b>„＋ Dokument vorbereiten"</b> legt das Büro ein Protokoll an und speichert es ohne Unterschrift bzw. ohne PDF zwischen. Am Reiter steht, wie viel offen und in Arbeit ist.' ]},
   { v:145, titel:'Typenschild-Foto an jedem Gerät', punkte:[
     'Jedes <b>Gerät mit Elektro- oder Sanitäranschluss</b> hat jetzt den Knopf <b>🏷 Typenschild</b>. Solange das Foto fehlt, ist er <b>rot</b> umrandet. Armaturen, Becken, Tische, Schränke und Spender sind ausgenommen.',
     'Der Abschluss des Geräts lässt sich erst abhaken, wenn das Typenschild fotografiert ist: bei Geräten mit Elektro die <b>Inbetriebnahme</b>, bei reinen Sanitär-Geräten (z. B. Enthärtung) der <b>Sanitäranschluss</b>. Bei mehreren Geräten einer Position ein Foto je Gerät (z. B. 0/3).',
@@ -2932,6 +2976,147 @@ function updProg(pos){
       else { bar.classList.remove('vis'); fill.style.width='0%'; }
     }
   }));
+}
+
+// ── Reiter „Dokumente" (ab v146) ─────────────────────────────────────────
+// Alle Dokumente der BAUSTELLE auf einen Blick – nicht die Geräte-Protokolle an
+// den Positionen. Drei Gruppen:
+//   Auszufüllen     = gehört laut Stückliste zur Baustelle und fehlt (DOKU_SOLL)
+//   In Vorbereitung = angelegt, aber noch ohne PDF/Unterschrift (im Büro vorbereitet)
+//   Abgeschlossen   = mit PDF
+// „Abgeschlossen" erkennt die App am Merker pdfAm (gesetzt beim „Speichern & PDF",
+// dokuPdfMerken). Altbestand ohne Merker gilt als abgeschlossen, wenn beide
+// Unterschriften im Eintrag stehen – sonst als in Vorbereitung.
+// Die Daten kommen aus denselben Quellen wie die einzelnen Formulare; die Übersicht
+// schreibt selbst nichts außer dem PDF-Merker.
+let DOKU_EW=null;   // EINWEISUNG_<pid>.json (Protokolle + Entwürfe) – nur gelesen
+async function ewCacheGet(key){
+  const db=await ewIdb();
+  return new Promise((res)=>{ const tx=db.transaction('cache','readonly'); const r=tx.objectStore('cache').get(key);
+    r.onsuccess=()=>res(r.result||null); r.onerror=()=>res(null); });
+}
+async function dokuLaden(pid){
+  const ladeEw=async()=>{
+    try{ const txt=await spTryDownloadTextStrict('EINWEISUNG_'+pid+'.json'); if(txt!==null) return JSON.parse(txt||'{}'); }catch(e){}
+    try{ return await ewCacheGet('ew|'+pid); }catch(e){ return null; }   // offline: Stand der Einweisungs-App
+  };
+  const [ew]=await Promise.all([ladeEw(), loadService(pid).catch(()=>{}), loadBautagebuch(pid).catch(()=>{}), loadDicht(pid).catch(()=>{})]);
+  if(PID!==pid) return;
+  DOKU_EW=ew||{}; DOKU_EW.protokolle=DOKU_EW.protokolle||[]; DOKU_EW.entwuerfe=DOKU_EW.entwuerfe||[];
+}
+function dokuPdfMerken(art, entry){
+  entry.pdfAm=new Date().toISOString();
+  Promise.resolve().then(()=>queueJsonEintrag(art, entry)).then(()=>flushOutbox()).catch(e=>console.warn('PDF-Merker:', e&&e.message));
+}
+function dokuFertig(e, sigB){ return !!(e && (e.pdfAm || e.abrGemeldet || (e.sigKpc && e[sigB]))); }
+function dokuDat(iso){ if(!iso) return ''; const d=String(iso).slice(0,10).split('-'); return d.length===3?(d[2]+'.'+d[1]+'.'+d[0]):iso; }
+// Was zur Baustelle gehört und was davon fehlt
+function dokuStand(){
+  const ew=DOKU_EW||{protokolle:[],entwuerfe:[]}, off=[], vorb=[], fertig=[];
+  // Einweisung: Elektrogeräte mit Schritt „Einweisung"
+  let eTot=0, eIst=0;
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+    if(!relFields(it.pos).includes('ew')) return; const st=gs(it.pos); if(entf(st,'ew')) return;
+    eTot++; if(st.ew) eIst++; })));
+  if(eTot && eIst<eTot) off.push({ic:'&#128203;', t:'Einweisungsprotokoll', m:(eTot-eIst)+' von '+eTot+' Elektrogeräten noch nicht eingewiesen',
+    quote:eIst/eTot, knopf:'Einweisen', fn:'openEinweisung()'});
+  // Schlüsselübergabe: gehört immer dazu
+  const schlP=ew.protokolle.filter(p=>p.typ==='schluessel'), schlE=ew.entwuerfe.filter(p=>p.typ==='schluessel');
+  if(!schlP.length && !schlE.length) off.push({ic:'&#128273;', t:'Schlüsselübergabe', m:'noch kein Protokoll', knopf:'Anlegen', fn:'openSchluesselprotokoll()'});
+  // Dichtigkeit: sobald es Sanitär-Positionen gibt
+  let nS=0; try{ nS=dichtCollect('__all').length; }catch(e){}
+  if(nS && !DICHT.length) off.push({ic:'&#128167;', t:'Dichtigkeitsprotokoll', m:nS+' Sanitär-Positionen · noch kein Protokoll', knopf:'Anlegen', fn:'openDichtDialog()'});
+  // Mängelfreimeldung: erledigte Mängel ohne Vermerk
+  let nFm=0; try{ nFm=fmErledigte().filter(x=>x.r.mangel && !(x.r.fm&&x.r.fm.nr)).length; }catch(e){}
+  if(nFm) off.push({ic:'&#128228;', t:'Mängelfreimeldung', m:nFm+' erledigte Mängel noch nicht freigemeldet', knopf:'Freimelden', fn:'openFreimeldung()'});
+
+  // Entwürfe der Einweisungs-App
+  const EWT={geraete:'Einweisungsprotokoll', allgemein:'Einweisung allgemein', schluessel:'Schlüsselübergabe'};
+  ew.entwuerfe.forEach(e=>vorb.push({ic:e.typ==='schluessel'?'&#128273;':'&#128203;', t:(EWT[e.typ]||'Einweisung')+(e.titel?(' – '+e.titel):''), tag:'ohne Unterschrift',
+    m:'vorbereitet '+dokuDat(e.ts?new Date(e.ts).toISOString():e.datum)+(e.von?(' von '+e.von):'')+((e.positions||[]).length?(' · '+e.positions.length+' Positionen'):''),
+    knopf:'Vervollständigen', fn:'dokuEwEntwurf('+escapeHtml(JSON.stringify(e.id))+')'}));
+  // Serviceberichte, Dichtigkeit, Bautagebuch
+  SVC.slice().sort((a,b)=>(b.nr||0)-(a.nr||0)).forEach(e=>{
+    const d=(e.einsaetze&&e.einsaetze[0]&&e.einsaetze[0].datum)||e.sigDatum||'';
+    if(dokuFertig(e,'sigKunde')) fertig.push({ic:'&#128295;', t:'Servicebericht Nr. '+e.nr, m:[dokuDat(d), e.kunde, e.abrGemeldet?'Büro zur Abrechnung benachrichtigt':''].filter(Boolean).join(' · '), knopf:'&#128196; PDF', fn:'svcOpenPdf('+e.nr+')'});
+    else vorb.push({ic:'&#128295;', t:'Servicebericht Nr. '+e.nr, tag:'ohne PDF', m:'vorbereitet '+dokuDat(e.erstelltAm)+(e.erstelltVon?(' von '+e.erstelltVon):'')+(e.kunde?(' · '+e.kunde):''), knopf:'Vervollständigen', fn:'svcPick('+e.nr+')'});
+  });
+  DICHT.slice().sort((a,b)=>(a.nr||0)-(b.nr||0)).forEach(e=>{
+    if(dokuFertig(e,'sigAg')) fertig.push({ic:'&#128167;', t:'Dichtigkeitsprotokoll Nr. '+e.nr+(e.umfangLabel?(' – '+e.umfangLabel):''), m:[dokuDat(e.datum), e.pruefer, e.ergebnis].filter(Boolean).join(' · '), knopf:'&#128196; PDF', fn:'dichtOpenPdf('+e.nr+')'});
+    else vorb.push({ic:'&#128167;', t:'Dichtigkeitsprotokoll Nr. '+e.nr, tag:'ohne PDF', m:'vorbereitet '+dokuDat(e.erstelltAm)+(e.erstelltVon?(' von '+e.erstelltVon):''), knopf:'Vervollständigen', fn:'openDichtDialog()'});
+  });
+  const btbF=BTB.filter(e=>dokuFertig(e,'sigAg')), btbV=BTB.filter(e=>!dokuFertig(e,'sigAg'));
+  btbV.sort((a,b)=>(a.datum||'').localeCompare(b.datum||'')).forEach(e=>vorb.push({ic:'&#128211;', t:'Bautagebuch Nr. '+e.nr+' – '+dokuDat(e.datum), tag:'ohne PDF',
+    m:'gespeichert'+(e.erstelltVon?(' von '+e.erstelltVon):'')+((e.arbeiter||[]).length?(' · '+e.arbeiter.length+' Personen'):''), knopf:'Vervollständigen', fn:'btbPickDay('+escapeHtml(JSON.stringify(e.datum))+')'}));
+  if(btbF.length){ const z=btbF.slice().sort((a,b)=>(b.datum||'').localeCompare(a.datum||''))[0];
+    fertig.push({ic:'&#128211;', t:'Bautagebuch', tag:btbF.length+(btbF.length===1?' Tag':' Tage'), m:'zuletzt '+dokuDat(z.datum)+' · Nr. '+z.nr, knopf:'Alle anzeigen', fn:'openBautagebuchDialog()', leicht:true}); }
+  // Einweisungs- und Schlüsselprotokolle
+  ew.protokolle.slice().sort((a,b)=>String(b.datum||'').localeCompare(String(a.datum||''))).forEach(p=>fertig.push({ic:p.typ==='schluessel'?'&#128273;':'&#128203;',
+    t:(EWT[p.typ]||'Einweisungsprotokoll')+((p.etagen&&p.etagen.length)?(' – '+p.etagen.join(', ')):''),
+    m:[dokuDat(p.datum), p.einweiser, p.typ==='schluessel'?((p.schluessel||0)+' Schlüssel'):((p.positions||[]).length?(p.positions.length+' Geräte'):'')].filter(Boolean).join(' · '),
+    knopf:p.pdf?'&#128196; PDF':'', fn:p.pdf?('dokuEwPdf('+escapeHtml(JSON.stringify(p.pdf))+')'):''}));
+  // Freimeldungen und Protokoll-Übersicht
+  try{ fmBisher().forEach(f=>fertig.push({ic:'&#128228;', t:'Mängelfreimeldung Nr. '+f.nr, m:[dokuDat(f.datum), f.n+' Mängel freigemeldet', f.von].filter(Boolean).join(' · '), knopf:'Öffnen', fn:'openFreimeldung()', leicht:true})); }catch(e){}
+  let nProt=0; DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ nProt+=(gs(it.pos).pdfs||[]).length; })));
+  if(nProt) fertig.push({ic:'&#128450;', t:'Protokoll-Übersicht', m:nProt+' Geräte-Protokolle · hält sich selbst aktuell', knopf:'Anzeigen', fn:'expProtokollUebersicht()', leicht:true});
+  return {off, vorb, fertig};
+}
+function updDokuTab(){
+  const el=document.getElementById('TNO___doku'); if(!el) return;
+  if(!DOKU_EW){ el.textContent=''; return; }
+  const s=dokuStand(), t=[];
+  if(s.off.length) t.push(s.off.length+' offen'); if(s.vorb.length) t.push(s.vorb.length+' in Arbeit');
+  el.textContent=t.join(' · '); el.className='tno'+(t.length?'':' done');
+  if(!t.length && s.fertig.length) el.innerHTML='&#10003;';
+}
+async function dokuZeigen(){
+  dokuRender();
+  if(PID){ const pid=PID; try{ await dokuLaden(pid); }catch(e){} if(PID===pid && ACT==='__doku'){ dokuRender(); updDokuTab(); } }
+}
+function dokuRender(){
+  const box=document.getElementById('DOKU'); if(!box) return;
+  if(!DOKU_EW){ box.innerHTML='<div class="dk-leer">Dokumente werden geladen …</div>'; return; }
+  const s=dokuStand();
+  const zeile=(x,cls)=>'<div class="dk-row '+cls+'"><span class="dk-ic">'+x.ic+'</span><div class="dk-mt"><div class="dk-t">'+escapeHtml(x.t).replace(/&amp;(#\d+;)/g,'&$1')+
+    (x.tag?' <span class="dk-tag">'+escapeHtml(x.tag)+'</span>':'')+'</div><div class="dk-m">'+escapeHtml(x.m||'')+'</div>'+
+    (x.quote!=null?'<div class="dk-bar"><i style="width:'+Math.round(x.quote*100)+'%"></i></div>':'')+'</div>'+
+    (x.knopf?'<button class="dk-btn'+(x.leicht||cls==='dk-fertig'?'':' voll')+'" onclick="'+x.fn+'">'+x.knopf+'</button>':'')+'</div>';
+  const grp=(titel,cls,arr,hinweis,leer)=>'<div class="dk-grp '+cls+'"><div class="dk-gh">'+titel+' <span class="dk-n">'+arr.length+'</span></div>'+
+    (hinweis&&arr.length?'<div class="dk-hint">'+hinweis+'</div>':'')+
+    (arr.length?arr.map(x=>zeile(x,cls)).join(''):'<div class="dk-hint">'+leer+'</div>')+'</div>';
+  box.innerHTML='<div class="dk-kopf"><h2>Dokumente der Baustelle</h2><span class="dk-z">Protokolle und Berichte – ohne die Geräte-Protokolle an den Positionen</span>'+
+      '<button class="dk-neu" onclick="dokuNeuMenu(this)">&#65291; Dokument vorbereiten</button></div>'+
+    grp('Auszufüllen','dk-offen',s.off,'','Nichts offen – alles, was zu dieser Baustelle gehört, ist angelegt.')+
+    grp('In Vorbereitung','dk-vorb',s.vorb,'Angelegt, aber noch ohne PDF bzw. Unterschrift – vor Ort vervollständigen.','Nichts in Vorbereitung.')+
+    grp('Abgeschlossen','dk-fertig',s.fertig,'','Noch nichts abgeschlossen.');
+}
+function dokuNeuMenu(btn){
+  let menu=document.getElementById('dokuNeuMenu');
+  if(!menu){ menu=document.createElement('div'); menu.id='dokuNeuMenu'; menu.className='ptype-menu'; document.body.appendChild(menu);
+    document.addEventListener('click',e=>{ if(!e.target.closest('#dokuNeuMenu')&&!e.target.closest('.dk-neu')) menu.classList.remove('open'); }); }
+  const z=(ic,t,h,fn)=>'<div class="ptype-item" onclick="document.getElementById(\'dokuNeuMenu\').classList.remove(\'open\');'+fn+'">'+ic+'&nbsp; '+t+'<small>'+h+'</small></div>';
+  menu.innerHTML='<div class="ptype-h">Dokument vorbereiten</div>'+
+    z('&#128203;','Einweisungsprotokoll','Geräte wählen, „Zwischenspeichern – ohne Unterschrift"','openEinweisung()')+
+    z('&#128273;','Schlüsselübergabe','Schlüssel eintragen, zwischenspeichern','openSchluesselprotokoll()')+
+    z('&#128295;','Servicebericht','Kunde, Auftrag, Material – „Speichern" ohne PDF','svcPick(0)')+
+    z('&#128167;','Dichtigkeitsprotokoll','Umfang wählen, „Speichern" ohne PDF','openDichtDialog()')+
+    z('&#128211;','Bautagebuch','Tag wählen, „Speichern" ohne PDF','openBautagebuchDialog()');
+  const r=btn.getBoundingClientRect();
+  menu.style.maxWidth='300px'; menu.classList.add('open');
+  menu.style.left=Math.max(8, Math.min(r.right+window.scrollX-300, window.innerWidth-308))+'px';
+  menu.style.top=(r.bottom+window.scrollY+4)+'px';
+}
+// Entwurf der Einweisungs-App direkt zum Vervollständigen öffnen
+function dokuEwEntwurf(id){
+  if(!PID) return;
+  window.open(EINWEISUNG_URL+'#pid='+encodeURIComponent(PID)+'&projekt='+encodeURIComponent(curProjName())+'&entwurf='+encodeURIComponent(id),'_blank','noopener');
+}
+// PDF eines Einweisungs-/Schlüsselprotokolls (Fenster SYNCHRON im Klick, §9)
+function dokuEwPdf(pfad){
+  const win=window.open('','_blank');
+  if(win){ try{ win.document.write('<title>Protokoll</title><body style="font-family:Arial,sans-serif;padding:24px;color:#666">PDF wird geladen …</body>'); }catch(e){} }
+  getFileBlob(pfad).then(b=>{ const u=URL.createObjectURL(b); if(win) win.location=u; else window.open(u,'_blank'); })
+    .catch(e=>{ if(win) try{ win.close(); }catch(_){}; alert('PDF konnte nicht geladen werden: '+((e&&e.message)||e)); });
 }
 
 // ── Typenschild-Foto (ab v145) ───────────────────────────────────────────
@@ -4795,6 +4980,7 @@ async function btbSave(thenPdf){
     const blob=await btbBuildPdf(entry);
     const fname=safeName(curProjName())+'/_Bautagebuch/'+
       vaName([vaDatum(entry.datum),'Bautagebuch-'+String(entry.nr).padStart(3,'0')])+'.pdf';
+    dokuPdfMerken('btb', entry);
     const url=URL.createObjectURL(blob);
     if(win){ win.location=url; } else { window.open(url,'_blank'); }
     try{ await queueUpload(fname, blob, 'application/pdf', ''); showToast(navigator.onLine? 'PDF erstellt & in _Bautagebuch abgelegt' : 'PDF erstellt – wird mit Netz abgelegt'); }
@@ -5166,6 +5352,7 @@ async function dichtSave(thenPdf){
     const fname=safeName(curProjName())+'/_Dichtigkeitsprotokoll/'+
       vaName([vaDatum(entry.datum),'Dichtigkeitsprotokoll',
               entry.umfangLabel, String(entry.nr).padStart(3,'0')])+'.pdf';
+    dokuPdfMerken('dicht', entry);
     const url=URL.createObjectURL(blob);
     if(win) win.location=url; else window.open(url,'_blank');
     try{ await queueUpload(fname, blob, 'application/pdf', ''); showToast(navigator.onLine? 'PDF erstellt & abgelegt' : 'PDF erstellt – wird mit Netz abgelegt'); }
@@ -5666,6 +5853,7 @@ async function svcSave(thenPdf){
     const fname=safeName(curProjName())+'/_Servicebericht/'+
       vaName([vaDatum(entry.sigDatum||new Date()),'Servicebericht',
               projStamm().auftrag||curProjCode(), String(entry.nr).padStart(3,'0')])+'.pdf';
+    dokuPdfMerken('svc', entry);
     const url=URL.createObjectURL(blob);
     if(win) win.location=url; else window.open(url,'_blank');
     try{ await queueUpload(fname, blob, 'application/pdf', ''); showToast((navigator.onLine? 'PDF erstellt & in _Servicebericht abgelegt' : 'PDF erstellt – wird mit Netz abgelegt')+((melden&&bueroErreicht)?' · Büro zur Abrechnung benachrichtigt':'')); if(melden&&!bueroErreicht) setTimeout(()=>aufgOhneEmpfaenger('B'),2600); }
@@ -10598,6 +10786,7 @@ async function selectProject(pid){
     loadBautagebuch(pid).catch(()=>{});   // Bautagebuch der Baustelle nachladen (nicht blockierend)
     loadDicht(pid).then(()=>updDichtTasks()).catch(()=>{});   // Dichtigkeitsprotokolle nachladen (nicht blockierend)
     loadService(pid).catch(()=>{});   // Serviceberichte nachladen (nicht blockierend)
+    dokuLaden(pid).then(()=>{ if(PID===pid){ updDokuTab(); if(ACT==='__doku') dokuRender(); } }).catch(()=>{});
     aufgFlush();                      // wartende Aufgaben-Einträge nachreichen
     const proj = PROJECTS.find(p=>p.pid===pid);
     const nm = document.getElementById('projName'); if(nm) nm.textContent = proj ? proj.name : pid;
