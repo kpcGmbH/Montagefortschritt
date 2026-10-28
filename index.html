@@ -1108,7 +1108,11 @@ async function enqueuePos(pos){
   if(!PID) return;
   DIRTY.add(pos);
   const fields = { pos: pos, projekt: PID, data: buildPosData(pos) };
-  if(!await idbSet('outbox', 'pos|'+PID+'|'+pos, { kind:'pos', pid:PID, pos:pos, fields:fields, id: ITEMID[itemKey(pos)]||null, ts: nowMs() })){
+  // Basis = der zuletzt vom Server bekannte Stand VOR der ersten eigenen Änderung.
+  // Liegt schon ein Eintrag in der Warteschlange, bleibt dessen Basis (v158).
+  const key='pos|'+PID+'|'+pos;
+  let base=null; try{ const alt=await idbGet('outbox', key); base = alt ? (alt.base!==undefined?alt.base:null) : (BASE[PID+'|'+pos]!==undefined?BASE[PID+'|'+pos]:null); }catch(e){}
+  if(!await idbSet('outbox', key, { kind:'pos', pid:PID, pos:pos, fields:fields, id: ITEMID[itemKey(pos)]||null, ts: nowMs(), base:base })){
     // Änderung steht nur im Arbeitsspeicher – beim Schließen der App wäre sie weg
     speicherWarnung();
   }
@@ -1262,6 +1266,119 @@ async function spListWriteFields(pos, fields, knownId, pid){
   updLastEdit(new Date().toISOString());
 }
 
+// ── Zusammenführen beim Nachsenden (ab v158) ─────────────────────────────
+// Bisher schrieb eine Position beim Nachsenden ihren GANZEN Stand: wer offline
+// war, überschrieb damit, was ein Kollege inzwischen an derselben Position
+// eingetragen hatte. Jetzt Drei-Wege-Abgleich je Feld: Basis (Serverstand vor der
+// eigenen Änderung) – eigener Stand – aktueller Serverstand. Was ich geändert
+// habe, gewinnt; alles andere kommt vom Server. Listen (Fotos, Protokolle,
+// Restarbeiten, Typenschild, Verlauf) werden je Eintrag zusammengeführt.
+const BASE={};   // 'pid|pos' -> zuletzt vom Server gelesener data-Blob (String)
+const MERGE_INNER=['fotos','pdfs','restarbeiten','ts','usr','na','hist','typenschild','ovr'];
+function mergeKey(liste, x){
+  if(typeof x==='string') return x;
+  if(!x || typeof x!=='object') return JSON.stringify(x);
+  if(liste==='hist') return [x.t,x.a,x.x,x.u].join('|');
+  if(liste==='restarbeiten') return x.erstelltAm ? (x.erstelltAm+'|'+(x.ersteller||'')) : ('txt|'+(x.txt||''));
+  if(x.fname) return x.fname;
+  return JSON.stringify(x);
+}
+function merge3Liste(liste, b, l, s){
+  b=Array.isArray(b)?b:[]; l=Array.isArray(l)?l:[]; s=Array.isArray(s)?s:[];
+  const K=x=>mergeKey(liste,x), bm=new Map(b.map(x=>[K(x),x])), lm=new Map(l.map(x=>[K(x),x]));
+  const out=[], da=new Set();
+  s.forEach(x=>{ const k=K(x); da.add(k);
+    if(bm.has(k) && !lm.has(k)) return;                                   // bei mir gelöscht
+    if(lm.has(k) && JSON.stringify(lm.get(k))!==JSON.stringify(bm.get(k))) out.push(lm.get(k));   // bei mir geändert
+    else out.push(x); });
+  l.forEach(x=>{ const k=K(x); if(da.has(k)) return;
+    if(!bm.has(k)) out.push(x);                                           // bei mir neu
+    else if(JSON.stringify(x)!==JSON.stringify(bm.get(k))) out.push(x);   // drüben gelöscht, bei mir geändert: behalten
+  });
+  if(liste==='hist'){ out.sort((a,c)=>String(a.t||'').localeCompare(String(c.t||''))); return out.slice(-HIST_MAX); }
+  return out;
+}
+function merge3Obj(b, l, s){
+  b=(b&&typeof b==='object')?b:{}; l=(l&&typeof l==='object')?l:{}; s=(s&&typeof s==='object')?s:{};
+  const out={}; new Set([...Object.keys(b),...Object.keys(l),...Object.keys(s)]).forEach(k=>{
+    const v = (JSON.stringify(l[k])!==JSON.stringify(b[k])) ? l[k] : s[k];
+    if(v!==undefined) out[k]=v; });
+  return out;
+}
+// data-Blobs (Strings) zusammenführen; gibt den neuen Blob-String zurück
+function mergeDaten(baseRaw, lokalRaw, serverRaw){
+  const P=r=>{ try{ return r?JSON.parse(r):{}; }catch(e){ return {}; } };
+  const b=P(baseRaw), l=P(lokalRaw), s=P(serverRaw);
+  const inner=(o,k)=>{ const v=o[k]; if(typeof v==='string'){ try{ return JSON.parse(v); }catch(e){ return undefined; } } return v; };
+  const out={};
+  new Set([...Object.keys(b),...Object.keys(l),...Object.keys(s)]).forEach(k=>{
+    const istString = typeof l[k]==='string' && MERGE_INNER.includes(k);
+    if(MERGE_INNER.includes(k) || ['efotos','bfotos'].includes(k)){
+      const bv=inner(b,k), lv=inner(l,k), sv=inner(s,k);
+      const listig = Array.isArray(lv)||Array.isArray(sv)||Array.isArray(bv);
+      const m = listig ? merge3Liste(k,bv,lv,sv) : merge3Obj(bv,lv,sv);
+      out[k] = istString||typeof s[k]==='string' ? JSON.stringify(m) : m;
+    } else {
+      const v = (JSON.stringify(l[k])!==JSON.stringify(b[k])) ? l[k] : s[k];
+      if(v!==undefined) out[k]=v;
+    }
+  });
+  return JSON.stringify(out);
+}
+// Position aus einem data-Blob in ST übernehmen (gleiche Regeln wie loadState)
+function stAusRaw(raw){
+  let row={}; try{ row=raw?JSON.parse(raw):{}; }catch(e){}
+  if(row.__etage) return {__etage:true, efotos:Array.isArray(row.efotos)?row.efotos:[], bfotos:Array.isArray(row.bfotos)?row.bfotos:[], restarbeiten:Array.isArray(row.restarbeiten)?row.restarbeiten:[]};
+  const J=(v,d)=>{ try{ const x=v?JSON.parse(v):d; return x==null?d:x; }catch(e){ return d; } };
+  const ovr=J(row.ovr,null);
+  return { g:row.g||false, m:row.m||false, nu:row.nu||false, a:row.a||false, sa:row.sa||false, dp:row.dp||false, ea:row.ea||false, pa:row.pa||false, ib:row.ib||false, ew:row.ew||false,
+    note:row.note||'', fotos:J(row.fotos,[]), pdfs:J(row.pdfs,[]), restarbeiten:J(row.restarbeiten,[]), ts:J(row.ts,{}), by:J(row.usr,{}),
+    na:J(row.na,{}), hist:J(row.hist,[]), typenschild:J(row.typenschild,[]), anschl:row.anschl||'', ovr:(ovr&&typeof ovr==='object')?ovr:undefined };
+}
+// Karte einer Position komplett nachziehen
+function posNeuZeichnen(pos){
+  if(isEKey(pos)){ try{ updRA(pos); }catch(e){} return; }
+  try{
+    if(ST[pos] && ST[pos].ovr) ovrAnwenden(pos);
+    ['g','m','nu','a','sa','dp','ea','pa','ib','ew'].forEach(f=>ckRender(pos,f));
+    const card=document.getElementById('C'+sp(pos));
+    if(card){ const st=ist(pos,TF); card.className='card'+(st!=='open'?' '+st:'');
+      const anm=card.querySelector('.anm'); if(anm && anm!==document.activeElement){ anm.value=ST[pos].note||''; cnUpdate(pos); autoR(anm); } }
+    updProg(pos); updRA(pos); updTG(pos); updPG(pos);
+    try{ updFG(pos); }catch(e){}
+  }catch(e){ console.warn('Neuzeichnen', pos, e); }
+}
+// Nach dem Zusammenführen: Serverneuigkeiten auch lokal zeigen – aber nur, wenn
+// ich die Position seit dem Absenden nicht schon wieder geändert habe.
+async function nachMerge(e, gemerged){
+  const key=e.key, pid=e.val.pid, pos=e.val.pos;
+  BASE[pid+'|'+pos]=gemerged;
+  const jetzt=await idbGet('outbox', key);
+  if(jetzt && jetzt.ts!==e.val.ts){                    // inzwischen neu geändert
+    jetzt.base=gemerged; await idbSet('outbox', key, jetzt); return false;
+  }
+  await idbDel('outbox', key);
+  if(pid===PID && gemerged!==e.val.fields.data){
+    ST[pos]=stAusRaw(gemerged); posNeuZeichnen(pos);
+    try{ await idbSet('state', PID, JSON.parse(JSON.stringify(ST))); }catch(_){}
+  }
+  return true;
+}
+// Aktuellen Serverstand einer Position holen (id bekannt oder per Filter suchen)
+async function serverPosHolen(pos, pid, id){
+  if(id){
+    const it=await (await graph('/sites/'+SPIDS.siteId+'/lists/'+SPIDS.listId+'/items/'+id+'?$expand=fields($select=data,pos,projekt)')).json();
+    return {id, raw:(it.fields&&it.fields.data)||''};
+  }
+  // Ohne bekannte id: nachsehen, ob ein anderes Gerät die Position inzwischen
+  // angelegt hat – sonst entstünde sie doppelt.
+  const q="fields/projekt eq '"+String(pid).replace(/'/g,"''")+"' and fields/pos eq '"+String(pos).replace(/'/g,"''")+"'";
+  const r=await (await graph('/sites/'+SPIDS.siteId+'/lists/'+SPIDS.listId+'/items?$expand=fields($select=data)&$filter='+encodeURIComponent(q),
+    {headers:{'Prefer':'HonorNonIndexedQueriesWarningMayFailRandomly'}})).json();
+  const it=(r.value||[])[0];
+  return it ? {id:it.id, raw:(it.fields&&it.fields.data)||''} : null;
+}
+
 // Warteschlange abarbeiten: erst Dateien hochladen, dann Positionsdaten schreiben
 async function flushOutbox(){
   if(_flushing) return;
@@ -1298,9 +1415,24 @@ async function flushOutbox(){
     }
     for(const e of poss){
       try{
-        await spListWriteFields(e.val.pos, e.val.fields, e.val.id, e.val.pid);
-        await idbDel('outbox', e.key);
-        DIRTY.delete(e.val.pos);
+        const pid=e.val.pid, pos=e.val.pos;
+        let id=ITEMID[(pid||'')+pos] || e.val.id || null, fields=e.val.fields;
+        // Aktuellen Serverstand holen und mit dem eigenen zusammenführen (v158).
+        // Scheitert nur das Lesen (kein Netzfehler), wie bisher den eigenen Stand schreiben.
+        let srv=null;
+        try{ srv=await serverPosHolen(pos, pid, id); }
+        catch(err){ if(isNetErr(err)) throw err; console.warn('Serverstand nicht lesbar, schreibe eigenen Stand:', err&&err.message); }
+        if(srv){
+          id=srv.id; ITEMID[(pid||'')+pos]=id;
+          if(srv.raw && srv.raw!==fields.data && srv.raw!==e.val.base){
+            // Basis unbekannt (Altbestand der Warteschlange): Serverstand als Basis –
+            // dann gewinnt der eigene Stand überall, wo er abweicht (= bisheriges Verhalten)
+            const base = (e.val.base!==null && e.val.base!==undefined) ? e.val.base : srv.raw;
+            fields=Object.assign({}, fields, {data: mergeDaten(base, fields.data, srv.raw)});
+          }
+        }
+        await spListWriteFields(pos, fields, id, pid);
+        if(await nachMerge(e, fields.data)) DIRTY.delete(pos);
       }catch(err){
         if(isNetErr(err)) throw err;
         console.warn('Sync-Schreibfehler (bleibt in Queue):', (err&&err.message)||err);
@@ -2057,8 +2189,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 157;
+const APP_VERSION = 158;
 const CHANGELOG = [
+  { v:158, titel:'Zwei Geräte an derselben Position', punkte:[
+    'Beim Nachsenden führt die App jetzt den eigenen Stand mit dem aktuellen Stand in SharePoint zusammen – Feld für Feld. Wer offline Haken gesetzt hat, überschreibt damit nicht mehr, was ein Kollege inzwischen an derselben Position eingetragen hat (Fotos, Restarbeiten, Protokolle, Haken).',
+    'Nach dem Neuladen bleiben noch nicht übertragene eigene Änderungen sichtbar, statt kurz zu verschwinden.',
+    'Eine Position, die zwei Geräte gleichzeitig zum ersten Mal bearbeiten, wird nicht mehr doppelt angelegt.' ]},
   { v:157, titel:'Offline-Betrieb verbessert', punkte:[
     'Die App startet jetzt auch <b>ohne Netz</b> – mit den zuletzt geladenen Baustellen und Ständen. Bisher blieb sie an der Anmeldung hängen.',
     'Im Funkloch leitet die App nicht mehr zur Microsoft-Anmeldeseite um. Änderungen warten auf dem Gerät, bis wieder Netz da ist.',
@@ -7023,6 +7159,7 @@ async function spListLoadRows(){
       let row = {};
       try{ row = f.data ? JSON.parse(f.data) : {}; }catch(e){ row = {}; }
       row.pos = f.pos;
+      row.__raw = f.data || '';          // Serverstand als Basis für das Zusammenführen (v158)
       row.updated_at = it.lastModifiedDateTime || null;
       rows.push(row);
     });
@@ -7234,6 +7371,7 @@ async function loadState() {
     if (data) {
       let newest = null;
       data.forEach(row => {
+        if(row.__raw!==undefined) BASE[PID+'|'+row.pos]=row.__raw;
         if(row.__etage || isEKey(row.pos)){ ST[row.pos] = {__etage:true, efotos: Array.isArray(row.efotos)?row.efotos:[], bfotos: Array.isArray(row.bfotos)?row.bfotos:[], restarbeiten: Array.isArray(row.restarbeiten)?row.restarbeiten:[]}; if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at; return; }
         let fotos = [], pdfs = [];
         try { fotos = row.fotos ? JSON.parse(row.fotos) : []; } catch(e) {}
@@ -7277,6 +7415,10 @@ async function loadState() {
       if (ci) Object.assign(ITEMID, ci);
     }
   }
+  // Noch nicht übertragene eigene Änderungen wieder obenauf legen – sonst
+  // zeigte die App nach dem Laden den Serverstand und die eigenen Haken
+  // „verschwanden" bis zum nächsten Abgleich (v158).
+  try{ (await idbAll('outbox')).forEach(e=>{ const v=e.val; if(v && v.kind==='pos' && v.pid===PID && v.fields && v.fields.data) ST[v.pos]=stAusRaw(v.fields.data); }); }catch(e){}
   hideLoader();
   await rebuildDirty();   // bekannte lokale Änderungen markieren …
   flushOutbox();          // … und (falls online) gleich synchronisieren
@@ -7387,6 +7529,7 @@ setInterval(async () => {
       if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at;
       if (row.__etage || isEKey(row.pos)){ if(!DIRTY.has(row.pos) && !ST[row.pos]){ ST[row.pos]={__etage:true, efotos:Array.isArray(row.efotos)?row.efotos:[], bfotos:Array.isArray(row.bfotos)?row.bfotos:[], restarbeiten:Array.isArray(row.restarbeiten)?row.restarbeiten:[]}; if(document.getElementById('RA'+sp(row.pos))) updRA(row.pos); } return; }
       if (DIRTY.has(row.pos)) return;     // lokale, noch nicht synchronisierte Änderung nicht überschreiben
+      if (row.__raw!==undefined) BASE[PID+'|'+row.pos]=row.__raw;
       const cur = ST[row.pos];
       let newRest = cur ? cur.restarbeiten : [];
       try { if(row.restarbeiten) newRest = JSON.parse(row.restarbeiten); } catch(e) {}
