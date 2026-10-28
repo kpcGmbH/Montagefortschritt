@@ -2011,8 +2011,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 149;
+const APP_VERSION = 150;
 const CHANGELOG = [
+  { v:150, titel:'IBN-Pflicht je Gerät abwählen', punkte:[
+    'In der Liste <b>„Fehlende Inbetriebnahmeprotokolle"</b> (Reiter Dokumente) können Büro und Bauleitung jedes Gerät einzeln auf <b>„nicht erforderlich"</b> setzen – „Inbetriebnahme" ist dort dann ohne Protokoll abhakbar.',
+    'Abgewählte Geräte stehen darunter unter „Nicht erforderlich", mit Name und Datum, und lassen sich wieder aktivieren.' ]},
   { v:149, titel:'Dokumente abwählbar · Typenschild-Prüfung', punkte:[
     'Im Reiter <b>Dokumente</b> können Büro und Bauleitung einen Eintrag als <b>„nicht erforderlich"</b> markieren – z. B. die Schlüsselübergabe, wenn es auf der Baustelle keine Schlüssel gibt. Er rutscht dann in die Gruppe „Nicht erforderlich" und lässt sich dort wieder aktivieren.',
     'Sind die <b>Inbetriebnahmeprotokolle</b> auf einer Baustelle abgewählt, entfällt dort auch die Sperre an „Inbetriebnahme".',
@@ -3092,6 +3095,10 @@ function dokuStand(){
   let ibnTot=0; DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ if(ibnPflicht(it.pos)) ibnTot++; })));
   if(ibnOff) off.push({k:'ibn', ic:'&#9881;&#65039;', t:'Inbetriebnahmeprotokolle', m:(ibnTot-ibnOff)+' von '+ibnTot+' Pflicht-Geräten · '+ibnOff+(ibnOff===1?' fehlt':' fehlen'),
     quote:(ibnTot-ibnOff)/ibnTot, knopf:'Liste', fn:'ibnListe()'});
+  // Alles da, aber Geräte abgewählt: Liste trotzdem erreichbar, sonst ließe sich
+  // die Abwahl nicht mehr zurücknehmen.
+  const ibnWeg=dokuIstAus('ibn')?0:ibnAbgewaehlt().length;
+  if(!ibnOff && ibnWeg) fertig.push({ic:'&#9881;&#65039;', t:'Inbetriebnahmeprotokolle', m:(ibnTot?('alle '+ibnTot+' Pflicht-Geräte versorgt · '):'')+ibnWeg+' Gerät'+(ibnWeg===1?'':'e')+' nicht erforderlich', knopf:'Liste', fn:'ibnListe()', leicht:true});
   // Schlüsselübergabe: gehört immer dazu
   const schlP=ew.protokolle.filter(p=>p.typ==='schluessel'), schlE=ew.entwuerfe.filter(p=>p.typ==='schluessel');
   if(!schlP.length && !schlE.length) off.push({k:'schluessel', ic:'&#128273;', t:'Schlüsselübergabe', m:'noch kein Protokoll', knopf:'Anlegen', fn:'openSchluesselprotokoll()'});
@@ -3493,18 +3500,46 @@ function ibnFehlende(){
   })));
   return r;
 }
-// Liste für den Reiter „Dokumente": noch nicht in Betrieb genommene Pflicht-Geräte
+// Liste für den Reiter „Dokumente": noch nicht in Betrieb genommene Pflicht-Geräte.
+// Büro und Bauleitung können hier je Gerät „nicht erforderlich" setzen (ab v150,
+// Wunsch des Nutzers) – das ist dieselbe Übersteuerung wie im Dialog „✎ Gewerk"
+// (item.ibn=false), nur ohne jede Position einzeln aufzusuchen.
+function ibnAbgewaehlt(){
+  const r=[];
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+    if(it.ibn!==false || !relFields(it.pos).includes('ib')) return;
+    r.push({pos:it.pos, bez:(it.bez||'').trim(), etage:sec.label||sec.pos, anlage:sub.bez||sub.pos, von:it.ibnAusVon||'', am:it.ibnAusAm||''});
+  })));
+  return r;
+}
+function ibnPosSchalten(pos, pflicht){
+  if(!dokuDarfSchalten()) return;
+  const it=tsItem(pos); if(!it) return;
+  if(pflicht){ delete it.ibnAusVon; delete it.ibnAusAm; if(ibnAuto(pos)) delete it.ibn; else it.ibn=true; }
+  else { it.ibn=false; it.ibnAusVon=USER||''; it.ibnAusAm=new Date().toISOString(); }
+  ibnRender(pos); saveLV();
+  if(ACT==='__doku'){ dokuRender(); updDokuTab(); }
+  ibnListe();
+}
+let IBN_LS_AUS=false;
 function ibnListe(){
-  const l=ibnFehlende().filter(x=>x.ist<x.soll);
+  const l=ibnFehlende().filter(x=>x.ist<x.soll), weg=ibnAbgewaehlt(), darf=dokuDarfSchalten();
   let ov=document.getElementById('ibnLsOv');
+  const scroll=ov?((ov.firstElementChild||{}).scrollTop||0):0;
   if(!ov){ ov=document.createElement('div'); ov.id='ibnLsOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
   ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
-  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);color:var(--text);border-radius:12px;max-width:480px;width:100%;max-height:80vh;overflow:auto;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.45)">'+
-    '<div style="font-size:16px;font-weight:700;margin-bottom:10px">&#9881;&#65039; Fehlende Inbetriebnahmeprotokolle ('+l.length+')</div>'+
-    (l.length?l.map(x=>'<div onclick="document.getElementById(\'ibnLsOv\').remove();ibnGoToPos(\''+x.pos+'\')" style="border:1px solid var(--line);border-left:4px solid var(--red,#b3402e);border-radius:8px;padding:8px 10px;margin-bottom:6px;cursor:pointer;font-size:13px">'+
-      escapeHtml(x.pos)+' '+escapeHtml(x.bez)+'<div style="font-size:11px;color:var(--accent2)">'+escapeHtml(x.etage)+' · '+escapeHtml(x.anlage)+' · '+x.ist+' von '+x.soll+' vorhanden</div></div>').join('')
-      :'<div style="font-size:13px;color:var(--accent2)">Alle Pflicht-Protokolle liegen vor.</div>')+
+  const knopf=(pos,pfl)=>darf?('<button onclick="event.stopPropagation();ibnPosSchalten(\''+pos+'\','+pfl+')" style="flex-shrink:0;border:'+(pfl?'1px solid var(--braun)':'none')+';background:none;color:'+(pfl?'var(--braun)':'var(--accent2)')+';border-radius:14px;padding:'+(pfl?'5px 10px':'4px')+';font-family:inherit;font-size:11px;text-decoration:'+(pfl?'none':'underline')+';cursor:pointer;white-space:nowrap">'+(pfl?'wieder aktivieren':'nicht erforderlich')+'</button>'):'';
+  const zeile=(x,aus)=>'<div onclick="document.getElementById(\'ibnLsOv\').remove();ibnGoToPos(\''+x.pos+'\')" style="display:flex;align-items:center;gap:8px;border:1px solid var(--line);border-left:4px solid '+(aus?'var(--line)':'var(--red,#b3402e)')+';border-radius:8px;padding:8px 10px;margin-bottom:6px;cursor:pointer;font-size:13px'+(aus?';opacity:.75':'')+'">'+
+    '<div style="flex:1;min-width:0"><span style="'+(aus?'text-decoration:line-through':'')+'">'+escapeHtml(x.pos)+' '+escapeHtml(x.bez)+'</span><div style="font-size:11px;color:var(--accent2)">'+escapeHtml(x.etage)+' · '+escapeHtml(x.anlage)+' · '+
+    (aus?('abgewählt'+(x.von?(' von '+escapeHtml(x.von)):'')+(x.am?(' · '+dokuDat(x.am)):'')):(x.ist+' von '+x.soll+' vorhanden'))+'</div></div>'+knopf(x.pos,aus)+'</div>';
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);color:var(--text);border-radius:12px;max-width:520px;width:100%;max-height:80vh;overflow:auto;padding:18px;box-shadow:0 10px 40px rgba(0,0,0,.45)">'+
+    '<div style="font-size:16px;font-weight:700;margin-bottom:4px">&#9881;&#65039; Fehlende Inbetriebnahmeprotokolle ('+l.length+')</div>'+
+    (darf?'<div style="font-size:11px;color:var(--accent2);margin-bottom:10px">„nicht erforderlich" hebt die Pflicht für dieses Gerät auf – „Inbetriebnahme" ist dann ohne Protokoll abhakbar.</div>':'<div style="margin-bottom:6px"></div>')+
+    (l.length?l.map(x=>zeile(x,false)).join(''):'<div style="font-size:13px;color:var(--accent2)">Alle Pflicht-Protokolle liegen vor.</div>')+
+    (weg.length?('<div onclick="IBN_LS_AUS=!IBN_LS_AUS;ibnListe()" style="font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:var(--accent2);margin:12px 0 8px;cursor:pointer">'+(IBN_LS_AUS?'&#9662;':'&#9656;')+' Nicht erforderlich ('+weg.length+')</div>'+
+      (IBN_LS_AUS?weg.map(x=>zeile(x,true)).join(''):'')):'')+
     '<div style="text-align:right;margin-top:8px"><button onclick="document.getElementById(\'ibnLsOv\').remove()" style="padding:8px 16px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-family:inherit">Schließen</button></div></div>';
+  if(scroll) ov.firstElementChild.scrollTop=scroll;
 }
 
 // FOTO
@@ -11289,6 +11324,8 @@ function confirmGewerk(pos){
   if(it && ibWunsch!==null){
     const vorher=it.ibn;
     if(ibWunsch===ibnAuto(pos)) delete it.ibn; else it.ibn=ibWunsch;
+    if(it.ibn!==false){ delete it.ibnAusVon; delete it.ibnAusAm; }
+    else if(vorher!==false){ it.ibnAusVon=USER||''; it.ibnAusAm=new Date().toISOString(); }
     if(vorher!==it.ibn) saveLV();
   }
   ibnRender(pos);
