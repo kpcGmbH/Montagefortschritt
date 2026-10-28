@@ -2011,8 +2011,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 150;
+const APP_VERSION = 151;
 const CHANGELOG = [
+  { v:151, titel:'Einweisungen nicht abwählbar', punkte:[
+    'Geräte- und Grundlagen-Einweisung lassen sich im Reiter Dokumente nicht mehr als „nicht erforderlich" markieren. Die Geräte-Einweisung erscheint nur, wenn es auf der Baustelle Elektrogeräte gibt.' ]},
   { v:150, titel:'IBN-Pflicht je Gerät abwählen', punkte:[
     'In der Liste <b>„Fehlende Inbetriebnahmeprotokolle"</b> (Reiter Dokumente) können Büro und Bauleitung jedes Gerät einzeln auf <b>„nicht erforderlich"</b> setzen – „Inbetriebnahme" ist dort dann ohne Protokoll abhakbar.',
     'Abgewählte Geräte stehen darunter unter „Nicht erforderlich", mit Name und Datum, und lassen sich wieder aktivieren.' ]},
@@ -3086,10 +3088,10 @@ function dokuStand(){
     eTot++; if(st.ew) eIst++; })));
   // Zwei Einweisungen gehören dazu (Wunsch des Nutzers): die Geräte-Einweisung
   // (je Gerät, mit Fortschritt) und die Grundlagen-Einweisung (einmal je Baustelle).
-  if(eTot && eIst<eTot) off.push({k:'ew-geraete', ic:'&#128203;', t:'Geräte-Einweisung', m:(eTot-eIst)+' von '+eTot+' Elektrogeräten noch nicht eingewiesen',
+  if(eTot && eIst<eTot) off.push({ic:'&#128203;', t:'Geräte-Einweisung', m:(eTot-eIst)+' von '+eTot+' Elektrogeräten noch nicht eingewiesen',
     quote:eIst/eTot, knopf:'Einweisen', fn:'dokuEwNeu(\'geraete\')'});
   if(!ew.protokolle.some(p=>p.typ==='allgemein') && !ew.entwuerfe.some(p=>p.typ==='allgemein'))
-    off.push({k:'ew-allgemein', ic:'&#128203;', t:'Grundlagen-Einweisung', m:'Hygiene, Sicherheit, Reinigung – noch kein Protokoll', knopf:'Einweisen', fn:'dokuEwNeu(\'allgemein\')'});
+    off.push({ic:'&#128203;', t:'Grundlagen-Einweisung', m:'Hygiene, Sicherheit, Reinigung – noch kein Protokoll', knopf:'Einweisen', fn:'dokuEwNeu(\'allgemein\')'});
   // Inbetriebnahmeprotokolle der Pflicht-Geräte (ab v148)
   const ibnL=ibnFehlende(), ibnOff=ibnL.filter(x=>x.ist<x.soll).length;
   let ibnTot=0; DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ if(ibnPflicht(it.pos)) ibnTot++; })));
@@ -3112,7 +3114,10 @@ function dokuStand(){
   // Abgewählte Einträge: aus „Auszufüllen" heraus, in die eigene Gruppe. Auch
   // abgewählte, die gerade nichts Offenes hätten, bleiben sichtbar – sonst fände
   // man den Schalter zum Zurückholen nicht mehr.
-  const DOKU_NAMEN={'ibn':['&#9881;&#65039;','Inbetriebnahmeprotokolle'],'ew-geraete':['&#128203;','Geräte-Einweisung'],'ew-allgemein':['&#128203;','Grundlagen-Einweisung'],
+  // Einweisungen sind NICHT abwählbar (Nutzer 28.10.2026): die Grundlagen-Einweisung
+  // gehört zu jeder Baustelle, die Geräte-Einweisung entfällt nur von selbst,
+  // wenn es keine Elektrogeräte gibt (dann erscheint sie gar nicht erst).
+  const DOKU_NAMEN={'ibn':['&#9881;&#65039;','Inbetriebnahmeprotokolle'],
     'schluessel':['&#128273;','Schlüsselübergabe'],'dicht':['&#128167;','Dichtigkeitsprotokoll'],'fm':['&#128228;','Mängelfreimeldung']};
   const ausM=dokuAusMap(), aus=[];
   Object.keys(ausM).forEach(k=>{ const n=DOKU_NAMEN[k]; if(!n) return; const a=ausM[k]||{};
