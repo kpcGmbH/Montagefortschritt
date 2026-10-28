@@ -2012,8 +2012,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 155;
+const APP_VERSION = 156;
 const CHANGELOG = [
+  { v:156, titel:'IBN-Pflicht: Erkennung nachgeschärft', punkte:[
+    'Keine IBN-Pflicht mehr für Geschirrspülbrausen, Kühlzellen-Türen, bauseitige Geräte und Biertheken.',
+    'Neu erkannt: Eiswürfelbereiter auch bei abweichender Schreibweise, Kontaktgrills auch mit Bindestrich („Doppel-Kontakt-Grill").' ]},
   { v:155, titel:'Korrekturen je Position statt in der Stückliste', punkte:[
     'Gewerk-Korrekturen sowie „nicht erforderlich" bei Typenschild, Inbetriebnahme- und DGUV-Protokoll werden jetzt <b>je Position</b> gespeichert – wie die Haken.',
     'Dadurch erscheinen sie nach spätestens 30 Sekunden auf allen Geräten, und ein Handy mit älterem Stand kann sie nicht mehr überschreiben.' ]},
@@ -3477,8 +3480,8 @@ function tsNachholen(pos){
 // Pflegbar wie TS_OHNE: Reihenfolge = Vorrang.
 const IBN_KAT=[
   ['Spültechnik',/spülmasch|spuelmasch|geschirrspül|geschirrspuel|bandspül|korbtransport|haubenspül|haubenmasch|durchschub|gläserspül|glaeserspuel|topfspül|universalspül|osmose|wärmerückgew|waermerueckgew/i],
-  ['Gartechnik',/kombidämpf|kombidaempf|dämpfer|heißluft|heissluft|konvektomat|multifunktion|vario|fritteuse|friteuse|induktion|\bwok|herd|backofen|griddle|grillplatte|bratplatte|kontaktgrill|pizzaofen|nudelkoch|pastakoch|kippbrat|kochkessel|druckgar|front.?cooking|cooking.?station|salamander|kochfeld|kochstelle/i],
-  ['Eis/Wasser',/eiswürfel|eiswuerfel|eisbereit|scherbeneis|flockeneis|wasserspender|wassersprudler/i],
+  ['Gartechnik',/kombidämpf|kombidaempf|dämpfer|heißluft|heissluft|konvektomat|multifunktion|vario|fritteuse|friteuse|induktion|\bwok|herd|backofen|griddle|grillplatte|bratplatte|kontakt.?grill|pizzaofen|nudelkoch|pastakoch|kippbrat|kochkessel|druckgar|front.?cooking|cooking.?station|salamander|kochfeld|kochstelle/i],
+  ['Eis/Wasser',/eiswürfel|eiswuerfel|würfelbereit|wuerfelbereit|eisbereit|scherbeneis|flockeneis|wasserspender|wassersprudler/i],
   ['Kaffee/Bier',/kaffee|siebträger|siebtraeger|espresso|vollautomat|mengenbrüh|mengenbrueh|\bbier|zapf|schankanl/i],
   ['Kühlzelle/Schockkühler',/kühlzelle|kuehlzelle|tiefkühlzelle|kälteaggregat|kaelteaggregat|kühlaggregat|verflüssiger|verdampfer|schockkühl|schockkuehl|schockfrost|schnellkühl|schnellkuehl/i],
   ['Lüftung',/stützstrahl|stuetzstrahl|zuluft|abluft|lüftungsdecke|lüftungshaube|lueftungs|abzugshaube|dunstabzug|kochhaube|dunsthaube|magic.?hood/i],
@@ -3486,7 +3489,9 @@ const IBN_KAT=[
 ];
 // … außer Wärmetechnik und Ausgabe, auch wenn ein Stichwort oben passt
 // („Induktions-Warmhalteplatte", „Bainmarie mit Induktion")
-const IBN_NEIN=/warmhalt|bain.?marie|wärmeplatte|waermeplatte|warmplatte|wärmestrahl|hustenschutz|vitrine|wärmebrücke/i;
+// Trockenlauf 28.10.2026: Spülbrause (Armatur), Kühlzellen-Tür, bauseitige Geräte
+// und die Biertheke (Möbel, Nutzer: „eher nein") wurden fälschlich Pflicht.
+const IBN_NEIN=/warmhalt|bain.?marie|wärmeplatte|waermeplatte|warmplatte|wärmestrahl|hustenschutz|vitrine|wärmebrücke|brause|bauseits|drehtür|schiebetür|zellentür|biertheke/i;
 function ibnKat(pos){
   if(!relFields(pos).includes('ib')) return null;          // ohne Elektro keine Inbetriebnahme
   const bez=String((tsItem(pos)||{}).bez||'');
