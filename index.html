@@ -324,6 +324,8 @@ main{display:block;padding-bottom:80px;}
 
 /* FOTO */
 .fsec{margin-top:8px;}
+.fbtn.tsbtn{background:transparent;color:var(--accent2);border:1px solid var(--line);margin-left:6px;}
+.fbtn.tsbtn.fehlt{color:var(--mg);border-color:var(--mg);}
 .fbtn{display:inline-flex;align-items:center;gap:6px;padding:6px 13px;
   background:var(--anthrazit);color:#fff;border-radius:20px;font-size:12px;font-weight:700;
   cursor:pointer;border:none;font-family:Arial Narrow,Arial,sans-serif;
@@ -1393,7 +1395,7 @@ function savePos(pos) {
 }
 let ACT='__all', FPOS=null;   // Standard: „Alle" (keine Etagen-Auswahl)
 
-function gs(p){if(!ST[p])ST[p]={g:false,m:false,nu:false,a:false,sa:false,dp:false,ea:false,pa:false,ib:false,ew:false,fotos:[],pdfs:[],restarbeiten:[],note:'',ts:{},by:{},na:{}};if(!ST[p].pdfs)ST[p].pdfs=[];if(!ST[p].restarbeiten)ST[p].restarbeiten=[];if(!ST[p].ts)ST[p].ts={};if(!ST[p].by)ST[p].by={};if(!ST[p].na)ST[p].na={};return ST[p];}
+function gs(p){if(!ST[p])ST[p]={g:false,m:false,nu:false,a:false,sa:false,dp:false,ea:false,pa:false,ib:false,ew:false,fotos:[],pdfs:[],restarbeiten:[],note:'',ts:{},by:{},na:{}};if(!ST[p].pdfs)ST[p].pdfs=[];if(!ST[p].restarbeiten)ST[p].restarbeiten=[];if(!ST[p].ts)ST[p].ts={};if(!ST[p].by)ST[p].by={};if(!ST[p].na)ST[p].na={};if(!Array.isArray(ST[p].typenschild))ST[p].typenschild=[];return ST[p];}
 // Gewerk -> die Haken, die dieses Gewerk "vollständig erledigen":
 //   Montage (M) = Geliefert + Montiert.
 //   Sanitär (S) = Sanitär-Anschluss + Dichtheit,  Elektro (E) = Elektro-Anschluss + Inbetriebnahme + Einweisung.
@@ -1755,10 +1757,12 @@ function buildPanels(){
   </div>
   <div class="fsec">
     <button class="fbtn" id="FB${id}" onclick="trf('${item.pos}')">&#128247; Foto</button>
+    <button class="fbtn tsbtn" id="TB${id}" onclick="tsFoto('${item.pos}')" title="Foto vom Typenschild – Pflicht vor Inbetriebnahme bzw. Sanitäranschluss" style="display:none">&#127991; Typenschild</button>
     <button class="fbtn" style="background:#4a3a28;margin-left:6px" onclick="trpdf('${item.pos}',this)">&#128196; Protokoll</button>
     <button class="fbtn histbtn" style="background:transparent;border:1px solid var(--line);color:var(--accent2);margin-left:6px" onclick="openHist('${item.pos}')" title="Änderungsverlauf dieser Position">&#128338; Verlauf</button>
     <button class="fbtn lvonly" style="background:transparent;border:1px solid var(--line);color:var(--accent2);margin-left:6px" onclick="openPosEdit('${item.pos}')" title="Position bearbeiten oder aus der Stückliste löschen">&#9998; Position</button>
     <button class="fbtn notebtn" id="NB${id}" onclick="tgNote('${item.pos}')" title="Notiz zu dieser Position">&#9998; Notiz</button>
+    <div class="fgrid tgrid" id="TG${id}"></div>
     <div class="fgrid" id="FG${id}"></div>
     <div class="pgrid" id="PG${id}"></div>
   </div>
@@ -1815,6 +1819,7 @@ function buildPanels(){
   updGewerkSwitcher();
   updAllgSection();   // Sammel-Balken für allgemeine Restarbeiten füllen
   syncPanels();       // sichtbar machen, was zum aktiven Tab gehört (auch „Alle")
+  updAllTG();         // Typenschild-Knopf je Position (Pflicht hängt am Gewerk)
 }
 
 // Gewerk-Umschalter nur zeigen, wenn die Baustelle Gewerk-Daten hat; Ansicht auf "Alle" zurücksetzen
@@ -1951,8 +1956,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 144;
+const APP_VERSION = 145;
 const CHANGELOG = [
+  { v:145, titel:'Typenschild-Foto an jedem Gerät', punkte:[
+    'Jedes <b>Gerät mit Elektro- oder Sanitäranschluss</b> hat jetzt den Knopf <b>🏷 Typenschild</b>. Solange das Foto fehlt, ist er <b>rot</b> umrandet. Armaturen, Becken, Tische, Schränke und Spender sind ausgenommen.',
+    'Der Abschluss des Geräts lässt sich erst abhaken, wenn das Typenschild fotografiert ist: bei Geräten mit Elektro die <b>Inbetriebnahme</b>, bei reinen Sanitär-Geräten (z. B. Enthärtung) der <b>Sanitäranschluss</b>. Bei mehreren Geräten einer Position ein Foto je Gerät (z. B. 0/3).',
+    'Liegt die Automatik daneben, lässt sich die Pflicht je Position im Dialog <b>„✎ Gewerk"</b> ein- oder ausschalten.',
+    'Wird ein Inbetriebnahmeprotokoll abgelegt, bevor das Foto da ist, bleibt der Haken zunächst offen – er wird <b>von selbst gesetzt</b>, sobald das Typenschild fotografiert ist.',
+    'Fehlende Typenschilder stehen im Bericht <b>„Offene Punkte"</b>, die Fotos auch in der Gerätekartei des Kundendiensts. Bereits abgeschlossene Geräte bleiben unverändert; das Foto lässt sich nachtragen.' ]},
   { v:144, titel:'Anlagenfotos nach Tagen geordnet', punkte:[
     'Die Alben <b>Anlagenfotos</b> und <b>Bauphase</b> sind jetzt <b>nach Tagen gegliedert</b>: über jedem Tag steht das Datum mit der Anzahl der Fotos, der <b>neueste Tag steht oben</b>. Bisher lief alles als eine Reihe durch, die ältesten Bilder zuerst.',
     'Der Kategorie-Filter oben bleibt und wirkt zusätzlich – zum Beispiel nur „Aktueller Montagestand", Tag für Tag.',
@@ -2697,7 +2708,8 @@ function histAdd(pos,art,txt){
 }
 const HIST_TXT={set:'abgehakt','set-auto':'automatisch mitgesetzt','set-proto':'durch Protokoll gesetzt',unset:'Haken entfernt',notiz:'Anmerkung geändert',
   'notiz-weg':'Anmerkung gelöscht','ra-neu':'Restarbeit erfasst','ra-erledigt':'Restarbeit erledigt',
-  'ra-offen':'Restarbeit wieder offen','na-set':'entfällt','na-unset':'entfällt aufgehoben'};
+  'ra-offen':'Restarbeit wieder offen','na-set':'entfällt','na-unset':'entfällt aufgehoben',
+  'ts-neu':'Typenschild fotografiert','ts-weg':'Typenschild-Foto gelöscht'};
 function histFmt(t){ try{ const d=new Date(t);
   return String(d.getDate()).padStart(2,'0')+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+d.getFullYear()+
     ' · '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0'); }catch(e){ return ''; } }
@@ -2781,6 +2793,10 @@ function tc(pos,f){
       : '';
     if(!confirm('„'+(FLD_LBL[f]||f)+'" zurücknehmen?\n\n'+posLabel(pos)+wer+warn)) return;
   }
+  // Typenschild-Foto ist Pflicht vor „Inbetriebnahme" bzw. bei reinen Sanitär-Geräten
+  // vor „Sanitäranschluss" (ab v145). Gilt auch für spätere Schritte, die diesen über
+  // die Chronologie-Automatik mitsetzen würden (Einweisung, Dichtigkeitsprüfung).
+  if(!s[f] && tsBetrifft(pos,f) && tsFehlt(pos)){ tsSperreMelden(pos); return; }
   s[f]=!s[f];
   if(s[f]){ s.ts[f]=new Date().toISOString(); s.by[f]=USER; }
   else { delete s.ts[f]; delete s.by[f]; }
@@ -2827,6 +2843,12 @@ function protoHinweis(auto){
 // Widerspruch zwischen Protokoll und „entfällt" gehört vor Augen, nicht in einen
 // Toast, der nach drei Sekunden weg ist.
 function protoWarnen(pos, auto){
+  if(auto && auto.stand==='typenschild'){
+    alert('Hinweis zu '+posLabel(pos)+'\n\nDas Protokoll ist abgelegt. „Inbetriebnahme" wird erst abgehakt, '+
+          'wenn das Typenschild fotografiert ist ('+tsIst(pos)+' von '+tsSoll(pos)+').\n\n'+
+          'Über den Knopf „🏷 Typenschild" an der Position – danach setzt die App den Haken von selbst.');
+    return;
+  }
   if(!auto || auto.stand!=='entfaellt') return;
   alert('Hinweis zu '+posLabel(pos)+'\n\n„'+(FLD_LBL[auto.feld]||auto.feld)+
         '" ist an dieser Position als ENTFÄLLT gekennzeichnet – der Haken wurde deshalb '+
@@ -2845,6 +2867,10 @@ function schrittAusProtokoll(pos, type){
   // still überschrieben – aber gemeldet, denn sie widerspricht dem Protokoll.
   if(entf(s,f)) return {stand:'entfaellt', feld:f};
   if(s[f]) return {stand:'stand-schon', feld:f};
+  // Ohne Typenschild-Foto wird die Inbetriebnahme auch über das Protokoll nicht
+  // gesetzt; das Protokoll bleibt abgelegt. Kommt das Foto, holt tsFotoUpload den
+  // Haken nach (tsNachholen).
+  if(f===tsSchritt(pos) && tsFehlt(pos)) return {stand:'typenschild', feld:f};
   s[f]=true; s.ts[f]=new Date().toISOString(); s.by[f]=USER;
   histAdd(pos,'set-proto',(FLD_LBL[f]||f)+' · '+type);
   ckRender(pos,f);
@@ -2906,6 +2932,132 @@ function updProg(pos){
       else { bar.classList.remove('vis'); fill.style.width='0%'; }
     }
   }));
+}
+
+// ── Typenschild-Foto (ab v145) ───────────────────────────────────────────
+// Pflicht an jedem GERÄT mit Elektro- ODER Sanitäranschluss (Entscheidung des
+// Nutzers: eine Enthärtung hat oft nur Sanitär). Ausgenommen sind über die
+// Bezeichnung Armaturen, Becken, Tische, Schränke, Spender usw. – die haben kein
+// Typenschild. Je Position übersteuerbar im Dialog „✎ Gewerk" (item.ts = true/false
+// in der Stückliste; fehlt das Feld, gilt die Automatik).
+// Gesperrt wird der Schritt, an dem das Gerät fertig angeschlossen ist:
+// mit Elektro „Inbetriebnahme", nur Sanitär „Sanitäranschluss" (tsSchritt) – weder
+// von Hand noch über ein abgelegtes IBN-Protokoll. Grund: für Wartung und Störungen
+// braucht der Kundendienst Typ und Seriennummer, und die stehen nur auf dem Schild.
+// Ein Foto je Gerät: bei ganzzahliger Stückzahl > 1 so viele wie Geräte.
+// Gespeichert als s.typenschild=[{fname,ts,by}] im data-Blob der Position.
+// Altbestand mit bereits gesetztem Schritt bleibt unberührt.
+// Pflegbar wie MONTEURE: was ohne Typenschild ist …
+const TS_OHNE=/batterie|armatur|becken|spültisch|spueltisch|zulauftisch|ablauftisch|arbeitstisch|tischanlage|schrank|spender|brause|abroller|siphon|ausguss/i;
+// … außer es ist erkennbar ein Gerät (Kühlschrank, Wärmeschrank, Tellerspender beheizt)
+const TS_GERAET=/kühl|kuehl|gefrier|wärme|waerme|warmhalte|beheiz|heiz/i;
+function tsItem(pos){ let it=null; DATA.forEach(s=>s.subsections.forEach(sub=>sub.items.forEach(i=>{ if(i.pos===pos) it=i; }))); return it; }
+// Automatik ohne Übersteuerung (für den Dialog „✎ Gewerk")
+function tsAuto(pos){
+  const rel=relFields(pos);
+  if(!rel.includes('ib') && !rel.includes('sa')) return false;   // weder Elektro noch Sanitär
+  const it=tsItem(pos), bez=String((it&&it.bez)||'');
+  if(TS_GERAET.test(bez)) return true;
+  return !TS_OHNE.test(bez);
+}
+function tsPflicht(pos){
+  const it=tsItem(pos);
+  if(it && (it.ts===true || it.ts===false)) return it.ts;
+  return tsAuto(pos);
+}
+// Welcher Schritt wartet auf das Foto?
+function tsSchritt(pos){ const rel=relFields(pos); return rel.includes('ib') ? 'ib' : (rel.includes('sa') ? 'sa' : null); }
+// Würde das Setzen von f den gesperrten Schritt setzen (direkt oder über die
+// Chronologie-Automatik, z. B. „Dichtigkeitsprüfung" setzt „Sanitäranschluss")?
+function tsBetrifft(pos, f){
+  const s=gs(pos), st=tsSchritt(pos); if(!st || s[st] || entf(s,st)) return false;
+  return f===st || (VORSTUFEN[f]||[]).includes(st);
+}
+function tsSoll(pos){
+  const it=tsItem(pos); const m=parseFloat(String(it&&it.menge||'1').replace(',','.'));
+  return (isFinite(m) && m>=1 && Math.round(m)===m) ? Math.min(m,50) : 1;
+}
+function tsIst(pos){ return (gs(pos).typenschild||[]).length; }
+function tsFehlt(pos){ return tsPflicht(pos) && tsIst(pos) < tsSoll(pos); }
+function tsSperreMelden(pos){
+  if(confirm('Für „'+(FLD_LBL[tsSchritt(pos)]||'')+'" fehlt das Foto vom Typenschild ('+tsIst(pos)+' von '+tsSoll(pos)+').\n\n'+
+             posLabel(pos)+'\n\nJetzt fotografieren?')) tsFoto(pos);
+}
+// Knopf und Vorschaubilder einer Position nachziehen
+function updTG(pos){
+  const id=sp(pos), s=gs(pos), b=document.getElementById('TB'+id), g=document.getElementById('TG'+id);
+  const pfl=tsPflicht(pos), n=(s.typenschild||[]).length, soll=tsSoll(pos);
+  if(b){
+    b.style.display=(pfl||n)?'':'none';
+    b.classList.toggle('fehlt', pfl && n<soll);
+    b.innerHTML='&#127991; Typenschild <span class="fcnt">'+n+'/'+(pfl?soll:n)+'</span>';
+  }
+  if(g){
+    g.innerHTML=(s.typenschild||[]).map((t,i)=>
+      '<div class="fth-wrap"><div class="fth" onclick="tsOlb(\''+pos+'\','+i+')"><img class="fth-img" data-src="'+escapeHtml(t.fname)+'" id="TSIMG_'+id+'_'+i+'" alt="Typenschild">'+
+      '<button class="fdel" onclick="event.stopPropagation();tsDel(\''+pos+'\','+i+')">&#10005;</button></div>'+
+      '<div class="fts">Typenschild'+(soll>1?(' '+(i+1)):'')+'</div></div>').join('');
+    (s.typenschild||[]).forEach((t,i)=>{ const img=document.getElementById('TSIMG_'+id+'_'+i); if(img) imgObserver.observe(img); });
+  }
+}
+function updAllTG(){ DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>updTG(it.pos)))); }
+function tsOlb(pos,i){ lbOpen(gs(pos).typenschild||[], i, x=>x.fname); }
+function tsDel(pos,i){
+  const s=gs(pos), t=(s.typenschild||[])[i]; if(!t) return;
+  if(!confirm('Dieses Typenschild-Foto löschen?\n\n'+posLabel(pos))) return;
+  s.typenschild.splice(i,1);
+  if(t.fname){ try{ removeQueuedFile(t.fname); }catch(e){} try{ spDelete(t.fname); }catch(e){} }
+  histAdd(pos,'ts-weg','');
+  updTG(pos); saveFotos(pos);
+}
+let TS_POS=null;
+function tsFoto(pos){
+  TS_POS=pos;
+  let ov=document.getElementById('fsrcOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='fsrcOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:20px;'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  const bs='width:100%;background:#3a3530;border:1px solid #895500;color:#fff;border-radius:10px;padding:14px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit;margin-bottom:10px';
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:20px;max-width:360px;width:100%;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:16px;font-weight:700;margin-bottom:4px">&#127991; Typenschild fotografieren</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:14px">'+escapeHtml(posLabel(pos))+' · '+tsIst(pos)+' von '+tsSoll(pos)+
+      '<br>Schild ganz im Bild, Typ und Seriennummer lesbar.</div>'+
+    '<button type="button" onclick="tsQuelle(\'cam\')" style="'+bs+'">&#128247; Kamera</button>'+
+    '<button type="button" onclick="tsQuelle(\'gal\')" style="'+bs+'">&#128444;&#65039; Aus Galerie</button>'+
+    '<button type="button" onclick="document.getElementById(\'fsrcOv\').remove()" style="width:100%;background:none;border:1px solid #555;color:#ccc;border-radius:10px;padding:11px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
+  '</div>';
+}
+function tsQuelle(src){
+  const ov=document.getElementById('fsrcOv'); if(ov) ov.remove();
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
+  if(src==='cam') inp.setAttribute('capture','environment');
+  inp.style.display='none'; document.body.appendChild(inp);
+  inp.addEventListener('change', async function(e){ const f=e.target.files[0]; if(f) await tsFotoUpload(TS_POS, f); e.target.remove(); });
+  inp.click();
+}
+async function tsFotoUpload(pos, file){
+  if(!pos||!file) return;
+  showLoader('Typenschild wird gespeichert…');
+  try{
+    const uf=await tryCompressImage(file);
+    const ts=uniqTs();
+    const fname=folderFor(pos)+'/'+fotoPosTeil(pos)+'_'+vaDatum(new Date(ts))+'_Typenschild_'+ts+'.jpg';
+    await queueUpload(fname, uf, 'image/jpeg', pos);
+    const s=gs(pos); s.typenschild.push({fname, ts, by:USER||''});
+    histAdd(pos,'ts-neu','');
+    updTG(pos); saveFotos(pos);
+    hideLoader();
+    const nach=tsNachholen(pos);
+    showToast('Typenschild gespeichert ('+tsIst(pos)+' von '+tsSoll(pos)+')'+(nach?' · „Inbetriebnahme" abgehakt':''));
+  }catch(e){ hideLoader(); alert('Typenschild konnte nicht gespeichert werden: '+((e&&e.message)||e)); }
+}
+// Liegt schon ein IBN-Protokoll vor und ist das Typenschild jetzt vollständig, wird
+// die Inbetriebnahme nachgeholt – genau das, was das Protokoll vorher nicht durfte.
+function tsNachholen(pos){
+  const s=gs(pos);
+  if(tsFehlt(pos) || s.ib || entf(s,'ib')) return false;
+  if(!(s.pdfs||[]).some(p=>p&&p.type==='IBN Protokoll')) return false;
+  const a=schrittAusProtokoll(pos,'IBN Protokoll');
+  return !!(a && a.stand==='gesetzt');
 }
 
 // FOTO
@@ -3821,6 +3973,7 @@ document.getElementById('srch').addEventListener('input',applyF);
 
 
 function restoreUI() {
+  try{ updAllTG(); }catch(e){}
   Object.keys(ST).forEach(pos => {
     if(isEKey(pos)) return;             // Etagen-Fotozeilen haben keine Positions-UI
     const s = ST[pos];
@@ -6166,7 +6319,8 @@ function buildPosData(pos){
     ts: JSON.stringify(s.ts||{}),
     usr: JSON.stringify(s.by||{}),
     na: JSON.stringify(s.na||{}),
-    hist: JSON.stringify(s.hist||[])
+    hist: JSON.stringify(s.hist||[]),
+    typenschild: JSON.stringify(s.typenschild||[])
   });
 }
 
@@ -6366,12 +6520,15 @@ async function loadState() {
         try { histArr = row.hist ? JSON.parse(row.hist) : []; } catch(e) {}
         let naObj = {};
         try { naObj = row.na ? JSON.parse(row.na) : {}; } catch(e) {}
+        let tsch = [];
+        try { tsch = row.typenschild ? JSON.parse(row.typenschild) : []; } catch(e) {}
         ST[row.pos] = {
           g: row.g||false, m: row.m||false, nu: row.nu||false, a: row.a||false,
           sa: row.sa||false, dp: row.dp||false, ea: row.ea||false, pa: row.pa||false, ib: row.ib||false, ew: row.ew||false,
           note: row.note||'', fotos: fotos, pdfs: pdfs, restarbeiten: rest, ts: tsObj, by: byObj,
           na: (naObj&&typeof naObj==='object')?naObj:{},
-          hist: Array.isArray(histArr)?histArr:[]
+          hist: Array.isArray(histArr)?histArr:[],
+          typenschild: Array.isArray(tsch)?tsch:[]
         };
         if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at;
       });
@@ -6511,10 +6668,17 @@ setInterval(async () => {
       // „entfällt"-Kennzeichen mitführen – ohne das wirft das Polling es alle 30 s weg
       let newNa = cur ? (cur.na||{}) : {};
       try { if(row.na){ const n=JSON.parse(row.na); if(n&&typeof n==='object') newNa=n; } } catch(e) {}
+      // Typenschild-Fotos VEREINIGEN (über den Dateinamen), nicht ersetzen: ein Gerät,
+      // das das Foto vom Handy noch nicht kennt, schriebe es sonst beim nächsten
+      // eigenen Speichern wieder heraus.
+      let newTsch = cur ? (cur.typenschild||[]) : [];
+      try { if(row.typenschild){ const r=JSON.parse(row.typenschild); if(Array.isArray(r)){
+        const da=new Set(newTsch.map(x=>x&&x.fname)); newTsch=newTsch.concat(r.filter(x=>x&&!da.has(x.fname))); } } } catch(e) {}
+      const tschChanged = JSON.stringify(cur?(cur.typenschild||[]):[])!==JSON.stringify(newTsch);
       const tsChanged = JSON.stringify(cur?(cur.ts||{}):{})!==JSON.stringify(newTs);
       const naChanged = JSON.stringify(cur?(cur.na||{}):{})!==JSON.stringify(newNa);
       if (!cur || cur.g!==row.g || cur.m!==row.m || cur.nu!==row.nu || cur.a!==row.a ||
-          cur.sa!==row.sa || cur.dp!==row.dp || cur.ea!==row.ea || cur.pa!==row.pa || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged || naChanged) {
+          cur.sa!==row.sa || cur.dp!==row.dp || cur.ea!==row.ea || cur.pa!==row.pa || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged || naChanged || tschChanged) {
         let pdfs = cur ? cur.pdfs : [];
         try { if(row.pdfs) pdfs = JSON.parse(row.pdfs); } catch(e) {}
         // Verlauf: den längeren der beiden Stände behalten. Ohne das würde das
@@ -6525,8 +6689,9 @@ setInterval(async () => {
         ST[row.pos] = { g:row.g||false, m:row.m||false, nu:row.nu||false, a:row.a||false,
           sa:row.sa||false, dp:row.dp||false, ea:row.ea||false, pa:row.pa||false, ib:row.ib||false, ew:row.ew||false,
           note:row.note||'', fotos:cur?cur.fotos:[], pdfs:pdfs, restarbeiten:newRest, ts:newTs, by:newBy,
-          na:newNa, hist:newHist };
+          na:newNa, hist:newHist, typenschild:newTsch };
         changed = true;
+        if(tschChanged) updTG(row.pos);
         const id = row.pos.replace(/\./g,'_');
         ['g','m','nu','a','sa','dp','ea','pa','ib','ew'].forEach(f => ckRender(row.pos,f));
         const card = document.getElementById('C'+id);
@@ -8911,7 +9076,7 @@ function collectRestRows(){
 // Anders als die Restarbeitenliste (= Mängel/Nacharbeiten) listet das die noch
 // NICHT erbrachten Leistungen aus dem LV: fehlender Anschluss, Inbetriebnahme,
 // Einweisung, Dichtigkeitsprüfung.
-const FLD_LBL={g:'Geliefert',m:'Montiert',nu:'Ausgeführt',sa:'Sanitäranschluss',dp:'Dichtigkeitsprüfung',ea:'Elektroanschluss',pa:'Potentialausgleich',ib:'Inbetriebnahme',ew:'Einweisung'};
+const FLD_LBL={g:'Geliefert',m:'Montiert',nu:'Ausgeführt',sa:'Sanitäranschluss',dp:'Dichtigkeitsprüfung',ea:'Elektroanschluss',pa:'Potentialausgleich',ib:'Inbetriebnahme',ew:'Einweisung',typenschild:'Typenschild-Foto'};
 function collectOffeneLeistungen(gw){
   const rows=[];
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(item=>{
@@ -8923,6 +9088,8 @@ function collectOffeneLeistungen(gw){
     const felder=tfFields(gw).filter(f=>rel.includes(f));
     // Als „entfällt" gekennzeichnete Schritte sind keine offenen Leistungen
     const offen=felder.filter(f=>!s[f] && !entf(s,f));
+    // Fehlendes Typenschild-Foto als eigener offener Punkt (nur im Elektro-Kontext)
+    if(felder.includes(tsSchritt(item.pos)) && tsFehlt(item.pos)) offen.push('typenschild');
     if(!offen.length) return;                         // hier ist alles erledigt
     rows.push({
       geschoss:sec.label, bereich:sub.bez, pos:item.pos, bez:(item.bez||'').trim(),
@@ -10627,6 +10794,12 @@ function openGewerkChooser(pos){
     +row('E','Elektroanschluss','mit IBN + Einweisung',true)
     +row('PA','Potentialausgleich','Erdung – auch ohne Anschluss',true)
     +row('NU')
+    // Typenschild-Pflicht übersteuern. Vorbelegt mit dem, was gerade gilt; beim
+    // Übernehmen wird nur gespeichert, was von der Automatik abweicht (confirmGewerk).
+    +'<label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px dashed var(--line);border-radius:8px;margin:4px 0 8px;cursor:pointer">'
+    +'<input type="checkbox" class="gwts" style="width:18px;height:18px"'+(tsPflicht(pos)?' checked':'')+'>'
+    +'<span>&#127991; Typenschild-Foto erforderlich<br><span style="font-size:11px;color:var(--accent2)">automatisch bei Geräten mit Elektro oder Sanitär'
+    +((tsItem(pos)||{}).ts!==undefined?' · <b>hier von Hand festgelegt</b>':'')+'</span></span></label>'
     +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">'
     +'<button onclick="(document.getElementById(\'gwOv\')||{}).remove&&document.getElementById(\'gwOv\').remove()" style="padding:9px 16px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-family:inherit">Abbrechen</button>'
     +'<button onclick="confirmGewerk(\''+pos+'\')" style="padding:9px 18px;border:none;background:var(--accent);color:#2b2b2b;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Übernehmen</button>'
@@ -10635,9 +10808,18 @@ function openGewerkChooser(pos){
 }
 function confirmGewerk(pos){
   const ov=document.getElementById('gwOv'); if(!ov) return;
-  const sel=[...ov.querySelectorAll('input[type=checkbox]:checked')].map(c=>c.value);
+  const sel=[...ov.querySelectorAll('input[type=checkbox]:not(.gwts):checked')].map(c=>c.value);
+  const tsBox=ov.querySelector('input.gwts'), tsWunsch=tsBox?tsBox.checked:null;
   ov.remove();
   setPosGewerk(pos, sel);
+  // Typenschild: nur eine ABWEICHUNG von der Automatik speichern – sonst bliebe eine
+  // Position an einer alten Entscheidung hängen, wenn sich das Gewerk später ändert.
+  const it=tsItem(pos);
+  if(it && tsWunsch!==null){
+    const vorher=it.ts;
+    if(tsWunsch===tsAuto(pos)) delete it.ts; else it.ts=tsWunsch;
+    if(vorher!==it.ts){ updTG(pos); saveLV(); }
+  }
 }
 function setPosGewerk(pos, gewArr){
   let item=null;
@@ -10650,9 +10832,11 @@ function setPosGewerk(pos, gewArr){
   if(card){
     card.dataset.gew=gewAttr(item.gew);
     const imet=card.querySelector('.imet');
-    if(imet) imet.innerHTML=(item.fabrikat?'&#127981; '+item.fabrikat.trim():'')+(item.typ?' &nbsp;&#128203; '+item.typ.trim():'')+ntBadge(item)+gewBadgeEditable(item.pos,item.gew);
+    const _sec=DATA.find(sc=>sc.subsections.some(sb=>sb.items.includes(item)));
+    if(imet) imet.innerHTML=(item.fabrikat?'&#127981; '+item.fabrikat.trim():'')+(item.typ?' &nbsp;&#128203; '+item.typ.trim():'')+berBadge(_sec)+ntBadge(item)+gewBadgeEditable(item.pos,item.gew);
   }
   applyFieldVisibility(); rc(pos); updProg(pos); upStats(); applyF();
+  updTG(pos);   // Elektro dazu/weg -> Typenschild-Pflicht ändert sich
   // Gewerk-Umschalter einblenden, falls die Baustelle dadurch erstmals Gewerke bekommt
   const bar=document.getElementById('gwbar');
   if(bar && bar.style.display==='none' && DATA.some(s=>s.subsections.some(sub=>sub.items.some(it=>it.gew&&it.gew.length)))) bar.style.display='flex';
