@@ -1188,6 +1188,9 @@ const JSON_ARTEN={
 };
 function jsonUpsert(arr, schluessel, daten){
   const i=arr.findIndex(e=>e && e[schluessel]===daten[schluessel]);
+  // Abnahmeprotokolle: ein abgeschlossener Eintrag (mit PDF) wird nie durch einen
+  // älteren Entwurf eines anderen Geräts wieder geöffnet (v166).
+  if(i>=0 && arr[i] && arr[i].abgeschlossen && daten && daten.abgeschlossen===false) return arr;
   if(i>=0) arr[i]=daten; else arr.push(daten);
   return arr;
 }
@@ -1227,8 +1230,13 @@ async function jsonLaden(art, pid){
     const a= txt? JSON.parse(txt) : [];
     arr = Array.isArray(a)? a : [];
   }catch(e){
+    // offline: lokaler Stand + noch wartende eigene Einträge (v166)
     const lokal=await jsonCacheGet(datei);
-    return Array.isArray(lokal)? lokal : [];     // offline: enthält die eigenen Einträge bereits
+    arr=Array.isArray(lokal)? lokal : [];
+    try{ (await idbAll('outbox')).filter(x=>x.val&&x.val.kind==='json'&&x.val.datei===datei).sort((a,b)=>(a.val.ts||0)-(b.val.ts||0))
+      .forEach(x=>jsonUpsert(arr, x.val.schluessel, x.val.daten)); }catch(_){}
+    arr.sort(cfg.sort);
+    return arr;
   }
   try{
     const offen=(await idbAll('outbox')).filter(e=>e.val&&e.val.kind==='json'&&e.val.datei===datei)
@@ -1490,9 +1498,11 @@ async function flushOutbox(){
         await spUploadText(datei, JSON.stringify(arr));
         // Nur löschen, was seit dem Lesen nicht neu gespeichert wurde – sonst ginge
         // ein Zwischenspeichern während des Sendens verloren (v165).
-        const neuer=[];
-        for(const e of posten){ const j=await idbGet('outbox', e.key); if(j && j.ts===e.val.ts) await idbDel('outbox', e.key); else if(j) neuer.push(j); }
-        neuer.forEach(j=>jsonUpsert(arr, j.schluessel, j.daten));
+        for(const e of posten){ const j=await idbGet('outbox', e.key); if(j && j.ts===e.val.ts) await idbDel('outbox', e.key); }
+        // Alles, was inzwischen für diese Datei neu in der Warteschlange liegt (auch
+        // neue Einträge mit eigenem Schlüssel), wieder obenauf legen (v166)
+        try{ (await idbAll('outbox')).filter(x=>x.val&&x.val.kind==='json'&&x.val.datei===datei).sort((a,b)=>(a.val.ts||0)-(b.val.ts||0))
+          .forEach(x=>jsonUpsert(arr, x.val.schluessel, x.val.daten)); }catch(_){}
         if(cfg) arr.sort(cfg.sort);
         await jsonCacheSet(datei, arr);
         // Zusammengeführten Stand übernehmen, wenn es die offene Baustelle ist –
@@ -2241,8 +2251,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 165;
+const APP_VERSION = 166;
 const CHANGELOG = [
+  { v:166, titel:'Abnahmeprotokoll: Handy-Ansicht und Korrekturen', punkte:[
+    'Das Formular „Vor Ort ausfüllen" ist für das Handy überarbeitet: Restleistungen und Mängel zweizeilig, Datum und Uhrzeit untereinander, Teilnehmer nebeneinander, kleinere Ränder.',
+    'Ein abgeschlossenes Protokoll kann nicht mehr durch einen älteren Entwurf auf einem anderen Gerät wieder geöffnet werden.',
+    'Bleibt der Auftraggeber fern, steht im Reiter Dokumente „AG nicht erschienen"; Unterschriftsfeld und Name des Auftraggebers entfallen.',
+    'Positionen, die inzwischen aus der Stückliste entfernt wurden, werden im Formular genannt statt still zu verschwinden.' ]},
   { v:165, titel:'Abnahmeprotokoll: Korrekturen', punkte:[
     'Bleibt der Auftraggeber trotz Einladung fern, heißt die Auswahl jetzt richtig „einseitige Zustandsfeststellung" – eine Abnahme in Abwesenheit des Auftraggebers gibt es nicht. Eine Unterschrift des Auftraggebers wird dann nicht verlangt.',
     'Kann das PDF beim Abschließen nicht abgelegt werden, bleibt das Protokoll offen statt gesperrt. Gleich nummerierte Protokolle zweier Geräte überschreiben sich nicht mehr.',
@@ -3442,7 +3457,8 @@ function dokuStand(){
   // Abnahme-/Leistungsfeststellungsprotokolle (v164)
   (ABN_LISTE||[]).slice().sort((a,b)=>(a.nr||0)-(b.nr||0)).forEach(e=>{
     const t=abnArtLbl(e.art,e.va)+' Nr. '+e.nr+(e.ort?(' – '+e.ort):'');
-    if(e.abgeschlossen) fertig.push({ic:'&#128203;', t, m:[dokuDat(e.datum), e.agVerw?'Unterschrift AG verweigert':'unterschrieben AG + AN', e.sigAnName].filter(Boolean).join(' · '),
+    const abw=abnAbwesend(e);
+    if(e.abgeschlossen) fertig.push({ic:'&#128203;', t, m:[dokuDat(e.datum), abw?'AG nicht erschienen':(e.agVerw?'Unterschrift AG verweigert':'unterschrieben AG + AN'), e.sigAnName].filter(Boolean).join(' · '),
       knopf:e.pdf?'&#128196; PDF':'', fn:e.pdf?('dokuEwPdf('+escapeHtml(JSON.stringify(e.pdf))+')'):''});
     else vorb.push({ic:'&#128203;', t, tag:'ohne Unterschrift', m:'vorbereitet '+dokuDat(e.erstelltAm)+(e.erstelltVon?(' von '+e.erstelltVon):''), knopf:'Vervollständigen', fn:'abnEdit('+escapeHtml(JSON.stringify(e.id))+')'});
   });
@@ -11616,7 +11632,7 @@ function abnRender(){
   if(!ABN) return;
   let ov=document.getElementById('abnOv');
   const scroll=ov&&ov.firstElementChild?ov.firstElementChild.scrollTop:0;
-  if(!ov){ ov=document.createElement('div'); ov.id='abnOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:14px;'; document.body.appendChild(ov); }
+  if(!ov){ ov=document.createElement('div'); ov.id='abnOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:'+(innerWidth<500?'6px':'14px')+';'; document.body.appendChild(ov); }
   ov.onclick=function(e){ if(e.target===ov) abnClose(); };
   const st=projStamm();
   if(!ABN.gegEigen) ABN.gegenstand=abnGegenstandVorschlag();
@@ -11629,12 +11645,12 @@ function abnRender(){
       '<span style="margin-left:auto;color:#a8a8a8;font-size:11px;font-weight:400">'+n+' von '+items.length+'</span></div>'+
       g.subs.map((s,si)=>{ const k=gi+'|'+si, auf=ABN.auf.has(k), ns=s.items.filter(it=>ABN.sel.has(it.pos)).length;
         return '<div style="'+zeile+';padding-left:16px;font-weight:700"><span onclick="abnToggle(\'a\','+gi+','+si+')" style="display:flex;align-items:center;gap:8px;flex:1">'+abnCb(abnZustand(s.items))+escapeHtml(s.sub.bez||s.sub.pos)+'</span>'+
-          '<span onclick="abnAuf(\''+k+'\')" style="color:#d7c1ae;font-weight:400;font-size:12px;padding:0 4px">'+(auf?'▾ zuklappen':'▸ Positionen')+'</span>'+
+          '<span onclick="abnAuf(\''+k+'\')" style="color:#d7c1ae;font-weight:400;font-size:12px;padding:6px 6px;white-space:nowrap;cursor:pointer">'+(auf?'▾ zu':'▸ Positionen')+'</span>'+
           '<span style="color:#a8a8a8;font-size:11px;font-weight:400;min-width:48px;text-align:right">'+ns+' von '+s.items.length+'</span></div>'+
           (auf? s.items.map(it=>{ const an=ABN.sel.has(it.pos), gel=abnGeliefert(it.pos);
             return '<div style="'+zeile+';padding-left:40px;'+(an?'':'opacity:.6')+'" onclick="abnToggle(\'p\','+escapeHtml(JSON.stringify(it.pos))+')">'+abnCb(an?'an':'aus')+
-              '<span style="color:#a8a8a8;font-size:11.5px;min-width:56px">'+escapeHtml(it.pos)+'</span><span style="flex:1">'+escapeHtml((it.bez||'').trim())+'</span>'+
-              (gel?'':'<span style="font-size:10.5px;border-radius:8px;padding:1px 7px;background:#444;color:#ccc;white-space:nowrap">„Geliefert" nicht abgehakt</span>')+
+              '<span style="color:#a8a8a8;font-size:11.5px;min-width:50px">'+escapeHtml(it.pos)+'</span><span style="flex:1;min-width:0">'+escapeHtml((it.bez||'').trim())+
+              (gel?'':'<span style="display:inline-block;font-size:10.5px;border-radius:8px;padding:1px 7px;margin-left:4px;background:#444;color:#ccc;white-space:nowrap">nicht geliefert</span>')+'</span>'+
               abnFotoKnopf(it.pos)+'</div>'; }).join('') : '');
       }).join(''); }).join('');
   const op=abnOffenePunkte();
@@ -11648,7 +11664,7 @@ function abnRender(){
       '<span style="display:block;font-size:10.5px;color:#a8a8a8;margin-top:2px">'+escapeHtml(x.src)+' → Abschnitt '+(x.ziel===6?'6 Mängel':'5 Restleistungen')+'</span></div></div>'; }).join('')
     : '<div style="font-size:12px;color:#a8a8a8;padding:6px 0">Keine offenen Punkte im gewählten Umfang.</div>';
   const vtxt=[st.auftragVom?('Auftrag vom '+fmDatDE(st.auftragVom)):'', st.los].filter(Boolean).join(', ');
-  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:20px;max-width:560px;width:100%;max-height:92vh;overflow:auto;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:'+(innerWidth<500?'14px 12px':'20px')+';max-width:560px;width:100%;max-height:'+(innerWidth<500?'98vh':'92vh')+';overflow:auto;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
     '<div style="font-size:17px;font-weight:700">📋 Abnahme / Leistungsfeststellung</div>'+
     '<div style="font-size:12px;color:#a8a8a8">'+escapeHtml(curProjName())+'</div>'+
     '<div style="font-size:11px;color:#a8a8a8;border-left:3px solid #4a423a;padding-left:9px;margin:8px 0 0">Vertrag: '+escapeHtml(vtxt||'–')+' · <b style="color:#ddd">'+escapeHtml(vertragsartLbl(st.vertragsart))+'</b> (aus den Stammdaten)</div>'+
@@ -11684,7 +11700,7 @@ function abnFotoGewaehlt(pos){ const da=new Set(abnFotosAn(pos).map(x=>x.fname))
 function abnFotoDatum(fname){ const d=protoTs(fname); return d? d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : ''; }
 function abnFotoKnopf(pos){
   const alle=abnFotosAn(pos), n=abnFotoGewaehlt(pos).length, q=escapeHtml(JSON.stringify(pos));
-  const st='margin-left:6px;border-radius:14px;padding:3px 9px;font-size:12px;white-space:nowrap;font-family:inherit;cursor:pointer;';
+  const st='margin-left:4px;border-radius:14px;padding:5px 9px;font-size:12px;white-space:nowrap;font-family:inherit;cursor:pointer;flex:0 0 auto;';
   if(!alle.length) return '<span style="'+st+'border:1px solid #7a5a2a;color:#e0a060;cursor:default">kein Foto</span>';
   return '<button type="button" onclick="event.stopPropagation();abnFotoWahl('+q+')" style="'+st+(n?'background:#b8860b;border:1px solid #b8860b;color:#fff;font-weight:700':'background:none;border:1px solid #6a5433;color:#ddd')+'">📷 '+(n||'wählen')+'</button>';
 }
@@ -11823,12 +11839,13 @@ async function abnErstellen(){
 // Nach „Abschließen" liegt das PDF in <Baustelle>/_Abnahme und der Eintrag ist
 // nicht mehr änderbar.
 let ABN_LISTE=[], ABN_ED=null;
-async function loadAbnahmen(pid){ ABN_LISTE=await jsonLaden('abn', pid); }
+async function loadAbnahmen(pid){ const l=await jsonLaden('abn', pid); if(PID===pid) ABN_LISTE=l; }
 function abnArtLbl(art, va){
   if(va==='kauf' && art==='abnahme') return 'Übergabe';
   if(va==='kauf' && art==='teil') return 'Teilübergabe';
   return ({abnahme:'Abnahme',teil:'Teilabnahme',zustand:'Zustandsfeststellung',leistung:'Leistungsfeststellung'})[art]||'Protokoll';
 }
+function abnAbwesend(e){ try{ const a=abnTexte(e.va, e.art, {}).art1[e.art1]; return !!(a && a[3]==='abwesend'); }catch(_){ return false; } }
 function abnNeueNr(){ return ABN_LISTE.reduce((m,e)=>Math.max(m,e.nr||0),0)+1; }
 // Aus dem Dialog einen Entwurf anlegen und das Formular öffnen
 async function abnVorOrt(){
@@ -11882,22 +11899,25 @@ function abnEdSet(k,v){ if(ABN_ED) ABN_ED[k]=v; }
 function abnEdListe(liste,i,k,v){ if(ABN_ED&&ABN_ED[liste]&&ABN_ED[liste][i]) ABN_ED[liste][i][k]=v; }
 function abnEdBem(pos,v){ if(ABN_ED){ if(v) ABN_ED.bem[pos]=v; else delete ABN_ED.bem[pos]; } }
 function abnEdIO(pos){ ABN_ED.io[pos]=!ABN_ED.io[pos]; if(!ABN_ED.io[pos]) delete ABN_ED.io[pos]; abnEdNeu(); }
-function abnEdAlleIO(){ ABN_ED.sel.forEach(p=>{ if(!ABN_ED.bem[p]) ABN_ED.io[p]=true; }); abnEdNeu(); }
+function abnFehlendePos(E){ const da=new Set(); abnGruppen().forEach(g=>g.subs.forEach(s=>s.items.forEach(it=>da.add(it.pos)))); return E.sel.filter(p=>!da.has(p)); }
+function abnEdAlleIO(){ const weg=new Set(abnFehlendePos(ABN_ED)); ABN_ED.sel.forEach(p=>{ if(!ABN_ED.bem[p] && !weg.has(p)) ABN_ED.io[p]=true; }); abnEdNeu(); }
 function abnEdZeile(liste, neu){ ABN_ED[liste].push(neu); abnEdNeu(); }
 function abnEdWeg(liste,i){ ABN_ED[liste].splice(i,1); abnEdNeu(); }
 function abnEdRender(){
   const E=ABN_ED; if(!E) return;
   const st=projStamm(), T=abnTexte(E.va, E.art, st);
   let ov=document.getElementById('abnEdOv');
-  if(!ov){ ov=document.createElement('div'); ov.id='abnEdOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:10px;'; document.body.appendChild(ov); }
+  if(!ov){ ov=document.createElement('div'); ov.id='abnEdOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:'+(innerWidth<500?'4px':'10px')+';'; document.body.appendChild(ov); }
   const fld='width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid #6a5433;background:#3a3530;color:#fff;font-size:15px;font-family:inherit';
   const sec=t=>'<div style="font-size:12px;color:#d7c1ae;font-weight:700;letter-spacing:.4px;margin:18px 0 7px;text-transform:uppercase">'+t+'</div>';
   const add=(t,fn)=>'<button type="button" onclick="'+fn+'" style="background:none;border:none;color:#d7c1ae;font-family:inherit;font-size:13px;cursor:pointer;padding:4px 0">＋ '+t+'</button>';
-  const weg=(liste,i)=>'<button type="button" onclick="abnEdWeg(\''+liste+'\','+i+')" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:0 10px;font-family:inherit;cursor:pointer;flex:0 0 auto">✕</button>';
+  const weg=(liste,i)=>'<button type="button" onclick="abnEdWeg(\''+liste+'\','+i+')" title="Zeile entfernen" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;min-width:40px;min-height:38px;font-family:inherit;cursor:pointer;flex:0 0 auto">✕</button>';
   const v=s=>escapeHtml(s==null?'':String(s));
   const q=s=>escapeHtml(JSON.stringify(String(s)));   // als JS-Wert im Attribut
   // Positionen in Reihenfolge der Stückliste mit Bereichszeilen
   let posHtml='';
+  const weg_=abnFehlendePos(E);
+  if(weg_.length) posHtml+='<div style="font-size:12px;color:#e0a060;margin:6px 0">⚠ Nicht mehr in der Stückliste (oder Menge 0): '+v(weg_.join(', '))+' – erscheinen nicht im Protokoll.</div>';
   abnGruppen().forEach(g=>g.subs.forEach(s=>{ const its=s.items.filter(it=>E.sel.includes(it.pos)); if(!its.length) return;
     posHtml+='<div style="font-size:12px;color:#a8a8a8;font-weight:700;margin:10px 0 2px">'+v((g.sec.label||g.sec.pos)+' · '+(s.sub.bez||s.sub.pos))+'</div>';
     its.forEach(it=>{ const an=!!E.io[it.pos];
@@ -11905,40 +11925,36 @@ function abnEdRender(){
         '<span style="color:#a8a8a8;font-size:12px;min-width:54px">'+v(it.pos)+'</span><span style="flex:1;font-size:14px">'+v((it.bez||'').trim())+'</span>'+
         '<button type="button" onclick="abnEdIO('+q(it.pos)+')" style="border-radius:13px;padding:4px 11px;font-size:13px;font-family:inherit;cursor:pointer;'+(an?'background:#3a7a3a;border:1px solid #3a7a3a;color:#fff;font-weight:700':'background:none;border:1px solid #6a5433;color:#ddd')+'">'+(an?'✓ ':'')+v(T.ioKopf)+'</button></div>'+
         '<input type="text" value="'+v(E.bem[it.pos]||'')+'" oninput="abnEdBem('+q(it.pos)+',this.value)" placeholder="Bemerkung" style="'+fld+';font-size:13px;padding:5px 8px;margin:0 0 4px;'+(E.bem[it.pos]?'color:#e0b070':'')+'">'; }); }));
-  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:18px;max-width:640px;width:100%;max-height:96vh;overflow:auto;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:'+(innerWidth<500?'14px 12px':'18px')+';max-width:640px;width:100%;max-height:'+(innerWidth<500?'99vh':'96vh')+';overflow:auto;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
     '<div style="font-size:17px;font-weight:700">✍ '+v(abnArtLbl(E.art,E.va))+' Nr. '+E.nr+'</div>'+
     '<div style="font-size:12px;color:#a8a8a8">'+v([E.ort, curProjName(), vertragsartLbl(E.va)].filter(Boolean).join(' · '))+'</div>'+
     sec('1 Art der Feststellung')+T.art1.map((a,i)=>{ const on=E.art1===i;
-      return '<div onclick="abnEdSigMerken();ABN_ED.art1='+i+';abnEdNeu()" style="display:flex;gap:9px;align-items:flex-start;padding:8px 10px;border:1px solid '+(on?'#b8860b':'#4a423a')+';border-radius:9px;margin-bottom:6px;cursor:pointer;font-size:13.5px;'+(on?'background:#3a3122':'')+'">'+
+      return '<div onclick="abnEdSigMerken();if(ABN_ED.art1!=='+i+')ABN_ED.art1Zusatz=\'\';ABN_ED.art1='+i+';abnEdNeu()" style="display:flex;gap:9px;align-items:flex-start;padding:8px 10px;border:1px solid '+(on?'#b8860b':'#4a423a')+';border-radius:9px;margin-bottom:6px;cursor:pointer;font-size:13.5px;'+(on?'background:#3a3122':'')+'">'+
         '<span style="width:16px;height:16px;border-radius:50%;flex:0 0 auto;margin-top:1px;border:2px solid '+(on?'#b8860b':'#888')+';'+(on?'background:radial-gradient(#b8860b 45%,transparent 50%)':'')+'"></span><span>'+v((a[0]+a[1]).replace(/\s*_{6,}/g,' …'))+'</span></div>'; }).join('')+
     (E.art1>=0 && /_{6,}/.test(T.art1[E.art1][1]) ? '<input type="text" value="'+v(E.art1Zusatz)+'" oninput="abnEdSet(\'art1Zusatz\',this.value)" placeholder="'+v(/eingeladen/.test(T.art1[E.art1][1])?'Termin vereinbart bzw. eingeladen am …':'Gründe …')+'" style="'+fld+'">' : '')+
-    sec('Datum / Uhrzeit')+'<div style="display:flex;gap:8px"><input type="date" value="'+v(E.datum)+'" onchange="abnEdSet(\'datum\',this.value)" style="'+fld+'">'+
-      '<input type="time" value="'+v(E.von)+'" onchange="abnEdSet(\'von\',this.value)" style="'+fld+'"><input type="time" value="'+v(E.bis)+'" onchange="abnEdSet(\'bis\',this.value)" style="'+fld+'"></div>'+
-    sec('3 Teilnehmer')+E.teilnehmer.map((t,i)=>'<div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" value="'+v(t.name)+'" oninput="abnEdListe(\'teilnehmer\','+i+',\'name\',this.value)" placeholder="Name" style="'+fld+'">'+
-      '<input type="text" value="'+v(t.firma)+'" oninput="abnEdListe(\'teilnehmer\','+i+',\'firma\',this.value)" placeholder="Firma / Funktion" style="'+fld+'">'+weg('teilnehmer',i)+'</div>').join('')+
+    sec('Datum / Uhrzeit von – bis')+'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><input type="date" value="'+v(E.datum)+'" onchange="abnEdSet(\'datum\',this.value)" style="'+fld+';grid-column:1 / -1">'+
+      '<input type="time" value="'+v(E.von)+'" onchange="abnEdSet(\'von\',this.value)" title="von" style="'+fld+'"><input type="time" value="'+v(E.bis)+'" onchange="abnEdSet(\'bis\',this.value)" title="bis" style="'+fld+'"></div>'+
+    sec('3 Teilnehmer')+E.teilnehmer.map((t,i)=>'<div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" value="'+v(t.name)+'" oninput="abnEdListe(\'teilnehmer\','+i+',\'name\',this.value)" placeholder="Name" style="'+fld+';flex:1 1 0;min-width:0;width:auto">'+
+      '<input type="text" value="'+v(t.firma)+'" oninput="abnEdListe(\'teilnehmer\','+i+',\'firma\',this.value)" placeholder="Firma / Funktion" style="'+fld+';flex:1 1 0;min-width:0;width:auto">'+weg('teilnehmer',i)+'</div>').join('')+
       add('Teilnehmer',"abnEdZeile('teilnehmer',{name:'',firma:''})")+
     sec('4 Leistungen und Zustand')+posHtml+
       '<button type="button" onclick="abnEdAlleIO()" style="background:none;border:none;color:#d7c1ae;font-family:inherit;font-size:13px;cursor:pointer;padding:6px 0">Alle ohne Bemerkung als „'+v(T.ioKopf)+'" markieren</button>'+
-    sec('5 Restleistungen')+E.rest.map((r,i)=>'<div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" value="'+v(r.pos)+'" oninput="abnEdListe(\'rest\','+i+',\'pos\',this.value)" placeholder="Pos." style="'+fld+';flex:0 0 76px">'+
-      '<input type="text" value="'+v(r.txt)+'" oninput="abnEdListe(\'rest\','+i+',\'txt\',this.value)" placeholder="Restleistung" style="'+fld+'">'+
-      '<input type="date" value="'+v(r.bis)+'" onchange="abnEdListe(\'rest\','+i+',\'bis\',this.value)" title="erledigt bis" style="'+fld+';flex:0 0 140px">'+weg('rest',i)+'</div>').join('')+
+    sec('5 Restleistungen')+E.rest.map((r,i)=>'<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #3d3832"><div style="display:flex;gap:6px"><input type="text" value="'+v(r.pos)+'" oninput="abnEdListe(\'rest\','+i+',\'pos\',this.value)" placeholder="Pos." style="'+fld+';flex:0 0 76px;width:auto"><input type="text" value="'+v(r.txt)+'" oninput="abnEdListe(\'rest\','+i+',\'txt\',this.value)" placeholder="Restleistung" style="'+fld+';flex:1 1 0;min-width:0;width:auto"></div><div style="display:flex;gap:6px;align-items:center;margin-top:6px"><span style="font-size:12px;color:#a8a8a8;flex:0 0 76px">erledigt bis</span><input type="date" value="'+v(r.bis)+'" onchange="abnEdListe(\'rest\','+i+',\'bis\',this.value)" style="'+fld+';flex:1 1 0;min-width:0;width:auto">'+weg('rest',i)+'</div></div>').join('')+
       add('Restleistung',"abnEdZeile('rest',{pos:'',txt:'',bis:''})")+
-    sec('6 Mängel')+E.maengel.map((r,i)=>'<div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" value="'+v(r.pos)+'" oninput="abnEdListe(\'maengel\','+i+',\'pos\',this.value)" placeholder="Pos." style="'+fld+';flex:0 0 76px">'+
-      '<input type="text" value="'+v(r.txt)+'" oninput="abnEdListe(\'maengel\','+i+',\'txt\',this.value)" placeholder="Mangel" style="'+fld+'">'+
-      '<input type="date" value="'+v(r.frist)+'" onchange="abnEdListe(\'maengel\','+i+',\'frist\',this.value)" title="Frist" style="'+fld+';flex:0 0 140px">'+weg('maengel',i)+'</div>').join('')+
+    sec('6 Mängel')+E.maengel.map((r,i)=>'<div style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid #3d3832"><div style="display:flex;gap:6px"><input type="text" value="'+v(r.pos)+'" oninput="abnEdListe(\'maengel\','+i+',\'pos\',this.value)" placeholder="Pos." style="'+fld+';flex:0 0 76px;width:auto"><input type="text" value="'+v(r.txt)+'" oninput="abnEdListe(\'maengel\','+i+',\'txt\',this.value)" placeholder="Mangel" style="'+fld+';flex:1 1 0;min-width:0;width:auto"></div><div style="display:flex;gap:6px;align-items:center;margin-top:6px"><span style="font-size:12px;color:#a8a8a8;flex:0 0 76px">Frist</span><input type="date" value="'+v(r.frist)+'" onchange="abnEdListe(\'maengel\','+i+',\'frist\',this.value)" style="'+fld+';flex:1 1 0;min-width:0;width:auto">'+weg('maengel',i)+'</div></div>').join('')+
       add('Mangel',"abnEdZeile('maengel',{pos:'',txt:'',frist:''})")+
     sec(E.art==='zustand'||E.art==='leistung'?'7 Anmerkungen und Einwendungen':'7 Vorbehalte und Einwendungen')+
       '<textarea rows="3" oninput="abnEdSet(\'vorbehalt\',this.value)" placeholder="'+v(T.vorbehalt)+'" style="'+fld+';resize:vertical;font-size:14px;margin-bottom:6px">'+v(E.vorbehalt)+'</textarea>'+
       '<textarea rows="2" oninput="abnEdSet(\'einwand\',this.value)" placeholder="Einwendungen des Auftragnehmers" style="'+fld+';resize:vertical;font-size:14px">'+v(E.einwand)+'</textarea>'+
     sec('9 Unterschriften')+
       (E.art1>=0 && T.art1[E.art1] && T.art1[E.art1][3]==='abwesend' ? '<div style="font-size:13px;color:#e0b070;margin-bottom:8px">Auftraggeber nicht erschienen – keine Unterschrift des Auftraggebers nötig. Das Protokoll ist ihm danach alsbald zu übersenden.</div>' : '')+
-      '<div style="font-size:12px;color:#a8a8a8;margin-bottom:4px">Für den Auftraggeber</div>'+
+      (abnAbwesend(E) ? '' : '<div style="font-size:12px;color:#a8a8a8;margin-bottom:4px">Für den Auftraggeber</div>'+
       '<input type="text" value="'+v(E.sigAgName)+'" oninput="abnEdSet(\'sigAgName\',this.value)" placeholder="Name in Druckbuchstaben" style="'+fld+';margin-bottom:6px">'+
       (E.agVerw ? '<div style="display:flex;gap:6px"><input type="text" value="'+v(E.verwGrund)+'" oninput="abnEdSet(\'verwGrund\',this.value)" placeholder="Grund der Verweigerung" style="'+fld+'">'+
           '<input type="time" value="'+v(E.verwZeit)+'" onchange="abnEdSet(\'verwZeit\',this.value)" style="'+fld+';flex:0 0 120px"></div>'
         : '<canvas id="abnSigAg" width="900" height="260" style="width:100%;height:120px;background:#fff;border-radius:8px;touch-action:none"></canvas>'+
           '<button type="button" onclick="abnSigLoeschen(\'abnSigAg\')" style="background:none;border:none;color:#a8a8a8;font-family:inherit;font-size:12px;cursor:pointer">Unterschrift löschen</button>')+
-      '<label style="display:flex;gap:8px;align-items:center;font-size:13px;color:#ddd;margin-top:4px;cursor:pointer"><input type="checkbox" '+(E.agVerw?'checked':'')+' onchange="abnEdSigMerken();ABN_ED.agVerw=this.checked;if(this.checked&&!ABN_ED.verwZeit)ABN_ED.verwZeit=new Date().toTimeString().slice(0,5);abnEdNeu()" style="width:17px;height:17px;accent-color:#b8860b">Unterschrift verweigert</label>'+
+      '<label style="display:flex;gap:8px;align-items:center;font-size:13px;color:#ddd;margin-top:4px;cursor:pointer"><input type="checkbox" '+(E.agVerw?'checked':'')+' onchange="abnEdSigMerken();ABN_ED.agVerw=this.checked;if(this.checked&&!ABN_ED.verwZeit)ABN_ED.verwZeit=new Date().toTimeString().slice(0,5);abnEdNeu()" style="width:17px;height:17px;accent-color:#b8860b">Unterschrift verweigert</label>')+
       '<div style="font-size:12px;color:#a8a8a8;margin:14px 0 4px">Für den Auftragnehmer kpc GmbH</div>'+
       '<input type="text" value="'+v(E.sigAnName)+'" oninput="abnEdSet(\'sigAnName\',this.value)" placeholder="Name in Druckbuchstaben" style="'+fld+';margin-bottom:6px">'+
       '<canvas id="abnSigAn" width="900" height="260" style="width:100%;height:120px;background:#fff;border-radius:8px;touch-action:none"></canvas>'+
@@ -11986,8 +12002,10 @@ async function abnEdAbschliessen(){
   else if(E.agVerw){ if(!(E.verwGrund||'').trim()) fehlt.push('Grund der Verweigerung'); }
   else { if(!E.sigAg) fehlt.push('Unterschrift Auftraggeber (oder „Unterschrift verweigert" ankreuzen)'); if(!(E.sigAgName||'').trim()) fehlt.push('Name Auftraggeber'); }
   if(fehlt.length){ alert('Bitte noch ergänzen:\n\n• '+fehlt.join('\n• ')); return; }
-  if(!confirm(abnArtLbl(E.art,E.va)+' Nr. '+E.nr+' abschließen?\n\nGewählt: '+(T.art1[E.art1][0])+'\n\nDanach ist das Protokoll nicht mehr änderbar.')) return;
-  const win=window.open('','_blank');   // synchron im Klick (§9)
+  const weg=abnFehlendePos(E);
+  // 6) Fenster VOR der Rückfrage öffnen – nach einem langen confirm() blockt der Browser sonst
+  const win=window.open('','_blank');
+  if(!confirm(abnArtLbl(E.art,E.va)+' Nr. '+E.nr+' abschließen?\n\nGewählt: '+(T.art1[E.art1][0])+(weg.length?('\n\n⚠ Nicht mehr in der Stückliste, fehlen im Protokoll: '+weg.join(', ')):'')+'\n\nDanach ist das Protokoll nicht mehr änderbar.')){ if(win) try{ win.close(); }catch(_){} return; }
   if(win){ try{ win.document.write('<title>Protokoll</title><body style="font-family:Arial,sans-serif;padding:24px;color:#666">PDF wird erstellt …</body>'); }catch(e){} }
   try{
     showLoader('Protokoll wird erstellt …');
@@ -12147,7 +12165,7 @@ async function abnBuildPdf(A, F){
   dc(dark); doc.setLineWidth(0.3); doc.line(M,y,M+half,y); doc.line(M+half+10,y,R,y); y+=4;
   doc.setFontSize(8); tc(grey);
   if(F){ const ortDat=[A.ort, datumDE].filter(Boolean).join(', ');
-    doc.text(doc.splitTextToSize(ortDat+(F.sigAgName?(', '+F.sigAgName):''),half)[0],M,y); doc.text(doc.splitTextToSize(ortDat+(F.sigAnName?(', '+F.sigAnName):''),half)[0],M+half+10,y); y+=9;
+    doc.text(doc.splitTextToSize(ortDat+(F.sigAgName&&!abnAbwesend(F)?(', '+F.sigAgName):''),half)[0],M,y); doc.text(doc.splitTextToSize(ortDat+(F.sigAnName?(', '+F.sigAnName):''),half)[0],M+half+10,y); y+=9;
     doc.setFontSize(9.5); tc(dark);
     if(F.agVerw && !(T.art1[F.art1] && T.art1[F.art1][3]==='abwesend')){ doc.splitTextToSize('Unterschrift verweigert durch: '+(F.sigAgName||'—')+'  ·  Uhrzeit: '+(F.verwZeit||'—')+'  ·  Grund: '+(F.verwGrund||'—'),R-M).forEach(ln=>{ doc.text(ln,M,y); y+=4.6; }); y+=2.4; }
   } else {
@@ -12299,6 +12317,7 @@ async function selectProject(pid){
     loadBautagebuch(pid).catch(()=>{});   // Bautagebuch der Baustelle nachladen (nicht blockierend)
     loadDicht(pid).then(()=>updDichtTasks()).catch(()=>{});   // Dichtigkeitsprotokolle nachladen (nicht blockierend)
     loadService(pid).catch(()=>{});   // Serviceberichte nachladen (nicht blockierend)
+    ABN_LISTE=[];                      // nicht die Protokolle der vorigen Baustelle zeigen
     loadAbnahmen(pid).then(()=>{ if(PID===pid){ updDokuTab(); if(ACT==='__doku') dokuRender(); } }).catch(()=>{});
     dokuLaden(pid).then(()=>{ if(PID===pid){ updDokuTab(); if(ACT==='__doku') dokuRender(); } }).catch(()=>{});
     aufgFlush();                      // wartende Aufgaben-Einträge nachreichen
