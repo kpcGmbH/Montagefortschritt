@@ -2234,8 +2234,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 160;
+const APP_VERSION = 161;
 const CHANGELOG = [
+  { v:161, titel:'Vertragsdaten je Baustelle', punkte:[
+    'In den <b>Stammdaten</b> (🏢 in der Baustellenauswahl) gibt es den neuen Abschnitt <b>Vertrag</b>: Vertragsart (VOB/B, BGB, VOL/B, Kauf/Werklieferung, Sonstige), Auftrag vom, Los/Gewerk, Mängelhaftung und abweichende Vereinbarungen.',
+    'Die Angaben sind die Grundlage für das kommende Abnahme- und Leistungsfeststellungsprotokoll. Nichts ist vorausgewählt – Vertragsart und Mängelhaftung trägt das Büro bewusst nach Vertrag ein.' ]},
   { v:160, titel:'Anschlussart zurücksetzen', punkte:[
     'Wird „Elektroanschluss" wieder abgewählt (oder als „entfällt" markiert), wird auch die Angabe Stecker/Festanschluss zurückgesetzt. Beim nächsten Abhaken fragt die App neu.' ]},
   { v:159, titel:'Korrekturen Synchronisierung', punkte:[
@@ -11067,7 +11070,10 @@ function projStamm(p){
     // Anschrift gepflegt ist: der Ort allein wäre bei Altbaustellen der aus dem
     // Projektnamen GERATENE Ort – als „Anschrift der Baustelle" im PDF sähe das
     // nach einer belastbaren Angabe aus und wäre keine.
-    adresse: strasse ? [strasse, plzOrt].filter(Boolean).join(', ') : (plz ? plzOrt : '')
+    adresse: strasse ? [strasse, plzOrt].filter(Boolean).join(', ') : (plz ? plzOrt : ''),
+    // Vertrag (v161) – leer bleibt leer, nichts wird ergänzt
+    vertragsart: proj.vertragsart||'', auftragVom: proj.auftragVom||'', los: (proj.los||'').trim(),
+    maengelhaftung: (proj.maengelhaftung||'').trim(), abweichend: (proj.abweichend||'').trim()
   };
 }
 // Kopfzeile „wer / wo" für die Formular-Overlays (Bautagebuch, Dichtigkeit …):
@@ -11436,6 +11442,25 @@ function editStammdaten(pid, ev){
     '</div>'+
     '<label style="'+lbl+'">Auftrags-/Kommissionsnummer</label>'+
     '<input id="stAuftr" type="text" value="'+escapeHtml(p.auftragsnr||'')+'" placeholder="leer lassen = Projektnummer'+(p.nummer?(' ('+escapeHtml(p.nummer)+')'):'')+'" style="'+fld+'">'+
+    // Vertrag (v161) – Grundlage für Abnahme-/Leistungsfeststellungsprotokolle.
+    // Bewusst OHNE Vorauswahl und ohne vorgeschlagene Frist: eine falsch
+    // vorbelegte Vertragsart oder Mängelhaftung darf nie ins Protokoll geraten.
+    '<div style="font-size:12px;color:#d7c1ae;font-weight:700;letter-spacing:.3px;margin:18px 0 0">VERTRAG</div>'+
+    '<label style="'+lbl+'">Vertragsart</label>'+
+    '<input id="stVa" type="hidden" value="'+escapeHtml(p.vertragsart||'')+'">'+
+    '<div id="stVaSeg" style="display:flex;flex-wrap:wrap;gap:6px">'+VERTRAGSARTEN.map(([k,l])=>
+      '<button type="button" data-va="'+k+'" onclick="stVaWahl(\''+k+'\')" style="border:1px solid #6a5433;border-radius:16px;padding:7px 11px;font-size:13px;font-family:inherit;cursor:pointer;'+
+      (p.vertragsart===k?'background:#b8860b;border-color:#b8860b;color:#fff;font-weight:700':'background:none;color:#ddd')+'">'+l+'</button>').join('')+'</div>'+
+    '<div style="font-size:11px;color:#a8a8a8;margin-top:5px">Nichts vorausgewählt – ohne Vertragsart lässt sich kein Abnahmeprotokoll erstellen. Erneut tippen hebt die Auswahl auf.</div>'+
+    '<div style="display:flex;gap:12px">'+
+      '<div style="flex:0 0 40%"><label style="'+lbl+'">Auftrag vom</label><input id="stAvom" type="date" value="'+escapeHtml(p.auftragVom||'')+'" style="'+fld+'"></div>'+
+      '<div style="flex:1"><label style="'+lbl+'">Los / Gewerk</label><input id="stLos" type="text" value="'+escapeHtml(p.los||'')+'" placeholder="z. B. Los 16 Kücheneinrichtung" style="'+fld+'"></div>'+
+    '</div>'+
+    '<label style="'+lbl+'">Mängelhaftung (optional)</label>'+
+    '<textarea id="stMh" rows="2" placeholder="leer = im Protokoll „gemäß Vertrag“" style="'+fld+';resize:vertical">'+escapeHtml(p.maengelhaftung||'')+'</textarea>'+
+    '<div style="font-size:11px;color:#a8a8a8;margin-top:4px">Nur eintragen, was im Vertrag steht – z. B. „4 Jahre gem. Ziff. 5 des Auftrags; 5 Jahre bei Abschluss eines Wartungsvertrags". Die App schlägt keine Frist vor und rechnet kein Ende aus.</div>'+
+    '<label style="'+lbl+'">Abweichende Vereinbarungen (optional)</label>'+
+    '<textarea id="stAbw" rows="2" placeholder="z. B. „Teilabnahmen nur nach schriftlicher Vereinbarung (ZVB Ziff. 9)“" style="'+fld+';resize:vertical">'+escapeHtml(p.abweichend||'')+'</textarea>'+
     // Sichtschutz – im Pilotbetrieb nur für die freigegebenen Konten sichtbar.
     // Wenn der Pilot endet, ist `darfBenutzerWechseln()` die richtige Schranke
     // (Bauleitung + Innendienst), damit niemand versehentlich eine laufende
@@ -11453,11 +11478,24 @@ function editStammdaten(pid, ev){
     '</div></div>';
 }
 function stammClose(){ const o=document.getElementById('stammDlg'); if(o) o.remove(); }
+// Vertragsarten (v161). Schlüssel werden gespeichert – nicht umbenennen.
+const VERTRAGSARTEN=[['vob','VOB/B'],['bgb','BGB-Bauvertrag / Werkvertrag'],['vol','VOL/B'],['kauf','Kauf / Werklieferung mit Montage'],['sonst','Sonstige']];
+function vertragsartLbl(k){ const v=VERTRAGSARTEN.find(x=>x[0]===k); return v?v[1]:''; }
+function stVaWahl(k){
+  const inp=document.getElementById('stVa'); if(!inp) return;
+  inp.value = inp.value===k ? '' : k;            // erneut tippen = Auswahl aufheben
+  document.querySelectorAll('#stVaSeg [data-va]').forEach(b=>{ const an=b.dataset.va===inp.value;
+    b.style.background=an?'#b8860b':'none'; b.style.borderColor=an?'#b8860b':'#6a5433'; b.style.color=an?'#fff':'#ddd'; b.style.fontWeight=an?'700':'300'; });
+}
 async function stammSave(pid){
   const p=PROJECTS.find(x=>x.pid===pid); if(!p){ stammClose(); return; }
   const v=id=>((document.getElementById(id)||{}).value||'').trim();
-  const alt={auftraggeber:p.auftraggeber, strasse:p.strasse, plz:p.plz, ort:p.ort, auftragsnr:p.auftragsnr, privat:p.privat};
+  const alt={auftraggeber:p.auftraggeber, strasse:p.strasse, plz:p.plz, ort:p.ort, auftragsnr:p.auftragsnr, privat:p.privat,
+             vertragsart:p.vertragsart, auftragVom:p.auftragVom, los:p.los, maengelhaftung:p.maengelhaftung, abweichend:p.abweichend};
   p.auftraggeber=v('stAg'); p.strasse=v('stStr'); p.plz=v('stPlz'); p.ort=v('stOrt'); p.auftragsnr=v('stAuftr');
+  if(document.getElementById('stVa')){
+    p.vertragsart=v('stVa'); p.auftragVom=v('stAvom'); p.los=v('stLos'); p.maengelhaftung=v('stMh'); p.abweichend=v('stAbw');
+  }
   // Das Häkchen gibt es nur für Bauleitung/Innendienst; fehlt es, bleibt der
   // bisherige Stand stehen (nicht stillschweigend freigeben).
   p.stammEdit=new Date().toISOString();   // bewusste Änderung -> schlägt ältere Stände
