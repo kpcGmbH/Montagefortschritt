@@ -2234,8 +2234,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 159;
+const APP_VERSION = 160;
 const CHANGELOG = [
+  { v:160, titel:'Anschlussart zurücksetzen', punkte:[
+    'Wird „Elektroanschluss" wieder abgewählt (oder als „entfällt" markiert), wird auch die Angabe Stecker/Festanschluss zurückgesetzt. Beim nächsten Abhaken fragt die App neu.' ]},
   { v:159, titel:'Korrekturen Synchronisierung', punkte:[
     'Zusammenführen beim Nachsenden in Sonderfällen abgesichert: Eingaben während des Sendens, gleichzeitig angelegte Restarbeiten (Sammelimport), Start ohne Netz, neue Positionen.',
     'Läuft die Microsoft-Anmeldung ab, fordert die App wieder eine Anmeldung an – statt die Synchronisierung dauerhaft hängen zu lassen.',
@@ -3145,6 +3147,7 @@ function tc(pos,f){
   if(s[f]){ s.ts[f]=new Date().toISOString(); s.by[f]=USER; }
   else { delete s.ts[f]; delete s.by[f]; }
   histAdd(pos, s[f]?'set':'unset', FLD_LBL[f]||f);
+  if(f==='ea' && !s.ea) anschlZuruecksetzen(pos);   // v160: Anschlussart gehört zum Anschluss
   ckRender(pos,f);
   if(s[f]) autoFillVorstufen(pos,f);       // Chronologie: Vorstufen zwangsläufig mitsetzen
   // upStats() führt den Feldfilter-Zähler mit. Die abgehakte Position verschwindet
@@ -3254,6 +3257,7 @@ function tcNA(pos,f,anAus){
     if(!confirm('„'+(FLD_LBL[f]||f)+'" für diese Position als entfallen kennzeichnen?\n\nDer Schritt zählt dann nirgends mehr als offen – die Position kann ohne ihn vollständig werden.')) return;
     s.na[f]=1;
     if(s[f]){ s[f]=false; delete s.ts[f]; delete s.by[f]; }   // gesetzt + entfällt wäre widersprüchlich
+    if(f==='ea') anschlZuruecksetzen(pos);
   } else {
     delete s.na[f];
   }
@@ -3807,6 +3811,15 @@ function ibnRender(pos){
 // der Inbetriebnahme (Sperre wie beim IBN-Protokoll). Gespeichert als s.anschl =
 // 'stecker' | 'fest' im data-Blob der Position. Altbestand (Elektroanschluss schon
 // gesetzt) wird nicht nachträglich gefragt.
+// Elektroanschluss zurückgenommen (oder „entfällt"): die Antwort Stecker/
+// Festanschluss gilt nicht mehr – beim nächsten Abhaken wird neu gefragt (v160,
+// Wunsch des Nutzers). Abgelegte DGUV-Protokolle bleiben unberührt.
+function anschlZuruecksetzen(pos){
+  const s=gs(pos); if(!s.anschl) return;
+  histAdd(pos,'anschl','zurückgesetzt (vorher '+(s.anschl==='fest'?'Festanschluss':'Stecker')+')');
+  s.anschl='';
+  ibnRender(pos);
+}
 function anschlFragen(pos, f){
   const s=gs(pos);
   if(s.anschl || s.ea || entf(s,'ea') || !relFields(pos).includes('ea')) return false;
