@@ -1181,7 +1181,8 @@ async function removeQueuedFile(fname){
 const JSON_ARTEN={
   btb:   { datei:pid=>'BAUTAGEBUCH_'+pid+'.json', schluessel:'datum',  sort:(a,b)=>(a.datum||'').localeCompare(b.datum||''), setzen:a=>{BTB=a;}, holen:()=>BTB },
   dicht: { datei:pid=>'DICHT_'+pid+'.json',       schluessel:'umfang', sort:(a,b)=>(a.nr||0)-(b.nr||0), setzen:a=>{DICHT=a;}, holen:()=>DICHT, nach:()=>{ try{ updDichtTasks(); }catch(e){} } },
-  svc:   { datei:pid=>'SERVICE_'+pid+'.json',     schluessel:'nr',     sort:(a,b)=>(a.nr||0)-(b.nr||0), setzen:a=>{SVC=a;}, holen:()=>SVC }
+  svc:   { datei:pid=>'SERVICE_'+pid+'.json',     schluessel:'nr',     sort:(a,b)=>(a.nr||0)-(b.nr||0), setzen:a=>{SVC=a;}, holen:()=>SVC },
+  abn:   { datei:pid=>'ABNAHME_'+pid+'.json',     schluessel:'id',     sort:(a,b)=>(a.nr||0)-(b.nr||0), setzen:a=>{ABN_LISTE=a;}, holen:()=>ABN_LISTE, nach:()=>{ try{ if(ACT==='__doku') dokuRender(); updDokuTab(); }catch(e){} } }
   // Die Gerätekartei des Kundendienstes (KD_GERAETE_<pid>.json) folgt demselben
   // Muster, wird aber in `kundendienst.html` geführt – diese App rührt sie nicht an.
 };
@@ -2235,8 +2236,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 163;
+const APP_VERSION = 164;
 const CHANGELOG = [
+  { v:164, titel:'Abnahme vor Ort ausfüllen und unterschreiben', punkte:[
+    'Im Protokoll „Abnahme / Leistungsfeststellung" gibt es jetzt <b>„✍ Vor Ort ausfüllen"</b>: Art der Feststellung, Uhrzeit, Teilnehmer, „i. O." je Position, Restleistungen und Mängel mit Frist, Vorbehalte – und die <b>Unterschriften</b> von Auftraggeber und kpc direkt auf dem Bildschirm (oder „Unterschrift verweigert" mit Grund).',
+    '<b>Zwischenspeichern</b> geht jederzeit – so kann das Büro das Protokoll vorbereiten. <b>Abschließen</b> erzeugt das ausgefüllte PDF und legt es in SharePoint (_Abnahme) und im Reiter <b>Dokumente</b> ab.' ]},
   { v:163, titel:'Abnahme: Fotos je Position', punkte:[
     'Im Protokoll „Abnahme / Leistungsfeststellung" lassen sich je Position <b>ein oder mehrere Fotos</b> auswählen (📷 an der Position). Die Auswahl wird an der Position gemerkt.',
     'Im PDF stehen die Fotonummern in der Spalte „Foto-Nr.", die Fotos selbst als nummerierte <b>Fotodokumentation</b> im Anhang.' ]},
@@ -3426,6 +3430,13 @@ function dokuStand(){
   Object.keys(ausM).forEach(k=>{ const n=DOKU_NAMEN[k]; if(!n) return; const a=ausM[k]||{};
     aus.push({k, ic:n[0], t:n[1], m:'abgewählt'+(a.von?(' von '+a.von):'')+(a.am?(' · '+dokuDat(a.am)):''), knopf:'wieder aktivieren', fn:'dokuSchalten(\''+k+'\',false)', leicht:true}); });
   for(let i=off.length-1;i>=0;i--) if(off[i].k && ausM[off[i].k]) off.splice(i,1);
+  // Abnahme-/Leistungsfeststellungsprotokolle (v164)
+  (ABN_LISTE||[]).slice().sort((a,b)=>(a.nr||0)-(b.nr||0)).forEach(e=>{
+    const t=abnArtLbl(e.art,e.va)+' Nr. '+e.nr+(e.ort?(' – '+e.ort):'');
+    if(e.abgeschlossen) fertig.push({ic:'&#128203;', t, m:[dokuDat(e.datum), e.agVerw?'Unterschrift AG verweigert':'unterschrieben AG + AN', e.sigAnName].filter(Boolean).join(' · '),
+      knopf:e.pdf?'&#128196; PDF':'', fn:e.pdf?('dokuEwPdf('+escapeHtml(JSON.stringify(e.pdf))+')'):''});
+    else vorb.push({ic:'&#128203;', t, tag:'ohne Unterschrift', m:'vorbereitet '+dokuDat(e.erstelltAm)+(e.erstelltVon?(' von '+e.erstelltVon):''), knopf:'Vervollständigen', fn:'abnEdit('+escapeHtml(JSON.stringify(e.id))+')'});
+  });
   // Entwürfe der Einweisungs-App
   const EWT={geraete:'Geräte-Einweisung', allgemein:'Grundlagen-Einweisung', schluessel:'Schlüsselübergabe'};
   ew.entwuerfe.forEach(e=>vorb.push({ic:e.typ==='schluessel'?'&#128273;':'&#128203;', t:(EWT[e.typ]||'Einweisung')+(e.titel?(' – '+e.titel):''), tag:'ohne Unterschrift',
@@ -3501,7 +3512,8 @@ function dokuNeuMenu(btn){
     z('&#128273;','Schlüsselübergabe','Schlüssel eintragen, zwischenspeichern','openSchluesselprotokoll()')+
     z('&#128295;','Servicebericht','Kunde, Auftrag, Material – „Speichern" ohne PDF','svcPick(0)')+
     z('&#128167;','Dichtigkeitsprotokoll','Umfang wählen, „Speichern" ohne PDF','openDichtDialog()')+
-    z('&#128211;','Bautagebuch','Tag wählen, „Speichern" ohne PDF','openBautagebuchDialog()');
+    z('&#128211;','Bautagebuch','Tag wählen, „Speichern" ohne PDF','openBautagebuchDialog()')+
+    z('&#128203;','Abnahme / Leistungsfeststellung','Umfang wählen, „Vor Ort ausfüllen" – zwischenspeichern','openAbnahme()');
   const r=btn.getBoundingClientRect();
   menu.style.maxWidth='300px'; menu.classList.add('open');
   menu.style.left=Math.max(8, Math.min(r.right+window.scrollX-300, window.innerWidth-308))+'px';
@@ -11571,11 +11583,12 @@ function abnGegenstandVorschlag(){
   return t;
 }
 // Offene Punkte im gewählten Umfang (nichts vorausgewählt)
-function abnOffenePunkte(){
+function abnOffenePunkte(A){
+  A=A||ABN;
   const r=[], ets=new Set();
   const raArt=x=>x.mangel?'Mangel (AG)':(x.best?'Bestellteil':'Restarbeit');
   abnPositionen().forEach(({sec, it})=>{
-    if(!ABN.sel.has(it.pos)) return; ets.add(sec);
+    if(!A.sel.has(it.pos)) return; ets.add(sec);
     const s=gs(it.pos), bez=(it.bez||'').trim();
     (s.restarbeiten||[]).forEach((x,i)=>{ if(x.done) return;
       r.push({k:'ra|'+it.pos+'|'+i, pos:it.pos, ziel:x.mangel?6:5, txt:((x.txt||'').trim()||bez), src:'Pos. '+it.pos+' · '+raArt(x)+(x.ersteller?(' · erfasst von '+x.ersteller):'')}); });
@@ -11647,9 +11660,10 @@ function abnRender(){
     '<div style="background:#332f2b;border:1px solid #4a423a;border-radius:9px;padding:2px 10px;font-size:13.5px;max-height:38vh;overflow:auto">'+opHtml+'</div>'+
     '<div style="font-size:11px;color:#a8a8a8;margin-top:5px">Angekreuzte Punkte lassen sich vor der Übernahme umformulieren. Alles andere bleibt intern.</div>'+
     '<label style="display:flex;align-items:center;gap:9px;margin-top:14px;font-size:13px;color:#ddd;cursor:pointer"><input type="checkbox" '+(ABN.io?'checked':'')+' onchange="ABN.io=this.checked" style="width:17px;height:17px;accent-color:#b8860b">„i. O." bei vollständigen Positionen vorankreuzen</label>'+
-    '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px">'+
+    '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:18px;flex-wrap:wrap">'+
       '<button type="button" onclick="abnClose()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:10px 16px;font-size:14px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
-      '<button type="button" onclick="abnErstellen()" style="background:#b8860b;border:none;color:#fff;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">📄 PDF erstellen</button>'+
+      '<button type="button" onclick="abnErstellen()" style="background:#3a3530;border:1px solid #895500;color:#fff;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer;font-family:inherit">📄 Leeres PDF zum Drucken</button>'+
+      '<button type="button" onclick="abnVorOrt()" style="background:#b8860b;border:none;color:#fff;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">✍ Vor Ort ausfüllen</button>'+
     '</div></div>';
   if(scroll) ov.firstElementChild.scrollTop=scroll;
 }
@@ -11743,18 +11757,18 @@ function abnTexte(va, art, st){
   if(art==='zustand') art1=[[ 'Gemeinsame Zustandsfeststellung', ' der unter 2 genannten Leistungen'+(va==='vob'?' (§ 4 Abs. 10 VOB/B)':'')+'. Eine Abnahme ist damit nicht verbunden.' ]];
   else if(art==='leistung') art1=[[ 'Gemeinsame Leistungsfeststellung', ' der unter 2 genannten Leistungen (Leistungsstand) als Grundlage der Abrechnung. Eine Abnahme ist damit nicht verbunden.' ]];
   else if(va==='vob') art1=[
-    [ 'Förmliche '+A, ' gemäß § 12 Abs. '+(teil?'2 und Abs. ':'')+'4 Nr. 1 VOB/B der unter 2 genannten'+(teil?', in sich abgeschlossenen':'')+' Leistungen.' ],
-    [ A+' in Abwesenheit des Auftraggebers', ' gemäß § 12 Abs. 4 Nr. 2 VOB/B. Termin vereinbart bzw. eingeladen am: ______________' ],
+    [ 'Förmliche '+A, ' gemäß § 12 Abs. '+(teil?'2 und Abs. ':'')+'4 Nr. 1 VOB/B der unter 2 genannten'+(teil?', in sich abgeschlossenen':'')+' Leistungen.', true ],
+    [ A+' in Abwesenheit des Auftraggebers', ' gemäß § 12 Abs. 4 Nr. 2 VOB/B. Termin vereinbart bzw. eingeladen am: ______________', true ],
     [ 'Gemeinsame Zustandsfeststellung', ', die '+A+' wird nicht erteilt. Gründe des Auftraggebers: ______________________________' ] ];
   else if(va==='bgb') art1=[
-    [ A, teil?' der unter 2 genannten Leistungen gemäß Vereinbarung der Vertragsparteien (§ 640 BGB).':' der unter 2 genannten Leistungen gemäß § 640 Abs. 1 BGB.' ],
+    [ A, teil?' der unter 2 genannten Leistungen gemäß Vereinbarung der Vertragsparteien (§ 640 BGB).':' der unter 2 genannten Leistungen gemäß § 640 Abs. 1 BGB.', true ],
     [ A+' verweigert', '. Angegebene Mängel/Gründe des Auftraggebers: ______________________________' ],
     [ 'Auftraggeber nicht erschienen', ', Zustandsfeststellung gemäß § 650g BGB. Termin vereinbart bzw. eingeladen am: ______________' ] ];
   else if(kauf) art1=[
-    [ teil?'Teilübergabe':'Übergabe', ' der unter 2 genannten Lieferungen und Leistungen.' ],
+    [ teil?'Teilübergabe':'Übergabe', ' der unter 2 genannten Lieferungen und Leistungen.', true ],
     [ 'Übernahme verweigert', '. Gründe: ______________________________' ] ];
   else art1=[
-    [ A, ' der unter 2 genannten Leistungen gemäß den Bestimmungen des Vertrags'+(va==='vol'?' (VOL/B)':'')+'.' ],
+    [ A, ' der unter 2 genannten Leistungen gemäß den Bestimmungen des Vertrags'+(va==='vol'?' (VOL/B)':'')+'.', true ],
     [ A+' nicht erteilt', '. Gründe des Auftraggebers: ______________________________' ] ];
   const vorbehalt = (art==='zustand'||art==='leistung') ? 'Anmerkungen des Auftraggebers'
     : va==='vob' ? 'Vorbehalte des Auftraggebers (bekannte Mängel, Vertragsstrafe, § 12 Abs. 4 Nr. 1 VOB/B)'
@@ -11790,20 +11804,203 @@ async function abnErstellen(){
   }catch(e){ hideLoader(); if(win) try{ win.close(); }catch(_){} console.error(e); alert('Protokoll fehlgeschlagen: '+((e&&e.message)||e)); }
 }
 
-async function abnBuildPdf(A){
+
+// ── Vor Ort ausfüllen, unterschreiben, ablegen (v164) ─────────────────────────
+// Gespeichert in ABNAHME_<pid>.json (Warteschlange wie Bautagebuch/Dichtigkeit),
+// Schlüssel `id` (eindeutig je Gerät/Zeit) – die laufende Nr. ist nur Anzeige.
+// Nach „Abschließen" liegt das PDF in <Baustelle>/_Abnahme und der Eintrag ist
+// nicht mehr änderbar.
+let ABN_LISTE=[], ABN_ED=null;
+async function loadAbnahmen(pid){ ABN_LISTE=await jsonLaden('abn', pid); }
+function abnArtLbl(art, va){
+  if(va==='kauf' && art==='abnahme') return 'Übergabe';
+  if(va==='kauf' && art==='teil') return 'Teilübergabe';
+  return ({abnahme:'Abnahme',teil:'Teilabnahme',zustand:'Zustandsfeststellung',leistung:'Leistungsfeststellung'})[art]||'Protokoll';
+}
+function abnNeueNr(){ return ABN_LISTE.reduce((m,e)=>Math.max(m,e.nr||0),0)+1; }
+// Aus dem Dialog einen Entwurf anlegen und das Formular öffnen
+async function abnVorOrt(){
+  if(!ABN) return;
+  if(!ABN.art){ alert('Bitte die Art wählen (Abnahme, Teilabnahme, Zustands- oder Leistungsfeststellung).'); return; }
+  if(!ABN.sel.size){ alert('Bitte mindestens eine Position auswählen.'); return; }
+  const st=projStamm(), gew=abnOffenePunkte().filter(x=>ABN.offen[x.k]).map(x=>Object.assign({},x,{txt:(ABN.offen[x.k].txt||'').trim()||x.txt}));
+  const maengel=gew.filter(x=>x.ziel===6), rest=gew.filter(x=>x.ziel===5);
+  const io={}, bem={};
+  abnPositionen().forEach(({it})=>{ if(!ABN.sel.has(it.pos)) return;
+    const b=[]; rest.filter(x=>x.pos===it.pos).forEach(x=>b.push('Restleistung: '+x.txt));
+    maengel.forEach((x,i)=>{ if(x.pos===it.pos) b.push('Mangel Nr. '+(i+1)+': '+x.txt); });
+    if(b.length) bem[it.pos]=b.join('\n');
+    if(ABN.io && !b.length && ist(it.pos,'all')==='done') io[it.pos]=true; });
+  const e={ id:'A'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), nr:abnNeueNr(), art:ABN.art, va:st.vertragsart,
+    sel:[...ABN.sel], gegenstand:ABN.gegenstand, ort:ABN.ort, datum:ABN.datum, von:'', bis:'', fotoDoku:ABN.fotoDoku!==false,
+    art1:-1, art1Zusatz:'', teilnehmer:[], io, bem,
+    rest:rest.map(x=>({pos:x.pos, txt:x.txt, bis:''})), maengel:maengel.map(x=>({pos:x.pos, txt:x.txt, frist:''})),
+    vorbehalt:'', einwand:'', sigAg:'', sigAgName:'', agVerw:false, verwGrund:'', verwZeit:'', sigAn:'', sigAnName:USER||'',
+    erstelltAm:new Date().toISOString(), erstelltVon:USER||'', abgeschlossen:false };
+  ABN_LISTE.push(e);
+  try{ await jsonSpeichern('abn', e); }catch(err){ console.warn(err); }
+  abnClose();
+  abnEdit(e.id);
+  if(ACT==='__doku'){ dokuRender(); updDokuTab(); }
+}
+function abnEdit(id){
+  const e=ABN_LISTE.find(x=>x.id===id); if(!e) return;
+  if(e.abgeschlossen){ if(e.pdf) dokuEwPdf(e.pdf); return; }
+  ABN_ED=JSON.parse(JSON.stringify(e));
+  abnEdRender();
+}
+function abnEdClose(){ const o=document.getElementById('abnEdOv'); if(o) o.remove(); ABN_ED=null; }
+// Nur übernehmen, was wirklich auf dem Feld steht. Ein leeres Feld überschreibt
+// eine gespeicherte Unterschrift NICHT – das Bild lädt asynchron nach, und bis
+// dahin wäre das Feld leer. Gelöscht wird nur über abnSigLoeschen.
+function abnEdSigMerken(){
+  if(!ABN_ED) return;
+  const a=btbSigData('abnSigAg'), n=btbSigData('abnSigAn');
+  if(a) ABN_ED.sigAg=a; if(n) ABN_ED.sigAn=n;
+}
+function abnSigLoeschen(id){
+  const c=document.getElementById(id); if(!c) return;
+  if(!confirm('Unterschrift löschen?\n\nSie muss danach neu geleistet werden.')) return;
+  btbSigClear(id,false);
+  if(id==='abnSigAg') ABN_ED.sigAg=''; else ABN_ED.sigAn='';
+}
+function abnEdNeu(){ abnEdSigMerken(); const o=document.getElementById('abnEdOv'); const sc=o&&o.firstElementChild?o.firstElementChild.scrollTop:0; abnEdRender(); const o2=document.getElementById('abnEdOv'); if(o2&&o2.firstElementChild) o2.firstElementChild.scrollTop=sc; }
+// Kleine Setter für die Eingabefelder (ohne Neuzeichnen – sonst springt der Fokus)
+function abnEdSet(k,v){ if(ABN_ED) ABN_ED[k]=v; }
+function abnEdListe(liste,i,k,v){ if(ABN_ED&&ABN_ED[liste]&&ABN_ED[liste][i]) ABN_ED[liste][i][k]=v; }
+function abnEdBem(pos,v){ if(ABN_ED){ if(v) ABN_ED.bem[pos]=v; else delete ABN_ED.bem[pos]; } }
+function abnEdIO(pos){ ABN_ED.io[pos]=!ABN_ED.io[pos]; if(!ABN_ED.io[pos]) delete ABN_ED.io[pos]; abnEdNeu(); }
+function abnEdAlleIO(){ ABN_ED.sel.forEach(p=>{ if(!ABN_ED.bem[p]) ABN_ED.io[p]=true; }); abnEdNeu(); }
+function abnEdZeile(liste, neu){ ABN_ED[liste].push(neu); abnEdNeu(); }
+function abnEdWeg(liste,i){ ABN_ED[liste].splice(i,1); abnEdNeu(); }
+function abnEdRender(){
+  const E=ABN_ED; if(!E) return;
+  const st=projStamm(), T=abnTexte(E.va, E.art, st);
+  let ov=document.getElementById('abnEdOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='abnEdOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:10px;'; document.body.appendChild(ov); }
+  const fld='width:100%;box-sizing:border-box;padding:8px 10px;border-radius:8px;border:1px solid #6a5433;background:#3a3530;color:#fff;font-size:15px;font-family:inherit';
+  const sec=t=>'<div style="font-size:12px;color:#d7c1ae;font-weight:700;letter-spacing:.4px;margin:18px 0 7px;text-transform:uppercase">'+t+'</div>';
+  const add=(t,fn)=>'<button type="button" onclick="'+fn+'" style="background:none;border:none;color:#d7c1ae;font-family:inherit;font-size:13px;cursor:pointer;padding:4px 0">＋ '+t+'</button>';
+  const weg=(liste,i)=>'<button type="button" onclick="abnEdWeg(\''+liste+'\','+i+')" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:0 10px;font-family:inherit;cursor:pointer;flex:0 0 auto">✕</button>';
+  const v=s=>escapeHtml(s==null?'':String(s));
+  const q=s=>String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  // Positionen in Reihenfolge der Stückliste mit Bereichszeilen
+  let posHtml='';
+  abnGruppen().forEach(g=>g.subs.forEach(s=>{ const its=s.items.filter(it=>E.sel.includes(it.pos)); if(!its.length) return;
+    posHtml+='<div style="font-size:12px;color:#a8a8a8;font-weight:700;margin:10px 0 2px">'+v((g.sec.label||g.sec.pos)+' · '+(s.sub.bez||s.sub.pos))+'</div>';
+    its.forEach(it=>{ const an=!!E.io[it.pos];
+      posHtml+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0 3px;border-top:1px solid #3d3832">'+
+        '<span style="color:#a8a8a8;font-size:12px;min-width:54px">'+v(it.pos)+'</span><span style="flex:1;font-size:14px">'+v((it.bez||'').trim())+'</span>'+
+        '<button type="button" onclick="abnEdIO(\''+q(it.pos)+'\')" style="border-radius:13px;padding:4px 11px;font-size:13px;font-family:inherit;cursor:pointer;'+(an?'background:#3a7a3a;border:1px solid #3a7a3a;color:#fff;font-weight:700':'background:none;border:1px solid #6a5433;color:#ddd')+'">'+(an?'✓ ':'')+v(T.ioKopf)+'</button></div>'+
+        '<input type="text" value="'+v(E.bem[it.pos]||'')+'" oninput="abnEdBem(\''+q(it.pos)+'\',this.value)" placeholder="Bemerkung" style="'+fld+';font-size:13px;padding:5px 8px;margin:0 0 4px;'+(E.bem[it.pos]?'color:#e0b070':'')+'">'; }); }));
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:18px;max-width:640px;width:100%;max-height:96vh;overflow:auto;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:17px;font-weight:700">✍ '+v(abnArtLbl(E.art,E.va))+' Nr. '+E.nr+'</div>'+
+    '<div style="font-size:12px;color:#a8a8a8">'+v([E.ort, curProjName(), vertragsartLbl(E.va)].filter(Boolean).join(' · '))+'</div>'+
+    sec('1 Art der Feststellung')+T.art1.map((a,i)=>{ const on=E.art1===i;
+      return '<div onclick="abnEdSigMerken();ABN_ED.art1='+i+';abnEdNeu()" style="display:flex;gap:9px;align-items:flex-start;padding:8px 10px;border:1px solid '+(on?'#b8860b':'#4a423a')+';border-radius:9px;margin-bottom:6px;cursor:pointer;font-size:13.5px;'+(on?'background:#3a3122':'')+'">'+
+        '<span style="width:16px;height:16px;border-radius:50%;flex:0 0 auto;margin-top:1px;border:2px solid '+(on?'#b8860b':'#888')+';'+(on?'background:radial-gradient(#b8860b 45%,transparent 50%)':'')+'"></span><span>'+v((a[0]+a[1]).replace(/\s*_{6,}/g,' …'))+'</span></div>'; }).join('')+
+    (E.art1>=0 && /_{6,}/.test(T.art1[E.art1][1]) ? '<input type="text" value="'+v(E.art1Zusatz)+'" oninput="abnEdSet(\'art1Zusatz\',this.value)" placeholder="'+v(/eingeladen/.test(T.art1[E.art1][1])?'Termin vereinbart bzw. eingeladen am …':'Gründe …')+'" style="'+fld+'">' : '')+
+    sec('Datum / Uhrzeit')+'<div style="display:flex;gap:8px"><input type="date" value="'+v(E.datum)+'" onchange="abnEdSet(\'datum\',this.value)" style="'+fld+'">'+
+      '<input type="time" value="'+v(E.von)+'" onchange="abnEdSet(\'von\',this.value)" style="'+fld+'"><input type="time" value="'+v(E.bis)+'" onchange="abnEdSet(\'bis\',this.value)" style="'+fld+'"></div>'+
+    sec('3 Teilnehmer')+E.teilnehmer.map((t,i)=>'<div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" value="'+v(t.name)+'" oninput="abnEdListe(\'teilnehmer\','+i+',\'name\',this.value)" placeholder="Name" style="'+fld+'">'+
+      '<input type="text" value="'+v(t.firma)+'" oninput="abnEdListe(\'teilnehmer\','+i+',\'firma\',this.value)" placeholder="Firma / Funktion" style="'+fld+'">'+weg('teilnehmer',i)+'</div>').join('')+
+      add('Teilnehmer',"abnEdZeile('teilnehmer',{name:'',firma:''})")+
+    sec('4 Leistungen und Zustand')+posHtml+
+      '<button type="button" onclick="abnEdAlleIO()" style="background:none;border:none;color:#d7c1ae;font-family:inherit;font-size:13px;cursor:pointer;padding:6px 0">Alle ohne Bemerkung als „'+v(T.ioKopf)+'" markieren</button>'+
+    sec('5 Restleistungen')+E.rest.map((r,i)=>'<div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" value="'+v(r.pos)+'" oninput="abnEdListe(\'rest\','+i+',\'pos\',this.value)" placeholder="Pos." style="'+fld+';flex:0 0 76px">'+
+      '<input type="text" value="'+v(r.txt)+'" oninput="abnEdListe(\'rest\','+i+',\'txt\',this.value)" placeholder="Restleistung" style="'+fld+'">'+
+      '<input type="date" value="'+v(r.bis)+'" onchange="abnEdListe(\'rest\','+i+',\'bis\',this.value)" title="erledigt bis" style="'+fld+';flex:0 0 140px">'+weg('rest',i)+'</div>').join('')+
+      add('Restleistung',"abnEdZeile('rest',{pos:'',txt:'',bis:''})")+
+    sec('6 Mängel')+E.maengel.map((r,i)=>'<div style="display:flex;gap:6px;margin-bottom:6px"><input type="text" value="'+v(r.pos)+'" oninput="abnEdListe(\'maengel\','+i+',\'pos\',this.value)" placeholder="Pos." style="'+fld+';flex:0 0 76px">'+
+      '<input type="text" value="'+v(r.txt)+'" oninput="abnEdListe(\'maengel\','+i+',\'txt\',this.value)" placeholder="Mangel" style="'+fld+'">'+
+      '<input type="date" value="'+v(r.frist)+'" onchange="abnEdListe(\'maengel\','+i+',\'frist\',this.value)" title="Frist" style="'+fld+';flex:0 0 140px">'+weg('maengel',i)+'</div>').join('')+
+      add('Mangel',"abnEdZeile('maengel',{pos:'',txt:'',frist:''})")+
+    sec(E.art==='zustand'||E.art==='leistung'?'7 Anmerkungen und Einwendungen':'7 Vorbehalte und Einwendungen')+
+      '<textarea rows="3" oninput="abnEdSet(\'vorbehalt\',this.value)" placeholder="'+v(T.vorbehalt)+'" style="'+fld+';resize:vertical;font-size:14px;margin-bottom:6px">'+v(E.vorbehalt)+'</textarea>'+
+      '<textarea rows="2" oninput="abnEdSet(\'einwand\',this.value)" placeholder="Einwendungen des Auftragnehmers" style="'+fld+';resize:vertical;font-size:14px">'+v(E.einwand)+'</textarea>'+
+    sec('9 Unterschriften')+
+      '<div style="font-size:12px;color:#a8a8a8;margin-bottom:4px">Für den Auftraggeber</div>'+
+      '<input type="text" value="'+v(E.sigAgName)+'" oninput="abnEdSet(\'sigAgName\',this.value)" placeholder="Name in Druckbuchstaben" style="'+fld+';margin-bottom:6px">'+
+      (E.agVerw ? '<div style="display:flex;gap:6px"><input type="text" value="'+v(E.verwGrund)+'" oninput="abnEdSet(\'verwGrund\',this.value)" placeholder="Grund der Verweigerung" style="'+fld+'">'+
+          '<input type="time" value="'+v(E.verwZeit)+'" onchange="abnEdSet(\'verwZeit\',this.value)" style="'+fld+';flex:0 0 120px"></div>'
+        : '<canvas id="abnSigAg" width="900" height="260" style="width:100%;height:120px;background:#fff;border-radius:8px;touch-action:none"></canvas>'+
+          '<button type="button" onclick="abnSigLoeschen(\'abnSigAg\')" style="background:none;border:none;color:#a8a8a8;font-family:inherit;font-size:12px;cursor:pointer">Unterschrift löschen</button>')+
+      '<label style="display:flex;gap:8px;align-items:center;font-size:13px;color:#ddd;margin-top:4px;cursor:pointer"><input type="checkbox" '+(E.agVerw?'checked':'')+' onchange="abnEdSigMerken();ABN_ED.agVerw=this.checked;if(this.checked&&!ABN_ED.verwZeit)ABN_ED.verwZeit=new Date().toTimeString().slice(0,5);abnEdNeu()" style="width:17px;height:17px;accent-color:#b8860b">Unterschrift verweigert</label>'+
+      '<div style="font-size:12px;color:#a8a8a8;margin:14px 0 4px">Für den Auftragnehmer kpc GmbH</div>'+
+      '<input type="text" value="'+v(E.sigAnName)+'" oninput="abnEdSet(\'sigAnName\',this.value)" placeholder="Name in Druckbuchstaben" style="'+fld+';margin-bottom:6px">'+
+      '<canvas id="abnSigAn" width="900" height="260" style="width:100%;height:120px;background:#fff;border-radius:8px;touch-action:none"></canvas>'+
+      '<button type="button" onclick="abnSigLoeschen(\'abnSigAn\')" style="background:none;border:none;color:#a8a8a8;font-family:inherit;font-size:12px;cursor:pointer">Unterschrift löschen</button>'+
+    '<div style="display:flex;gap:8px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">'+
+      '<button type="button" onclick="abnEdAbbrechen()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer;font-family:inherit">Schließen</button>'+
+      '<button type="button" onclick="abnEdSpeichern(true)" style="background:#3a3530;border:1px solid #895500;color:#fff;border-radius:8px;padding:10px 14px;font-size:14px;cursor:pointer;font-family:inherit">Zwischenspeichern</button>'+
+      '<button type="button" onclick="abnEdAbschliessen()" style="background:#b8860b;border:none;color:#fff;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">✓ Abschließen &amp; PDF</button>'+
+    '</div><div style="font-size:11px;color:#a8a8a8;margin-top:8px;text-align:right">Abschließen legt das PDF in SharePoint (_Abnahme) und im Reiter Dokumente ab. Danach ist das Protokoll nicht mehr änderbar.</div></div>';
+  ['abnSigAg','abnSigAn'].forEach(id=>{ const c=document.getElementById(id); if(!c) return; btbSigSetup(c);
+    const d=id==='abnSigAg'?E.sigAg:E.sigAn; if(d) btbSigDrawImage(id,d); });
+}
+async function abnEdSpeichern(meldung){
+  if(!ABN_ED) return;
+  abnEdSigMerken();
+  ABN_ED.geaendertAm=new Date().toISOString(); ABN_ED.geaendertVon=USER||'';
+  const i=ABN_LISTE.findIndex(x=>x.id===ABN_ED.id);
+  const kopie=JSON.parse(JSON.stringify(ABN_ED));
+  if(i>=0) ABN_LISTE[i]=kopie; else ABN_LISTE.push(kopie);
+  try{ await jsonSpeichern('abn', kopie); }catch(e){ console.warn(e); }
+  if(meldung) showToast('Zwischengespeichert'+(navigator.onLine?'':' – wird mit Netz übertragen'));
+  if(ACT==='__doku'){ dokuRender(); updDokuTab(); }
+}
+function abnEdAbbrechen(){
+  abnEdSigMerken();
+  const alt=ABN_LISTE.find(x=>x.id===(ABN_ED&&ABN_ED.id));
+  const geaendert = alt && JSON.stringify(Object.assign({},alt,{geaendertAm:0,geaendertVon:0}))!==JSON.stringify(Object.assign({},ABN_ED,{geaendertAm:0,geaendertVon:0}));
+  if(geaendert && !confirm('Änderungen verwerfen?\n\n„Abbrechen" und dann „Zwischenspeichern", um sie zu behalten.')) return;
+  abnEdClose();
+}
+async function abnEdAbschliessen(){
+  const E=ABN_ED; if(!E) return;
+  abnEdSigMerken();
+  const T=abnTexte(E.va, E.art, projStamm());
+  const fehlt=[];
+  if(E.art1<0) fehlt.push('Art der Feststellung (Abschnitt 1) auswählen');
+  if(!E.sigAn) fehlt.push('Unterschrift Auftragnehmer');
+  if(!(E.sigAnName||'').trim()) fehlt.push('Name Auftragnehmer');
+  if(E.agVerw){ if(!(E.verwGrund||'').trim()) fehlt.push('Grund der Verweigerung'); }
+  else { if(!E.sigAg) fehlt.push('Unterschrift Auftraggeber (oder „Unterschrift verweigert" ankreuzen)'); if(!(E.sigAgName||'').trim()) fehlt.push('Name Auftraggeber'); }
+  if(fehlt.length){ alert('Bitte noch ergänzen:\n\n• '+fehlt.join('\n• ')); return; }
+  if(!confirm(abnArtLbl(E.art,E.va)+' Nr. '+E.nr+' abschließen?\n\nGewählt: '+(T.art1[E.art1][0])+'\n\nDanach ist das Protokoll nicht mehr änderbar.')) return;
+  const win=window.open('','_blank');   // synchron im Klick (§9)
+  if(win){ try{ win.document.write('<title>Protokoll</title><body style="font-family:Arial,sans-serif;padding:24px;color:#666">PDF wird erstellt …</body>'); }catch(e){} }
+  try{
+    showLoader('Protokoll wird erstellt …');
+    const A={art:E.art, sel:new Set(E.sel), gegenstand:E.gegenstand, ort:E.ort, datum:E.datum, io:false, offen:{}, fotoDoku:E.fotoDoku};
+    const blob=await abnBuildPdf(A, E);
+    const fname=safeName(curProjName())+'/_Abnahme/'+vaName([vaDatum(E.datum), abnArtLbl(E.art,E.va).replace(/ü/g,'ue').replace(/ä/g,'ae'), 'Nr-'+String(E.nr).padStart(2,'0')])+'.pdf';
+    let hoch=true;
+    try{ await queueUpload(fname, blob, 'application/pdf', ''); }catch(e){ hoch=false; console.warn('Abnahme-Ablage:', e&&e.message); }
+    E.pdf=fname; E.pdfAm=new Date().toISOString(); E.abgeschlossen=true;
+    await abnEdSpeichern(false);
+    hideLoader();
+    const url=URL.createObjectURL(blob);
+    if(win) win.location=url; else window.open(url,'_blank');
+    abnEdClose();
+    showToast(hoch?(abnArtLbl(E.art,E.va)+' Nr. '+E.nr+' abgeschlossen & in _Abnahme abgelegt'):'Abgeschlossen – Ablage fehlgeschlagen (offline?)', hoch?undefined:{bg:'#8b6d22'});
+  }catch(e){ hideLoader(); if(win) try{ win.close(); }catch(_){} console.error(e); alert('Protokoll fehlgeschlagen: '+((e&&e.message)||e)); }
+}
+
+async function abnBuildPdf(A, F){
   if(!window.jspdf) throw new Error('PDF-Bibliothek nicht geladen (Seite neu laden)');
   const {jsPDF}=window.jspdf;
   const doc=new jsPDF({orientation:'p',unit:'mm',format:'a4'});
   const M=16, W=210, R=W-M, PH=297;
   const copper=[137,86,0], dark=[43,43,43], grey=[120,120,120], braun=[107,76,53], hell=[243,236,228], linie=[227,201,168];
-  const st=projStamm(), T=abnTexte(st.vertragsart, A.art, st);
+  const st=projStamm(), T=abnTexte(F?F.va:st.vertragsart, A.art, st);
   const tc=c=>doc.setTextColor(c[0],c[1],c[2]), dc=c=>doc.setDrawColor(c[0],c[1],c[2]), fc=c=>doc.setFillColor(c[0],c[1],c[2]);
   let FF='helvetica';
   try{ if(typeof BTB_FONT_B64!=='undefined' && BTB_FONT_B64){ doc.addFileToVFS('RC.ttf',BTB_FONT_B64); doc.addFont('RC.ttf','RobotoCondensed','normal'); FF='RobotoCondensed'; } }catch(e){ FF='helvetica'; }
   const bold=()=>doc.setFont(FF, FF==='helvetica'?'bold':'normal'), reg=()=>doc.setFont(FF,'normal');
   const logo=await btbSvgToPng(repLogo(),300);
   const datumDE=fmDatDE(A.datum);
-  const fussText='kpc GmbH · '+curProjName()+' · '+T.titel+' · '+datumDE;
+  const fussText='kpc GmbH · '+curProjName()+' · '+T.titel+(F?(' Nr. '+F.nr):'')+' · '+datumDE;
   let y=M;
   const kopfLogo=()=>{ if(logo){ const lw=22, lh=lw*logo.h/logo.w; try{ doc.addImage(logo.png,'PNG',R-lw,y,lw,lh); }catch(e){} y+=lh+4; } };
   const neueSeite=()=>{ doc.addPage(); y=M; kopfLogo(); };
@@ -11833,13 +12030,13 @@ async function abnBuildPdf(A){
 
   // ── Kopf ──
   kopfLogo();
-  bold(); doc.setFontSize(18); tc(dark); doc.text(T.titel,M,y+2); y+=7;
+  bold(); doc.setFontSize(18); tc(dark); doc.text(T.titel+(F?(' Nr. '+F.nr):''),M,y+2); y+=7;
   reg(); doc.setFontSize(11); tc(grey);
   const unter=[A.ort, curProjName()].filter(Boolean).join(' · '); if(unter){ doc.text(doc.splitTextToSize(unter,R-M)[0],M,y); y+=6; }
   y+=2;
   const vtxt=[st.auftragVom?('Auftrag vom '+fmDatDE(st.auftragVom)):'', st.los].filter(Boolean).join(', ');
   const kv=[['Bauvorhaben',[st.objekt||curProjName(), st.adresse].filter(Boolean).join(', ')],['Auftraggeber',st.auftraggeber||'______________________________'],
-    ['Auftragnehmer',KPC_ANSCHRIFT],['Vertrag',(vtxt?vtxt+' ':'')+'('+vertragsartLbl(st.vertragsart)+')'],['Datum / Uhrzeit',datumDE+', ______ Uhr bis ______ Uhr'],['Ort',A.ort||'______________________________']];
+    ['Auftragnehmer',KPC_ANSCHRIFT],['Vertrag',(vtxt?vtxt+' ':'')+'('+vertragsartLbl(F?F.va:st.vertragsart)+')'],['Datum / Uhrzeit',datumDE+', '+(F&&F.von?F.von:'______')+' Uhr bis '+(F&&F.bis?F.bis:'______')+' Uhr'],['Ort',A.ort||'______________________________']];
   kv.forEach(([k,v])=>{ bold(); doc.setFontSize(9.5); tc(dark); doc.text(k,M,y+4); reg(); const l=doc.splitTextToSize(v,R-M-42); doc.text(l,M+42,y+4);
     const h=Math.max(6.5,l.length*4.3+2.4); dc(linie); doc.setLineWidth(0.3); doc.line(M,y+h,R,y+h); y+=h; });
   y+=2;
@@ -11847,8 +12044,11 @@ async function abnBuildPdf(A){
   // ── 1 Art ──
   h2('1 Art der Feststellung');
   y+=1;
-  T.art1.forEach(([b,t])=>{ platz(10); reg(); doc.setFontSize(9.5); tc(dark);
-    const zl=doc.splitTextToSize(b+t, R-M-6); box(M,y,false);
+  T.art1.forEach(([b,t],ai)=>{ platz(10); reg(); doc.setFontSize(9.5); tc(dark);
+    const an=!!(F && F.art1===ai);
+    // Ausgefüllt: Platzhalter der gewählten Zeile durch den Eintrag ersetzen
+    if(an && (F.art1Zusatz||'').trim()) t=t.replace(/_{6,}/, F.art1Zusatz.trim());
+    const zl=doc.splitTextToSize(b+t, R-M-6); box(M,y,an);
     zl.forEach(ln=>{ doc.text(ln,M+5.5,y); y+=4.4; }); y+=1.6; });
 
   // ── 2 Gegenstand ──
@@ -11856,12 +12056,14 @@ async function abnBuildPdf(A){
 
   // ── 3 Teilnehmer ──
   h2('3 Teilnehmer');
-  tabelle([{t:'Name',w:62},{t:'Firma / Funktion',w:62},{t:'Unterschrift',w:R-M-124}], [[],[],[],[],[]], 9);
+  if(F){ const tn=(F.teilnehmer||[]).filter(x=>(x.name||'').trim()||(x.firma||'').trim());
+    tabelle([{t:'Name',w:80},{t:'Firma / Funktion',w:R-M-80}], tn.length?tn.map(x=>[x.name||'',x.firma||'']):[['—','']], 7); }
+  else tabelle([{t:'Name',w:62},{t:'Firma / Funktion',w:62},{t:'Unterschrift',w:R-M-124}], [[],[],[],[],[]], 9);
 
   // ── 4 Leistungen und Zustand ──
   h2('4 Leistungen und Zustand');
   absatz('Zustand: „'+T.ioKopf+'" ankreuzen oder Bemerkung eintragen.', 8.5); y+=1;
-  const gewaehlt=abnOffenePunkte().filter(x=>A.offen[x.k]).map(x=>Object.assign({},x,{txt:(A.offen[x.k].txt||'').trim()||x.txt}));
+  const gewaehlt=(F?[]:abnOffenePunkte(A)).filter(x=>A.offen[x.k]).map(x=>Object.assign({},x,{txt:(A.offen[x.k].txt||'').trim()||x.txt}));
   const maengel=gewaehlt.filter(x=>x.ziel===6), rest=gewaehlt.filter(x=>x.ziel===5);
   const zeilen=[];
   // Fotonummern in Protokollreihenfolge (v163)
@@ -11872,37 +12074,59 @@ async function abnBuildPdf(A){
     its.forEach(it=>{
       const bem=[]; rest.filter(x=>x.pos===it.pos).forEach(x=>bem.push('Restleistung: '+x.txt));
       maengel.forEach((x,i)=>{ if(x.pos===it.pos) bem.push('Mangel Nr. '+(i+1)+': '+x.txt); });
-      const io = A.io && !bem.length && ist(it.pos,'all')==='done';
-      const z=[it.pos, (it.menge!=null?it.menge:'')+' '+(it.einh||''), (it.bez||'').trim(), io, bem.join('\n'), (fotoNr[it.pos]||[]).join(', ')];
-      z.hl=[0,0,0,0,bem.length?1:0,0]; zeilen.push(z); });
+      const io = F ? !!F.io[it.pos] : (A.io && !bem.length && ist(it.pos,'all')==='done');
+      const bemTxt = F ? (F.bem[it.pos]||'') : bem.join('\n');
+      const z=[it.pos, (it.menge!=null?it.menge:'')+' '+(it.einh||''), (it.bez||'').trim(), io, bemTxt, (fotoNr[it.pos]||[]).join(', ')];
+      z.hl=[0,0,0,0,bemTxt?1:0,0]; zeilen.push(z); });
   }));
   tabelle([{t:'Pos.',w:20},{t:'Menge',w:15},{t:'Bezeichnung',w:62},{t:T.ioKopf,w:12,align:'center',box:true},{t:'Bemerkung',w:51},{t:'Foto-Nr.',w:R-M-160}], zeilen, 6);
 
   // ── 5 Restleistungen ──
   h2('5 Restleistungen');
-  tabelle([{t:'Nr.',w:10},{t:'Restleistung',w:R-M-10-36},{t:'erledigt bis',w:36}],
+  if(F){ const r=(F.rest||[]).filter(x=>(x.txt||'').trim());
+    tabelle([{t:'Nr.',w:10},{t:'Restleistung',w:R-M-10-36},{t:'erledigt bis',w:36}], r.length? r.map((x,i)=>[String(i+1), (x.pos?('Pos. '+x.pos+' – '):'')+x.txt, x.bis?fmDatDE(x.bis):'']) : [['','keine','']], 6.5); }
+  else tabelle([{t:'Nr.',w:10},{t:'Restleistung',w:R-M-10-36},{t:'erledigt bis',w:36}],
     rest.map((x,i)=>[String(i+1), (x.pos?('Pos. '+x.pos+' – '):'')+x.txt, '']).concat([0,1].map(i=>[String(rest.length+i+1),'',''])), 6.5);
   // ── 6 Mängel ──
   h2('6 Mängel');
-  tabelle([{t:'Nr.',w:10},{t:'Pos.',w:20},{t:'Mangel',w:R-M-10-20-30},{t:'Frist',w:30}],
+  if(F){ const m=(F.maengel||[]).filter(x=>(x.txt||'').trim());
+    tabelle([{t:'Nr.',w:10},{t:'Pos.',w:20},{t:'Mangel',w:R-M-10-20-30},{t:'Frist',w:30}], m.length? m.map((x,i)=>[String(i+1), x.pos||'', x.txt, x.frist?fmDatDE(x.frist):'']) : [['','','keine','']], 7); }
+  else tabelle([{t:'Nr.',w:10},{t:'Pos.',w:20},{t:'Mangel',w:R-M-10-20-30},{t:'Frist',w:30}],
     maengel.map((x,i)=>[String(i+1), x.pos, x.txt, '']).concat([0,1,2].map(i=>[String(maengel.length+i+1),'','',''])), 7);
   // ── 7 Vorbehalte / Einwendungen ──
   h2(A.art==='zustand'||A.art==='leistung' ? '7 Anmerkungen und Einwendungen' : '7 Vorbehalte und Einwendungen');
-  [T.vorbehalt,'Einwendungen des Auftragnehmers'].forEach(t=>{ platz(30); fc(hell); doc.rect(M,y,R-M,6.5,'F'); dc(linie); doc.rect(M,y,R-M,6.5);
-    bold(); doc.setFontSize(8.5); tc(dark); doc.text(doc.splitTextToSize(t,R-M-3)[0],M+1.5,y+4.4); y+=6.5; doc.rect(M,y,R-M,20); y+=22; });
+  [[T.vorbehalt, F?F.vorbehalt:null],['Einwendungen des Auftragnehmers', F?F.einwand:null]].forEach(([t,inhalt])=>{ platz(30); fc(hell); doc.rect(M,y,R-M,6.5,'F'); dc(linie); doc.rect(M,y,R-M,6.5);
+    bold(); doc.setFontSize(8.5); tc(dark); doc.text(doc.splitTextToSize(t,R-M-3)[0],M+1.5,y+4.4); y+=6.5;
+    if(F){ reg(); doc.setFontSize(9); const l=doc.splitTextToSize((inhalt||'').trim()||'keine',R-M-4); const h=Math.max(8,l.length*4.3+3); platz(h); dc(linie); doc.rect(M,y,R-M,h); doc.text(l,M+2,y+4.6); y+=h+2; }
+    else { doc.rect(M,y,R-M,20); y+=22; } });
   // ── 8 Rechtsfolgen ──
   h2('8 '+T.rfTitel);
   T.rf.forEach(t=>{ absatz(t); y+=1; });
-  if(T.beginn){ platz(8); reg(); doc.setFontSize(9.5); doc.text('Beginn der Mängelhaftung (Tag der '+(st.vertragsart==='kauf'?'Übergabe':(A.art==='teil'?'Teilabnahme':'Abnahme'))+'): ____________________',M,y+2); y+=7; }
+  if(T.beginn){ platz(8); reg(); doc.setFontSize(9.5);
+    // Ausgefüllt: Datum nur, wenn tatsächlich eine (Teil-)Abnahme/Übergabe angekreuzt ist
+    const istAbn = F && T.art1[F.art1] && T.art1[F.art1][2];
+    doc.text('Beginn der Mängelhaftung (Tag der '+((F?F.va:st.vertragsart)==='kauf'?'Übergabe':(A.art==='teil'?'Teilabnahme':'Abnahme'))+'): '+(F?(istAbn?datumDE:'— (keine '+abnArtLbl(A.art,F.va)+' erteilt)'):'____________________'),M,y+2); y+=7; }
   // ── 9 Unterschriften ──
   if(y>PH-75) neueSeite();
   h2('9 Unterschriften');
   reg(); doc.setFontSize(9); tc(dark);
   const half=(R-M-10)/2;
   doc.text('Für den Auftraggeber',M,y); doc.text('Für den Auftragnehmer kpc GmbH',M+half+10,y); y+=22;
+  if(F){ // Unterschriften als Bild über der Linie
+    const sig=(d,x)=>{ if(!d) return; try{ doc.addImage(d,'PNG',x,y-19,Math.min(half,62),18); }catch(e){} };
+    if(!F.agVerw) sig(F.sigAg,M); sig(F.sigAn,M+half+10);
+    if(F.agVerw){ reg(); doc.setFontSize(10); tc(copper); doc.text('Unterschrift verweigert',M,y-4); }
+  }
   dc(dark); doc.setLineWidth(0.3); doc.line(M,y,M+half,y); doc.line(M+half+10,y,R,y); y+=4;
-  doc.setFontSize(8); tc(grey); doc.text('Ort, Datum, Name in Druckbuchstaben, Unterschrift',M,y); doc.text('Ort, Datum, Name in Druckbuchstaben, Unterschrift',M+half+10,y); y+=9;
+  doc.setFontSize(8); tc(grey);
+  if(F){ const ortDat=[A.ort, datumDE].filter(Boolean).join(', ');
+    doc.text(doc.splitTextToSize(ortDat+(F.sigAgName?(', '+F.sigAgName):''),half)[0],M,y); doc.text(doc.splitTextToSize(ortDat+(F.sigAnName?(', '+F.sigAnName):''),half)[0],M+half+10,y); y+=9;
+    doc.setFontSize(9.5); tc(dark);
+    if(F.agVerw){ doc.splitTextToSize('Unterschrift verweigert durch: '+(F.sigAgName||'—')+'  ·  Uhrzeit: '+(F.verwZeit||'—')+'  ·  Grund: '+(F.verwGrund||'—'),R-M).forEach(ln=>{ doc.text(ln,M,y); y+=4.6; }); y+=2.4; }
+  } else {
+  doc.text('Ort, Datum, Name in Druckbuchstaben, Unterschrift',M,y); doc.text('Ort, Datum, Name in Druckbuchstaben, Unterschrift',M+half+10,y); y+=9;
   doc.setFontSize(9.5); tc(dark); doc.text('Unterschrift verweigert durch: ___________________________  Uhrzeit: _________  Grund: ______________________',M,y); y+=7;
+  }
   absatz('Je eine Ausfertigung für Auftraggeber und Auftragnehmer. Wird die Unterschrift verweigert, stellt der Auftragnehmer den Zustand mit Fotodokumentation fest und übersendet dem Auftraggeber eine Abschrift.', 8.5);
 
   // ── Anlage: Fotodokumentation (v163) ──
@@ -12047,6 +12271,7 @@ async function selectProject(pid){
     loadBautagebuch(pid).catch(()=>{});   // Bautagebuch der Baustelle nachladen (nicht blockierend)
     loadDicht(pid).then(()=>updDichtTasks()).catch(()=>{});   // Dichtigkeitsprotokolle nachladen (nicht blockierend)
     loadService(pid).catch(()=>{});   // Serviceberichte nachladen (nicht blockierend)
+    loadAbnahmen(pid).then(()=>{ if(PID===pid){ updDokuTab(); if(ACT==='__doku') dokuRender(); } }).catch(()=>{});
     dokuLaden(pid).then(()=>{ if(PID===pid){ updDokuTab(); if(ACT==='__doku') dokuRender(); } }).catch(()=>{});
     aufgFlush();                      // wartende Aufgaben-Einträge nachreichen
     const proj = PROJECTS.find(p=>p.pid===pid);
