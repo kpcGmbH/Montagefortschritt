@@ -1488,7 +1488,12 @@ async function flushOutbox(){
         const cfg=JSON_ARTEN[posten[0].val.art];
         if(cfg) arr.sort(cfg.sort);
         await spUploadText(datei, JSON.stringify(arr));
-        for(const e of posten) await idbDel('outbox', e.key);
+        // Nur löschen, was seit dem Lesen nicht neu gespeichert wurde – sonst ginge
+        // ein Zwischenspeichern während des Sendens verloren (v165).
+        const neuer=[];
+        for(const e of posten){ const j=await idbGet('outbox', e.key); if(j && j.ts===e.val.ts) await idbDel('outbox', e.key); else if(j) neuer.push(j); }
+        neuer.forEach(j=>jsonUpsert(arr, j.schluessel, j.daten));
+        if(cfg) arr.sort(cfg.sort);
         await jsonCacheSet(datei, arr);
         // Zusammengeführten Stand übernehmen, wenn es die offene Baustelle ist –
         // sonst zeigte die App weiter nur den eigenen Ausschnitt.
@@ -2236,8 +2241,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 164;
+const APP_VERSION = 165;
 const CHANGELOG = [
+  { v:165, titel:'Abnahmeprotokoll: Korrekturen', punkte:[
+    'Bleibt der Auftraggeber trotz Einladung fern, heißt die Auswahl jetzt richtig „einseitige Zustandsfeststellung" – eine Abnahme in Abwesenheit des Auftraggebers gibt es nicht. Eine Unterschrift des Auftraggebers wird dann nicht verlangt.',
+    'Kann das PDF beim Abschließen nicht abgelegt werden, bleibt das Protokoll offen statt gesperrt. Gleich nummerierte Protokolle zweier Geräte überschreiben sich nicht mehr.',
+    'Zwischenspeichern während einer laufenden Übertragung geht nicht mehr verloren (gilt auch für Bautagebuch, Dichtigkeitsprotokoll und Servicebericht).' ]},
   { v:164, titel:'Abnahme vor Ort ausfüllen und unterschreiben', punkte:[
     'Im Protokoll „Abnahme / Leistungsfeststellung" gibt es jetzt <b>„✍ Vor Ort ausfüllen"</b>: Art der Feststellung, Uhrzeit, Teilnehmer, „i. O." je Position, Restleistungen und Mängel mit Frist, Vorbehalte – und die <b>Unterschriften</b> von Auftraggeber und kpc direkt auf dem Bildschirm (oder „Unterschrift verweigert" mit Grund).',
     '<b>Zwischenspeichern</b> geht jederzeit – so kann das Büro das Protokoll vorbereiten. <b>Abschließen</b> erzeugt das ausgefüllte PDF und legt es in SharePoint (_Abnahme) und im Reiter <b>Dokumente</b> ab.' ]},
@@ -11544,7 +11553,7 @@ function openAbnahme(){
   }
   const sel=new Set();
   abnPositionen().forEach(x=>{ if(abnGeliefert(x.it.pos)) sel.add(x.it.pos); });
-  ABN={art:'', sel, auf:new Set(), offen:{}, datum:new Date().toISOString().slice(0,10), ort:'', gegenstand:'', gegEigen:false, io:false};
+  ABN={art:'', sel, auf:new Set(), offen:{}, datum:localDay(new Date().toISOString()), ort:'', gegenstand:'', gegEigen:false, io:false};
   abnRender();
 }
 function abnClose(){ const o=document.getElementById('abnOv'); if(o) o.remove(); ABN=null; }
@@ -11623,7 +11632,7 @@ function abnRender(){
           '<span onclick="abnAuf(\''+k+'\')" style="color:#d7c1ae;font-weight:400;font-size:12px;padding:0 4px">'+(auf?'▾ zuklappen':'▸ Positionen')+'</span>'+
           '<span style="color:#a8a8a8;font-size:11px;font-weight:400;min-width:48px;text-align:right">'+ns+' von '+s.items.length+'</span></div>'+
           (auf? s.items.map(it=>{ const an=ABN.sel.has(it.pos), gel=abnGeliefert(it.pos);
-            return '<div style="'+zeile+';padding-left:40px;'+(an?'':'opacity:.6')+'" onclick="abnToggle(\'p\',\''+String(it.pos).replace(/'/g,"\\'")+'\')">'+abnCb(an?'an':'aus')+
+            return '<div style="'+zeile+';padding-left:40px;'+(an?'':'opacity:.6')+'" onclick="abnToggle(\'p\','+escapeHtml(JSON.stringify(it.pos))+')">'+abnCb(an?'an':'aus')+
               '<span style="color:#a8a8a8;font-size:11.5px;min-width:56px">'+escapeHtml(it.pos)+'</span><span style="flex:1">'+escapeHtml((it.bez||'').trim())+'</span>'+
               (gel?'':'<span style="font-size:10.5px;border-radius:8px;padding:1px 7px;background:#444;color:#ccc;white-space:nowrap">„Geliefert" nicht abgehakt</span>')+
               abnFotoKnopf(it.pos)+'</div>'; }).join('') : '');
@@ -11633,9 +11642,9 @@ function abnRender(){
   Object.keys(ABN.offen).forEach(k=>{ if(!op.some(x=>x.k===k)) delete ABN.offen[k]; });
   const opHtml=op.length? op.map(x=>{ const w=ABN.offen[x.k];
     return '<div style="display:flex;gap:8px;align-items:flex-start;padding:7px 0;border-bottom:1px solid #3d3832">'+
-      '<span onclick="abnOp(\''+x.k.replace(/'/g,"\\'")+'\')" style="cursor:pointer;margin-top:2px">'+abnCb(w?'an':'aus')+'</span>'+
-      '<div style="flex:1;min-width:0">'+(w?'<input type="text" value="'+escapeHtml(w.txt)+'" oninput="abnOpTxt(\''+x.k.replace(/'/g,"\\'")+'\',this.value)" style="'+fld+';font-size:13.5px;padding:5px 8px">'
-        :'<span onclick="abnOp(\''+x.k.replace(/'/g,"\\'")+'\')" style="cursor:pointer">'+escapeHtml(x.txt)+'</span>')+
+      '<span onclick="abnOp('+escapeHtml(JSON.stringify(x.k))+')" style="cursor:pointer;margin-top:2px">'+abnCb(w?'an':'aus')+'</span>'+
+      '<div style="flex:1;min-width:0">'+(w?'<input type="text" value="'+escapeHtml(w.txt)+'" oninput="abnOpTxt('+escapeHtml(JSON.stringify(x.k))+',this.value)" style="'+fld+';font-size:13.5px;padding:5px 8px">'
+        :'<span onclick="abnOp('+escapeHtml(JSON.stringify(x.k))+')" style="cursor:pointer">'+escapeHtml(x.txt)+'</span>')+
       '<span style="display:block;font-size:10.5px;color:#a8a8a8;margin-top:2px">'+escapeHtml(x.src)+' → Abschnitt '+(x.ziel===6?'6 Mängel':'5 Restleistungen')+'</span></div></div>'; }).join('')
     : '<div style="font-size:12px;color:#a8a8a8;padding:6px 0">Keine offenen Punkte im gewählten Umfang.</div>';
   const vtxt=[st.auftragVom?('Auftrag vom '+fmDatDE(st.auftragVom)):'', st.los].filter(Boolean).join(', ');
@@ -11674,10 +11683,10 @@ function abnFotosAn(pos){ const s=gs(pos); return (s.fotos||[]).map(f=>({fname:f
 function abnFotoGewaehlt(pos){ const da=new Set(abnFotosAn(pos).map(x=>x.fname)); return (gs(pos).abnfotos||[]).filter(f=>da.has(f)); }
 function abnFotoDatum(fname){ const d=protoTs(fname); return d? d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : ''; }
 function abnFotoKnopf(pos){
-  const alle=abnFotosAn(pos), n=abnFotoGewaehlt(pos).length, q=String(pos).replace(/'/g,"\\'");
+  const alle=abnFotosAn(pos), n=abnFotoGewaehlt(pos).length, q=escapeHtml(JSON.stringify(pos));
   const st='margin-left:6px;border-radius:14px;padding:3px 9px;font-size:12px;white-space:nowrap;font-family:inherit;cursor:pointer;';
   if(!alle.length) return '<span style="'+st+'border:1px solid #7a5a2a;color:#e0a060;cursor:default">kein Foto</span>';
-  return '<button type="button" onclick="event.stopPropagation();abnFotoWahl(\''+q+'\')" style="'+st+(n?'background:#b8860b;border:1px solid #b8860b;color:#fff;font-weight:700':'background:none;border:1px solid #6a5433;color:#ddd')+'">📷 '+(n||'wählen')+'</button>';
+  return '<button type="button" onclick="event.stopPropagation();abnFotoWahl('+q+')" style="'+st+(n?'background:#b8860b;border:1px solid #b8860b;color:#fff;font-weight:700':'background:none;border:1px solid #6a5433;color:#ddd')+'">📷 '+(n||'wählen')+'</button>';
 }
 // Fotos in Protokollreihenfolge (ausgewählte Positionen, Reihenfolge der Stückliste)
 function abnFotoListe(A){
@@ -11758,12 +11767,15 @@ function abnTexte(va, art, st){
   else if(art==='leistung') art1=[[ 'Gemeinsame Leistungsfeststellung', ' der unter 2 genannten Leistungen (Leistungsstand) als Grundlage der Abrechnung. Eine Abnahme ist damit nicht verbunden.' ]];
   else if(va==='vob') art1=[
     [ 'Förmliche '+A, ' gemäß § 12 Abs. '+(teil?'2 und Abs. ':'')+'4 Nr. 1 VOB/B der unter 2 genannten'+(teil?', in sich abgeschlossenen':'')+' Leistungen.', true ],
-    [ A+' in Abwesenheit des Auftraggebers', ' gemäß § 12 Abs. 4 Nr. 2 VOB/B. Termin vereinbart bzw. eingeladen am: ______________', true ],
+    // NICHT § 12 Abs. 4 Nr. 2 VOB/B – der regelt die Abwesenheit des AUFTRAGNEHMERS.
+    // Bleibt der Auftraggeber fern, gibt es keine Abnahme in Abwesenheit, sondern
+    // die einseitige Zustandsfeststellung (Prüfung 29.10.2026).
+    [ 'Auftraggeber trotz Einladung nicht erschienen', '; einseitige Zustandsfeststellung durch den Auftragnehmer (§ 650g Abs. 2 BGB). Eine '+A+' ist damit nicht erteilt. Termin vereinbart bzw. eingeladen am: ______________', false, 'abwesend' ],
     [ 'Gemeinsame Zustandsfeststellung', ', die '+A+' wird nicht erteilt. Gründe des Auftraggebers: ______________________________' ] ];
   else if(va==='bgb') art1=[
     [ A, teil?' der unter 2 genannten Leistungen gemäß Vereinbarung der Vertragsparteien (§ 640 BGB).':' der unter 2 genannten Leistungen gemäß § 640 Abs. 1 BGB.', true ],
     [ A+' verweigert', '. Angegebene Mängel/Gründe des Auftraggebers: ______________________________' ],
-    [ 'Auftraggeber nicht erschienen', ', Zustandsfeststellung gemäß § 650g BGB. Termin vereinbart bzw. eingeladen am: ______________' ] ];
+    [ 'Auftraggeber trotz Einladung nicht erschienen', '; einseitige Zustandsfeststellung durch den Auftragnehmer (§ 650g Abs. 2 BGB, bei Bauverträgen). Termin vereinbart bzw. eingeladen am: ______________', false, 'abwesend' ] ];
   else if(kauf) art1=[
     [ teil?'Teilübergabe':'Übergabe', ' der unter 2 genannten Lieferungen und Leistungen.', true ],
     [ 'Übernahme verweigert', '. Gründe: ______________________________' ] ];
@@ -11828,7 +11840,7 @@ async function abnVorOrt(){
   const io={}, bem={};
   abnPositionen().forEach(({it})=>{ if(!ABN.sel.has(it.pos)) return;
     const b=[]; rest.filter(x=>x.pos===it.pos).forEach(x=>b.push('Restleistung: '+x.txt));
-    maengel.forEach((x,i)=>{ if(x.pos===it.pos) b.push('Mangel Nr. '+(i+1)+': '+x.txt); });
+    maengel.forEach(x=>{ if(x.pos===it.pos) b.push('Mangel: '+x.txt); });   // ohne Nr.: Liste kann sich noch ändern
     if(b.length) bem[it.pos]=b.join('\n');
     if(ABN.io && !b.length && ist(it.pos,'all')==='done') io[it.pos]=true; });
   const e={ id:'A'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), nr:abnNeueNr(), art:ABN.art, va:st.vertragsart,
@@ -11883,7 +11895,7 @@ function abnEdRender(){
   const add=(t,fn)=>'<button type="button" onclick="'+fn+'" style="background:none;border:none;color:#d7c1ae;font-family:inherit;font-size:13px;cursor:pointer;padding:4px 0">＋ '+t+'</button>';
   const weg=(liste,i)=>'<button type="button" onclick="abnEdWeg(\''+liste+'\','+i+')" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:0 10px;font-family:inherit;cursor:pointer;flex:0 0 auto">✕</button>';
   const v=s=>escapeHtml(s==null?'':String(s));
-  const q=s=>String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+  const q=s=>escapeHtml(JSON.stringify(String(s)));   // als JS-Wert im Attribut
   // Positionen in Reihenfolge der Stückliste mit Bereichszeilen
   let posHtml='';
   abnGruppen().forEach(g=>g.subs.forEach(s=>{ const its=s.items.filter(it=>E.sel.includes(it.pos)); if(!its.length) return;
@@ -11891,8 +11903,8 @@ function abnEdRender(){
     its.forEach(it=>{ const an=!!E.io[it.pos];
       posHtml+='<div style="display:flex;align-items:center;gap:8px;padding:6px 0 3px;border-top:1px solid #3d3832">'+
         '<span style="color:#a8a8a8;font-size:12px;min-width:54px">'+v(it.pos)+'</span><span style="flex:1;font-size:14px">'+v((it.bez||'').trim())+'</span>'+
-        '<button type="button" onclick="abnEdIO(\''+q(it.pos)+'\')" style="border-radius:13px;padding:4px 11px;font-size:13px;font-family:inherit;cursor:pointer;'+(an?'background:#3a7a3a;border:1px solid #3a7a3a;color:#fff;font-weight:700':'background:none;border:1px solid #6a5433;color:#ddd')+'">'+(an?'✓ ':'')+v(T.ioKopf)+'</button></div>'+
-        '<input type="text" value="'+v(E.bem[it.pos]||'')+'" oninput="abnEdBem(\''+q(it.pos)+'\',this.value)" placeholder="Bemerkung" style="'+fld+';font-size:13px;padding:5px 8px;margin:0 0 4px;'+(E.bem[it.pos]?'color:#e0b070':'')+'">'; }); }));
+        '<button type="button" onclick="abnEdIO('+q(it.pos)+')" style="border-radius:13px;padding:4px 11px;font-size:13px;font-family:inherit;cursor:pointer;'+(an?'background:#3a7a3a;border:1px solid #3a7a3a;color:#fff;font-weight:700':'background:none;border:1px solid #6a5433;color:#ddd')+'">'+(an?'✓ ':'')+v(T.ioKopf)+'</button></div>'+
+        '<input type="text" value="'+v(E.bem[it.pos]||'')+'" oninput="abnEdBem('+q(it.pos)+',this.value)" placeholder="Bemerkung" style="'+fld+';font-size:13px;padding:5px 8px;margin:0 0 4px;'+(E.bem[it.pos]?'color:#e0b070':'')+'">'; }); }));
   ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:18px;max-width:640px;width:100%;max-height:96vh;overflow:auto;color:#fff;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
     '<div style="font-size:17px;font-weight:700">✍ '+v(abnArtLbl(E.art,E.va))+' Nr. '+E.nr+'</div>'+
     '<div style="font-size:12px;color:#a8a8a8">'+v([E.ort, curProjName(), vertragsartLbl(E.va)].filter(Boolean).join(' · '))+'</div>'+
@@ -11919,6 +11931,7 @@ function abnEdRender(){
       '<textarea rows="3" oninput="abnEdSet(\'vorbehalt\',this.value)" placeholder="'+v(T.vorbehalt)+'" style="'+fld+';resize:vertical;font-size:14px;margin-bottom:6px">'+v(E.vorbehalt)+'</textarea>'+
       '<textarea rows="2" oninput="abnEdSet(\'einwand\',this.value)" placeholder="Einwendungen des Auftragnehmers" style="'+fld+';resize:vertical;font-size:14px">'+v(E.einwand)+'</textarea>'+
     sec('9 Unterschriften')+
+      (E.art1>=0 && T.art1[E.art1] && T.art1[E.art1][3]==='abwesend' ? '<div style="font-size:13px;color:#e0b070;margin-bottom:8px">Auftraggeber nicht erschienen – keine Unterschrift des Auftraggebers nötig. Das Protokoll ist ihm danach alsbald zu übersenden.</div>' : '')+
       '<div style="font-size:12px;color:#a8a8a8;margin-bottom:4px">Für den Auftraggeber</div>'+
       '<input type="text" value="'+v(E.sigAgName)+'" oninput="abnEdSet(\'sigAgName\',this.value)" placeholder="Name in Druckbuchstaben" style="'+fld+';margin-bottom:6px">'+
       (E.agVerw ? '<div style="display:flex;gap:6px"><input type="text" value="'+v(E.verwGrund)+'" oninput="abnEdSet(\'verwGrund\',this.value)" placeholder="Grund der Verweigerung" style="'+fld+'">'+
@@ -11936,6 +11949,7 @@ function abnEdRender(){
       '<button type="button" onclick="abnEdAbschliessen()" style="background:#b8860b;border:none;color:#fff;border-radius:8px;padding:10px 16px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">✓ Abschließen &amp; PDF</button>'+
     '</div><div style="font-size:11px;color:#a8a8a8;margin-top:8px;text-align:right">Abschließen legt das PDF in SharePoint (_Abnahme) und im Reiter Dokumente ab. Danach ist das Protokoll nicht mehr änderbar.</div></div>';
   ['abnSigAg','abnSigAn'].forEach(id=>{ const c=document.getElementById(id); if(!c) return; btbSigSetup(c);
+    ['mousedown','touchstart'].forEach(ev=>c.addEventListener(ev,()=>{ if(ABN_ED) ABN_ED.__sigNeu=true; },{passive:true}));
     const d=id==='abnSigAg'?E.sigAg:E.sigAn; if(d) btbSigDrawImage(id,d); });
 }
 async function abnEdSpeichern(meldung){
@@ -11943,6 +11957,7 @@ async function abnEdSpeichern(meldung){
   abnEdSigMerken();
   ABN_ED.geaendertAm=new Date().toISOString(); ABN_ED.geaendertVon=USER||'';
   const i=ABN_LISTE.findIndex(x=>x.id===ABN_ED.id);
+  delete ABN_ED.__sigNeu;
   const kopie=JSON.parse(JSON.stringify(ABN_ED));
   if(i>=0) ABN_LISTE[i]=kopie; else ABN_LISTE.push(kopie);
   try{ await jsonSpeichern('abn', kopie); }catch(e){ console.warn(e); }
@@ -11950,9 +11965,11 @@ async function abnEdSpeichern(meldung){
   if(ACT==='__doku'){ dokuRender(); updDokuTab(); }
 }
 function abnEdAbbrechen(){
-  abnEdSigMerken();
+  // Unterschriften nicht byteweise vergleichen (Neukodierung ändert die Bytes) –
+  // stattdessen merken, ob auf einem Feld gezeichnet wurde.
   const alt=ABN_LISTE.find(x=>x.id===(ABN_ED&&ABN_ED.id));
-  const geaendert = alt && JSON.stringify(Object.assign({},alt,{geaendertAm:0,geaendertVon:0}))!==JSON.stringify(Object.assign({},ABN_ED,{geaendertAm:0,geaendertVon:0}));
+  const ohne=o=>Object.assign({},o,{geaendertAm:0,geaendertVon:0,sigAg:0,sigAn:0,__sigNeu:0});
+  const geaendert = alt && (ABN_ED.__sigNeu || JSON.stringify(ohne(alt))!==JSON.stringify(ohne(ABN_ED)));
   if(geaendert && !confirm('Änderungen verwerfen?\n\n„Abbrechen" und dann „Zwischenspeichern", um sie zu behalten.')) return;
   abnEdClose();
 }
@@ -11964,7 +11981,9 @@ async function abnEdAbschliessen(){
   if(E.art1<0) fehlt.push('Art der Feststellung (Abschnitt 1) auswählen');
   if(!E.sigAn) fehlt.push('Unterschrift Auftragnehmer');
   if(!(E.sigAnName||'').trim()) fehlt.push('Name Auftragnehmer');
-  if(E.agVerw){ if(!(E.verwGrund||'').trim()) fehlt.push('Grund der Verweigerung'); }
+  const agAbwesend = E.art1>=0 && T.art1[E.art1] && T.art1[E.art1][3]==='abwesend';
+  if(agAbwesend){ /* Auftraggeber nicht da: keine Unterschrift/Verweigerung */ }
+  else if(E.agVerw){ if(!(E.verwGrund||'').trim()) fehlt.push('Grund der Verweigerung'); }
   else { if(!E.sigAg) fehlt.push('Unterschrift Auftraggeber (oder „Unterschrift verweigert" ankreuzen)'); if(!(E.sigAgName||'').trim()) fehlt.push('Name Auftraggeber'); }
   if(fehlt.length){ alert('Bitte noch ergänzen:\n\n• '+fehlt.join('\n• ')); return; }
   if(!confirm(abnArtLbl(E.art,E.va)+' Nr. '+E.nr+' abschließen?\n\nGewählt: '+(T.art1[E.art1][0])+'\n\nDanach ist das Protokoll nicht mehr änderbar.')) return;
@@ -11974,13 +11993,19 @@ async function abnEdAbschliessen(){
     showLoader('Protokoll wird erstellt …');
     const A={art:E.art, sel:new Set(E.sel), gegenstand:E.gegenstand, ort:E.ort, datum:E.datum, io:false, offen:{}, fotoDoku:E.fotoDoku};
     const blob=await abnBuildPdf(A, E);
-    const fname=safeName(curProjName())+'/_Abnahme/'+vaName([vaDatum(E.datum), abnArtLbl(E.art,E.va).replace(/ü/g,'ue').replace(/ä/g,'ae'), 'Nr-'+String(E.nr).padStart(2,'0')])+'.pdf';
+    const fname=safeName(curProjName())+'/_Abnahme/'+vaName([vaDatum(E.datum), abnArtLbl(E.art,E.va).replace(/ü/g,'ue').replace(/ä/g,'ae'), 'Nr-'+String(E.nr).padStart(2,'0'), String(E.id).slice(-4)])+'.pdf';   // id-Rest: zwei Geräte mit gleicher Nr. überschreiben sich nicht
     let hoch=true;
     try{ await queueUpload(fname, blob, 'application/pdf', ''); }catch(e){ hoch=false; console.warn('Abnahme-Ablage:', e&&e.message); }
+    const url=URL.createObjectURL(blob);
+    if(!hoch){
+      // Nicht sperren: ohne abgelegtes PDF bliebe nur ein Eintrag ohne Datei.
+      hideLoader(); if(win) win.location=url; else window.open(url,'_blank');
+      alert('Das PDF konnte auf dem Gerät nicht abgelegt werden (Speicher voll?).\n\nDas Protokoll bleibt offen – bitte Platz schaffen oder ins Netz gehen und erneut „Abschließen" tippen. Das angezeigte PDF kann zusätzlich gespeichert werden.');
+      return;
+    }
     E.pdf=fname; E.pdfAm=new Date().toISOString(); E.abgeschlossen=true;
     await abnEdSpeichern(false);
     hideLoader();
-    const url=URL.createObjectURL(blob);
     if(win) win.location=url; else window.open(url,'_blank');
     abnEdClose();
     showToast(hoch?(abnArtLbl(E.art,E.va)+' Nr. '+E.nr+' abgeschlossen & in _Abnahme abgelegt'):'Abgeschlossen – Ablage fehlgeschlagen (offline?)', hoch?undefined:{bg:'#8b6d22'});
@@ -12114,15 +12139,17 @@ async function abnBuildPdf(A, F){
   doc.text('Für den Auftraggeber',M,y); doc.text('Für den Auftragnehmer kpc GmbH',M+half+10,y); y+=22;
   if(F){ // Unterschriften als Bild über der Linie
     const sig=(d,x)=>{ if(!d) return; try{ doc.addImage(d,'PNG',x,y-19,Math.min(half,62),18); }catch(e){} };
-    if(!F.agVerw) sig(F.sigAg,M); sig(F.sigAn,M+half+10);
-    if(F.agVerw){ reg(); doc.setFontSize(10); tc(copper); doc.text('Unterschrift verweigert',M,y-4); }
+    const abw = T.art1[F.art1] && T.art1[F.art1][3]==='abwesend';
+    if(!F.agVerw && !abw) sig(F.sigAg,M); sig(F.sigAn,M+half+10);
+    if(abw){ reg(); doc.setFontSize(10); tc(copper); doc.text('Auftraggeber nicht erschienen',M,y-4); }
+    else if(F.agVerw){ reg(); doc.setFontSize(10); tc(copper); doc.text('Unterschrift verweigert',M,y-4); }
   }
   dc(dark); doc.setLineWidth(0.3); doc.line(M,y,M+half,y); doc.line(M+half+10,y,R,y); y+=4;
   doc.setFontSize(8); tc(grey);
   if(F){ const ortDat=[A.ort, datumDE].filter(Boolean).join(', ');
     doc.text(doc.splitTextToSize(ortDat+(F.sigAgName?(', '+F.sigAgName):''),half)[0],M,y); doc.text(doc.splitTextToSize(ortDat+(F.sigAnName?(', '+F.sigAnName):''),half)[0],M+half+10,y); y+=9;
     doc.setFontSize(9.5); tc(dark);
-    if(F.agVerw){ doc.splitTextToSize('Unterschrift verweigert durch: '+(F.sigAgName||'—')+'  ·  Uhrzeit: '+(F.verwZeit||'—')+'  ·  Grund: '+(F.verwGrund||'—'),R-M).forEach(ln=>{ doc.text(ln,M,y); y+=4.6; }); y+=2.4; }
+    if(F.agVerw && !(T.art1[F.art1] && T.art1[F.art1][3]==='abwesend')){ doc.splitTextToSize('Unterschrift verweigert durch: '+(F.sigAgName||'—')+'  ·  Uhrzeit: '+(F.verwZeit||'—')+'  ·  Grund: '+(F.verwGrund||'—'),R-M).forEach(ln=>{ doc.text(ln,M,y); y+=4.6; }); y+=2.4; }
   } else {
   doc.text('Ort, Datum, Name in Druckbuchstaben, Unterschrift',M,y); doc.text('Ort, Datum, Name in Druckbuchstaben, Unterschrift',M+half+10,y); y+=9;
   doc.setFontSize(9.5); tc(dark); doc.text('Unterschrift verweigert durch: ___________________________  Uhrzeit: _________  Grund: ______________________',M,y); y+=7;
@@ -12169,6 +12196,7 @@ async function stammSave(pid){
   }
   // Das Häkchen gibt es nur für Bauleitung/Innendienst; fehlt es, bleibt der
   // bisherige Stand stehen (nicht stillschweigend freigeben).
+  const altEdit=p.stammEdit;
   p.stammEdit=new Date().toISOString();   // bewusste Änderung -> schlägt ältere Stände
   const _cbP=document.getElementById('stPriv');
   if(_cbP){
@@ -12181,7 +12209,7 @@ async function stammSave(pid){
     } else p.privat='';
   }
   try{ await saveProjects(); }
-  catch(e){ Object.assign(p,alt); alert('Speichern fehlgeschlagen: '+(e.message||e)); return; }
+  catch(e){ Object.assign(p,alt); p.stammEdit=altEdit; try{ await idbSet('projects','__list', PROJECTS); }catch(_){} alert('Speichern fehlgeschlagen: '+(e.message||e)); return; }
   stammClose(); renderProjectPicker();
 }
 
