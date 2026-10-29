@@ -1868,6 +1868,12 @@ async function startOffline(){
   document.getElementById('projName').textContent=PROJNAME;
   document.getElementById('projSub').textContent='Baustelle · offline';
   renderOverview(); updSyncBadge();
+  // Direkteinstieg aus der Hauptapp auch OHNE Netz (bis 29.10.2026 nur online):
+  // „Vervollständigen" im Reiter Dokumente öffnet den Entwurf, „Einweisen" die Art.
+  if(['schluessel','geraete','allgemein'].includes(h.get('neu'))){ startSession(); sessionType(h.get('neu')); }
+  if(h.get('entwurf')){ const eid=h.get('entwurf');
+    if((EW.entwuerfe||[]).some(e=>e.id===eid)) editEntwurf(eid);
+    else toast('Dieser Entwurf liegt nicht auf dem Gerät – die Baustelle einmal mit Netz in der Montagefortschritt-App öffnen.'); }
   return true;
 }
 

@@ -2251,8 +2251,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 166;
+const APP_VERSION = 167;
 const CHANGELOG = [
+  { v:167, titel:'Einweisung: Entwurf offline öffnen', punkte:[
+    '„Vervollständigen" bei einer vorbereiteten Einweisung (Reiter Dokumente) öffnet den Entwurf jetzt auch <b>ohne Netz</b> direkt – bisher landete man offline nur auf der Übersicht der Einweisungs-App.' ]},
   { v:166, titel:'Abnahmeprotokoll: Handy-Ansicht und Korrekturen', punkte:[
     'Das Formular „Vor Ort ausfüllen" ist für das Handy überarbeitet: Restleistungen und Mängel zweizeilig, Datum und Uhrzeit untereinander, Teilnehmer nebeneinander, kleinere Ränder.',
     'Ein abgeschlossenes Protokoll kann nicht mehr durch einen älteren Entwurf auf einem anderen Gerät wieder geöffnet werden.',
