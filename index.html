@@ -1291,7 +1291,7 @@ function baseMerken(){
 async function baseLaden(pid){
   try{ const m=await idbGet('state', pid+'|__base'); if(m && typeof m==='object') Object.keys(m).forEach(k=>{ if(BASE[k]===undefined) BASE[k]=m[k]; }); }catch(e){}
 }
-const MERGE_INNER=['fotos','pdfs','restarbeiten','ts','usr','na','hist','typenschild','ovr'];
+const MERGE_INNER=['fotos','pdfs','restarbeiten','ts','usr','na','hist','typenschild','ovr','abnfotos'];
 function mergeKey(liste, x){
   if(typeof x==='string') return x;
   if(!x || typeof x!=='object') return JSON.stringify(x);
@@ -1357,7 +1357,8 @@ function stAusRaw(raw){
   const ovr=J(row.ovr,null);
   return { g:row.g||false, m:row.m||false, nu:row.nu||false, a:row.a||false, sa:row.sa||false, dp:row.dp||false, ea:row.ea||false, pa:row.pa||false, ib:row.ib||false, ew:row.ew||false,
     note:row.note||'', fotos:J(row.fotos,[]), pdfs:J(row.pdfs,[]), restarbeiten:J(row.restarbeiten,[]), ts:J(row.ts,{}), by:J(row.usr,{}),
-    na:J(row.na,{}), hist:J(row.hist,[]), typenschild:J(row.typenschild,[]), anschl:row.anschl||'', ovr:(ovr&&typeof ovr==='object')?ovr:undefined };
+    na:J(row.na,{}), hist:J(row.hist,[]), typenschild:J(row.typenschild,[]), anschl:row.anschl||'', ovr:(ovr&&typeof ovr==='object')?ovr:undefined,
+    abnfotos:J(row.abnfotos,[]) };
 }
 // Karte einer Position komplett nachziehen
 function posNeuZeichnen(pos){
@@ -2234,8 +2235,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 162;
+const APP_VERSION = 163;
 const CHANGELOG = [
+  { v:163, titel:'Abnahme: Fotos je Position', punkte:[
+    'Im Protokoll „Abnahme / Leistungsfeststellung" lassen sich je Position <b>ein oder mehrere Fotos</b> auswählen (📷 an der Position). Die Auswahl wird an der Position gemerkt.',
+    'Im PDF stehen die Fotonummern in der Spalte „Foto-Nr.", die Fotos selbst als nummerierte <b>Fotodokumentation</b> im Anhang.' ]},
   { v:162, titel:'Abnahme / Leistungsfeststellung', punkte:[
     'Unter <b>Berichte</b> gibt es das neue Protokoll <b>„Abnahme / Leistungsfeststellung"</b>: Abnahme, Teilabnahme, gemeinsame Zustandsfeststellung oder Leistungsfeststellung – mit Texten passend zur Vertragsart aus den Stammdaten.',
     'Umfang per Häkchen wählen – Etagen, Anlagen oder einzelne Positionen. Nicht als geliefert abgehakte Positionen sind vorab abgewählt und werden als „nicht Gegenstand" genannt.',
@@ -7262,7 +7266,8 @@ function buildPosData(pos){
     hist: JSON.stringify(s.hist||[]),
     typenschild: JSON.stringify(s.typenschild||[]),
     anschl: s.anschl||'',
-    ovr: JSON.stringify(s.ovr||{})
+    ovr: JSON.stringify(s.ovr||{}),
+    abnfotos: JSON.stringify(s.abnfotos||[])
   });
 }
 
@@ -7473,7 +7478,8 @@ async function loadState() {
           hist: Array.isArray(histArr)?histArr:[],
           typenschild: Array.isArray(tsch)?tsch:[],
           anschl: row.anschl||'',
-          ovr: (()=>{ try{ const o=row.ovr?JSON.parse(row.ovr):null; return (o&&typeof o==='object')?o:undefined; }catch(e){ return undefined; } })()
+          ovr: (()=>{ try{ const o=row.ovr?JSON.parse(row.ovr):null; return (o&&typeof o==='object')?o:undefined; }catch(e){ return undefined; } })(),
+          abnfotos: (()=>{ try{ const a=row.abnfotos?JSON.parse(row.abnfotos):[]; return Array.isArray(a)?a:[]; }catch(e){ return []; } })()
         };
         if (row.updated_at && (!newest || row.updated_at > newest)) newest = row.updated_at;
       });
@@ -7633,8 +7639,9 @@ setInterval(async () => {
       const pdfsChanged = !!row.pdfs && JSON.stringify(cur?(cur.pdfs||[]):[])!==row.pdfs;
       // Übersteuerungen (Gewerk, Typenschild-/IBN-/DGUV-Pflicht) je Position (v155)
       const ovrChanged = (row.ovr||'{}')!==JSON.stringify(cur?(cur.ovr||{}):{});
+      const abnfChanged = (row.abnfotos||'[]')!==JSON.stringify(cur?(cur.abnfotos||[]):[]);
       if (!cur || cur.g!==row.g || cur.m!==row.m || cur.nu!==row.nu || cur.a!==row.a ||
-          cur.sa!==row.sa || cur.dp!==row.dp || cur.ea!==row.ea || cur.pa!==row.pa || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged || naChanged || tschChanged || anschlChanged || pdfsChanged || ovrChanged) {
+          cur.sa!==row.sa || cur.dp!==row.dp || cur.ea!==row.ea || cur.pa!==row.pa || cur.ib!==row.ib || cur.ew!==row.ew || cur.note!==row.note || restChanged || tsChanged || naChanged || tschChanged || anschlChanged || pdfsChanged || ovrChanged || abnfChanged) {
         let pdfs = cur ? cur.pdfs : [];
         try { if(row.pdfs) pdfs = JSON.parse(row.pdfs); } catch(e) {}
         // Verlauf: den längeren der beiden Stände behalten. Ohne das würde das
@@ -7646,6 +7653,7 @@ setInterval(async () => {
           sa:row.sa||false, dp:row.dp||false, ea:row.ea||false, pa:row.pa||false, ib:row.ib||false, ew:row.ew||false,
           note:row.note||'', fotos:cur?cur.fotos:[], pdfs:pdfs, restarbeiten:newRest, ts:newTs, by:newBy,
           na:newNa, hist:newHist, typenschild:newTsch, anschl:row.anschl||'' };
+        try{ const a=row.abnfotos?JSON.parse(row.abnfotos):[]; ST[row.pos].abnfotos=Array.isArray(a)?a:[]; }catch(e){ ST[row.pos].abnfotos=[]; }
         if(row.ovr){ try{ const o=JSON.parse(row.ovr); if(o&&typeof o==='object') ST[row.pos].ovr=o; }catch(e){} }
         else if(cur && cur.ovr) ST[row.pos].ovr=cur.ovr;
         if(ovrChanged) ovrAnwenden(row.pos);
@@ -11604,7 +11612,8 @@ function abnRender(){
           (auf? s.items.map(it=>{ const an=ABN.sel.has(it.pos), gel=abnGeliefert(it.pos);
             return '<div style="'+zeile+';padding-left:40px;'+(an?'':'opacity:.6')+'" onclick="abnToggle(\'p\',\''+String(it.pos).replace(/'/g,"\\'")+'\')">'+abnCb(an?'an':'aus')+
               '<span style="color:#a8a8a8;font-size:11.5px;min-width:56px">'+escapeHtml(it.pos)+'</span><span style="flex:1">'+escapeHtml((it.bez||'').trim())+'</span>'+
-              (gel?'':'<span style="font-size:10.5px;border-radius:8px;padding:1px 7px;background:#444;color:#ccc;white-space:nowrap">„Geliefert" nicht abgehakt</span>')+'</div>'; }).join('') : '');
+              (gel?'':'<span style="font-size:10.5px;border-radius:8px;padding:1px 7px;background:#444;color:#ccc;white-space:nowrap">„Geliefert" nicht abgehakt</span>')+
+              abnFotoKnopf(it.pos)+'</div>'; }).join('') : '');
       }).join(''); }).join('');
   const op=abnOffenePunkte();
   // Auswahl auf vorhandene Punkte beschränken (Umfang kann sich geändert haben)
@@ -11626,7 +11635,10 @@ function abnRender(){
       (ABN.art===k?'background:#b8860b;color:#fff;font-weight:700':'background:none;color:#ddd')+'">'+(st.vertragsart==='kauf'&&k==='abnahme'?'Übergabe':(st.vertragsart==='kauf'&&k==='teil'?'Teilübergabe':l))+'</button>').join('')+'</div>'+
     '<label style="'+lbl+'">Umfang – was wird festgestellt?</label>'+
     '<div style="background:#332f2b;border:1px solid #4a423a;border-radius:9px;padding:4px 10px;font-size:13.5px">'+baum+'</div>'+
-    '<div style="font-size:11px;color:#a8a8a8;margin-top:5px">Positionen mit Menge 0 erscheinen nicht. Nicht als geliefert abgehakte sind vorab abgewählt.</div>'+
+    '<div style="font-size:11px;color:#a8a8a8;margin-top:5px">Positionen mit Menge 0 erscheinen nicht. Nicht als geliefert abgehakte sind vorab abgewählt. Fotos je Position über „▸ Positionen" → 📷.</div>'+
+    (()=>{ const n=abnFotoListe(ABN).length;
+      return '<label style="display:flex;align-items:center;gap:9px;margin-top:10px;font-size:13px;color:#ddd;cursor:pointer"><input type="checkbox" '+(ABN.fotoDoku!==false?'checked':'')+' onchange="ABN.fotoDoku=this.checked" style="width:17px;height:17px;accent-color:#b8860b">'+
+        'Fotodokumentation anhängen <span style="color:#a8a8a8">('+n+' Foto'+(n===1?'':'s')+' ausgewählt)</span></label>'; })()+
     '<label style="'+lbl+'">Gegenstand '+(ABN.gegEigen?'(eigener Text – <span onclick="ABN.gegEigen=false;abnRender()" style="text-decoration:underline;cursor:pointer">Vorschlag wiederherstellen</span>)':'(vorgeschlagen, änderbar)')+'</label>'+
     '<textarea rows="3" oninput="ABN.gegenstand=this.value;ABN.gegEigen=true" style="'+fld+';font-size:13.5px;resize:vertical">'+escapeHtml(ABN.gegenstand)+'</textarea>'+
     '<div style="display:flex;gap:10px"><div style="flex:0 0 42%"><label style="'+lbl+'">Datum</label><input type="date" value="'+escapeHtml(ABN.datum)+'" onchange="ABN.datum=this.value" style="'+fld+'"></div>'+
@@ -11640,6 +11652,76 @@ function abnRender(){
       '<button type="button" onclick="abnErstellen()" style="background:#b8860b;border:none;color:#fff;border-radius:8px;padding:10px 18px;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit">📄 PDF erstellen</button>'+
     '</div></div>';
   if(scroll) ov.firstElementChild.scrollTop=scroll;
+}
+// ── Fotos je Position (v163) ──
+// s.abnfotos = [fname, …] – an der Position gemerkt (data-Blob), damit die Auswahl
+// beim nächsten Protokoll vorbelegt und auf allen Geräten gleich ist.
+function abnFotosAn(pos){ const s=gs(pos); return (s.fotos||[]).map(f=>({fname:f, ts:false})).concat((s.typenschild||[]).map(t=>({fname:t.fname, ts:true}))); }
+function abnFotoGewaehlt(pos){ const da=new Set(abnFotosAn(pos).map(x=>x.fname)); return (gs(pos).abnfotos||[]).filter(f=>da.has(f)); }
+function abnFotoDatum(fname){ const d=protoTs(fname); return d? d.toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'}) : ''; }
+function abnFotoKnopf(pos){
+  const alle=abnFotosAn(pos), n=abnFotoGewaehlt(pos).length, q=String(pos).replace(/'/g,"\\'");
+  const st='margin-left:6px;border-radius:14px;padding:3px 9px;font-size:12px;white-space:nowrap;font-family:inherit;cursor:pointer;';
+  if(!alle.length) return '<span style="'+st+'border:1px solid #7a5a2a;color:#e0a060;cursor:default">kein Foto</span>';
+  return '<button type="button" onclick="event.stopPropagation();abnFotoWahl(\''+q+'\')" style="'+st+(n?'background:#b8860b;border:1px solid #b8860b;color:#fff;font-weight:700':'background:none;border:1px solid #6a5433;color:#ddd')+'">📷 '+(n||'wählen')+'</button>';
+}
+// Fotos in Protokollreihenfolge (ausgewählte Positionen, Reihenfolge der Stückliste)
+function abnFotoListe(A){
+  const r=[]; abnGruppen().forEach(g=>g.subs.forEach(s=>s.items.forEach(it=>{ if(!A.sel.has(it.pos)) return;
+    abnFotoGewaehlt(it.pos).forEach(f=>r.push({pos:it.pos, bez:(it.bez||'').trim(), fname:f})); })));
+  return r;
+}
+let ABN_FW=null;
+function abnFotoWahl(pos){
+  ABN_FW={pos, wahl:abnFotoGewaehlt(pos).slice()};
+  abnFotoWahlRender();
+}
+function abnFotoWahlRender(){
+  if(!ABN_FW) return;
+  const pos=ABN_FW.pos, alle=abnFotosAn(pos), it=tsItem(pos)||{};
+  let ov=document.getElementById('abnFotoOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='abnFotoOv'; ov.style.cssText='position:fixed;inset:0;z-index:2100;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:14px;'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov){ ov.remove(); ABN_FW=null; } };
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;border-radius:14px;padding:18px;max-width:560px;width:100%;max-height:90vh;overflow:auto;color:#fff;font-family:inherit">'+
+    '<div style="font-size:16px;font-weight:700">📷 Fotos für das Protokoll</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin-bottom:10px">'+escapeHtml(pos+' '+(it.bez||'').trim())+' · '+alle.length+' Foto'+(alle.length===1?'':'s')+' an der Position · mehrere wählbar</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(110px,1fr));gap:8px">'+alle.map((x,i)=>{ const k=ABN_FW.wahl.indexOf(x.fname);
+      return '<div onclick="abnFotoTipp('+i+')" style="aspect-ratio:1;border-radius:8px;position:relative;overflow:hidden;cursor:pointer;background:#3a3530;border:3px solid '+(k>=0?'#b8860b':'transparent')+'">'+
+        '<img id="abnFW'+i+'" alt="" style="width:100%;height:100%;object-fit:cover;display:block">'+
+        (x.ts?'<span style="position:absolute;top:5px;left:5px;font-size:10px;background:#895500;color:#fff;border-radius:6px;padding:1px 5px">Typenschild</span>':'')+
+        (k>=0?'<span style="position:absolute;top:5px;right:5px;width:22px;height:22px;border-radius:50%;background:#b8860b;color:#fff;font-size:12px;font-weight:700;text-align:center;line-height:22px">'+(k+1)+'</span>':'')+
+        '<span style="position:absolute;bottom:4px;left:5px;font-size:10px;color:#fff;text-shadow:0 1px 2px #000">'+escapeHtml(abnFotoDatum(x.fname))+'</span></div>'; }).join('')+'</div>'+
+    '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">'+
+      '<button type="button" onclick="ABN_FW.wahl=[];abnFotoUebernehmen()" style="background:none;border:1px solid #555;color:#ccc;border-radius:8px;padding:9px 14px;font-family:inherit;cursor:pointer">Keins</button>'+
+      '<button type="button" onclick="abnFotoUebernehmen()" style="background:#b8860b;border:none;color:#fff;border-radius:8px;padding:9px 16px;font-weight:700;font-family:inherit;cursor:pointer">Übernehmen ('+ABN_FW.wahl.length+')</button></div></div>';
+  // Vorschaubilder nachladen (lokal oder aus SharePoint)
+  alle.forEach((x,i)=>{ const u=IMG_CACHE[x.fname]; const img=document.getElementById('abnFW'+i); if(!img) return;
+    if(u){ img.src=u; return; }
+    getFileBlob(x.fname).then(b=>{ if(!b) return; const url=URL.createObjectURL(b); IMG_CACHE[x.fname]=url; const el=document.getElementById('abnFW'+i); if(el) el.src=url; }).catch(()=>{}); });
+}
+function abnFotoTipp(i){
+  const x=abnFotosAn(ABN_FW.pos)[i]; if(!x) return;
+  const k=ABN_FW.wahl.indexOf(x.fname);
+  if(k>=0) ABN_FW.wahl.splice(k,1); else ABN_FW.wahl.push(x.fname);
+  abnFotoWahlRender();
+}
+function abnFotoUebernehmen(){
+  const pos=ABN_FW.pos, s=gs(pos);
+  if(JSON.stringify(s.abnfotos||[])!==JSON.stringify(ABN_FW.wahl)){ s.abnfotos=ABN_FW.wahl.slice(); savePos(pos); }
+  const ov=document.getElementById('abnFotoOv'); if(ov) ov.remove(); ABN_FW=null;
+  abnRender();
+}
+// Foto für das PDF verkleinern (sonst wird das Protokoll riesig)
+async function abnFotoFuerPdf(fname){
+  const blob=await getFileBlob(fname); if(!blob) return null;
+  const url=URL.createObjectURL(blob);
+  try{
+    const img=await new Promise((ok,nok)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=nok; i.src=url; });
+    const sk=Math.min(1, 1400/Math.max(img.naturalWidth,img.naturalHeight));
+    const c=document.createElement('canvas'); c.width=Math.round(img.naturalWidth*sk); c.height=Math.round(img.naturalHeight*sk);
+    c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+    return {data:c.toDataURL('image/jpeg',0.8), w:c.width, h:c.height};
+  } finally { URL.revokeObjectURL(url); }
 }
 function abnOp(k){
   if(ABN.offen[k]) delete ABN.offen[k];
@@ -11737,13 +11819,13 @@ async function abnBuildPdf(A){
       let x=M; spalten.forEach(s=>{ doc.text(s.t, s.align==='center'?x+s.w/2:x+1.5, y+4.4, s.align==='center'?{align:'center'}:undefined); x+=s.w; }); y+=6.5; reg(); };
     platz(14); kopf();
     zeilen.forEach(z=>{
-      if(z.gruppe){ if(platz(16)) kopf();   // Bereichszeile nie allein am Seitenende fc(hell); doc.rect(M,y,R-M,6,'F'); dc(linie); doc.rect(M,y,R-M,6); bold(); doc.setFontSize(8.5); tc(dark); doc.text(z.gruppe,M+1.5,y+4.1); y+=6; reg(); return; }
+      if(z.gruppe){ if(platz(16)) kopf(); /* Bereichszeile nie allein am Seitenende */ fc(hell); doc.rect(M,y,R-M,6,'F'); dc(linie); doc.rect(M,y,R-M,6); bold(); doc.setFontSize(8.5); tc(dark); doc.text(z.gruppe,M+1.5,y+4.1); y+=6; reg(); return; }
       reg(); doc.setFontSize(8.5);
       const lines=spalten.map((s,i)=>s.box?[''] : doc.splitTextToSize(String(z[i]==null?'':z[i]), s.w-3));
       const h=Math.max(minH||6, Math.max(...lines.map(l=>l.length))*3.8+2.4);
       if(platz(h)) kopf();
       let x=M; dc(linie); doc.setLineWidth(0.2);
-      spalten.forEach((s,i)=>{ doc.rect(x,y,s.w,h); tc(z.hl&&z.hl[i]?copper:dark);
+      spalten.forEach((s,i)=>{ dc(linie); doc.setLineWidth(0.2); doc.rect(x,y,s.w,h); tc(z.hl&&z.hl[i]?copper:dark);
         if(s.box){ box(x+s.w/2-1.6, y+h/2+1.6, !!z[i]); } else doc.text(lines[i], x+1.5, y+4); x+=s.w; });
       y+=h;
     });
@@ -11782,13 +11864,16 @@ async function abnBuildPdf(A){
   const gewaehlt=abnOffenePunkte().filter(x=>A.offen[x.k]).map(x=>Object.assign({},x,{txt:(A.offen[x.k].txt||'').trim()||x.txt}));
   const maengel=gewaehlt.filter(x=>x.ziel===6), rest=gewaehlt.filter(x=>x.ziel===5);
   const zeilen=[];
+  // Fotonummern in Protokollreihenfolge (v163)
+  const fotos = A.fotoDoku===false ? [] : abnFotoListe(A);
+  const fotoNr={}; fotos.forEach((f,i)=>{ (fotoNr[f.pos]=fotoNr[f.pos]||[]).push(i+1); });
   abnGruppen().forEach(g=>g.subs.forEach(s=>{ const its=s.items.filter(it=>A.sel.has(it.pos)); if(!its.length) return;
     zeilen.push({gruppe:(g.sec.label||g.sec.pos)+' · '+(s.sub.bez||s.sub.pos)});
     its.forEach(it=>{
       const bem=[]; rest.filter(x=>x.pos===it.pos).forEach(x=>bem.push('Restleistung: '+x.txt));
       maengel.forEach((x,i)=>{ if(x.pos===it.pos) bem.push('Mangel Nr. '+(i+1)+': '+x.txt); });
       const io = A.io && !bem.length && ist(it.pos,'all')==='done';
-      const z=[it.pos, (it.menge!=null?it.menge:'')+' '+(it.einh||''), (it.bez||'').trim(), io, bem.join('\n'), ''];
+      const z=[it.pos, (it.menge!=null?it.menge:'')+' '+(it.einh||''), (it.bez||'').trim(), io, bem.join('\n'), (fotoNr[it.pos]||[]).join(', ')];
       z.hl=[0,0,0,0,bem.length?1:0,0]; zeilen.push(z); });
   }));
   tabelle([{t:'Pos.',w:20},{t:'Menge',w:15},{t:'Bezeichnung',w:62},{t:T.ioKopf,w:12,align:'center',box:true},{t:'Bemerkung',w:51},{t:'Foto-Nr.',w:R-M-160}], zeilen, 6);
@@ -11820,6 +11905,29 @@ async function abnBuildPdf(A){
   doc.setFontSize(9.5); tc(dark); doc.text('Unterschrift verweigert durch: ___________________________  Uhrzeit: _________  Grund: ______________________',M,y); y+=7;
   absatz('Je eine Ausfertigung für Auftraggeber und Auftragnehmer. Wird die Unterschrift verweigert, stellt der Auftragnehmer den Zustand mit Fotodokumentation fest und übersendet dem Auftraggeber eine Abschrift.', 8.5);
 
+  // ── Anlage: Fotodokumentation (v163) ──
+  if(fotos.length){
+    neueSeite();
+    bold(); doc.setFontSize(14); tc(copper); doc.text('Anlage: Fotodokumentation',M,y+2); y+=8;
+    const fehlend=[];
+    const bw=(R-M-8)/2, bh=88;
+    let yStart=y;
+    for(let i=0;i<fotos.length;i++){
+      const f=fotos[i], slot=i%4;
+      if(i>0 && slot===0){ neueSeite(); yStart=y; }
+      const x=M+(slot%2)*(bw+8), y0=yStart+Math.floor(slot/2)*(bh+14);
+      let bild=null;
+      try{ showLoader('Fotos werden eingefügt … '+(i+1)+'/'+fotos.length); bild=await Promise.race([abnFotoFuerPdf(f.fname), new Promise(r=>setTimeout(()=>r(null),20000))]); }catch(e){ bild=null; }
+      dc(linie); doc.setLineWidth(0.2);
+      let hBild=bh;
+      if(bild){ const sk=Math.min(bw/bild.w, bh/bild.h), w=bild.w*sk; hBild=bild.h*sk;
+        try{ doc.addImage(bild.data,'JPEG',x+(bw-w)/2,y0,w,hBild); }catch(e){ fehlend.push(i+1); } }
+      else { hBild=bw*0.75; fc(hell); doc.rect(x,y0,bw,hBild,'F'); reg(); doc.setFontSize(9); tc(grey); doc.text('Foto nicht verfügbar (offline?)',x+bw/2,y0+hBild/2,{align:'center'}); fehlend.push(i+1); }
+      reg(); doc.setFontSize(8.5); tc(dark);
+      doc.text(doc.splitTextToSize('Foto '+(i+1)+' · Pos. '+f.pos+' '+f.bez+(abnFotoDatum(f.fname)?' · '+abnFotoDatum(f.fname):''), bw), x, y0+hBild+4);
+    }
+    if(fehlend.length) try{ showToast('Foto '+fehlend.join(', ')+' konnte nicht geladen werden', {bg:'#8b6d22'}); }catch(e){}
+  }
   // Fußzeile auf jeder Seite
   const n=doc.getNumberOfPages();
   for(let i=1;i<=n;i++){ doc.setPage(i); dc(copper); doc.setLineWidth(0.4); doc.line(M,PH-14,R,PH-14);
