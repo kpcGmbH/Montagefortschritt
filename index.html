@@ -2254,7 +2254,7 @@ function startData(){
 const APP_VERSION = 167;
 const CHANGELOG = [
   { v:167, titel:'Einweisung: Entwurf offline öffnen', punkte:[
-    '„Vervollständigen" bei einer vorbereiteten Einweisung (Reiter Dokumente) öffnet den Entwurf jetzt auch <b>ohne Netz</b> direkt – bisher landete man offline nur auf der Übersicht der Einweisungs-App.' ]},
+    '„Vervollständigen" bei einer vorbereiteten Einweisung oder Schlüsselübergabe (Reiter Dokumente) öffnet den Entwurf jetzt auch <b>ohne Netz</b> direkt – bisher landete man offline nur auf der Übersicht der Einweisungs-App.' ]},
   { v:166, titel:'Abnahmeprotokoll: Handy-Ansicht und Korrekturen', punkte:[
     'Das Formular „Vor Ort ausfüllen" ist für das Handy überarbeitet: Restleistungen und Mängel zweizeilig, Datum und Uhrzeit untereinander, Teilnehmer nebeneinander, kleinere Ränder.',
     'Ein abgeschlossenes Protokoll kann nicht mehr durch einen älteren Entwurf auf einem anderen Gerät wieder geöffnet werden.',
@@ -11878,6 +11878,10 @@ function abnEdit(id){
   const e=ABN_LISTE.find(x=>x.id===id); if(!e) return;
   if(e.abgeschlossen){ if(e.pdf) dokuEwPdf(e.pdf); return; }
   ABN_ED=JSON.parse(JSON.stringify(e));
+  // Robust gegen unvollständige Einträge (z. B. von einem Gerät mit älterem Stand)
+  ['sel','teilnehmer','rest','maengel'].forEach(k=>{ if(!Array.isArray(ABN_ED[k])) ABN_ED[k]=[]; });
+  ['io','bem'].forEach(k=>{ if(!ABN_ED[k]||typeof ABN_ED[k]!=='object') ABN_ED[k]={}; });
+  if(typeof ABN_ED.art1!=='number') ABN_ED.art1=-1;
   abnEdRender();
 }
 function abnEdClose(){ const o=document.getElementById('abnEdOv'); if(o) o.remove(); ABN_ED=null; }
