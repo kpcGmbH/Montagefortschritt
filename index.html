@@ -2251,8 +2251,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 167;
+const APP_VERSION = 168;
 const CHANGELOG = [
+  { v:168, titel:'Protokolle offline: Korrekturen', punkte:[
+    'Ein offline ausgefülltes Inbetriebnahme- oder DGUV-Protokoll wird nur an der richtigen Baustelle abgelegt. Ist eine andere offen, wartet es, bis die richtige geöffnet wird.',
+    'Weiterbearbeiten ohne Netz: Liegt der Datenstand nicht auf dem Gerät, sagt die App das jetzt klar – statt von einer älteren App-Version zu sprechen.' ]},
   { v:167, titel:'Einweisung: Entwurf offline öffnen', punkte:[
     '„Vervollständigen" bei einer vorbereiteten Einweisung oder Schlüsselübergabe (Reiter Dokumente) öffnet den Entwurf jetzt auch <b>ohne Netz</b> direkt – bisher landete man offline nur auf der Übersicht der Einweisungs-App.' ]},
   { v:166, titel:'Abnahmeprotokoll: Handy-Ansicht und Korrekturen', punkte:[
@@ -7945,6 +7948,11 @@ async function editIbnProto(pos,i){
   showLoader('IBN-Protokoll wird geladen...');
   let blob=null, gefunden='';
   for(const fn of kand){ try{ blob=await getFileBlob(fn); gefunden=fn; break; }catch(e){} }
+  if(!blob && !navigator.onLine){
+    hideLoader(); if(win) try{ win.close(); }catch(e){}
+    alert('Ohne Netz nicht möglich: Der Datenstand dieses Protokolls liegt nicht auf diesem Gerät.\n\nDas Protokoll ist nicht verloren – mit Netz lässt es sich wie gewohnt weiterbearbeiten. Neue Protokolle lassen sich auch offline ausfüllen.');
+    return;
+  }
   if(!blob){
     hideLoader(); if(win) try{ win.close(); }catch(e){}
     alert('Zu diesem Protokoll ist kein Datenstand hinterlegt – es lässt sich deshalb nicht digital weiterbearbeiten.\n\n'
@@ -7982,6 +7990,12 @@ async function ibnReceive(p){
   if(!p||!p.pos||!p.pdf||!p.id)return false;
   if(_ibnSeen.has(p.id))return true;                 // schon abgelegt -> Übergabe darf weg
   if(!PID) return false;                             // noch keine Baustelle offen -> aufheben, nicht verwerfen
+  // Andere Baustelle offen (z. B. App wurde offline neu gestartet und eine andere
+  // gewählt): aufheben statt an der falschen Baustelle ablegen (v168).
+  if(p.projekt && !p.replaceFname && p.projekt!==curProjName()){
+    try{ showToast('Ein Protokoll für „'+p.projekt+'" wartet – bitte diese Baustelle öffnen',{bg:'#8b6d22'}); }catch(e){}
+    return false;
+  }
   _ibnSeen.add(p.id);
   try{
     const pos=p.pos, type=p.ptype||'IBN Protokoll', ts=Date.now();
