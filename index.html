@@ -2251,8 +2251,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 168;
+const APP_VERSION = 169;
 const CHANGELOG = [
+  { v:169, titel:'Dokumente: Geräte-Protokolle gebündelt', punkte:[
+    'Im Reiter <b>Dokumente</b> stehen unter „Abgeschlossen" jetzt auch die ausgefüllten <b>Inbetriebnahme-</b> und <b>DGUV-Prüfprotokolle</b> – gebündelt in je einer Zeile. „Liste" zeigt alle mit Position, Gerät und Datum; ein Tipp öffnet das PDF.' ]},
   { v:168, titel:'Protokolle offline: Korrekturen', punkte:[
     'Ein offline ausgefülltes Inbetriebnahme- oder DGUV-Protokoll wird nur an der richtigen Baustelle abgelegt. Ist eine andere offen, wartet es, bis die richtige geöffnet wird.',
     'Weiterbearbeiten ohne Netz: Liegt der Datenstand nicht auf dem Gerät, sagt die App das jetzt klar – statt von einer älteren App-Version zu sprechen.' ]},
@@ -3494,6 +3496,13 @@ function dokuStand(){
     knopf:p.pdf?'&#128196; PDF':'', fn:p.pdf?('dokuEwPdf('+escapeHtml(JSON.stringify(p.pdf))+')'):''}));
   // Freimeldungen und Protokoll-Übersicht
   try{ fmBisher().forEach(f=>fertig.push({ic:'&#128228;', t:'Mängelfreimeldung Nr. '+f.nr, m:[dokuDat(f.datum), f.n+' Mängel freigemeldet', f.von].filter(Boolean).join(' · '), knopf:'Öffnen', fn:'openFreimeldung()', leicht:true})); }catch(e){}
+  // Ausgefüllte Geräte-Protokolle gebündelt (v169, Wunsch des Nutzers) – bisher nur
+  // an der einzelnen Position erreichbar
+  [['IBN Protokoll','&#9881;&#65039;','Inbetriebnahmeprotokolle'],['DGUV Protokoll','&#9889;','DGUV-Prüfprotokolle']].forEach(([typ,ic,titel])=>{
+    const l=geraeteProtokolle(typ); if(!l.length) return;
+    const pos=new Set(l.map(x=>x.pos)).size;
+    fertig.push({ic, t:titel, tag:String(l.length), m:l.length+' Protokoll'+(l.length===1?'':'e')+' an '+pos+' Position'+(pos===1?'':'en')+' · zuletzt '+(l[0].datum||'–'), knopf:'Liste', fn:'geraeteProtokollListe('+escapeHtml(JSON.stringify(typ))+')'});
+  });
   let nProt=0; DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ nProt+=(gs(it.pos).pdfs||[]).length; })));
   if(nProt) fertig.push({ic:'&#128450;', t:'Protokoll-Übersicht', m:nProt+' Geräte-Protokolle · hält sich selbst aktuell', knopf:'Anzeigen', fn:'expProtokollUebersicht()', leicht:true});
   return {off, vorb, fertig, aus};
@@ -3530,6 +3539,32 @@ function dokuRender(){
     grp('Abgeschlossen','dk-fertig',s.fertig,'','Noch nichts abgeschlossen.')+
     (s.aus.length?('<div class="dk-grp dk-ausg"><div class="dk-gh" onclick="DOKU_AUS_AUF=!DOKU_AUS_AUF;dokuRender()">'+(DOKU_AUS_AUF?'&#9662;':'&#9656;')+' Nicht erforderlich <span class="dk-n">'+s.aus.length+'</span></div>'+
       (DOKU_AUS_AUF?s.aus.map(x=>zeile(x,'dk-ausg')).join(''):'')+'</div>'):'');
+}
+// Alle abgelegten Protokolle einer Art an den Positionen, neueste zuerst
+function geraeteProtokolle(typ){
+  const r=[];
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+    (gs(it.pos).pdfs||[]).forEach((p,i)=>{ if(!p || (p.type||'')!==typ) return;
+      const d=protoTs(p.fname);
+      r.push({pos:it.pos, i, bez:(it.bez||'').trim(), etage:sec.label||sec.pos, anlage:sub.bez||sub.pos,
+        geraet:[p.mfr,p.dev].filter(Boolean).join(' · ')||[it.fabrikat,it.typ].filter(Boolean).join(' · '),
+        nr:(p.nr&&p.von>1)?('Gerät '+p.nr+'/'+p.von):(p.alle?'alle Geräte':''), ts:d?d.getTime():0, datum:protoDatum(p.fname)}); });
+  })));
+  return r.sort((a,b)=>(b.ts||0)-(a.ts||0));
+}
+function geraeteProtokollListe(typ){
+  const l=geraeteProtokolle(typ);
+  let ov=document.getElementById('gpLsOv');
+  if(!ov){ ov=document.createElement('div'); ov.id='gpLsOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:'+(innerWidth<500?'6px':'20px')+';'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  const titel=typ==='DGUV Protokoll'?'DGUV-Prüfprotokolle':'Inbetriebnahmeprotokolle';
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:var(--surface);color:var(--text);border-radius:12px;max-width:560px;width:100%;max-height:88vh;overflow:auto;padding:16px;box-shadow:0 10px 40px rgba(0,0,0,.45)">'+
+    '<div style="font-size:16px;font-weight:700;margin-bottom:10px">'+(typ==='DGUV Protokoll'?'&#9889;':'&#9881;&#65039;')+' '+titel+' ('+l.length+')</div>'+
+    l.map(x=>'<div onclick="document.getElementById(\'gpLsOv\').remove();pdfView('+escapeHtml(JSON.stringify(x.pos))+','+x.i+')" style="display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-left:4px solid var(--green);border-radius:8px;padding:8px 10px;margin-bottom:6px;cursor:pointer">'+
+      '<div style="flex:1;min-width:0"><div style="font-size:13.5px">'+escapeHtml(x.pos+' '+x.bez)+(x.nr?' <span style="font-size:11px;color:var(--accent2)">· '+escapeHtml(x.nr)+'</span>':'')+'</div>'+
+      '<div style="font-size:11px;color:var(--accent2)">'+escapeHtml([x.etage+' · '+x.anlage, x.geraet, x.datum].filter(Boolean).join(' · '))+'</div></div>'+
+      '<span style="border:1px solid var(--braun);color:var(--braun);border-radius:14px;padding:4px 10px;font-size:12px;white-space:nowrap;flex:0 0 auto">&#128196; PDF</span></div>').join('')+
+    '<div style="text-align:right;margin-top:8px"><button onclick="document.getElementById(\'gpLsOv\').remove()" style="padding:8px 16px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-family:inherit">Schließen</button></div></div>';
 }
 function dokuNeuMenu(btn){
   let menu=document.getElementById('dokuNeuMenu');
