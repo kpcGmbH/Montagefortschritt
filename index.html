@@ -1690,7 +1690,10 @@ function gs(p){if(!ST[p])ST[p]={g:false,m:false,nu:false,a:false,sa:false,dp:fal
 //   beides je Position an-/abwählbar (Gewerk-Dialog, Stücklisten-Import) und der
 //   ALTBESTAND bleibt unberührt – hätte „pa" in GEW_FIELDS.E gestanden, wären alle
 //   bereits fertigen Elektro-Positionen schlagartig wieder „teilweise".
-const GEW_FIELDS={M:['g','m'],S:['sa','dp'],E:['ea','ib','ew'],PA:['pa'],NU:['g','nu']};
+// NU (Nachunternehmer, z. B. Kältetechnik) ab v172 mit „Einweisung": der NU ist meist
+// dabei; Inbetriebnahme/Druckprobe liefert er selbst (Ablage in Odoo, nicht hier).
+// Gleiche Tabelle in einweisung.html – wer eine ändert, ändert beide.
+const GEW_FIELDS={M:['g','m'],S:['sa','dp'],E:['ea','ib','ew'],PA:['pa'],NU:['g','nu','ew']};
 const ALL_CK=['g','m','nu','sa','dp','ea','pa','ib','ew'];
 // Filter-Knopf -> die Gewerk-Codes, die er umfasst. PA hat BEWUSST keinen eigenen
 // Knopf: den Potentialausgleich macht dieselbe Person wie den Elektroanschluss, sie
@@ -2252,8 +2255,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 171;
+const APP_VERSION = 172;
 const CHANGELOG = [
+  { v:172, titel:'Nachunternehmer: Einweisung', punkte:[
+    'Positionen mit Gewerk <b>„Nachunternehmer"</b> (z. B. Kältetechnik) haben jetzt den Schritt <b>Einweisung</b>: Geliefert · Ausgeführt · Einweisung. Wo keine nötig ist (z. B. Brandschutz): „entfällt". Inbetriebnahme und Druckprobe liefert der Nachunternehmer selbst – die liegen in Odoo, die App verlangt sie nicht.',
+    'Einweisungsprotokoll: Sind Nachunternehmer-Geräte ausgewählt, erscheint <b>„Mitwirkender Nachunternehmer"</b> (Firma, Name, wahlweise mit Unterschrift). Im PDF steht „Unter Mitwirkung von … für Pos. …", in der Geräte-Anlage sind seine Positionen gekennzeichnet.' ]},
   { v:171, titel:'Sammel-Abhaken bis Anschluss', punkte:[
     'Neu unter jeder Anlage und jeder Etage (Bauleitung, Innendienst): <b>„✓ Alles bis Anschluss erledigt"</b>. Setzt Geliefert, Montiert, Sanitär-, Elektroanschluss, Dichtigkeitsprüfung und Potentialausgleich auf einmal – Inbetriebnahme und Einweisung bleiben offen. Gedacht für Baustellen, deren Stückliste erst nachgetragen wird.',
     'Für jedes Elektrogerät wird dabei einmal <b>Stecker oder Festanschluss</b> abgefragt (mit „alle Stecker" / „alle Festanschluss"), damit die DGUV-Pflicht bei Festanschluss nicht verloren geht. Sanitärgeräte ohne Typenschild-Foto behalten den Sanitäranschluss offen.',
@@ -3221,7 +3227,7 @@ function tc(pos,f){
 // „pa" hängt wie „ea" an Lieferung + Montage. Umgekehrt setzen Inbetriebnahme und
 // Einweisung den Potentialausgleich voraus – an Positionen ohne PA greift das nicht,
 // weil autoFillVorstufen nur Felder aus relFields anfasst.
-const VORSTUFEN={m:['g'],nu:['g'],sa:['g','m'],dp:['g','m','sa'],ea:['g','m'],pa:['g','m'],ib:['g','m','ea','pa'],ew:['g','m','ea','pa','ib']};
+const VORSTUFEN={m:['g'],nu:['g'],sa:['g','m'],dp:['g','m','sa'],ea:['g','m'],pa:['g','m'],ib:['g','m','ea','pa'],ew:['g','m','nu','ea','pa','ib']};
 function autoFillVorstufen(pos,f){
   const s=gs(pos), rel=relFields(pos);
   (VORSTUFEN[f]||[]).forEach(p=>{
@@ -3514,7 +3520,7 @@ function dokuStand(){
     eTot++; if(st.ew) eIst++; })));
   // Zwei Einweisungen gehören dazu (Wunsch des Nutzers): die Geräte-Einweisung
   // (je Gerät, mit Fortschritt) und die Grundlagen-Einweisung (einmal je Baustelle).
-  if(eTot && eIst<eTot) off.push({ic:'&#128203;', t:'Geräte-Einweisung', m:(eTot-eIst)+' von '+eTot+' Elektrogeräten noch nicht eingewiesen',
+  if(eTot && eIst<eTot) off.push({ic:'&#128203;', t:'Geräte-Einweisung', m:(eTot-eIst)+' von '+eTot+' Geräten noch nicht eingewiesen',
     quote:eIst/eTot, knopf:'Einweisen', fn:'dokuEwNeu(\'geraete\')'});
   if(!ew.protokolle.some(p=>p.typ==='allgemein') && !ew.entwuerfe.some(p=>p.typ==='allgemein'))
     off.push({ic:'&#128203;', t:'Grundlagen-Einweisung', m:'Hygiene, Sicherheit, Reinigung – noch kein Protokoll', knopf:'Einweisen', fn:'dokuEwNeu(\'allgemein\')'});

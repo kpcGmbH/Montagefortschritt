@@ -687,7 +687,10 @@ function allDevices(){ const a=[]; LV.forEach(et=>et.bereiche.forEach(b=>b.gerae
 // Einweisungs-Relevanz je Position – EXAKT wie Hauptapp: das Feld "Einweisung" (ew)
 // gehört zum Gewerk Elektro. Positionen ohne Gewerk werden wie Montage behandelt
 // (keine Einweisung). Nur einweisungspflichtige Geräte bekommen Checkliste + Auswahl.
-const GEW_FIELDS={M:['g','m'],S:['sa','dp'],E:['ea','ib','ew']};
+// NU = Nachunternehmer (z. B. Kältetechnik): ab v172 mit Einweisung – der NU ist
+// meist dabei, hat er kein eigenes Protokoll, steht er in unserem (nuGeraete).
+// Gleiche Tabelle wie in der Hauptapp (GEW_FIELDS dort) – wer eine ändert, ändert beide.
+const GEW_FIELDS={M:['g','m'],S:['sa','dp'],E:['ea','ib','ew'],PA:['pa'],NU:['g','nu','ew']};
 function relFieldsG(gew){ const set=new Set(); (gew||[]).forEach(g=>(GEW_FIELDS[g]||[]).forEach(f=>set.add(f))); if(!set.size){ set.add('g'); set.add('m'); } return set; }
 function needsEinw(gew){ return relFieldsG(gew).has('ew'); }
 
@@ -1159,7 +1162,7 @@ function editProt(id){
     teilnehmer:p.teilnehmer||'', auftraggeber:p.auftraggeber||'', ort:p.ort||'',
     adresse:(p.adresse!=null?p.adresse:PROJ_ADR), auftrag:(p.auftrag!=null?p.auftrag:PROJ_AUFTRAG),
     datum:(p.datum||'').slice(0,10)||todayISO(), einweiser:p.einweiser||'',
-    kommentar:p.kommentar||'', sig:'', sigKpc:'' };
+    kommentar:p.kommentar||'', sig:'', sigKpc:'', sigNu:'', nuFirma:p.nuFirma||'', nuName:p.nuName||'', nuSig:!!p.nuSig };
   mkOverlay('Protokoll korrigieren');
   renderSession();
 }
@@ -1200,7 +1203,7 @@ async function saveEntwurf(){
     teilnehmer:(SESSION.teilnehmer||'').trim(), auftraggeber:(SESSION.auftraggeber||'').trim(),
     ort:(SESSION.ort||'').trim(), adresse:(SESSION.adresse||'').trim(), auftrag:(SESSION.auftrag||'').trim(),
     datum:SESSION.datum||todayISO(), einweiser:(SESSION.einweiser||'').trim(),
-    kommentar:(SESSION.kommentar||'').trim(), etagen, titel:entwurfTitel(SESSION.typ, etagen),
+    kommentar:(SESSION.kommentar||'').trim(), ...nuDaten(), etagen, titel:entwurfTitel(SESSION.typ, etagen),
     ts:Date.now(), von:USER||'' };
   showLoader('Zwischenstand wird gespeichert …');
   try{
@@ -1225,7 +1228,7 @@ function editEntwurf(id){
     teilnehmer:e.teilnehmer||'', auftraggeber:e.auftraggeber||'', ort:e.ort||'',
     adresse:(e.adresse!=null?e.adresse:PROJ_ADR), auftrag:(e.auftrag!=null?e.auftrag:PROJ_AUFTRAG),
     datum:(e.datum||'').slice(0,10)||todayISO(), einweiser:e.einweiser||'',
-    kommentar:e.kommentar||'', sig:'', sigKpc:'' };
+    kommentar:e.kommentar||'', sig:'', sigKpc:'', sigNu:'', nuFirma:e.nuFirma||'', nuName:e.nuName||'', nuSig:!!e.nuSig };
   // Checklisten nachziehen: im Entwurf fehlen sie, wenn ein Gerät ohne sie
   // ausgewählt wurde oder die Stückliste inzwischen ergänzt wurde.
   Object.keys(selected).forEach(pos=>ensureSonder(pos));
@@ -1319,7 +1322,7 @@ function renderSessionGeraete(){
           const sel=!!SESSION.selected[g.pos];
           html+='<div class="selrow'+(sel?' on':'')+(done?' done':'')+'" onclick="selDev('+esc(JSON.stringify(g.pos))+')">'+
             '<div class="selbox">'+(sel?'&#10003;':'')+'</div>'+
-            '<div class="gi"><div class="gbez">'+esc(g.bez)+'</div><div class="gmeta">'+esc(g.pos)+(g.fab?' · '+esc(g.fab):'')+(g.typ?' · '+esc(g.typ):'')+(done?' · bereits eingewiesen':'')+'</div></div>'+
+            '<div class="gi"><div class="gbez">'+esc(g.bez)+'</div><div class="gmeta">'+esc(g.pos)+(g.fab?' · '+esc(g.fab):'')+(g.typ?' · '+esc(g.typ):'')+(istNU(g)?' · 🏗️ Nachunternehmer':'')+(done?' · bereits eingewiesen':'')+'</div></div>'+
           '</div>';
           if(sel && isK){
             const k=keyRow(g.pos);
@@ -1416,6 +1419,7 @@ function footerFields(){
     '<div class="fld"><label>Anschrift der Baustelle</label><input id="f_adr" value="'+esc(SESSION.adresse||'')+'" oninput="SESSION.adresse=this.value" placeholder="Straße Hausnr., PLZ Ort"><small class="hint" style="display:block;margin-top:4px">Aus den Stammdaten der Baustelle (🏢 in der Montagefortschritt-App). Steht im Protokollkopf.</small></div>'+
     '<div class="fld"><label>'+(isK?'Übernehmer (Kunde) *':'Bedienungsperson / eingewiesene Person *')+'</label><input id="f_teil" value="'+esc(SESSION.teilnehmer)+'" oninput="SESSION.teilnehmer=this.value" placeholder="'+(isK?'Name der übernehmenden Person':'Name (Techniker, Hausmeister, Küchenpersonal …)')+'"></div>'+
     '<div class="fld"><label>'+(isK?'Übergeber (KPC) *':'Einweiser (KPC)')+'</label><input id="f_einw" value="'+esc(SESSION.einweiser)+'" oninput="SESSION.einweiser=this.value" placeholder="Vorname Nachname"><small class="hint" style="display:block;margin-top:4px">'+(isK?'Steht als Übergeber im Protokoll.':'Steht im Protokoll und wird an den eingewiesenen Geräten vermerkt.')+'</small></div>'+
+    nuFelder()+
     '<div class="fld"><label>Ort (für „Anerkannt")</label><input id="f_ort" value="'+esc(SESSION.ort)+'" oninput="SESSION.ort=this.value" placeholder="Ort"></div>'+
     '<div class="fld"><label>Datum</label><input id="f_datum" type="date" value="'+esc(SESSION.datum)+'" oninput="SESSION.datum=this.value"></div>'+
     '<div class="fld"><label>Kommentar (optional)</label><textarea id="f_komm" rows="2" oninput="SESSION.kommentar=this.value" placeholder="Bemerkungen, Auffälligkeiten, Ausnahmen …" style="width:100%;box-sizing:border-box;padding:11px 12px;border:1px solid var(--border);border-radius:8px;font-size:15px;font-family:inherit;background:var(--white);color:var(--text);resize:vertical">'+esc(SESSION.kommentar||'')+'</textarea></div>'+
@@ -1431,6 +1435,28 @@ function footerFields(){
       '<div class="entw-hint">Hebt den Stand auf, damit er vor Ort fertiggestellt werden kann. Es entsteht <b>kein PDF</b>, und der Schritt „Einweisung" wird <b>nicht</b> abgehakt.</div>')+
     '<button class="finish" onclick="finishSession()">'+(SESSION.editId? 'Korrektur speichern' : 'Protokoll abschließen &amp; speichern')+'</button>';
 }
+// ── Mitwirkender Nachunternehmer (ab v172) ──────────────────────────────────
+// Wunsch des Nutzers (03.11.2026): Bei der Einweisung in Nachunternehmer-Leistungen
+// (Kältetechnik) ist der NU meist dabei. Hat er kein eigenes Protokoll, wird er in
+// unserem festgehalten – Firma, Name, wahlweise mit Unterschrift. Die Felder
+// erscheinen nur, wenn NU-Geräte ausgewählt sind.
+function istNU(g){ return !!(g && Array.isArray(g.gew) && g.gew.indexOf('NU')>=0); }
+function nuGeraete(){
+  if(!SESSION || SESSION.typ!=='geraete') return [];
+  return Object.keys(SESSION.selected||{}).map(devByPos).filter(istNU);
+}
+// Gespeichert nur, was bei gewählten NU-Geräten zählt (ohne Unterschriftsbild – wie sig/sigKpc)
+function nuDaten(){ return nuGeraete().length ? {nuFirma:(SESSION.nuFirma||'').trim(), nuName:(SESSION.nuName||'').trim(), nuSig:!!SESSION.nuSig} : {}; }
+function nuFelder(){
+  const l=nuGeraete(); if(!l.length) return '';
+  return '<div class="fld" style="border:1px dashed var(--border);border-radius:10px;padding:10px 12px">'+
+    '<label>🏗️ Mitwirkender Nachunternehmer <span style="font-weight:400">('+l.length+' Gerät'+(l.length===1?'':'e')+')</span></label>'+
+    '<input id="f_nufirma" value="'+esc(SESSION.nuFirma||'')+'" oninput="SESSION.nuFirma=this.value" placeholder="Firma, z. B. '+esc((l[0].fab||'Kältebau Muster').trim())+'" style="margin-bottom:6px">'+
+    '<input id="f_nuname" value="'+esc(SESSION.nuName||'')+'" oninput="SESSION.nuName=this.value" placeholder="Name (wer war dabei?)">'+
+    '<label style="display:flex;align-items:center;gap:8px;margin-top:8px;font-weight:400;cursor:pointer"><input type="checkbox" style="width:18px;height:18px"'+(SESSION.nuSig?' checked':'')+' onchange="SESSION.nuSig=this.checked;if(!this.checked)SESSION.sigNu=\'\';renderSession()"> Nachunternehmer unterschreibt mit</label>'+
+    (SESSION.nuSig? '<div class="sigwrap" style="margin-top:6px"><canvas id="sigCanvasNu"></canvas><div class="sigtools"><span style="font-size:11px;color:var(--accent2)">Unterschrift Nachunternehmer</span><button onclick="clearSig(\'sigNu\')">Löschen</button></div></div>' : '')+
+    '<small class="hint" style="display:block;margin-top:6px">Steht im Protokoll als „Unter Mitwirkung von …" mit den Positionen des Nachunternehmers. Leer lassen, wenn er nicht dabei war.</small></div>';
+}
 function devByPos(pos){ const d=allDevices().find(x=>x.g.pos===pos); return d?d.g:null; }
 // Checkliste nur für einweisungspflichtige (Elektro) Geräte anlegen
 function ensureSonder(pos){ if(istSchluessel()) return; if(!SESSION.sonder[pos]){ const g=devByPos(pos); if(g && needsEinw(g.gew)) SESSION.sonder[pos]=checksFor(g).map(t=>({txt:t,done:false})); } }
@@ -1444,7 +1470,7 @@ function toggleStd(fid,ci){ SESSION.std[fid][ci].done=!SESSION.std[fid][ci].done
 // ── Unterschrift-Pads ──
 // Zwei Stück: der Einweiser (KPC) und die eingewiesene Person. Das PDF hat für beide
 // seit jeher eine Spalte – die linke blieb nur leer, weil das Pad fehlte.
-const SIG_PADS={ sigCanvas:'sig', sigCanvasKpc:'sigKpc' };
+const SIG_PADS={ sigCanvas:'sig', sigCanvasKpc:'sigKpc', sigCanvasNu:'sigNu' };   // sigNu nur bei mitwirkendem NU (v172)
 function initSig(){ Object.keys(SIG_PADS).forEach(id=>sigPad(id, SIG_PADS[id])); }
 function sigPad(id, key){
   const cv=document.getElementById(id); if(!cv) return;
@@ -1479,6 +1505,7 @@ async function finishSession(){
   if(!einw){ alert(isK? 'Bitte den Übergeber (KPC) eintragen – er steht im Protokoll.' : 'Bitte den Einweiser eintragen – er steht im Protokoll und wird an den Geräten vermerkt.'); return; }
   if(!SESSION.sigKpc){ alert(isK? 'Bitte die Unterschrift des Übergebers (KPC) erfassen.' : 'Bitte die Unterschrift des Einweisers (KPC) erfassen.'); return; }
   if(!SESSION.sig){ alert(isK? 'Bitte die Unterschrift des Übernehmers erfassen.' : 'Bitte die Unterschrift der eingewiesenen Person erfassen.'); return; }
+  if(nuGeraete().length && SESSION.nuSig && !SESSION.sigNu){ alert('Bitte die Unterschrift des Nachunternehmers erfassen – oder den Haken „Nachunternehmer unterschreibt mit" entfernen.'); return; }
   let positions=[], zeilen=[];
   if(SESSION.typ==='geraete'){
     positions=Object.keys(SESSION.selected);
@@ -1565,7 +1592,7 @@ async function finishSession(){
     // die Ops setzen absolute Werte.
     ops.forEach(op=>applyEwOp(EW, op));
     let complete=false; if(SESSION.typ==='geraete'){ const c=counts(); complete = c.tot>0 && c.ein>=c.tot; }
-    const daten={ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), adresse:(SESSION.adresse||'').trim(), auftrag:(SESSION.auftrag||'').trim(), einweiser:einw, kommentar:(SESSION.kommentar||'').trim(), positions, bereiche, etagen, titel, complete, pdf:fname, pdfId:(up&&up.id)||(alt&&alt.pdfId)||'', ts:Date.now() };
+    const daten={ id, typ:SESSION.typ, datum:iso, teilnehmer:SESSION.teilnehmer.trim(), auftraggeber:SESSION.auftraggeber.trim(), ort:SESSION.ort.trim(), adresse:(SESSION.adresse||'').trim(), auftrag:(SESSION.auftrag||'').trim(), einweiser:einw, kommentar:(SESSION.kommentar||'').trim(), ...nuDaten(), positions, bereiche, etagen, titel, complete, pdf:fname, pdfId:(up&&up.id)||(alt&&alt.pdfId)||'', ts:Date.now() };
     // Schlüsselzeilen mitspeichern – nur so lässt sich das Protokoll später korrigieren.
     if(isK){ daten.zeilen=zeilen.map(z=>({pos:z.pos,bez:z.bez,anz:z.anz,nr:z.nr})); daten.schluessel=anzSchl; }
     if(alt){ daten.korrigiertAm=new Date().toISOString(); daten.korrigiertVon=USER||einw; MISSING.delete(id); }
@@ -1751,6 +1778,14 @@ function buildPdf(titel, positions){
   lab(tLabs[1],M,y); val((SESSION.einweiser?SESSION.einweiser+', ':'')+'KPC GmbH',tvx,y); y+=(isAllg?5.5:6);
   lab(tLabs[2],M,y); val(SESSION.teilnehmer||'—',tvx,y); y+=(isAllg?3:4);
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor.apply(doc,grey); doc.text('(Techniker, Hausmeister, Küchenpersonal etc.)',M,y); y+=(isAllg?6.5:8);
+  // Mitwirkender Nachunternehmer (v172) – nur wenn NU-Geräte gewählt und angegeben
+  const nuL=isAllg?[]:positions.map(devByPos).filter(istNU);
+  const nuWer=[(SESSION.nuName||'').trim(),(SESSION.nuFirma||'').trim()].filter(Boolean).join(', ');
+  if(nuL.length && nuWer){
+    doc.setFontSize(10); lab('Unter Mitwirkung von:',M,y); val(nuWer+' (Nachunternehmer)',M+42,y); y+=5;
+    doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc,grey);
+    const pl=doc.splitTextToSize('für Pos. '+nuL.map(g=>g.pos).join(', '), W-2*M-42); doc.text(pl,M+42,y); y+=pl.length*4+4;
+  }
 
   // Einweisung durchgeführt
   doc.setFont('helvetica','normal'); doc.setFontSize(10.5); doc.setTextColor.apply(doc,dark);
@@ -1781,7 +1816,8 @@ function buildPdf(titel, positions){
   // ── Unterer Block: Bestätigungstext steht DIREKT über den Unterschriften (Text = das, was unterschrieben wird) ──
   // Allgemein: folgt direkt auf den Inhalt (kompakt); Geräte: am unteren Seitenrand verankert (wie Vorlage)
   doc.setFontSize(9.5); const cl=doc.splitTextToSize(confText(), W-2*M); const confH=cl.length*5;
-  const blockH=confH+(isAllg?5:9)+(isAllg?10:14)+(isAllg?30:32);  // Bestätigung + Anerkannt + Unterschriften
+  const nuUnt=!isAllg && nuL.length && !!SESSION.sigNu;   // dritte Unterschrift (v172)
+  const blockH=confH+(isAllg?5:9)+(isAllg?10:14)+(isAllg?30:32)+(nuUnt?32:0);  // Bestätigung + Anerkannt + Unterschriften
   let by=isAllg? y+4 : Math.max(y+8, 287-blockH);
   if(by+blockH>289){ doc.addPage(); by=isAllg? 20 : 287-blockH; }
   doc.setTextColor.apply(doc,dark); doc.text(cl,M,by); by+=confH+(isAllg?5:9);
@@ -1798,6 +1834,11 @@ function buildPdf(titel, positions){
   doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor.apply(doc,grey);
   doc.text('Unterschrift Auftragnehmer (KPC GmbH)',M,sy+28);
   doc.text('Auftraggeber – Eingewiesene Person',M+colW+16,sy+28);
+  if(nuUnt){ const ny=sy+32;
+    try{ doc.addImage(SESSION.sigNu,'PNG',M,ny-1,colW*0.8,17); }catch(e){}
+    doc.setDrawColor.apply(doc,dark); doc.setLineWidth(0.3); doc.line(M,ny+19,M+colW,ny+19);
+    doc.setFont('helvetica','bold'); doc.setFontSize(9); doc.setTextColor.apply(doc,dark); doc.text(nuWer||'',M,ny+24);
+    doc.setFont('helvetica','normal'); doc.setFontSize(8); doc.setTextColor.apply(doc,grey); doc.text('Mitwirkender Nachunternehmer',M,ny+28); }
   doc.setFontSize(7); doc.text('Für diese Unterlage behalten wir uns alle Rechte vor.',M,293);
 
   // ═══════════ SEITE 2 – Anlage (nur Geräte-Einweisung; Allgemein hat die Punkte auf dem Deckblatt) ═══════════
@@ -1831,6 +1872,8 @@ function buildPdf(titel, positions){
         doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc,dark);
         doc.text(String(g.pos||''),cx.pos,ya); doc.text(String(g.menge||''),cx.stk,ya); doc.text(String(g.einh||''),cx.einh,ya);
         doc.text(bezL,cx.bez,ya); doc.text(fabL,cx.fab,ya); doc.text(typL,cx.typ,ya);
+        // v172: direkt unter der Bezeichnung; mehr Platz nur, wenn sie die längste Spalte ist
+        if(istNU(g)){ doc.setFontSize(7.5); doc.setTextColor.apply(doc,grey); doc.text('Nachunternehmer',cx.bez,ya+bezL.length*4.4-0.6); if(bezL.length>=rows) ya+=3.4; }
         ya+=rows*4.4+1.5;
       });
       ya+=2;
