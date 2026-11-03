@@ -1985,7 +1985,7 @@ function buildPanels(){
     hint.innerHTML='<div class="lvhint-t">Diese Baustelle hat noch keine Stückliste.</div>'+
       '<div class="lvhint-s">Allgemeine Restarbeiten lassen sich oben trotzdem erfassen. '+
       'Für Positionen (Geräte, Status, Fotos je Gerät) die Stückliste nachtragen.</div>'+
-      '<input id="lvNachInp" type="file" accept=".xlsx,.xls,.csv,.pdf" style="display:none" onchange="lvNachtragen(this.files[0])">'+
+      '<input id="lvNachInp" type="file" accept=".xlsx,.xlsm,.xls,.csv,.pdf" style="display:none" onchange="lvNachtragen(this.files[0])">'+
       '<button class="lvhint-b" onclick="document.getElementById(\'lvNachInp\').click()">&#128193; St&uuml;ckliste nachtragen</button>'+
       // Ohne Datei ging es bisher gar nicht weiter: „＋ Position ergänzen" hängt an
       // einer Anlage, und die gibt es hier noch nicht. Für kleine Baustellen
@@ -2085,14 +2085,15 @@ function buildPanels(){
   <span class="btog cl">&#9660;</span>
 </div>
 <div class="bprog-bar" id="PB${sid}"><div class="bprog-fill" id="PF${sid}" style="width:0%"></div></div>
-<div class="ilist hid" id="L${sid}">${cards}<div class="lvonly blk"><button class="lvadd" onclick="openPosNeu('${sec.pos}','${sub.pos}')" title="Nachtrag / fehlende Position in dieser Anlage ergänzen">&#65291; Position erg&auml;nzen</button></div></div>`;
+<div class="ilist hid" id="L${sid}">${cards}<div class="lvonly blk"><button class="lvadd" onclick="openPosNeu('${sec.pos}','${sub.pos}')" title="Nachtrag / fehlende Position in dieser Anlage ergänzen">&#65291; Position erg&auml;nzen</button><button class="lvadd" onclick="sammelOeffnen('${escapeHtml(sec.pos)}','${escapeHtml(sub.pos)}')" title="Alle Positionen dieser Anlage bis einschließlich Anschluss abhaken">&#10003; Alles bis Anschluss erledigt</button></div></div>`;
       panel.appendChild(div);
     });
     // Struktur von Hand erweitern – gleiche Rechte wie „＋ Position ergänzen".
     const lvst=document.createElement('div');
     lvst.className='lvonly blk lvst-p';   // lvst-p: je Bereich; in „Alle" gilt #LVSTALL (updEtbarVis)
     lvst.innerHTML='<button class="lvadd" onclick="openAnlageNeu(\''+escapeHtml(sec.pos)+'\')" title="Weitere Anlage in dieser Etage anlegen">&#65291; Anlage erg&auml;nzen</button>'+
-      '<button class="lvadd" onclick="openEtageNeu()" title="Weitere Etage / weiteren Bereich anlegen">&#65291; Etage anlegen</button>';
+      '<button class="lvadd" onclick="openEtageNeu()" title="Weitere Etage / weiteren Bereich anlegen">&#65291; Etage anlegen</button>'+
+      '<button class="lvadd" onclick="sammelOeffnen(\''+escapeHtml(sec.pos)+'\',\'\')" title="Alle Positionen dieser Etage bis einschließlich Anschluss abhaken">&#10003; Ganze Etage bis Anschluss erledigt</button>';
     panel.appendChild(lvst);
     main.appendChild(panel);
   });
@@ -2251,8 +2252,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 170;
+const APP_VERSION = 171;
 const CHANGELOG = [
+  { v:171, titel:'Sammel-Abhaken bis Anschluss', punkte:[
+    'Neu unter jeder Anlage und jeder Etage (Bauleitung, Innendienst): <b>„✓ Alles bis Anschluss erledigt"</b>. Setzt Geliefert, Montiert, Sanitär-, Elektroanschluss, Dichtigkeitsprüfung und Potentialausgleich auf einmal – Inbetriebnahme und Einweisung bleiben offen. Gedacht für Baustellen, deren Stückliste erst nachgetragen wird.',
+    'Für jedes Elektrogerät wird dabei einmal <b>Stecker oder Festanschluss</b> abgefragt (mit „alle Stecker" / „alle Festanschluss"), damit die DGUV-Pflicht bei Festanschluss nicht verloren geht. Sanitärgeräte ohne Typenschild-Foto behalten den Sanitäranschluss offen.',
+    'Stückliste nachtragen: Excel-Dateien mit Makros (<b>.xlsm</b>) lassen sich jetzt auswählen. Bei der Vorlage wird der lange Geschossname (Spalte „Geschoss_Name") übernommen.' ]},
   { v:170, titel:'Spültechnik: Wasseraufbereitung im selben Protokoll', punkte:[
     'Steht die <b>Enthärtung oder Osmose als eigene Position</b> in derselben Anlage, zeigt das Inbetriebnahmeprotokoll der Spülmaschine einen Kasten „Gilt auch als Inbetriebnahme von Pos. …" mit den fehlenden Werten (Resthärte, Kapazität, Regeneration, Dichtheit). Was das Hersteller-Protokoll schon abfragt, wird nicht doppelt eingetragen.',
     'Das PDF wird an <b>beiden Positionen</b> abgelegt (bei der Wasseraufbereitung als „über Pos. …") und zählt dort als Inbetriebnahmeprotokoll. Haken heraus → nur die Spülmaschine.',
@@ -3228,6 +3233,91 @@ function autoFillVorstufen(pos,f){
     ckRender(pos,p);
   });
 }
+// ── Sammel-Abhaken „alles bis einschließlich Anschluss" (ab v171) ───────────
+// Wunsch des Nutzers (03.11.2026, Kriftel): Stückliste erst nachgetragen, als schon
+// alles montiert und angeschlossen war – ohne Sammelknopf hieße das, jede Position
+// einzeln abzuhaken. Setzt je Anlage oder Etage die Schritte VOR der Inbetriebnahme;
+// Inbetriebnahme und Einweisung bleiben offen. Die Sperren gelten weiter:
+// – Stecker oder Festanschluss wird je Elektrogerät abgefragt. Ohne Antwort ginge die
+//   DGUV-Pflicht bei Festanschluss verloren (anschlFragen fragt nach gesetztem
+//   Elektroanschluss nicht mehr).
+// – Reine Sanitärgeräte ohne Typenschild-Foto behalten „Sanitäranschluss" (und die
+//   Dichtigkeitsprüfung) offen – wie beim Abhaken von Hand.
+// Gesetzte und „entfällt"-Schritte bleiben unberührt. Nur Bauleitung/Innendienst
+// (lvonly), weil es viele Positionen auf einmal ändert.
+const SAMMEL_FELDER=['g','m','nu','sa','dp','ea','pa'];
+let SAMMEL=null;
+function sammelOeffnen(secPos, subPos){
+  if(!darfLVAendern()){ alert('Sammel-Abhaken dürfen nur Bauleitung und Innendienst – es ändert viele Positionen auf einmal.'); return; }
+  const sec=DATA.find(x=>x.pos===secPos); if(!sec) return;
+  const subs=sec.subsections.filter(su=>!subPos || su.pos===subPos);
+  const plan=[];
+  subs.forEach(su=>su.items.forEach(it=>{
+    const s=gs(it.pos), rel=relFields(it.pos);
+    let felder=SAMMEL_FELDER.filter(f=>rel.includes(f) && !s[f] && !entf(s,f));
+    const tsSperre=tsSchritt(it.pos)==='sa' && tsFehlt(it.pos) && felder.some(f=>f==='sa'||f==='dp');
+    if(tsSperre) felder=felder.filter(f=>f!=='sa' && f!=='dp');
+    const frage=felder.includes('ea') && !s.anschl;
+    if(felder.length || tsSperre) plan.push({pos:it.pos, bez:String(it.bez||'').trim(), felder, tsSperre, frage});
+  }));
+  const titel=subPos ? (subs[0] ? (subs[0].bez||subs[0].pos) : subPos) : ('Etage '+(sec.label||sec.pos));
+  SAMMEL={titel, plan, wahl:{}};
+  sammelRender();
+}
+function sammelWahl(pos, v){ if(!SAMMEL) return; if(pos) SAMMEL.wahl[pos]=v; else SAMMEL.plan.forEach(x=>{ if(x.frage) SAMMEL.wahl[x.pos]=v; }); sammelRender(); }
+function sammelRender(){
+  let ov=document.getElementById('samOv');
+  const scroll=ov&&ov.firstElementChild?ov.firstElementChild.scrollTop:0;
+  if(!ov){ ov=document.createElement('div'); ov.id='samOv'; ov.style.cssText='position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.55);display:flex;align-items:center;justify-content:center;padding:'+(innerWidth<500?'6px':'20px')+';'; document.body.appendChild(ov); }
+  ov.onclick=function(e){ if(e.target===ov) ov.remove(); };
+  const P=SAMMEL.plan, setzen=P.filter(x=>x.felder.length), fragen=P.filter(x=>x.frage), ts=P.filter(x=>x.tsSperre);
+  const offen=fragen.filter(x=>!SAMMEL.wahl[x.pos]).length;
+  const felderAlle=[...new Set(setzen.flatMap(x=>x.felder))];
+  const chip=(pos,v,lbl)=>{ const an=SAMMEL.wahl[pos]===v; return '<button type="button" onclick="sammelWahl('+escapeHtml(JSON.stringify(pos))+',\''+v+'\')" style="border:1px solid #895500;border-radius:14px;padding:5px 10px;font-size:12.5px;cursor:pointer;font-family:inherit;white-space:nowrap;'+(an?'background:#895500;color:#fff;font-weight:700':'background:transparent;color:#ddd')+'">'+lbl+'</button>'; };
+  const zeile='display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid #3d3832;flex-wrap:wrap';
+  ov.innerHTML='<div onclick="event.stopPropagation()" style="background:#2b2b2b;color:#fff;border-radius:14px;padding:18px;max-width:560px;width:100%;max-height:90vh;overflow:auto;font-family:inherit;box-shadow:0 10px 40px rgba(0,0,0,.5)">'+
+    '<div style="font-size:16px;font-weight:700">&#10003; Alles bis Anschluss erledigt</div>'+
+    '<div style="font-size:12px;color:#a8a8a8;margin:2px 0 10px">'+escapeHtml(SAMMEL.titel)+'</div>'+
+    (setzen.length
+      ? '<div style="font-size:13px;line-height:1.5;margin-bottom:8px"><b>'+setzen.length+' Positionen</b> – gesetzt wird, soweit an der Position vorhanden: '+escapeHtml(felderAlle.map(f=>FLD_LBL[f]||f).join(', '))+'.<br><span style="color:#a8a8a8">Inbetriebnahme und Einweisung bleiben offen. Schon Abgehaktes und „entfällt" bleiben unverändert.</span></div>'
+      : '<div style="font-size:13px;margin-bottom:8px">Hier ist bis zum Anschluss schon alles abgehakt.</div>')+
+    (fragen.length
+      ? '<div style="font-size:12px;color:#d7c1ae;font-weight:700;letter-spacing:.3px;margin:12px 0 4px">WIE SIND DIE ELEKTROGERÄTE ANGESCHLOSSEN? ('+fragen.length+')</div>'+
+        '<div style="font-size:11.5px;color:#a8a8a8;margin-bottom:6px">Bei Festanschluss ist vor der Inbetriebnahme eine DGUV-Prüfung Pflicht.</div>'+
+        '<div style="display:flex;gap:8px;margin-bottom:4px">'+chip('','stecker','&#128268; alle Stecker')+chip('','fest','&#9889; alle Festanschluss')+'</div>'+
+        fragen.map(x=>'<div style="'+zeile+'"><span style="color:#a8a8a8;font-size:11.5px;min-width:78px">'+escapeHtml(x.pos)+'</span><span style="flex:1;min-width:140px;font-size:13px">'+escapeHtml(x.bez)+'</span>'+
+          '<span style="display:flex;gap:6px">'+chip(x.pos,'stecker','&#128268; Stecker')+chip(x.pos,'fest','&#9889; Festanschluss')+'</span></div>').join('')
+      : '')+
+    (ts.length
+      ? '<div style="font-size:12px;color:#e0b070;margin-top:12px;line-height:1.5">&#127991; Sanitäranschluss bleibt offen – Typenschild-Foto fehlt: '+escapeHtml(ts.map(x=>x.pos+' '+x.bez).join(' · '))+'</div>'
+      : '')+
+    '<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:16px;flex-wrap:wrap">'+
+      '<button type="button" onclick="document.getElementById(\'samOv\').remove()" style="padding:9px 16px;border:1px solid #555;background:transparent;color:#ccc;border-radius:8px;cursor:pointer;font-family:inherit">Abbrechen</button>'+
+      (setzen.length ? '<button type="button" '+(offen?'disabled ':'')+'onclick="sammelAusfuehren()" style="padding:9px 18px;border:none;background:#b8860b;color:#fff;border-radius:8px;font-weight:700;cursor:'+(offen?'default;opacity:.45':'pointer')+';font-family:inherit">'+
+        (offen?('Noch '+offen+' Anschlussart'+(offen===1?'':'en')+' offen'):('&#10003; '+setzen.length+' Positionen abhaken'))+'</button>' : '')+
+    '</div></div>';
+  ov.firstElementChild.scrollTop=scroll;
+}
+function sammelAusfuehren(){
+  if(!SAMMEL) return;
+  const P=SAMMEL.plan;
+  if(P.some(x=>x.frage && !SAMMEL.wahl[x.pos])) return;
+  const jetzt=new Date().toISOString(); let n=0;
+  P.forEach(x=>{
+    if(!x.felder.length) return;
+    const s=gs(x.pos);
+    if(x.frage && !s.anschl){ const v=SAMMEL.wahl[x.pos]; s.anschl=v; histAdd(x.pos,'anschl',v==='fest'?'Festanschluss':'Stecker'); }
+    let gesetzt=false;
+    x.felder.forEach(f=>{ if(s[f] || entf(s,f)) return;
+      s[f]=true; s.ts[f]=jetzt; s.by[f]=USER; histAdd(x.pos,'set',(FLD_LBL[f]||f)+' (Sammel)'); ckRender(x.pos,f); gesetzt=true; });
+    if(gesetzt){ ibnRender(x.pos); rc(x.pos); updRA(x.pos); savePos(x.pos); n++; }
+  });
+  const ov=document.getElementById('samOv'); if(ov) ov.remove();
+  SAMMEL=null;
+  upStats(); applyF();
+  showToast('✓ '+n+' Positionen bis Anschluss abgehakt');
+}
+
 // ── Protokoll legt den zugehörigen Schritt automatisch ab (ab v122) ─────────
 // Ein abgelegtes Inbetriebnahmeprotokoll IST der Nachweis der Inbetriebnahme –
 // den Haken danach von Hand zu setzen war doppelte Arbeit und wurde regelmäßig
@@ -12516,7 +12606,7 @@ function openImportWizard(){
     '<input id="impAuftragsnr" type="text" placeholder="leer lassen = Projektnummer" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:5px">'+
     '<div style="font-size:11px;color:#a8a8a8;margin-bottom:16px">Anzeigename wird als „Nummer Ort Objekt" gebildet. Diese Angaben werden in ALLE Protokolle übernommen (Inbetriebnahme, DGUV, Einweisung, Servicebericht, Bautagebuch, Dichtigkeit, Mängelfreimeldung).</div>'+
     '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Stückliste (Excel .xlsx/.csv oder PDF)</label>'+
-    '<input id="impFile" type="file" accept=".xlsx,.xls,.csv,.pdf" onchange="handleImportFile(this.files[0])" style="width:100%;color:#fff;font-size:13px;margin-bottom:8px">'+
+    '<input id="impFile" type="file" accept=".xlsx,.xlsm,.xls,.csv,.pdf" onchange="handleImportFile(this.files[0])" style="width:100%;color:#fff;font-size:13px;margin-bottom:8px">'+
     '<div style="font-size:11px;color:#a8a8a8;margin-bottom:14px">Empfohlen: Excel-Vorlage (saubere Spalten). PDF wird grob ausgelesen – bitte Vorschau prüfen.<br>'+
       '<b>Optional:</b> ohne Stückliste anlegen – z. B. wenn zunächst nur Mängel aus einem Abnahmeprotokoll erfasst werden. Die Stückliste lässt sich später nachtragen.</div>'+
     '<div id="impPreview"></div>'+
@@ -13463,7 +13553,8 @@ async function parseExcelToLV(file){
     const find=keys=>row.findIndex(c=>keys.some(k=>c.includes(k)));
     const m={
       sectLabel:find(['geschoss kurz','kurz','ebene kurz','label']),
-      sectName:find(['geschoss','ebene','bereich']),
+      // „Geschoss_Kurz" enthält auch „geschoss" – sonst landete der Kurzname als Name (v171)
+      sectName:row.findIndex(c=>['geschoss','ebene','bereich'].some(k=>c.includes(k)) && !c.includes('kurz')),
       anlage:find(['anlage','raum','abschnitt','gruppe']),
       pos:find(['pos']),
       menge:find(['menge','stück','stuck','anzahl','stk']),
