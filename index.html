@@ -2251,8 +2251,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 169;
+const APP_VERSION = 170;
 const CHANGELOG = [
+  { v:170, titel:'Spültechnik: Wasseraufbereitung im selben Protokoll', punkte:[
+    'Steht die <b>Enthärtung oder Osmose als eigene Position</b> in derselben Anlage, zeigt das Inbetriebnahmeprotokoll der Spülmaschine einen Kasten „Gilt auch als Inbetriebnahme von Pos. …" mit den fehlenden Werten (Resthärte, Kapazität, Regeneration, Dichtheit). Was das Hersteller-Protokoll schon abfragt, wird nicht doppelt eingetragen.',
+    'Das PDF wird an <b>beiden Positionen</b> abgelegt (bei der Wasseraufbereitung als „über Pos. …") und zählt dort als Inbetriebnahmeprotokoll. Haken heraus → nur die Spülmaschine.',
+    'Wasseraufbereitung als eigene Position braucht jetzt ein IBN-Protokoll – <b>auch ohne Stromanschluss</b>. Ohne Schritt „Inbetriebnahme" gibt es keine Sperre, das fehlende Protokoll steht aber an der Position, in der Liste und als offener Punkt bei der Abnahme.',
+    '„IBN digital" bei einer Enthärtung oder Osmose öffnet jetzt direkt das Formular „Wasserenthärter / Umkehrosmose" – auch bei Meiko, Winterhalter oder Hobart als Hersteller und bei Bezeichnungen wie „Enthärtungsanlage" (bisher: Startseite ohne Formular).' ]},
   { v:169, titel:'Dokumente: Geräte-Protokolle gebündelt', punkte:[
     'Im Reiter <b>Dokumente</b> stehen unter „Abgeschlossen" jetzt auch die ausgefüllten <b>Inbetriebnahme-</b> und <b>DGUV-Prüfprotokolle</b> – gebündelt in je einer Zeile. „Liste" zeigt alle mit Position, Gerät und Datum; ein Tipp öffnet das PDF.' ]},
   { v:168, titel:'Protokolle offline: Korrekturen', punkte:[
@@ -3544,14 +3549,18 @@ function dokuRender(){
 function geraeteProtokolle(typ){
   const r=[];
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
-    (gs(it.pos).pdfs||[]).forEach((p,i)=>{ if(!p || (p.type||'')!==typ) return;
-      const d=protoTs(p.fname);
-      r.push({pos:it.pos, i, bez:(it.bez||'').trim(), etage:sec.label||sec.pos, anlage:sub.bez||sub.pos,
+    (gs(it.pos).pdfs||[]).forEach((p,i)=>{ if(!p || (p.type||'')!==typ || p.ueber) return;   // Verweise (v170) nicht doppelt
+      const d=protoTs(p.fname), mit=waVerweise(it.pos,p.fname);
+      r.push({pos:it.pos, i, bez:(it.bez||'').trim()+(mit.length?(' + Pos. '+mit.join(', ')):''), etage:sec.label||sec.pos, anlage:sub.bez||sub.pos,
         geraet:[p.mfr,p.dev].filter(Boolean).join(' · ')||[it.fabrikat,it.typ].filter(Boolean).join(' · '),
         nr:(p.nr&&p.von>1)?('Gerät '+p.nr+'/'+p.von):(p.alle?'alle Geräte':''), ts:d?d.getTime():0, datum:protoDatum(p.fname)}); });
   })));
   return r.sort((a,b)=>(b.ts||0)-(a.ts||0));
 }
+function waVerweise(pos,fname){ const r=[]; if(!fname) return r;
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ const s=ST[it.pos];
+    if(s && Array.isArray(s.pdfs) && s.pdfs.some(x=>x&&x.ueber===pos&&x.fname===fname)) r.push(it.pos); })));
+  return r; }
 function geraeteProtokollListe(typ){
   const l=geraeteProtokolle(typ);
   let ov=document.getElementById('gpLsOv');
@@ -3809,8 +3818,23 @@ function tsNachholen(pos){
 // übersteuerbar im Dialog „✎ Gewerk" (item.ibn = true/false). Gesperrt wird nur
 // „Inbetriebnahme", Altbestand mit gesetztem Haken bleibt unberührt.
 // Pflegbar wie TS_OHNE: Reihenfolge = Vorrang.
+// Spülmaschinen (auch für die Wasseraufbereitung derselben Anlage, v170)
+const SPUEL_RE=/spülmasch|spuelmasch|geschirrspül|geschirrspuel|bandspül|korbtransport|haubenspül|haubenmasch|durchschub|gläserspül|glaeserspuel|topfspül|universalspül/i;
+// Wasseraufbereitung als EIGENE Position (v170, Wunsch des Nutzers 03.11.2026):
+// IBN-Protokoll Pflicht – unabhängig vom Stromanschluss, denn es geht um Resthärte,
+// Regeneration und Dichtheit. Mit Schritt „Inbetriebnahme" wie gewohnt gesperrt;
+// ohne (nur Sanitär) keine Sperre – der Anschluss darf gemeldet werden, bevor die
+// Spülmaschine läuft –, aber „IBN-Protokoll fehlt" an Position, Liste und Abnahme.
+// Miterledigt wird sie meist im Protokoll der Spülmaschine (waKandidaten).
+// „Enthärtung für Spülmaschine" ist Wasseraufbereitung, „Spülmaschine mit
+// Enthärtung" nicht: es zählt, welches Stichwort ZUERST steht (das Grundwort).
+const WA_RE=/enthärt|enthaert|osmose|entsalz|wasseraufbereit/i;
+function waIst(bez){
+  bez=String(bez||''); const w=WA_RE.exec(bez); if(!w || IBN_NEIN.test(bez)) return false;
+  const d=SPUEL_RE.exec(bez); return !d || w.index<d.index;
+}
 const IBN_KAT=[
-  ['Spültechnik',/spülmasch|spuelmasch|geschirrspül|geschirrspuel|bandspül|korbtransport|haubenspül|haubenmasch|durchschub|gläserspül|glaeserspuel|topfspül|universalspül|osmose|wärmerückgew|waermerueckgew/i],
+  ['Spültechnik',new RegExp(SPUEL_RE.source+'|wärmerückgew|waermerueckgew','i')],
   ['Gartechnik',/kombidämpf|kombidaempf|dämpfer|heißluft|heissluft|konvektomat|multifunktion|vario|fritteuse|friteuse|induktion|\bwok|herd|backofen|griddle|grillplatte|bratplatte|kontakt.?grill|pizzaofen|nudelkoch|pastakoch|kippbrat|kochkessel|druckgar|front.?cooking|cooking.?station|salamander|kochfeld|kochstelle/i],
   ['Eis/Wasser',/eiswürfel|eiswuerfel|würfelbereit|wuerfelbereit|eisbereit|scherbeneis|flockeneis|wasserspender|wassersprudler/i],
   ['Kaffee/Bier',/kaffee|siebträger|siebtraeger|espresso|vollautomat|mengenbrüh|mengenbrueh|\bbier|zapf|schankanl/i],
@@ -3823,15 +3847,24 @@ const IBN_KAT=[
 // Trockenlauf 28.10.2026: Spülbrause (Armatur), Kühlzellen-Tür, bauseitige Geräte
 // und die Biertheke (Möbel, Nutzer: „eher nein") wurden fälschlich Pflicht.
 const IBN_NEIN=/warmhalt|bain.?marie|wärmeplatte|waermeplatte|warmplatte|wärmestrahl|hustenschutz|vitrine|wärmebrücke|brause|bauseits|drehtür|schiebetür|zellentür|biertheke/i;
+// Gibt es an dieser Position überhaupt ein IBN-Protokoll? Mit Schritt
+// „Inbetriebnahme" immer, Wasseraufbereitung auch nur mit Sanitär (v170).
+function ibnMoeglich(pos){
+  const rel=relFields(pos);
+  return rel.includes('ib') || (rel.includes('sa') && waIst((tsItem(pos)||{}).bez));
+}
+// Wasseraufbereitung ohne Schritt „Inbetriebnahme": erledigt = Protokoll liegt vor
+function ibnOhneSchritt(pos){ return !relFields(pos).includes('ib') && ibnMoeglich(pos); }
 function ibnKat(pos){
-  if(!relFields(pos).includes('ib')) return null;          // ohne Elektro keine Inbetriebnahme
+  if(!ibnMoeglich(pos)) return null;                        // ohne Elektro keine Inbetriebnahme (außer Wasseraufbereitung)
   const bez=String((tsItem(pos)||{}).bez||'');
   if(IBN_NEIN.test(bez)) return null;
+  if(waIst(bez)) return 'Wasseraufbereitung';
   const k=IBN_KAT.find(([,re])=>re.test(bez)); return k?k[0]:null;
 }
 function ibnAuto(pos){ return !!ibnKat(pos); }
 function ibnPflicht(pos){
-  if(!relFields(pos).includes('ib')) return false;
+  if(!ibnMoeglich(pos)) return false;
   if(dokuIstAus('ibn')) return false;          // auf dieser Baustelle abgewählt (v149)
   const it=tsItem(pos);
   if(it && (it.ibn===true || it.ibn===false)) return it.ibn;
@@ -3986,7 +4019,8 @@ const PFL_ART={
 function pflFehlende(art){
   const A=PFL_ART[art], r=[];
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
-    const s=gs(it.pos); if(!A.pfl(it.pos) || s.ib || entf(s,'ib')) return;
+    const s=gs(it.pos); if(!A.pfl(it.pos)) return;
+    if(art==='ibn' && ibnOhneSchritt(it.pos) ? !ibnFehlt(it.pos) : (s.ib || entf(s,'ib'))) return;
     r.push({pos:it.pos, bez:(it.bez||'').trim(), etage:sec.label||sec.pos, anlage:sub.bez||sub.pos, ist:Math.min(A.ist(it.pos),A.soll(it.pos)), soll:A.soll(it.pos)});
   })));
   return r;
@@ -3999,7 +4033,7 @@ function ibnFehlende(){ return pflFehlende('ibn'); }
 function pflAbgewaehlt(art){
   const A=PFL_ART[art], r=[];
   DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
-    if(it[art]!==false || !relFields(it.pos).includes(A.rel)) return;
+    if(it[art]!==false || !(relFields(it.pos).includes(A.rel) || (art==='ibn' && ibnMoeglich(it.pos)))) return;
     r.push({pos:it.pos, bez:(it.bez||'').trim(), etage:sec.label||sec.pos, anlage:sub.bez||sub.pos, von:it[art+'AusVon']||'', am:it[art+'AusAm']||''});
   })));
   return r;
@@ -7830,8 +7864,24 @@ function ibnStammHash(){
   return 'projekt='+q(s.name||curProjName())+'&ort='+q(s.ort)+'&plz='+q(s.plz)+
          '&strasse='+q(s.strasse)+'&kunde='+q(s.auftraggeber)+'&auftrag='+q(s.auftrag);
 }
+// Wasseraufbereitung derselben Anlage für das Protokoll einer Spülmaschine (v170).
+// null = keine Spülmaschine (dann geht nichts mit), [] = Spülmaschine ohne eigene
+// Wasseraufbereitung (die IBN-App vergisst dann eine früher gemerkte Liste).
+function waKandidaten(pos){
+  const bez=String((itemByPos(pos)||{}).bez||'');
+  if(!SPUEL_RE.test(bez) || waIst(bez)) return null;
+  const r=[];
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>{
+    if(!sub.items.some(i=>i.pos===pos)) return;
+    sub.items.forEach(i=>{ if(i.pos!==pos && waIst(i.bez) && abnMenge(i)!==0)
+      r.push({pos:i.pos, bez:String(i.bez||'').trim(), fab:String(i.fabrikat||'').trim(), typ:String(i.typ||'').trim()}); });
+  }));
+  return r;
+}
 function _openIbnDigital(pos,nr,menge){const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
-  const url=IBN_URL+'#'+ibnStammHash()+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez)+'&nr='+q(nr)+'&von='+q(menge);
+  const wa=waKandidaten(pos);
+  const url=IBN_URL+'#'+ibnStammHash()+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez)+'&nr='+q(nr)+'&von='+q(menge)+
+            (wa?'&wa='+q(JSON.stringify(wa)):'');
   // BEWUSST OHNE 'noopener': die IBN-App ist unsere eigene Seite auf derselben Origin
   // und braucht window.opener, um das Protokoll direkt zurückzureichen und nach dem
   // Speichern hierher zurückzuspringen. Mit noopener war beides tot.
@@ -7972,6 +8022,10 @@ function ibnDataKandidaten(p,pos){
 async function editIbnProto(pos,i){
   const p=gs(pos).pdfs[i];
   if(!p){ alert('Protokoll nicht gefunden.'); return; }
+  // Verweis aus dem Spülmaschinen-Protokoll (v170): das Original bearbeiten
+  if(p.ueber){ const j=(gs(p.ueber).pdfs||[]).findIndex(x=>x&&x.fname===p.fname);
+    if(j>=0) return editIbnProto(p.ueber,j);
+    alert('Dieses Protokoll gehört zu Position '+p.ueber+' – dort ist es nicht mehr vorhanden.'); return; }
   const kand=ibnDataKandidaten(p,pos);
   // Das Fenster MUSS synchron im Klick aufgehen (§ mobiler Popup-Blocker) – der
   // Datenstand wird erst danach geladen. Vorher lag das `window.open` hinter dem
@@ -7998,6 +8052,7 @@ async function editIbnProto(pos,i){
   try{
     const o=JSON.parse(await blob.text());
     o.pos=pos; o.editFname=p.fname;
+    const wa=waKandidaten(pos); if(wa) o.wa=wa;           // Wasseraufbereitung (v170)
     // Stammdaten der Baustelle MITGEBEN. Ohne sie behielt die IBN-App Kunde,
     // Anschrift und Auftragsnummer der ZULETZT dort geöffneten Baustelle (sie
     // merkt sich das Projekt im localStorage) – und überschrieb damit beim
@@ -8076,15 +8131,17 @@ async function ibnReceive(p){
         if(old.dataFname && old.dataFname!==dataFname){removeQueuedFile(old.dataFname);spDelete(old.dataFname);} } }
     if(!replaced) gs(pos).pdfs.push(entry);
     saveFotos(pos); updPG(pos);
+    const waPos=waVerknuepfen(pos, entry, ersetzt, String(p.waPos||''));
     puAuto();                       // Übersicht in SharePoint nachziehen
     // Beim ERSETZEN eines Protokolls nichts nachsetzen – der Haken steht dann längst,
     // und ein „entfällt" wäre schon beim ersten Ablegen gemeldet worden.
     // Beim ERSETZEN nur dann nichts nachsetzen, wenn der Haken schon steht – seit den
     // Pflicht-Sperren (v148–152) kann das erste Ablegen den Haken auch verweigert haben.
     const auto = (replaced && gs(pos).ib) ? null : (type==='DGUV Protokoll' ? dguvNachholen(pos) : schrittAusProtokoll(pos, type));
-    showToast('✓ '+type+' bei Position '+pos+(replaced?' aktualisiert':' abgelegt')+
+    showToast('✓ '+type+' bei Position '+pos+(waPos?(' und '+waPos):'')+(replaced?' aktualisiert':' abgelegt')+
               protoHinweis(auto));
     protoWarnen(pos, auto);
+    if(waPos && !gs(waPos).ib){ const a2=schrittAusProtokoll(waPos, type); if(a2 && a2.stand!=='gesetzt' && a2.stand!=='nicht-relevant') protoWarnen(waPos, a2); }
     ibnGoToPos(pos);
     return true;
   }catch(e){ _ibnSeen.delete(p.id); alert('IBN-Protokoll konnte nicht abgelegt werden: '+((e&&e.message)||e)); return false; }
@@ -8241,7 +8298,8 @@ function updPG(pos){
     const editBtn=(isPdf&&!istIbn)?`<button class="pdoc-btn pdoc-edit" onclick="pdfOpen('${pos}',${i})" title="Ausfüllen">&#9999;&#65039;</button>`:'';
     // Bei Stückzahl > 1 den Gerätezähler zeigen – sonst heissen alle Einträge gleich
     const nrTag=(p.nr&&p.von>1)?` <span class="pdoc-nr">Gerät ${p.nr}/${p.von}</span>`:'';
-    return `<div class="pdoc">&#128196; <span class="pdoc-name" onclick="pdfView('${pos}',${i})">${p.type}: ${p.name}</span>${nrTag}${ibnBtn}${editBtn}<button class="pdoc-btn pdoc-del" onclick="delProto('${pos}',${i})" title="Löschen">&#10005;</button></div>`;
+    const ueTag=p.ueber?` <span class="pdoc-nr">über Pos. ${escapeHtml(p.ueber)}</span>`:'';
+    return `<div class="pdoc">&#128196; <span class="pdoc-name" onclick="pdfView('${pos}',${i})">${p.type}: ${p.name}</span>${nrTag}${ueTag}${ibnBtn}${editBtn}<button class="pdoc-btn pdoc-del" onclick="delProto('${pos}',${i})" title="Löschen">&#10005;</button></div>`;
   }).join('');
 }
 
@@ -8360,11 +8418,38 @@ async function dlProto(pos,i){
   }catch(e){hideLoader();alert('Download fehlgeschlagen.');}
 }
 
+// Spülmaschinen-Protokoll, das die Wasseraufbereitung einer anderen Position
+// miterledigt (v170): dort liegt ein VERWEIS auf dasselbe PDF ({…, ueber:pos}) –
+// keine zweite Datei. Bei jeder Ablage neu gesetzt: alte Verweise auf dieses
+// Protokoll (alte Fassung `alt` oder gleicher Name) weg, dann ggf. der neue.
+// p = gewählte Wasseraufbereitung aus der IBN-App ('' = keine / Haken entfernt).
+// Rückgabe: Position mit Verweis oder ''.
+function waVerknuepfen(pos, entry, alt, p){
+  const weg=new Set([alt, entry.fname].filter(Boolean));
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+    const s=ST[it.pos]; if(!s || !Array.isArray(s.pdfs)) return;
+    const n=s.pdfs.length; s.pdfs=s.pdfs.filter(x=>!(x && x.ueber===pos && weg.has(x.fname)));
+    if(s.pdfs.length!==n){ saveFotos(it.pos); updPG(it.pos); }
+  })));
+  if(!p || p===pos || !itemByPos(p)) return '';
+  const e={type:entry.type, name:entry.name, fname:entry.fname, ibn:true, mfr:entry.mfr, dev:entry.dev, dataFname:entry.dataFname, ueber:pos};
+  gs(p).pdfs.push(e); saveFotos(p); updPG(p);
+  return p;
+}
 function delProto(pos,i){
   const p=gs(pos).pdfs[i];
   if(!p)return;
-  if(!confirm(p.type+' wirklich löschen?'))return;
+  // Verweis aus einem Spülmaschinen-Protokoll: nur den Verweis entfernen, die
+  // Datei gehört zur Spülmaschine (v170)
+  if(p.ueber){
+    if(!confirm('Verweis auf das Protokoll von Position '+p.ueber+' hier entfernen?\n\nDas Protokoll selbst bleibt an Position '+p.ueber+'.'))return;
+    gs(pos).pdfs.splice(i,1); saveFotos(pos); updPG(pos); puAuto(); return;
+  }
+  const verw=[]; if(p.fname) DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{
+    const s=ST[it.pos]; if(s && Array.isArray(s.pdfs) && s.pdfs.some(x=>x&&x.ueber===pos&&x.fname===p.fname)) verw.push(it.pos); })));
+  if(!confirm(p.type+' wirklich löschen?'+(verw.length?('\n\nEs gilt auch für Position '+verw.join(', ')+' – dort wird es ebenfalls entfernt.'):'')))return;
   gs(pos).pdfs.splice(i,1);
+  verw.forEach(v=>{ const s=gs(v); s.pdfs=s.pdfs.filter(x=>!(x&&x.ueber===pos&&x.fname===p.fname)); saveFotos(v); updPG(v); });
   saveFotos(pos);
   updPG(pos);
   puAuto();                         // Übersicht in SharePoint nachziehen
@@ -11670,6 +11755,9 @@ function abnOffenePunkte(A){
       r.push({k:'ra|'+it.pos+'|'+i, pos:it.pos, ziel:x.mangel?6:5, txt:((x.txt||'').trim()||bez), src:'Pos. '+it.pos+' · '+raArt(x)+(x.ersteller?(' · erfasst von '+x.ersteller):'')}); });
     relFields(it.pos).forEach(f=>{ if(s[f] || entf(s,f)) return;
       r.push({k:'st|'+it.pos+'|'+f, pos:it.pos, ziel:5, txt:bez+': '+(FLD_LBL[f]||f), src:'Pos. '+it.pos+' · Schritt „'+(FLD_LBL[f]||f)+'" nicht abgehakt'}); });
+    // Wasseraufbereitung ohne Schritt „Inbetriebnahme": fehlendes Protokoll (v170)
+    if(ibnOhneSchritt(it.pos) && ibnFehlt(it.pos))
+      r.push({k:'st|'+it.pos+'|ibnproto', pos:it.pos, ziel:5, txt:bez+': Inbetriebnahme', src:'Pos. '+it.pos+' · Inbetriebnahmeprotokoll fehlt'});
   });
   // allgemeine Restarbeiten der gewählten Etagen und der Baustelle
   [...ets].map(sec=>({k:EKEY(sec), lbl:(sec.label||sec.pos)+' allgemein'})).concat([{k:PRAKEY, lbl:'Baustelle allgemein'}]).forEach(({k,lbl})=>{
@@ -12586,7 +12674,7 @@ function openGewerkChooser(pos){
         return '<input type="checkbox" class="gwibn" style="width:18px;height:18px" data-def="'+(v?1:0)+'"'+(v?' checked':'')+'>'; })()
     +'<span>&#9881;&#65039; IBN-Protokoll erforderlich<br><span style="font-size:11px;color:var(--accent2)">automatisch: '
     +(ibnKat(pos)?('ja – erkannt als „'+escapeHtml(ibnKat(pos))+'“'):'nein')
-    +((tsItem(pos)||{}).ibn!==undefined?' · <b>hier von Hand festgelegt</b>':'')+' · nur mit Elektroanschluss'
+    +((tsItem(pos)||{}).ibn!==undefined?' · <b>hier von Hand festgelegt</b>':'')+' · nur mit Elektroanschluss (Wasseraufbereitung auch ohne)'
     +(dokuIstAus('ibn')?' · <b>auf dieser Baustelle derzeit abgewählt</b>':'')+'</span></span></label>'
     +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">'
     +'<button onclick="(document.getElementById(\'gwOv\')||{}).remove&&document.getElementById(\'gwOv\').remove()" style="padding:9px 16px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-family:inherit">Abbrechen</button>'

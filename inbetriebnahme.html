@@ -171,6 +171,13 @@ textarea{border:1.4px solid var(--line);border-radius:8px;min-height:64px;resize
 .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:#222;color:#fff;
   padding:11px 18px;border-radius:10px;font-size:14.5px;opacity:0;pointer-events:none;transition:.25s;z-index:60}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* Wasseraufbereitung im Spülmaschinen-Protokoll (v170) */
+.wabox{border:2px solid var(--copper);border-radius:10px;padding:10px 12px;margin:10px 0 4px;background:#fffaf1}
+.wabox.aus{border-style:dashed;background:transparent}
+.wahead{display:flex;flex-wrap:wrap;align-items:center;gap:8px;font-weight:700;color:var(--copper-d);cursor:pointer;margin-bottom:6px}
+.wahead input{width:18px;height:18px;accent-color:var(--copper)}
+.wahead select{font:inherit;font-weight:400;border:1px solid var(--copper);border-radius:6px;padding:3px 6px;background:#fff;max-width:100%}
+.wahint{font-size:12.5px;color:var(--gray);margin-top:6px}
 </style>
 </head>
 <body>
@@ -771,6 +778,7 @@ function ibnUpdatePdfBtn(){
 function openForm(dev,keepScroll){
   CUR.dev=dev;if(!(CUR.fresh&&!CUR.pos))loadState();applyPrefills();setCrumbs();ibnUpdatePdfBtn();
   const o=DB[CUR.mfr].devices[dev];
+  waInit(o);
   var __sl=ibnStueckLabel();
   let h='<div class="formhead"><h2>'+CUR.mfr+' · '+dev+(__sl?(' <span class="tag">'+__sl+'</span>'):'')+'</h2><div class="sub">'+(o.pdfSub?(o.pdfTitle?o.pdfTitle.charAt(0)+o.pdfTitle.slice(1).toLowerCase()+' · ':'')+o.pdfSub:'Inbetriebnahmeprotokoll · Leistungsfeststellung')+'</div>'+
         '<div class="progress"><i id="prog"></i></div></div>'+((CUR.fresh&&!CUR.pos&&DRAFTAVAIL)?'<div class="draftbar">📝 Für dieses Gerät existiert ein früherer Entwurf. <button class="btn ghost small" onclick="continueDraft()">Letzten Entwurf fortsetzen</button></div>':'');
@@ -782,6 +790,7 @@ function openForm(dev,keepScroll){
   o.sections.forEach((s,si)=>{
     h+='<div class="section"><div class="sh"><span class="bar"></span><h3>'+s.title+'</h3></div><div class="body">';
     s.items.forEach((it,ii)=>{h+=itemHTML('s'+si+'i'+ii,it,s);});
+    if(si===waAbschnitt(o)) h+=waHTML(o);
     h+='</div></div>';
   });
   // Unterschriften
@@ -880,6 +889,7 @@ function updateProgress(){
   if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev];let total=0,done=0;
   o.sections.forEach((s,si)=>s.items.forEach((it,ii)=>{const k='s'+si+'i'+ii;
     if(it.k==='check'){total++;if((STATE[k]||{}).v)done++;}}));
+  if(waAktiv()) WA_FELDER.forEach(f=>{ if(f.k==='check'){total++;if((STATE['wa_'+f.id]||{}).v)done++;} });
   const pct=total?Math.round(done/total*100):0;
   const pr=$('prog');if(pr)pr.style.width=pct+'%';
   $('status').textContent=done+' / '+total+' Prüfpunkte · '+pct+'%';
@@ -937,6 +947,9 @@ function exportPDF(){
     doc.setFont('RC');doc.setFontSize(9);doc.setTextColor(...gray);
     const lab=label+':  ';const lw=doc.getTextWidth(lab);
     const lines=doc.splitTextToSize(val||'—',cw-lw);ensure(lines.length*4.6+1);
+    // ensure() kann eine neue Seite beginnen – Kopf/Fuß stellen dabei eine andere
+    // Schriftgröße ein, die erste Zeile der neuen Seite stand dann zu groß.
+    doc.setFont('RC');doc.setFontSize(9);doc.setTextColor(...gray);
     doc.text(lab,mL,y);doc.setTextColor(20,20,20);doc.text(lines,mL+lw,y);y+=lines.length*4.6+1.4;
   }
   function checkLine(label,st,cols,comment){
@@ -944,6 +957,7 @@ function exportPDF(){
     const boxW=cols.length*17+4;const labW=cw-boxW;
     const lines=doc.splitTextToSize(label,labW);const rowH=Math.max(lines.length*4.4,5.2);
     ensure(rowH+(comment&&st.c?4.4:0)+1);
+    doc.setFont('RC');doc.setFontSize(9.5);doc.setTextColor(20,20,20);   // nach Seitenwechsel (siehe kvLine)
     doc.text(lines,mL,y);
     let bx=mL+labW+2;const by=y-3;
     cols.forEach((c,ci)=>{
@@ -1008,6 +1022,16 @@ function exportPDF(){
     });
     y+=2;
   });
+  // Wasseraufbereitung, die im Spülmaschinen-Protokoll miterledigt wird (v170):
+  // eigener Abschnitt mit ALLEN Werten – auch denen, die oben im Hersteller-Teil
+  // eingetragen wurden –, damit er für die zweite Position für sich allein steht.
+  if(waAktiv()){ const g=waGewaehlt();
+    secHead('Wasseraufbereitung – zugleich Inbetriebnahme Pos. '+g.pos);
+    kvLine('Position',g.pos+' '+g.bez+(g.fab?(' · '+g.fab):''));
+    WA_FELDER.forEach(f=>{ const k=waBasisKey(o,f)||('wa_'+f.id);
+      if(f.k==='check') checkLine(f.l,STATE[k]||{},['erledigt'],false);
+      else { const v=STATE[k]||''; kvLine(f.l,(f.k==='measure'&&v)?(v+' '+f.u):v); } });
+    y+=2; }
   // Unterschriften (leere optionale Kundenunterschriften werden weggelassen)
   const anySig=o.sign.roles.some(function(r){return !sigAus(r);});
   if(anySig){
@@ -1320,10 +1344,83 @@ function ctxPrefill(p){if(!CUR.dev)return;var o=DB[CUR.mfr].devices[CUR.dev];var
 let IBNCTX=null;
 function ibnSendBack(durl,name){if(!IBNCTX||!IBNCTX.pos)return false;
   var __o=(DB[CUR.mfr]&&DB[CUR.mfr].devices[CUR.dev])||{};
-  var payload={id:String(Date.now())+'_'+IBNCTX.pos,pos:IBNCTX.pos,pdf:durl,name:name,ptype:(__o.ptype||'IBN Protokoll'),projekt:IBNCTX.projekt||'',mfr:CUR.mfr,dev:CUR.dev,state:STATE,replaceFname:(IBNCTX.replaceFname||''),nr:(IBNCTX.nr||0),von:(IBNCTX.von||0)};
+  var payload={id:String(Date.now())+'_'+IBNCTX.pos,pos:IBNCTX.pos,pdf:durl,name:name,ptype:(__o.ptype||'IBN Protokoll'),projekt:IBNCTX.projekt||'',mfr:CUR.mfr,dev:CUR.dev,state:STATE,replaceFname:(IBNCTX.replaceFname||''),nr:(IBNCTX.nr||0),von:(IBNCTX.von||0),
+    waPos:(waAktiv()&&waGewaehlt())?waGewaehlt().pos:''};
   try{localStorage.setItem('ibn:return',JSON.stringify(payload));}catch(e){}
   try{if(window.opener&&!window.opener.closed)window.opener.postMessage({__ibnReturn:true,payload:payload},location.origin);}catch(e){}
   return true;}
+// ── Wasseraufbereitung im Spülmaschinen-Protokoll (ab v170) ──────────────
+// Wunsch des Nutzers (03.11.2026): Steht die Enthärtung/Osmose als EIGENE
+// Position in derselben Anlage, wird ihre Inbetriebnahme im Protokoll der
+// Spülmaschine miterledigt – EIN PDF, das an beiden Positionen zählt. Für den
+// Techniker soll eindeutig sein, was er ausfüllt, und nichts doppelt.
+// Die Hauptapp schickt die Kandidaten mit (#wa=[{pos,bez,fab,typ}]); zusätzlich
+// im Stand gemerkt (wa_liste), damit „✎ weiterbearbeiten" den Kasten auch ohne
+// diese Angabe zeigt. Werte unter BENANNTEN Schlüsseln (wa_*), nicht nach Index:
+// die Felder der Hersteller-Abschnitte (s0i0 …) verschieben sich dadurch nicht.
+// Was das Hersteller-Protokoll schon abfragt (Typ, Härte, Leitwert …), steht im
+// Kasten nicht noch einmal (re = Feld im Hersteller-Teil); ins PDF kommt es im
+// Abschnitt der Wasseraufbereitung trotzdem mit.
+const WA_FELDER=[
+  {id:'typ',  l:'Typ / Modell', k:'text', re:/^(Typ \/ Modell|Enthärter-Modell)$/i},
+  {id:'sn',   l:'Serien-Nr. Wasseraufbereitung', k:'text', re:/^Serien-Nr\. Wasseraufbereitung$/i},
+  {id:'gh',   l:'Gesamthärte Rohwasser', k:'measure', u:'°dH', re:/Gesamthärte|\(GH\)/i},
+  {id:'kh',   l:'Karbonathärte Rohwasser', k:'measure', u:'°dH', re:/Karbonathärte|\(KH\)/i},
+  {id:'lw',   l:'Leitwert Rohwasser', k:'measure', u:'µS/cm', re:/^Leitwert( Rohwasser)?$/i},
+  {id:'rest', l:'Resthärte nach Aufbereitung', k:'measure', u:'°dH', re:/Resthärte|Ausgangshärte/i},
+  {id:'lwn',  l:'Leitwert nach Aufbereitung', k:'measure', u:'µS/cm', re:/Leitwert nach/i},
+  {id:'kap',  l:'Kapazität / Einstellung', k:'text', re:/^Kapazität/i},
+  {id:'regen',l:'Regeneration / Spülung eingestellt', k:'check'},
+  {id:'dicht',l:'Wasser- und Abwasseranschluss der Aufbereitung dicht', k:'check'}
+];
+function waIstSpuel(){ return !!(CUR.mfr && CUR.dev && CUR.mfr!=='DGUV V3' && DB[CUR.mfr] && DB[CUR.mfr].devices[CUR.dev] && /sp(ü|ue)l/i.test(CUR.dev)); }
+function waListe(){
+  if(!waIstSpuel()) return [];
+  const l=(IBNCTX&&Array.isArray(IBNCTX.wa))?IBNCTX.wa:STATE.wa_liste;
+  return Array.isArray(l)?l.filter(x=>x&&x.pos):[];
+}
+function waAktiv(){ return waListe().length>0 && STATE.wa_an!==false; }
+function waGewaehlt(){ const l=waListe(); return l.find(x=>x.pos===STATE.wa_pos)||l[0]||null; }
+// Abschnitt, in dem das Hersteller-Protokoll nach der Wasseraufbereitung fragt –
+// dort steht der Kasten. Ohne solchen Abschnitt: am Ende.
+function waAbschnitt(o){ const i=o.sections.findIndex(s=>s.items.some(it=>/wasseraufbereitung/i.test(it.l))); return i>=0?i:o.sections.length-1; }
+// Fragt das Hersteller-Protokoll dieses Feld schon ab? → dessen Schlüssel
+function waBasisKey(o,f){ if(!f.re) return null; let key=null;
+  o.sections.forEach((s,si)=>s.items.forEach((it,ii)=>{ if(!key&&(it.k==='text'||it.k==='measure')&&f.re.test(it.l)) key='s'+si+'i'+ii; }));
+  return key; }
+// Beim Öffnen: Kandidaten merken, Auswahl prüfen, Typ aus der Stückliste vorbelegen.
+// STATE wird hier nur gesetzt, nicht gespeichert – das erledigt die nächste Eingabe
+// (saveState am Anfang hätte einen frischen Entwurf als „begonnen" markiert).
+function waInit(o){
+  if(!waIstSpuel()) return;
+  if(IBNCTX&&Array.isArray(IBNCTX.wa)) STATE.wa_liste=IBNCTX.wa;
+  const l=waListe(); if(!l.length) return;
+  if(!l.some(x=>x.pos===STATE.wa_pos)) STATE.wa_pos=l[0].pos;
+  const g=waGewaehlt(), kt=waBasisKey(o,WA_FELDER[0])||'wa_typ';
+  if(STATE.wa_an!==false && g && g.typ && !STATE[kt]) STATE[kt]=g.typ;
+}
+function waHTML(o){
+  const l=waListe(); if(!l.length) return '';
+  const an=STATE.wa_an!==false, g=waGewaehlt(), lbl=x=>'Pos. '+x.pos+' '+x.bez;
+  let h='<div class="wabox'+(an?'':' aus')+'"><div class="wahead"><label style="display:flex;align-items:center;gap:8px;cursor:pointer">'+
+    '<input type="checkbox"'+(an?' checked':'')+' onchange="waSchalten(this.checked)">Gilt auch als Inbetriebnahme von</label>';
+  h+=(l.length>1)
+    ? '<select onchange="waWaehlen(this.value)">'+l.map(x=>'<option value="'+esc(x.pos)+'"'+(x===g?' selected':'')+'>'+esc(lbl(x))+'</option>').join('')+'</select>'
+    : '<span>'+esc(lbl(l[0]))+'</span>';
+  h+='</div>';
+  if(!an) return h+'<div class="wahint">Nur die Spülmaschine – die Wasseraufbereitung bekommt an ihrer Position ein eigenes Protokoll.</div></div>';
+  const oben=[];
+  WA_FELDER.forEach(f=>{
+    if(waBasisKey(o,f)){ oben.push(f.l); return; }
+    const key='wa_'+f.id;
+    h+=(f.k==='check') ? itemHTML(key,{k:'check',l:f.l,comment:false},{cols:['erledigt'],comment:false})
+                       : '<div class="item">'+fieldHTML(key,f)+'</div>';
+  });
+  if(oben.length) h+='<div class="wahint">Schon oben im Protokoll, gilt für beide Positionen: '+esc(oben.join(', '))+'.</div>';
+  return h+'<div class="wahint">Das PDF wird auch an '+esc('Pos. '+g.pos)+' abgelegt – dort ist dann kein eigenes Protokoll nötig.</div></div>';
+}
+function waSchalten(an){ STATE.wa_an=!!an; saveState(); openForm(CUR.dev,true); }
+function waWaehlen(p){ STATE.wa_pos=p; saveState(); openForm(CUR.dev,true); }
 function applyUrlContext(){var hash=(location.hash||'').replace(/^#/,'');if(!hash)return false;
   var p={};hash.split('&').forEach(function(kv){var i=kv.indexOf('=');if(i>0)try{p[decodeURIComponent(kv.slice(0,i))]=decodeURIComponent(kv.slice(i+1));}catch(e){}});
   if(!p.projekt&&!p.ort&&!p.hersteller&&!p.typ&&!p.proto)return false;
@@ -1344,7 +1441,10 @@ function applyUrlContext(){var hash=(location.hash||'').replace(/^#/,'');if(!has
   // nr/von = "Gerät n von m" bei Positionen mit Stückzahl > 1. Ohne diese Kennung
   // teilten sich alle Geräte einer Position denselben Entwurf – das nächste Gerät
   // startete dann mit der Seriennummer des vorherigen.
-  if(p.pos){IBNCTX={pos:p.pos,projekt:p.projekt||'',nr:parseInt(p.nr,10)||0,von:parseInt(p.von,10)||0};CUR.pos=p.pos;CUR.nr=IBNCTX.nr;}
+  if(p.pos){IBNCTX={pos:p.pos,projekt:p.projekt||'',nr:parseInt(p.nr,10)||0,von:parseInt(p.von,10)||0};CUR.pos=p.pos;CUR.nr=IBNCTX.nr;
+    // Wasseraufbereitung derselben Anlage (v170) – fehlt der Parameter, bleibt wa
+    // undefiniert und der gemerkte Stand (wa_liste) gilt.
+    if(p.wa!==undefined){try{var __wa=JSON.parse(p.wa);if(Array.isArray(__wa))IBNCTX.wa=__wa;}catch(e){}}}
   try{history.replaceState(null,'',location.pathname+location.search);}catch(e){}
   // Direkter Einsprung ins DGUV-V3-Prüfprotokoll (aus der Hauptapp: „DGUV digital ausfüllen")
   if(p.proto==='dguv'&&DB['DGUV V3']){CUR.mfr='DGUV V3';openForm('Prüfprotokoll elektrische Geräte');ctxPrefill(p);return true;}
@@ -1356,6 +1456,10 @@ function applyUrlContext(){var hash=(location.hash||'').replace(/^#/,'');if(!has
     // typ hat Vorrang, ist in den Stücklisten aber oft nur ein Modellcode ("DV270.2",
     // "2023105"). Die Geräteart steht in der Bezeichnung -> als Zweitversuch nutzen.
     if(!dev&&mfr)dev=ctxMatchDevBez(mfr,(p.typ||'')+' '+(p.bez||''));
+    // Enthärtung/Osmose eines Spültechnik-Herstellers (Meiko GiO, Winterhalter …):
+    // der hat dafür kein eigenes Formular -> das allgemeine statt der Startseite (v170).
+    // Nur dieses eine Formular – sonst gilt weiter „lieber Startseite als falsch".
+    if(!dev&&mfr&&mfr!=='Allgemein'&&ctxMatchDevBez('Allgemein',(p.typ||'')+' '+(p.bez||''))==='Wasserenthärter / Umkehrosmose'){mfr='Allgemein';dev='Wasserenthärter / Umkehrosmose';}
     if(mfr&&dev){CUR.mfr=mfr;openForm(dev);ctxPrefill(p);return true;}}
   goHome();return true;}  // kein passendes Protokoll -> Startseite (Baustelle ist gesetzt)
 DB.MKN.devices={
@@ -1415,7 +1519,8 @@ var CTX_MATCH={
   'Schockfroster / Schnellkühler':['schockfroster','schnellkühler'],
   'Eiswürfelbereiter / Eismaschine':['eiswürfel','eismaschine','eisbereiter','scherbeneis'],
   'Dunstabzugshaube / Lüftungsdecke':['ablufthaube','dunstabzug','lüftungsdecke','induktionshaube','kondensationshaube'],
-  'Wasserenthärter / Umkehrosmose':['enthärter','umkehrosmose','osmose','wasseraufbereitung'],
+  // „Enthärtungsanlage" enthält „enthärter" nicht – bis v169 ging sie deshalb auf die Startseite
+  'Wasserenthärter / Umkehrosmose':['enthärter','enthärtung','umkehrosmose','osmose','wasseraufbereitung','entsalzung'],
   'Kaffee- / Heißgetränkemaschine':['kaffeemaschine','kaffeevollautomat','siebträger','heissgetränke'],
   'Verarbeitungsmaschine (Aufschnitt/Kutter/Mixer)':['aufschnittmaschine','kutter','rührmaschine','fleischwolf','gemüseschneider','planetenrührwerk']
  },
@@ -1463,6 +1568,7 @@ function applyLoadState(){var raw;try{raw=localStorage.getItem('ibn:load');}catc
       +'deshalb lässt sich das Protokoll nicht weiterbearbeiten.\n\nDas abgelegte PDF bleibt unverändert erhalten.');
     return false;}
   CUR.mfr=o.mfr;CUR.pos=o.pos||null;IBNCTX=o.pos?{pos:o.pos,projekt:o.projekt||'',replaceFname:o.editFname||''}:null;
+  if(IBNCTX&&Array.isArray(o.wa))IBNCTX.wa=o.wa;   // Wasseraufbereitung (v170)
   if(o.projekt!==undefined){PROJECT.name=o.projekt||PROJECT.name;}
   // Stammdaten der AUFRUFENDEN Baustelle übernehmen – auch wenn sie leer sind.
   // PROJECT überlebt im localStorage; ohne dieses Setzen stünden beim
