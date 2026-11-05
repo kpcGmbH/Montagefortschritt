@@ -1191,8 +1191,11 @@ async function saveEntwurf(){
   const positions=Object.keys(SESSION.selected||{});
   const zeilen=istSchluessel()? keyZeilen() : [];
   // Ein völlig leerer Entwurf hilft niemandem und steht später als Karteileiche da.
-  if(!positions.length && !zeilen.length && !(SESSION.teilnehmer||'').trim() && !(SESSION.kommentar||'').trim()){
-    alert('Für einen Zwischenstand fehlt noch alles: kein Gerät ausgewählt, kein Name, kein Kommentar.');
+  // Ausnahme Grundlagen-Einweisung (v173): sie hat keine Geräte – die Prüfung
+  // meldete dort „kein Gerät ausgewählt", auch wenn alle Punkte abgehakt waren.
+  // Vorbereiten heißt hier: Termin steht, Rest vor Ort – also immer speicherbar.
+  if(SESSION.typ!=='allgemein' && !positions.length && !zeilen.length && !(SESSION.teilnehmer||'').trim() && !(SESSION.kommentar||'').trim()){
+    alert('Für einen Zwischenstand fehlt noch alles: '+(istSchluessel()?'keine Position ausgewählt':'kein Gerät ausgewählt')+', kein Name, kein Kommentar.');
     return;
   }
   const etagen=entwurfEtagen(positions);
