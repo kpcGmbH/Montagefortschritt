@@ -1742,8 +1742,25 @@ function relFields(p){
   const gw=POSGEW[p]||[]; const set=new Set();
   gw.forEach(g=>(GEW_FIELDS[g]||[]).forEach(f=>set.add(f)));
   if(!set.size){ set.add('g'); set.add('m'); }   // ohne Gewerk-Angabe wie Montage behandeln
+  if(set.has('ew') && !ewPflicht(p)) set.delete('ew');   // Steckdose & Co. weist niemand ein (v173)
   return [...set];
 }
+// ── Einweisung nur für Geräte (ab v173) ──────────────────────────────────
+// Wunsch des Nutzers (05.11.2026): Eine Steckdose im Möbel trägt das Gewerk Elektro,
+// eingewiesen wird sie aber nicht – eine Sensorarmatur schon. Positionen, deren
+// Bezeichnung nach Elektro-ZUBEHÖR klingt, haben deshalb keinen Schritt
+// „Einweisung". Je Position übersteuerbar im Dialog „✎ Gewerk" (item.einw =
+// true/false; fehlt das Feld, gilt die Automatik). Gleiche Liste in einweisung.html
+// (EW_OHNE) – wer eine ändert, ändert beide.
+const EW_OHNE=/steckdose|steckerleiste|elektrifizierung|kabelkanal|kabelf(ü|ue)hrung|kabeldurchf|leerrohr|anschlussdose|anschlusskasten|unterverteil|bewegungsmelder|datendose|netzwerkdose/i;
+// Licht nur im HAUPTWORT (vor „mit", „inkl.", „und", Komma, Klammer): „Kühlraum-
+// beleuchtung" ja, „Kühlvitrine mit Beleuchtung" nicht – die ist ein Gerät.
+const EW_OHNE_KOPF=/beleuchtung|leuchte|lichtleiste|led-?band|led-?leiste|schalter/i;
+function ewOhne(bez){ bez=String(bez||''); const kopf=bez.split(/\s(?:mit|inkl\.?|und|&)\s|,|\(/i)[0]; return EW_OHNE.test(bez) || EW_OHNE_KOPF.test(kopf); }
+const POSITEM={};   // pos -> Stücklisten-Eintrag (beim Aufbau der Panels gefüllt)
+function ewItem(p){ return POSITEM[p] || (typeof tsItem==='function' ? tsItem(p) : null); }
+function ewAuto(p){ return !ewOhne((ewItem(p)||{}).bez); }
+function ewPflicht(p){ const it=ewItem(p); if(it && (it.einw===true || it.einw===false)) return it.einw; return ewAuto(p); }
 // Status einer Position. ctx='all' -> alle für ihre Gewerke nötigen Haken;
 // ctx='M'/'S'/'E' -> nur die Haken dieses Gewerks (für die gefilterte Ansicht).
 function ist(p, ctx){
@@ -1969,7 +1986,7 @@ function buildPanels(){
   main.innerHTML='';
   applyLvRechte();   // „✎ Position" / „＋ Position ergänzen" nur für Bauleitung + Innendienst
   Object.keys(POSGEW).forEach(k=>delete POSGEW[k]);   // Gewerk-Index neu aufbauen
-  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ POSGEW[it.pos]=it.gew||[]; })));
+  DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ POSGEW[it.pos]=it.gew||[]; POSITEM[it.pos]=it; })));
   // Allgemeine Restarbeiten (ganzes Projekt + einzelne Etagen) – EIN einklappbarer
   // Sammel-Balken statt je Etage/Projekt ein Dauerblock (der beim Scrollen zu viel
   // Platz kostete). Beim Anlegen fragt die App den Geltungsbereich ab (raAddAllg).
@@ -2261,7 +2278,8 @@ const CHANGELOG = [
     'In der Grundlagen-Einweisung setzt <b>„✓ Alle Punkte bestätigen"</b> alle Haken auf einmal; je Abschnitt (Edelstahlmöbel, Kleingeräte, Großgeräte) geht das auch einzeln über „✓ alle". Sind schon alle gesetzt, nimmt derselbe Knopf sie wieder zurück.',
     '„Zwischenspeichern" bei der Grundlagen-Einweisung meldete „kein Gerät ausgewählt" und speicherte nicht – sie hat keine Geräte. Jetzt lässt sie sich immer zwischenspeichern.',
     'Einweisungs-App, Übersicht: Die runden Punkte vor den Geräten sind weg – sie sahen aus wie Kästchen zum Abhaken. Offene Geräte zeigen rechts „Einweisen ›"; ein Tipp auf die Zeile beginnt die Geräte-Einweisung mit diesem Gerät. Eingewiesene zeigen ✓ und das Datum.',
-    'Einweisungs-App zeigt und zählt nur noch <b>Geräte mit Einweisung</b> (Elektro, Nachunternehmer) – Tische, Borde, Becken und Armaturen ohne Strom weist niemand ein. Die Schlüsselübergabe bietet weiter alle Positionen an.' ]},
+    'Einweisungs-App zeigt und zählt nur noch <b>Geräte mit Einweisung</b> (Elektro, Nachunternehmer) – Tische, Borde, Becken und Armaturen ohne Strom weist niemand ein. Die Schlüsselübergabe bietet weiter alle Positionen an.',
+    'Elektro-Zubehör wie <b>Steckdosen, Kabelkanäle, Schalter, Beleuchtung</b> hat keinen Schritt „Einweisung" mehr (erkannt an der Bezeichnung). Je Position übersteuerbar im Dialog „✎ Gewerk" → „Einweisung erforderlich".' ]},
   { v:172, titel:'Nachunternehmer: Einweisung', punkte:[
     'Positionen mit Gewerk <b>„Nachunternehmer"</b> (z. B. Kältetechnik) haben jetzt den Schritt <b>Einweisung</b>: Geliefert · Ausgeführt · Einweisung. Wo keine nötig ist (z. B. Brandschutz): „entfällt". Inbetriebnahme und Druckprobe liefert der Nachunternehmer selbst – die liegen in Odoo, die App verlangt sie nicht.',
     'Einweisungsprotokoll: Sind Nachunternehmer-Geräte ausgewählt, erscheint <b>„Mitwirkender Nachunternehmer"</b> (Firma, Name, wahlweise mit Unterschrift). Im PDF steht „Unter Mitwirkung von … für Pos. …", in der Geräte-Anlage sind seine Positionen gekennzeichnet.' ]},
@@ -12777,6 +12795,13 @@ function openGewerkChooser(pos){
     +(ibnKat(pos)?('ja – erkannt als „'+escapeHtml(ibnKat(pos))+'“'):'nein')
     +((tsItem(pos)||{}).ibn!==undefined?' · <b>hier von Hand festgelegt</b>':'')+' · nur mit Elektroanschluss (Wasseraufbereitung auch ohne)'
     +(dokuIstAus('ibn')?' · <b>auf dieser Baustelle derzeit abgewählt</b>':'')+'</span></span></label>'
+    // Einweisung übersteuern (v173) – Automatik: keine bei Steckdose, Kabelkanal …
+    +(function(){ const it=tsItem(pos)||{}, v=it.einw===true||(it.einw!==false&&ewAuto(pos));
+        return '<label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px dashed var(--line);border-radius:8px;margin:0 0 8px;cursor:pointer">'
+          +'<input type="checkbox" class="gwew" style="width:18px;height:18px" data-def="'+(v?1:0)+'"'+(v?' checked':'')+'>'
+          +'<span>&#128203; Einweisung erforderlich<br><span style="font-size:11px;color:var(--accent2)">automatisch: '
+          +(ewAuto(pos)?'ja':'nein – Elektro-Zubehör (Steckdose, Kabelkanal …)')
+          +(it.einw!==undefined&&it.einw!==null?' · <b>hier von Hand festgelegt</b>':'')+' · nur mit Elektro oder Nachunternehmer</span></span></label>'; })()
     +'<div style="display:flex;gap:10px;justify-content:flex-end;margin-top:6px">'
     +'<button onclick="(document.getElementById(\'gwOv\')||{}).remove&&document.getElementById(\'gwOv\').remove()" style="padding:9px 16px;border:1px solid var(--line);background:transparent;color:var(--text);border-radius:8px;cursor:pointer;font-family:inherit">Abbrechen</button>'
     +'<button onclick="confirmGewerk(\''+pos+'\')" style="padding:9px 18px;border:none;background:var(--accent);color:#2b2b2b;border-radius:8px;font-weight:700;cursor:pointer;font-family:inherit">Übernehmen</button>'
@@ -12785,12 +12810,12 @@ function openGewerkChooser(pos){
 }
 function confirmGewerk(pos){
   const ov=document.getElementById('gwOv'); if(!ov) return;
-  const sel=[...ov.querySelectorAll('input[type=checkbox]:not(.gwts):not(.gwibn):checked')].map(c=>c.value);
+  const sel=[...ov.querySelectorAll('input[type=checkbox]:not(.gwts):not(.gwibn):not(.gwew):checked')].map(c=>c.value);
   // Nur ein ANGEFASSTES Kästchen ist eine Entscheidung. Sonst würde z. B. beim
   // Ergänzen von Elektro das (vorher mangels Elektro leere) Kästchen nach der
   // Gewerk-Änderung als „Pflicht abgewählt" gespeichert.
   const box=c=>{ const b=ov.querySelector('input.'+c); return (b && b.checked!==(b.dataset.def==='1')) ? b.checked : null; };
-  const tsWunsch=box('gwts'), ibWunsch=box('gwibn');
+  const tsWunsch=box('gwts'), ibWunsch=box('gwibn'), ewWunsch=box('gwew');
   ov.remove();
   // Ab v155 je POSITION gespeichert (s.ovr im data-Blob), nicht mehr in der
   // Stückliste: die wird als ganze Datei geschrieben, und ein Gerät mit altem Stand
@@ -12807,12 +12832,17 @@ function confirmGewerk(pos){
     if(o.ibn===false){ if(ibnVorher!==false){ o.ibnAusVon=USER||''; o.ibnAusAm=new Date().toISOString(); } }
     else { o.ibnAusVon=null; o.ibnAusAm=null; }
   }
+  const ewVorher=ewPflicht(pos);
+  if(ewWunsch!==null) o.einw=(ewWunsch===ewAuto(pos))?null:ewWunsch;
   s.ovr=o; ovrAnwenden(pos,true);
-  if(gewNeu) gewUI(pos,it);
+  const ewNeu=ewPflicht(pos)!==ewVorher;
+  if(gewNeu || ewNeu) gewUI(pos,it);
   updTG(pos); ibnRender(pos); savePos(pos);
   // Die Einweisungs- und die Kundendienst-App lesen das Gewerk aus der Stückliste:
   // dort gezielt nur dieses Feld nachtragen (frisch geladen, nicht der eigene Stand).
-  if(gewNeu) lvFeldNachtragen(pos,{gew:sel.slice()});
+  // Ebenso die Einweisungs-Übersteuerung (null = Automatik).
+  const lvf={}; if(gewNeu) lvf.gew=sel.slice(); if(ewWunsch!==null) lvf.einw=(o.einw===undefined?null:o.einw);
+  if(Object.keys(lvf).length) lvFeldNachtragen(pos,lvf);
 }
 function setPosGewerk(pos, gewArr, ohneSpeichern){
   let item=null;
@@ -12844,7 +12874,7 @@ function gewUI(pos, item, nurKarte){
 // vorhandener Schlüssel gewinnt gegen den Wert aus der Stückliste; null heißt
 // „zurück zur Automatik" (der Stücklisten-Wert wird dann ignoriert). Altbestand
 // ohne s.ovr behält die Werte aus der Stückliste – keine Umstellung nötig.
-const OVR_KEYS=['gew','ts','ibn','ibnAusVon','ibnAusAm','dguv','dguvAusVon','dguvAusAm'];
+const OVR_KEYS=['gew','ts','ibn','ibnAusVon','ibnAusAm','dguv','dguvAusVon','dguvAusAm','einw'];
 function ovrAnwenden(pos, ohneUI){
   const it=tsItem(pos), o=ST[pos]&&ST[pos].ovr; if(!it || !o) return false;
   let gewNeu=false;
