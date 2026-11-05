@@ -2255,8 +2255,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 172;
+const APP_VERSION = 173;
 const CHANGELOG = [
+  { v:173, titel:'Grundlagen-Einweisung: alle Punkte auf einmal', punkte:[
+    'In der Grundlagen-Einweisung setzt <b>„✓ Alle Punkte bestätigen"</b> alle Haken auf einmal; je Abschnitt (Edelstahlmöbel, Kleingeräte, Großgeräte) geht das auch einzeln über „✓ alle". Sind schon alle gesetzt, nimmt derselbe Knopf sie wieder zurück.' ]},
   { v:172, titel:'Nachunternehmer: Einweisung', punkte:[
     'Positionen mit Gewerk <b>„Nachunternehmer"</b> (z. B. Kältetechnik) haben jetzt den Schritt <b>Einweisung</b>: Geliefert · Ausgeführt · Einweisung. Wo keine nötig ist (z. B. Brandschutz): „entfällt". Inbetriebnahme und Druckprobe liefert der Nachunternehmer selbst – die liegen in Odoo, die App verlangt sie nicht.',
     'Einweisungsprotokoll: Sind Nachunternehmer-Geräte ausgewählt, erscheint <b>„Mitwirkender Nachunternehmer"</b> (Firma, Name, wahlweise mit Unterschrift). Im PDF steht „Unter Mitwirkung von … für Pos. …", in der Geräte-Anlage sind seine Positionen gekennzeichnet.' ]},

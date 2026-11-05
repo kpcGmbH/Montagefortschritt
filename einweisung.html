@@ -1395,10 +1395,17 @@ function updKeySum(){
 }
 function renderSessionAllgemein(){
   const body=document.getElementById('ewBody');
-  let html='<div class="step-title">1. Grundlagen bestätigen</div>';
+  STD_FORMS.forEach(f=>{ if(!SESSION.std[f.id]) SESSION.std[f.id]=f.checks.map(t=>({txt:t,done:false})); });
+  // Alle Haken auf einmal (v173, Wunsch des Nutzers): gesamt und je Abschnitt.
+  // Sind schon alle gesetzt, nimmt derselbe Knopf sie wieder zurück.
+  const alleDa=STD_FORMS.every(f=>SESSION.std[f.id].every(c=>c.done));
+  const kn='border:1px solid #895500;color:#895500;background:#fff;border-radius:16px;font-family:inherit;cursor:pointer';
+  let html='<div class="step-title" style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">1. Grundlagen bestätigen'+
+    '<button type="button" onclick="stdAlle(null,'+(alleDa?'false':'true')+')" style="'+kn+';margin-left:auto;padding:6px 12px;font-size:13px">'+(alleDa?'Alle zurücksetzen':'&#10003; Alle Punkte bestätigen')+'</button></div>';
   STD_FORMS.forEach(f=>{
-    const arr=SESSION.std[f.id]||(SESSION.std[f.id]=f.checks.map(t=>({txt:t,done:false})));
-    html+='<div class="card"><div class="card-h" style="font-size:13px">'+esc(f.titel)+'</div><div class="card-b" style="padding:6px 10px">';
+    const arr=SESSION.std[f.id], voll=arr.every(c=>c.done);
+    html+='<div class="card"><div class="card-h" style="font-size:13px;display:flex;align-items:center;gap:8px">'+esc(f.titel)+
+      '<button type="button" onclick="stdAlle('+esc(JSON.stringify(f.id))+','+(voll?'false':'true')+')" style="'+kn+';margin-left:auto;padding:3px 10px;font-size:12px">'+(voll?'zurücksetzen':'&#10003; alle')+'</button></div><div class="card-b" style="padding:6px 10px">';
     arr.forEach((c,ci)=>{ html+='<div class="sck'+(c.done?' on':'')+'" style="padding-left:0" onclick="toggleStd('+esc(JSON.stringify(f.id))+','+ci+')"><div class="sckb">'+(c.done?'&#10003;':'')+'</div><div>'+esc(c.txt)+'</div></div>'; });
     html+='</div></div>';
   });
@@ -1466,6 +1473,13 @@ function selEtage(ei){ const gs=[]; LV[ei].bereiche.forEach(b=>b.geraete.forEach
 function toggleEtColl(ei){ SESSION.collapsed[ei]=!(SESSION.collapsed[ei]!==false); renderSession(); }
 function toggleSck(pos,ci){ SESSION.sonder[pos][ci].done=!SESSION.sonder[pos][ci].done; renderSession(); }
 function toggleStd(fid,ci){ SESSION.std[fid][ci].done=!SESSION.std[fid][ci].done; renderSessionAllgemein(); }
+// fid=null: alle Abschnitte. Scrollposition bleibt, damit man nicht nach oben springt.
+function stdAlle(fid,wert){
+  const ov=document.getElementById('ewBody'), sc=[ov&&ov.parentElement?ov.parentElement.scrollTop:0, window.scrollY];
+  Object.keys(SESSION.std).forEach(k=>{ if(fid===null||k===fid) SESSION.std[k].forEach(c=>{ c.done=!!wert; }); });
+  renderSessionAllgemein();
+  if(ov&&ov.parentElement) ov.parentElement.scrollTop=sc[0]; window.scrollTo(0,sc[1]);
+}
 
 // ── Unterschrift-Pads ──
 // Zwei Stück: der Einweiser (KPC) und die eingewiesene Person. Das PDF hat für beide
