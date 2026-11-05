@@ -73,14 +73,17 @@ main{padding:14px 12px 40px;max-width:900px;margin:0 auto;}
 .berhd{font-size:11px;font-weight:700;color:var(--accent2);padding:8px 14px 2px;letter-spacing:.3px;text-transform:uppercase;}
 .grow{display:flex;align-items:flex-start;gap:10px;padding:8px 14px;border-top:1px solid var(--bg2);}
 /* Status-Punkt (NUR Anzeige, keine Checkbox – Auswahl passiert unter „+ Neue Einweisung") */
-.gmark{width:15px;height:15px;border-radius:50%;border:2px solid var(--border);opacity:.6;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;margin-top:3px;}
-.grow.ein .gmark{background:var(--green);border-color:var(--green);opacity:1;}
+/* v173: kein Kreis mehr – sah aus wie ein Kästchen zum Abhaken. Offene Zeilen sind
+   antippbar (startet die Einweisung mit diesem Gerät), eingewiesene zeigen nur ✓. */
+.gmark{width:15px;flex-shrink:0;font-size:13px;line-height:1;color:var(--green);font-weight:700;margin-top:2px;text-align:center;}
+.grow.klick{cursor:pointer;-webkit-tap-highlight-color:transparent;}
+.grow.klick:hover,.grow.klick:active{background:var(--bg2);}
 .gi{flex:1;min-width:0;}
 .gbez{font-size:13px;font-weight:700;line-height:1.3;}
 .gmeta{font-size:10px;color:var(--accent2);margin-top:1px;}
 .gstat{font-size:10px;white-space:nowrap;text-align:right;}
 .gstat .ok{color:var(--green);font-weight:700;}
-.gstat .off{color:var(--accent2);}
+.gstat .off{color:#895500;border:1px solid #895500;border-radius:12px;padding:2px 9px;display:inline-block;}
 
 /* CARDS */
 .card{background:var(--white);border-radius:10px;box-shadow:0 1px 4px rgba(0,0,0,.07);margin-bottom:12px;overflow:hidden;}
@@ -984,10 +987,10 @@ function renderOverview(){
       html+='<div class="berhd">'+esc(b.pos)+' '+esc(b.bez)+'</div>';
       b.geraete.forEach(g=>{
         const s=devState(g.pos); const ein=s&&s.eingewiesen;
-        html+='<div class="grow'+(ein?' ein':'')+'">'+
+        html+='<div class="grow'+(ein?' ein':' klick')+'"'+(ein?'':' onclick="ewMitGeraet('+esc(JSON.stringify(g.pos))+')" title="Einweisung für dieses Gerät beginnen"')+'>'+
           '<div class="gmark">'+(ein?'&#10003;':'')+'</div>'+
           '<div class="gi"><div class="gbez">'+esc(g.bez)+'</div><div class="gmeta">'+esc(g.pos)+(g.fab? ' · '+esc(g.fab):'')+(g.typ? ' · '+esc(g.typ):'')+'</div></div>'+
-          '<div class="gstat">'+(ein? '<span class="ok">✓ '+fmtDE(s.datum)+'</span>' : '<span class="off">offen</span>')+'</div>'+
+          '<div class="gstat">'+(ein? '<span class="ok">'+fmtDE(s.datum)+'</span>' : '<span class="off">Einweisen &#8250;</span>')+'</div>'+
         '</div>';
       });
     });
@@ -1263,6 +1266,14 @@ function entwurfLine(e){
 
 // ══════════════════ Sitzung (Neue Einweisung) ══════════════════
 let SESSION=null;
+// Tipp auf ein offenes Gerät in der Übersicht (v173): Geräte-Einweisung mit
+// diesem Gerät vorausgewählt – weitere lassen sich dort dazunehmen.
+function ewMitGeraet(pos){
+  startSession(); sessionType('geraete'); if(!SESSION) return;
+  // Etage des Geräts aufgeklappt zeigen – sonst sieht man die Auswahl nicht
+  const ei=LV.findIndex(et=>et.bereiche.some(b=>b.geraete.some(g=>g.pos===pos))); if(ei>=0) SESSION.collapsed[ei]=false;
+  if(!SESSION.selected[pos]) selDev(pos); else renderSession();
+}
 function startSession(){
   SESSION=null;
   const ov=mkOverlay('Neues Protokoll');
