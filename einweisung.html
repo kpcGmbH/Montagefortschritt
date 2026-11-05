@@ -942,7 +942,13 @@ async function openProject(pid, pname){
 }
 
 // ══════════════════ Übersicht ══════════════════
-function counts(){ let tot=0,ein=0; allDevices().forEach(d=>{ tot++; if(devState(d.g.pos)&&devState(d.g.pos).eingewiesen) ein++; }); return {tot,ein}; }
+// Nur Geräte mit Schritt „Einweisung" (Elektro, Nachunternehmer) – Tische, Borde,
+// Becken weist niemand ein (Nutzer, 05.11.2026). Die Schlüsselübergabe zeigt weiter
+// ALLE Positionen: Schlüssel gibt es auch zu Schränken. Etagen/Bereiche behalten ihre
+// Indizes (selEtage/selBereich zählen darauf), leere werden beim Zeichnen übersprungen.
+function sichtbar(g){ return (SESSION && istSchluessel()) ? true : needsEinw(g.gew); }
+function lvSicht(){ return LV.map(et=>Object.assign({},et,{bereiche:et.bereiche.map(b=>Object.assign({},b,{geraete:b.geraete.filter(sichtbar)}))})); }
+function counts(){ let tot=0,ein=0; allDevices().forEach(d=>{ if(!needsEinw(d.g.gew)) return; tot++; if(devState(d.g.pos)&&devState(d.g.pos).eingewiesen) ein++; }); return {tot,ein}; }
 function renderOverview(){
   const main=document.getElementById('main');
   const c=counts();
@@ -976,14 +982,18 @@ function renderOverview(){
 
   // Etagen
   if(!LV.length){ html+='<div class="empty">Keine Geräte in der Stückliste dieser Baustelle.</div>'; }
-  LV.forEach((et,ei)=>{
+  const LVE=LV.map(et=>Object.assign({},et,{bereiche:et.bereiche.map(b=>Object.assign({},b,{geraete:b.geraete.filter(g=>needsEinw(g.gew))}))}));
+  if(LV.length && !LVE.some(et=>et.bereiche.some(b=>b.geraete.length))) html+='<div class="empty">Keine einweisungspflichtigen Geräte (Elektro, Nachunternehmer) in der Stückliste dieser Baustelle.</div>';
+  LVE.forEach((et,ei)=>{
     let tot=0,ein=0; et.bereiche.forEach(b=>b.geraete.forEach(g=>{ tot++; if(devState(g.pos)&&devState(g.pos).eingewiesen) ein++; }));
+    if(!tot) return;
     const L=lid(et.label)+'_'+ei;
     html+='<div class="etblock"><div class="ethd" onclick="toggleEt('+ei+')">'+
       '<h3>'+esc(et.label)+(et.bez? ' · '+esc(et.bez):'')+'</h3>'+
       '<span class="cnt">'+ein+'/'+tot+'</span><span class="tog" id="TOG_'+L+'">&#9660;</span></div>'+
       '<div class="etbody" id="ETB_'+L+'">';
     et.bereiche.forEach(b=>{
+      if(!b.geraete.length) return;
       html+='<div class="berhd">'+esc(b.pos)+' '+esc(b.bez)+'</div>';
       b.geraete.forEach(g=>{
         const s=devState(g.pos); const ein=s&&s.eingewiesen;
@@ -1312,11 +1322,12 @@ function renderSessionGeraete(){
     ? '<div class="step-title">1. Geräte mit Schlüssel auswählen</div>'+
       '<div class="hint">Geräte aus der Stückliste ankreuzen – je Gerät dann Anzahl und Schlüssel-Nr. eintragen. Was nicht in der Stückliste steht (Türen, Zylinder, Räume, Transponder), kommt unten unter „Weitere Übergaben".</div>'
     : '<div class="step-title">1. Geräte auswählen</div>'+
-      '<div class="hint">Jeder Artikel ist ankreuzbar. Ganze Etage/Bereich per Button wählen oder Etage aufklappen und einzeln antippen. Bei einweisungspflichtigen Geräten (Gewerk Elektro) erscheint zusätzlich die Checkliste.</div>';
-  LV.forEach((et,ei)=>{
+      '<div class="hint">Nur Geräte mit Einweisung (Elektro, Nachunternehmer) – Tische, Borde, Becken stehen hier nicht. Ganze Etage/Bereich per Button wählen oder Etage aufklappen und einzeln antippen; je Gerät erscheint die Checkliste.</div>';
+  lvSicht().forEach((et,ei)=>{
     const collapsed = SESSION.collapsed[ei]!==false;   // Standard: zugeklappt
     let etTot=0, etSel=0;
     et.bereiche.forEach(b=>b.geraete.forEach(g=>{ etTot++; if(SESSION.selected[g.pos]) etSel++; }));
+    if(!etTot) return;
     html+='<div class="sel-et">'+
       '<div class="sel-ethd" onclick="toggleEtColl('+ei+')">'+
         '<span class="sel-tog'+(collapsed?' cl':'')+'">&#9660;</span>'+
@@ -1326,6 +1337,7 @@ function renderSessionGeraete(){
       '</div>';
     if(!collapsed){
       et.bereiche.forEach((b,bi)=>{
+        if(!b.geraete.length) return;
         html+='<div class="selbar"><div class="sub-bereich" style="padding:2px 6px">'+esc(b.pos)+' '+esc(b.bez)+'</div>'+
           (b.geraete.length? '<button class="chip" onclick="selBereich('+ei+','+bi+')">Bereich wählen</button>':'')+'</div>';
         b.geraete.forEach(g=>{
@@ -1482,8 +1494,8 @@ function devByPos(pos){ const d=allDevices().find(x=>x.g.pos===pos); return d?d.
 // Checkliste nur für einweisungspflichtige (Elektro) Geräte anlegen
 function ensureSonder(pos){ if(istSchluessel()) return; if(!SESSION.sonder[pos]){ const g=devByPos(pos); if(g && needsEinw(g.gew)) SESSION.sonder[pos]=checksFor(g).map(t=>({txt:t,done:false})); } }
 function selDev(pos){ if(SESSION.selected[pos]) delete SESSION.selected[pos]; else { SESSION.selected[pos]=true; ensureSonder(pos); } renderSession(); }
-function selBereich(ei,bi){ const gs=LV[ei].bereiche[bi].geraete; const anyOff=gs.some(g=>!SESSION.selected[g.pos]); gs.forEach(g=>{ if(anyOff){ SESSION.selected[g.pos]=true; ensureSonder(g.pos); } else delete SESSION.selected[g.pos]; }); renderSession(); }
-function selEtage(ei){ const gs=[]; LV[ei].bereiche.forEach(b=>b.geraete.forEach(g=>gs.push(g))); const anyOff=gs.some(g=>!SESSION.selected[g.pos]); gs.forEach(g=>{ if(anyOff){ SESSION.selected[g.pos]=true; ensureSonder(g.pos); } else delete SESSION.selected[g.pos]; }); renderSession(); }
+function selBereich(ei,bi){ const gs=lvSicht()[ei].bereiche[bi].geraete; const anyOff=gs.some(g=>!SESSION.selected[g.pos]); gs.forEach(g=>{ if(anyOff){ SESSION.selected[g.pos]=true; ensureSonder(g.pos); } else delete SESSION.selected[g.pos]; }); renderSession(); }
+function selEtage(ei){ const gs=[]; lvSicht()[ei].bereiche.forEach(b=>b.geraete.forEach(g=>gs.push(g))); const anyOff=gs.some(g=>!SESSION.selected[g.pos]); gs.forEach(g=>{ if(anyOff){ SESSION.selected[g.pos]=true; ensureSonder(g.pos); } else delete SESSION.selected[g.pos]; }); renderSession(); }
 function toggleEtColl(ei){ SESSION.collapsed[ei]=!(SESSION.collapsed[ei]!==false); renderSession(); }
 function toggleSck(pos,ci){ SESSION.sonder[pos][ci].done=!SESSION.sonder[pos][ci].done; renderSession(); }
 function toggleStd(fid,ci){ SESSION.std[fid][ci].done=!SESSION.std[fid][ci].done; renderSessionAllgemein(); }
