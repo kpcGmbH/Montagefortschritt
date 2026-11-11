@@ -1668,7 +1668,9 @@ async function finishSession(){
 // Werte. Ein durchlaufendes Dokument (keine Anlage) – Schlüssellisten sind kurz.
 function buildKeyPdf(zeilen){
   const { jsPDF }=window.jspdf;
-  const doc=new jsPDF({unit:'mm',format:'a4'});
+  // compress:true (v174): ohne sie legt jsPDF Logo und Schrift UNKOMPRIMIERT ab –
+  // ein einseitiges IBN-Protokoll ohne Fotos hatte 1.057 KB, mit 72 KB.
+  const doc=new jsPDF({compress:true,unit:'mm',format:'a4'});
   const W=210, M=18;
   const brown=[137,85,0], grey=[110,110,110], dark=[43,43,43];
   const logoH=15, logoW=logoH*149.8/181;
@@ -1781,7 +1783,7 @@ function buildKeyPdf(zeilen){
 // ── PDF-Layout (jsPDF, manuell) ──
 function buildPdf(titel, positions){
   const { jsPDF }=window.jspdf;
-  const doc=new jsPDF({unit:'mm',format:'a4'});
+  const doc=new jsPDF({compress:true,unit:'mm',format:'a4'});
   const W=210, M=18;
   const brown=[137,85,0], grey=[110,110,110], dark=[43,43,43];
   const logoH=15, logoW=logoH*149.8/181;

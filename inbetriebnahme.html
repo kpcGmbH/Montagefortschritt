@@ -899,7 +899,9 @@ function resetForm(){if(!confirm('Alle Eingaben dieses Protokolls löschen?'))re
 /* ---------- PDF Export ---------- */
 function exportPDF(){
   const o=DB[CUR.mfr].devices[CUR.dev];
-  const {jsPDF}=window.jspdf;const doc=new jsPDF({unit:'mm',format:'a4'});
+  // compress:true (v174): ohne sie legt jsPDF Logo und Schrift UNKOMPRIMIERT ab –
+  // ein einseitiges IBN-Protokoll ohne Fotos hatte 1.057 KB, mit 72 KB.
+  const {jsPDF}=window.jspdf;const doc=new jsPDF({compress:true,unit:'mm',format:'a4'});
   try{doc.addFileToVFS('RC.ttf',FONT_B64);doc.addFont('RC.ttf','RC','normal');doc.setFont('RC');}catch(e){doc.setFont('helvetica');}
   const W=210,H=297,mL=18,mR=18,cw=W-mL-mR;const copper=[137,86,18],gray=[103,108,111],black=[20,20,20];
   let y=0,page=0;

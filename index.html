@@ -2272,8 +2272,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 173;
+const APP_VERSION = 174;
 const CHANGELOG = [
+  { v:174, titel:'PDFs deutlich kleiner', punkte:[
+    'Alle Protokolle (Inbetriebnahme, DGUV, Einweisung, Schlüsselübergabe, Abnahme, Bautagebuch, Dichtigkeit, Servicebericht, Berichte) werden jetzt <b>komprimiert</b> erzeugt. Ein einseitiges Inbetriebnahmeprotokoll ohne Fotos hatte gut 1 MB, jetzt rund 70 KB – Inhalt und Aussehen unverändert.' ]},
   { v:173, titel:'Grundlagen-Einweisung: alle Punkte auf einmal', punkte:[
     'In der Grundlagen-Einweisung setzt <b>„✓ Alle Punkte bestätigen"</b> alle Haken auf einmal; je Abschnitt (Edelstahlmöbel, Kleingeräte, Großgeräte) geht das auch einzeln über „✓ alle". Sind schon alle gesetzt, nimmt derselbe Knopf sie wieder zurück.',
     '„Zwischenspeichern" bei der Grundlagen-Einweisung meldete „kein Gerät ausgewählt" und speicherte nicht – sie hat keine Geräte. Jetzt lässt sie sich immer zwischenspeichern.',
@@ -5953,7 +5955,9 @@ function btbSvgToPng(dataUri,targetW){
 async function btbBuildPdf(entry){
   if(!window.jspdf) throw new Error('PDF-Bibliothek nicht geladen (Seite neu laden)');
   const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({orientation:'p',unit:'mm',format:'a4'});
+  // compress:true (v174): ohne sie legt jsPDF Logo und Schrift UNKOMPRIMIERT ab –
+  // ein einseitiges IBN-Protokoll ohne Fotos hatte 1.057 KB, mit 72 KB.
+  const doc=new jsPDF({compress:true,orientation:'p',unit:'mm',format:'a4'});
   const M=16, W=210, R=W-M, PH=297;
   const copper=[137,86,0], dark=[43,43,43], grey=[120,120,120], line=[214,209,203];
   const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
@@ -6325,7 +6329,7 @@ function dichtOpenPdf(nr){
 async function dichtBuildPdf(entry){
   if(!window.jspdf) throw new Error('PDF-Bibliothek nicht geladen (Seite neu laden)');
   const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({orientation:'p',unit:'mm',format:'a4'});
+  const doc=new jsPDF({compress:true,orientation:'p',unit:'mm',format:'a4'});
   const M=16, W=210, R=W-M, PH=297;
   const copper=[137,86,0], dark=[43,43,43], grey=[120,120,120], line=[214,209,203];
   const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
@@ -6826,7 +6830,7 @@ function svcOpenPdf(nr){
 async function svcBuildPdf(entry){
   if(!window.jspdf) throw new Error('PDF-Bibliothek nicht geladen (Seite neu laden)');
   const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({orientation:'p',unit:'mm',format:'a4'});
+  const doc=new jsPDF({compress:true,orientation:'p',unit:'mm',format:'a4'});
   const M=16, W=210, R=W-M, PH=297;
   const dark=[43,43,43], grey=[120,120,120];
   const tc=c=>doc.setTextColor(c[0],c[1],c[2]);
@@ -8844,7 +8848,7 @@ async function pdfSaveData(){
     mc.drawImage(pg.ink,0,0);
     const imgData=merge.toDataURL('image/jpeg',0.7);
     const wmm=210, hmm=merge.height*210/merge.width;
-    if(idx===0){ doc=new jsPDF({orientation:'p',unit:'mm',format:[wmm,hmm]}); }
+    if(idx===0){ doc=new jsPDF({compress:true,orientation:'p',unit:'mm',format:[wmm,hmm]}); }
     else { doc.addPage([wmm,hmm]); }
     doc.addImage(imgData,'JPEG',0,0,wmm,hmm);
   });
@@ -8950,7 +8954,7 @@ async function pdfSaveDataBg(pos, idx, pages){
     mc.drawImage(pg.ink,0,0);
     const imgData=merge.toDataURL('image/jpeg',0.7);
     const wmm=210, hmm=merge.height*210/merge.width;
-    if(i===0){ doc=new jsPDF({orientation:'p',unit:'mm',format:[wmm,hmm]}); }
+    if(i===0){ doc=new jsPDF({compress:true,orientation:'p',unit:'mm',format:[wmm,hmm]}); }
     else { doc.addPage([wmm,hmm]); }
     doc.addImage(imgData,'JPEG',0,0,wmm,hmm);
   });
@@ -10686,7 +10690,7 @@ function protoUebersichtDaten(){
 async function puBuildPdf(){
   if(!window.jspdf) throw new Error('PDF-Bibliothek nicht geladen (Seite neu laden)');
   const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({orientation:'l',unit:'mm',format:'a4'});
+  const doc=new jsPDF({compress:true,orientation:'l',unit:'mm',format:'a4'});
   const M=14, W=297, R=W-M, PH=210;
   const copper=[137,86,0], dark=[43,43,43], grey=[120,120,120], line=[214,209,203];
   const tc=c=>doc.setTextColor(c[0],c[1],c[2]);
@@ -11201,7 +11205,7 @@ async function fmErstellen(){
 async function fmBuildPdf(o){
   if(!window.jspdf) throw new Error('PDF-Bibliothek nicht geladen (Seite neu laden)');
   const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({orientation:'p',unit:'mm',format:'a4'});
+  const doc=new jsPDF({compress:true,orientation:'p',unit:'mm',format:'a4'});
   const M=16, W=210, R=W-M, PH=297;
   const copper=[137,86,0], dark=[43,43,43], grey=[120,120,120], line=[214,209,203], gruen=[58,122,58];
   const proj=(PROJECTS||[]).find(p=>p.pid===PID)||{};
@@ -12295,7 +12299,7 @@ async function abnEdAbschliessen(){
 async function abnBuildPdf(A, F){
   if(!window.jspdf) throw new Error('PDF-Bibliothek nicht geladen (Seite neu laden)');
   const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({orientation:'p',unit:'mm',format:'a4'});
+  const doc=new jsPDF({compress:true,orientation:'p',unit:'mm',format:'a4'});
   const M=16, W=210, R=W-M, PH=297;
   const copper=[137,86,0], dark=[43,43,43], grey=[120,120,120], braun=[107,76,53], hell=[243,236,228], linie=[227,201,168];
   const st=projStamm(), T=abnTexte(F?F.va:st.vertragsart, A.art, st);

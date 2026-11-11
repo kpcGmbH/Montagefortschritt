@@ -332,7 +332,9 @@ function svgToPng(dataUri,targetW){
 async function buildPdf(entry){
   if(!window.jspdf) throw new Error('PDF-Bibliothek nicht geladen – bitte online öffnen und Seite neu laden');
   const {jsPDF}=window.jspdf;
-  const doc=new jsPDF({orientation:'p',unit:'mm',format:'a4'});
+  // compress:true (v174): ohne sie legt jsPDF Logo und Schrift UNKOMPRIMIERT ab –
+  // ein einseitiges IBN-Protokoll ohne Fotos hatte 1.057 KB, mit 72 KB.
+  const doc=new jsPDF({compress:true,orientation:'p',unit:'mm',format:'a4'});
   const M=16, W=210, R=W-M, PH=297;
   const dark=[43,43,43], grey=[120,120,120];
   const tc=c=>doc.setTextColor(c[0],c[1],c[2]);
