@@ -1030,9 +1030,11 @@ function exportPDF(){
   if(waAktiv()){ const g=waGewaehlt();
     secHead('Wasseraufbereitung – zugleich Inbetriebnahme Pos. '+g.pos);
     kvLine('Position',g.pos+' '+g.bez+(g.fab?(' · '+g.fab):''));
-    WA_FELDER.forEach(f=>{ const k=waBasisKey(o,f)||('wa_'+f.id);
+    WA_FELDER.forEach(f=>{ const bk=waBasisKey(o,f), k=bk||('wa_'+f.id);
+      // Einheit wie im Hersteller-Feld (Hobart: °d statt °dH)
+      const m=bk&&/^s(\d+)i(\d+)$/.exec(bk), bi=m&&o.sections[+m[1]]&&o.sections[+m[1]].items[+m[2]], u=(bi&&bi.u)||f.u;
       if(f.k==='check') checkLine(f.l,STATE[k]||{},['erledigt'],false);
-      else { const v=STATE[k]||''; kvLine(f.l,(f.k==='measure'&&v)?(v+' '+f.u):v); } });
+      else { const v=STATE[k]||''; kvLine(f.l,(f.k==='measure'&&v)?(v+' '+u):v); } });
     y+=2; }
   // Unterschriften (leere optionale Kundenunterschriften werden weggelassen)
   const anySig=o.sign.roles.some(function(r){return !sigAus(r);});
@@ -1375,7 +1377,8 @@ const WA_FELDER=[
   {id:'regen',l:'Regeneration / Spülung eingestellt', k:'check'},
   {id:'dicht',l:'Wasser- und Abwasseranschluss der Aufbereitung dicht', k:'check'}
 ];
-function waIstSpuel(){ return !!(CUR.mfr && CUR.dev && CUR.mfr!=='DGUV V3' && DB[CUR.mfr] && DB[CUR.mfr].devices[CUR.dev] && /sp(ü|ue)l/i.test(CUR.dev)); }
+function waIstSpuel(){ const o=CUR.mfr && CUR.dev && DB[CUR.mfr] && DB[CUR.mfr].devices[CUR.dev];
+  return !!(o && CUR.mfr!=='DGUV V3' && /sp(ü|ue)l/i.test(CUR.dev) && (o.sections||[]).length && CUR.pos && IBNCTX && IBNCTX.pos===CUR.pos); }
 function waListe(){
   if(!waIstSpuel()) return [];
   const l=(IBNCTX&&Array.isArray(IBNCTX.wa))?IBNCTX.wa:STATE.wa_liste;
@@ -1395,11 +1398,23 @@ function waBasisKey(o,f){ if(!f.re) return null; let key=null;
 // (saveState am Anfang hätte einen frischen Entwurf als „begonnen" markiert).
 function waInit(o){
   if(!waIstSpuel()) return;
+  const neuImKasten=!Array.isArray(STATE.wa_liste);   // Stand kennt den Kasten noch nicht
   if(IBNCTX&&Array.isArray(IBNCTX.wa)) STATE.wa_liste=IBNCTX.wa;
   const l=waListe(); if(!l.length) return;
+  // Standard „aus" (Prüfung 20.11.2026): bei einem schon abgelegten Protokoll von vor
+  // v170 – sonst stünde beim bloßen Korrigieren unter den alten Unterschriften
+  // plötzlich die Inbetriebnahme der Enthärtung – und ab dem 2. Gerät einer Position
+  // (zwei Spülmaschinen, eine Enthärtung: die erste nimmt sie mit).
+  if(STATE.wa_an===undefined && ((neuImKasten && IBNCTX && IBNCTX.replaceFname) || (IBNCTX && IBNCTX.nr>1))) STATE.wa_an=false;
   if(!l.some(x=>x.pos===STATE.wa_pos)) STATE.wa_pos=l[0].pos;
+  // Typ aus der Stückliste EINMAL je gewählter Wasseraufbereitung vorbelegen; beim
+  // Wechsel der Auswahl den vorbelegten Wert ersetzen, Eigenes nie überschreiben.
   const g=waGewaehlt(), kt=waBasisKey(o,WA_FELDER[0])||'wa_typ';
-  if(STATE.wa_an!==false && g && g.typ && !STATE[kt]) STATE[kt]=g.typ;
+  if(STATE.wa_an!==false && g && STATE.wa_typFuer!==g.pos){
+    const alt=l.find(x=>x.pos===STATE.wa_typFuer);
+    if(!STATE[kt] || (alt && STATE[kt]===alt.typ)) STATE[kt]=g.typ||'';
+    STATE.wa_typFuer=g.pos;
+  }
 }
 function waHTML(o){
   const l=waListe(); if(!l.length) return '';

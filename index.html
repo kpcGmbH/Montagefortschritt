@@ -1753,10 +1753,18 @@ function relFields(p){
 // true/false; fehlt das Feld, gilt die Automatik). Gleiche Liste in einweisung.html
 // (EW_OHNE) – wer eine ändert, ändert beide.
 const EW_OHNE=/steckdose|steckerleiste|elektrifizierung|kabelkanal|kabelf(ü|ue)hrung|kabeldurchf|leerrohr|anschlussdose|anschlusskasten|unterverteil|bewegungsmelder|datendose|netzwerkdose/i;
-// Licht nur im HAUPTWORT (vor „mit", „inkl.", „und", Komma, Klammer): „Kühlraum-
-// beleuchtung" ja, „Kühlvitrine mit Beleuchtung" nicht – die ist ein Gerät.
 const EW_OHNE_KOPF=/beleuchtung|leuchte|lichtleiste|led-?band|led-?leiste|schalter/i;
-function ewOhne(bez){ bez=String(bez||''); const kopf=bez.split(/\s(?:mit|inkl\.?|und|&)\s|,|\(/i)[0]; return EW_OHNE.test(bez) || EW_OHNE_KOPF.test(kopf); }
+// Möbel als Hauptwort: dort zählt Elektro-Zubehör auch im Zusatz („Arbeitstisch mit Steckdose")
+const EW_MOEBEL=/batterie|armatur|becken|arbeitstisch|spültisch|spueltisch|zulauftisch|ablauftisch|auslauftisch|tischanlage|arbeitsschrank|wandschrank|hängeschrank|haengeschrank|regal|bord\b|wandbord|theke|anlage|zeile|möbel|moebel/i;
+// Hauptwort = Text vor dem ersten Zusatz („mit", „m.", „inkl.", „und", „u.", „&", „/", Komma, Klammer).
+// Prüfung 20.11.2026: Zubehör-Wörter wirkten auf die GANZE Bezeichnung – „Kühltisch
+// mit Steckdose" und „Kochblock inkl. Unterverteilung" verloren Einweisung und
+// Typenschild. Jetzt: Zubehör im Hauptwort immer; im Zusatz nur, wenn das Hauptwort
+// ein Möbel ist. Wärme-/Heizgeräte („Wärmeleuchte") sind nie Zubehör.
+function ewKopf(bez){ return String(bez||'').split(/\s(?:mit|m\.|inkl\.?|inklusive|incl\.?|und|u\.|&)\s|\s\/\s|,|\(/i)[0]; }
+function ewOhne(bez){ bez=String(bez||''); const kopf=ewKopf(bez);
+  if(/wärme|waerme|heiz|infrarot/i.test(kopf)) return false;
+  return EW_OHNE.test(kopf) || EW_OHNE_KOPF.test(kopf) || (EW_MOEBEL.test(kopf) && (EW_OHNE.test(bez) || EW_OHNE_KOPF.test(bez))); }
 const POSITEM={};   // pos -> Stücklisten-Eintrag (beim Aufbau der Panels gefüllt)
 function ewItem(p){ return POSITEM[p] || (typeof tsItem==='function' ? tsItem(p) : null); }
 function ewAuto(p){ return !ewOhne((ewItem(p)||{}).bez); }
@@ -2272,8 +2280,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 175;
+const APP_VERSION = 176;
 const CHANGELOG = [
+  { v:176, titel:'Fehlerprüfung v170–v175', punkte:[
+    'Inbetriebnahme: Ein altes Spülmaschinen-Protokoll wird beim Weiterbearbeiten nicht mehr ungefragt zur Inbetriebnahme der Enthärtung; ab dem 2. Gerät einer Position ist „Gilt auch als Inbetriebnahme von …" standardmäßig aus. Der Typ wechselt mit der gewählten Wasseraufbereitung.',
+    'Baustelle umbenannt → „Ordner konsolidieren": Protokolle, die an zwei Positionen hängen (Spülmaschine + Enthärtung), werden einmal verschoben und bleiben an beiden Positionen erreichbar.',
+    'Einweisung/Typenschild: Zubehör-Wörter zählen nur noch im Hauptwort bzw. bei Möbeln – „Kühltisch mit Steckdose", „Kochblock inkl. Unterverteilung", „Dunstabzugshaube m. Beleuchtung" oder eine Wärmeleuchte behalten Einweisung und Typenschild.',
+    'Einweisungs-Protokoll: alte, schon gewählte Positionen bleiben sichtbar und abwählbar; Unterschrift des Nachunternehmers nur mit Firma oder Name; Schriftgröße in der Geräte-Anlage korrigiert.',
+    'Kleinere Korrekturen: kein doppelter Anschluss-Dialog beim Ablegen, Übersteuerung „Einweisung erforderlich" sofort sichtbar, Protokoll-Zählung ohne Verweise.' ]},
   { v:175, titel:'Typenschild-Foto: flüssiger', punkte:[
     'Nach der Aufnahme erscheint <b>sofort</b> „Foto wird geprüft…" – vorher geschah 1–3 Sekunden lang sichtbar nichts, während das Foto geprüft wurde.',
     'Das Foto wird nur noch <b>einmal</b> verarbeitet statt zweimal (Prüfung und Verkleinern nutzen dasselbe Bild). Am Handy deutlich schneller und speichersparender.',
@@ -3044,7 +3058,10 @@ function konsolRefs(){
   for(const sec of DATA){ for(const sub of sec.subsections){ for(const it of sub.items){
     const pos=it.pos, s=ST[pos]; if(!s) continue;
     (s.fotos||[]).forEach((ref,i)=>out.push({pos,kind:'foto',i,old:ref}));
-    (s.pdfs||[]).forEach((p,i)=>{ out.push({pos,kind:'pdf',i,old:p&&p.fname}); out.push({pos,kind:'pdfdata',i,old:p&&p.dataFname}); });
+    // Verweise ({ueber}, v170) teilen die Datei mit dem Original – nicht ein zweites
+    // Mal verschieben (das scheiterte und trennte Original und Verweis); sie werden
+    // beim Verschieben des Originals mitgezogen (ordnerKonsolidieren).
+    (s.pdfs||[]).forEach((p,i)=>{ if(p&&p.ueber) return; out.push({pos,kind:'pdf',i,old:p&&p.fname}); out.push({pos,kind:'pdfdata',i,old:p&&p.dataFname}); });
     (s.restarbeiten||[]).forEach((r,ri)=>{
       (r.fotos||[]).forEach((ref,fi)=>out.push({pos,kind:'ra',ri,fi,old:ref}));
       (r.fotosOk||[]).forEach((ref,fi)=>out.push({pos,kind:'raok',ri,fi,old:ref}));
@@ -3092,6 +3109,11 @@ async function ordnerKonsolidieren(dry){
       const s=ST[m.pos];
       konsolAnwenden(s,m);
       changed.add(m.pos); ok++;
+      // Verweise anderer Positionen auf diese Datei mitziehen
+      if(m.kind==='pdf' || m.kind==='pdfdata') Object.keys(ST).forEach(k=>{ const t=ST[k]; if(!t || !Array.isArray(t.pdfs)) return;
+        t.pdfs.forEach(x=>{ if(!x || x.ueber!==m.pos) return;
+          if(m.kind==='pdf' && x.fname===m.old){ x.fname=m.neu; changed.add(k); }
+          if(m.kind==='pdfdata' && x.dataFname===m.old){ x.dataFname=m.neu; changed.add(k); } }); });
     }catch(e){ console.warn('Verschieben fehlgeschlagen:', m.old, (e&&e.message)||e); fail++; }
   }
   for(const pos of changed){ await enqueuePos(pos); }
@@ -3634,7 +3656,7 @@ function dokuStand(){
     const pos=new Set(l.map(x=>x.pos)).size;
     fertig.push({ic, t:titel, tag:String(l.length), m:l.length+' Protokoll'+(l.length===1?'':'e')+' an '+pos+' Position'+(pos===1?'':'en')+' · zuletzt '+(l[0].datum||'–'), knopf:'Liste', fn:'geraeteProtokollListe('+escapeHtml(JSON.stringify(typ))+')'});
   });
-  let nProt=0; DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ nProt+=(gs(it.pos).pdfs||[]).length; })));
+  let nProt=0; DATA.forEach(sec=>sec.subsections.forEach(sub=>sub.items.forEach(it=>{ nProt+=(gs(it.pos).pdfs||[]).filter(p=>p&&!p.ueber).length; })));   // Verweise nicht doppelt
   if(nProt) fertig.push({ic:'&#128450;', t:'Protokoll-Übersicht', m:nProt+' Geräte-Protokolle · hält sich selbst aktuell', knopf:'Anzeigen', fn:'expProtokollUebersicht()', leicht:true});
   return {off, vorb, fertig, aus};
 }
@@ -3771,7 +3793,7 @@ function tsAuto(pos){
   if(!rel.includes('ib') && !rel.includes('sa')) return false;   // weder Elektro noch Sanitär
   const it=tsItem(pos), bez=String((it&&it.bez)||'');
   // Zubehör nur im HAUPTWORT: „Mikrowellengerät m. Wandkonsolen" bleibt ein Gerät
-  const kopf=bez.split(/\s(?:mit|m\.|inkl\.?|und|u\.|&)\s|,|\(/i)[0];
+  const kopf=ewKopf(bez);
   if(TS_ZUBEHOER.test(kopf) || ewOhne(bez)) return false;
   // nur Sanitär: Gerät im Namen UND kein Möbel als Hauptwort („Spülmaschinen Zulauftisch")
   if(!rel.includes('ib') && !rel.includes('ea')) return TS_SANI_GERAET.test(bez) && !TS_OHNE.test(kopf);
@@ -8321,7 +8343,12 @@ async function ibnReceive(p){
     showToast('✓ '+type+' bei Position '+pos+(waPos?(' und '+waPos):'')+(replaced?' aktualisiert':' abgelegt')+
               protoHinweis(auto));
     protoWarnen(pos, auto);
-    if(waPos && !gs(waPos).ib){ const a2=schrittAusProtokoll(waPos, type); if(a2 && a2.stand!=='gesetzt' && a2.stand!=='nicht-relevant') protoWarnen(waPos, a2); }
+    // Zweiter Dialog würde den ersten (gleiches Overlay) überschreiben: Anschluss-Frage der
+    // Wasseraufbereitung nur, wenn für die Spülmaschine keine offen ist – sonst Hinweis.
+    if(waPos && !gs(waPos).ib){ const a2=schrittAusProtokoll(waPos, type);
+      if(a2 && a2.stand!=='gesetzt' && a2.stand!=='nicht-relevant'){
+        if(a2.stand==='anschl' && auto && auto.stand==='anschl') showToast('Pos. '+waPos+': Stecker/Festanschluss noch offen – „Inbetriebnahme" dort abhaken',{bg:'#8b6d22'});
+        else protoWarnen(waPos, a2); } }
     ibnGoToPos(pos);
     return true;
   }catch(e){ _ibnSeen.delete(p.id); alert('IBN-Protokoll konnte nicht abgelegt werden: '+((e&&e.message)||e)); return false; }
@@ -12938,12 +12965,12 @@ function gewUI(pos, item, nurKarte){
 const OVR_KEYS=['gew','ts','ibn','ibnAusVon','ibnAusAm','dguv','dguvAusVon','dguvAusAm','einw'];
 function ovrAnwenden(pos, ohneUI){
   const it=tsItem(pos), o=ST[pos]&&ST[pos].ovr; if(!it || !o) return false;
-  let gewNeu=false;
+  let gewNeu=false; const ewVor=it.einw;
   OVR_KEYS.forEach(k=>{ if(!(k in o)) return;
     if(k==='gew'){ const g=Array.isArray(o.gew)?o.gew:[];
       if(JSON.stringify(g)!==JSON.stringify(it.gew||[])){ it.gew=g.slice(); POSGEW[pos]=it.gew; gewNeu=true; } return; }
     if(o[k]===null || o[k]===undefined) delete it[k]; else it[k]=o[k]; });
-  if(!ohneUI){ if(gewNeu) gewUI(pos,it); updTG(pos); ibnRender(pos); }
+  if(!ohneUI){ if(gewNeu || it.einw!==ewVor) gewUI(pos,it); updTG(pos); ibnRender(pos); }   // auch „Einweisung erforderlich" (v175)
   return gewNeu;
 }
 function ovrSetzen(pos, patch){

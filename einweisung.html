@@ -700,10 +700,18 @@ function needsEinw(gew){ return relFieldsG(gew).has('ew'); }
 // Gleiche Liste wie EW_OHNE in der Hauptapp – wer eine ändert, ändert beide.
 // g.einw = Übersteuerung je Position aus „✎ Gewerk" (true/false), sonst Automatik.
 const EW_OHNE=/steckdose|steckerleiste|elektrifizierung|kabelkanal|kabelf(ü|ue)hrung|kabeldurchf|leerrohr|anschlussdose|anschlusskasten|unterverteil|bewegungsmelder|datendose|netzwerkdose/i;
-// Licht nur im HAUPTWORT (vor „mit", „inkl.", „und", Komma, Klammer): „Kühlraum-
-// beleuchtung" ja, „Kühlvitrine mit Beleuchtung" nicht – die ist ein Gerät.
 const EW_OHNE_KOPF=/beleuchtung|leuchte|lichtleiste|led-?band|led-?leiste|schalter/i;
-function ewOhne(bez){ bez=String(bez||''); const kopf=bez.split(/\s(?:mit|inkl\.?|und|&)\s|,|\(/i)[0]; return EW_OHNE.test(bez) || EW_OHNE_KOPF.test(kopf); }
+// Möbel als Hauptwort: dort zählt Elektro-Zubehör auch im Zusatz („Arbeitstisch mit Steckdose")
+const EW_MOEBEL=/batterie|armatur|becken|arbeitstisch|spültisch|spueltisch|zulauftisch|ablauftisch|auslauftisch|tischanlage|arbeitsschrank|wandschrank|hängeschrank|haengeschrank|regal|bord\b|wandbord|theke|anlage|zeile|möbel|moebel/i;
+// Hauptwort = Text vor dem ersten Zusatz („mit", „m.", „inkl.", „und", „u.", „&", „/", Komma, Klammer).
+// Prüfung 20.11.2026: Zubehör-Wörter wirkten auf die GANZE Bezeichnung – „Kühltisch
+// mit Steckdose" und „Kochblock inkl. Unterverteilung" verloren Einweisung und
+// Typenschild. Jetzt: Zubehör im Hauptwort immer; im Zusatz nur, wenn das Hauptwort
+// ein Möbel ist. Wärme-/Heizgeräte („Wärmeleuchte") sind nie Zubehör.
+function ewKopf(bez){ return String(bez||'').split(/\s(?:mit|m\.|inkl\.?|inklusive|incl\.?|und|u\.|&)\s|\s\/\s|,|\(/i)[0]; }
+function ewOhne(bez){ bez=String(bez||''); const kopf=ewKopf(bez);
+  if(/wärme|waerme|heiz|infrarot/i.test(kopf)) return false;
+  return EW_OHNE.test(kopf) || EW_OHNE_KOPF.test(kopf) || (EW_MOEBEL.test(kopf) && (EW_OHNE.test(bez) || EW_OHNE_KOPF.test(bez))); }
 function einwNoetig(g){ if(!g || !needsEinw(g.gew)) return false; if(g.einw===true||g.einw===false) return g.einw; return !ewOhne(g.bez); }
 
 // ══════════════════ ew-Rückschreibung in die Positionen-Liste ══════════════════
@@ -955,7 +963,9 @@ async function openProject(pid, pname){
 // Becken weist niemand ein (Nutzer, 05.11.2026). Die Schlüsselübergabe zeigt weiter
 // ALLE Positionen: Schlüssel gibt es auch zu Schränken. Etagen/Bereiche behalten ihre
 // Indizes (selEtage/selBereich zählen darauf), leere werden beim Zeichnen übersprungen.
-function sichtbar(g){ return (SESSION && istSchluessel()) ? true : einwNoetig(g); }
+// Schon ausgewählte Positionen bleiben sichtbar – sonst landeten sie aus alten
+// Entwürfen/Protokollen (vor v173 war alles wählbar) unsichtbar im neuen Protokoll.
+function sichtbar(g){ return (SESSION && istSchluessel()) ? true : (einwNoetig(g) || !!(SESSION && SESSION.selected && SESSION.selected[g.pos])); }
 function lvSicht(){ return LV.map(et=>Object.assign({},et,{bereiche:et.bereiche.map(b=>Object.assign({},b,{geraete:b.geraete.filter(sichtbar)}))})); }
 function counts(){ let tot=0,ein=0; allDevices().forEach(d=>{ if(!einwNoetig(d.g)) return; tot++; if(devState(d.g.pos)&&devState(d.g.pos).eingewiesen) ein++; }); return {tot,ein}; }
 function renderOverview(){
@@ -1554,6 +1564,7 @@ async function finishSession(){
   if(!einw){ alert(isK? 'Bitte den Übergeber (KPC) eintragen – er steht im Protokoll.' : 'Bitte den Einweiser eintragen – er steht im Protokoll und wird an den Geräten vermerkt.'); return; }
   if(!SESSION.sigKpc){ alert(isK? 'Bitte die Unterschrift des Übergebers (KPC) erfassen.' : 'Bitte die Unterschrift des Einweisers (KPC) erfassen.'); return; }
   if(!SESSION.sig){ alert(isK? 'Bitte die Unterschrift des Übernehmers erfassen.' : 'Bitte die Unterschrift der eingewiesenen Person erfassen.'); return; }
+  if(nuGeraete().length && SESSION.nuSig && !((SESSION.nuFirma||'').trim() || (SESSION.nuName||'').trim())){ alert('Der Nachunternehmer unterschreibt mit – bitte Firma oder Name eintragen, sonst ist die Unterschrift im Protokoll niemandem zuzuordnen.'); return; }
   if(nuGeraete().length && SESSION.nuSig && !SESSION.sigNu){ alert('Bitte die Unterschrift des Nachunternehmers erfassen – oder den Haken „Nachunternehmer unterschreibt mit" entfernen.'); return; }
   let positions=[], zeilen=[];
   if(SESSION.typ==='geraete'){
@@ -1918,8 +1929,9 @@ function buildPdf(titel, positions){
       ac(9);
       doc.setFont('helvetica','bold'); doc.setFontSize(9.5); doc.setTextColor.apply(doc,brown); doc.text(gr.label,M,ya); ya+=5;
       gr.items.forEach(g=>{
+        doc.setFont('helvetica','normal'); doc.setFontSize(8.5);   // VOR dem Umbruch – sonst rechnet er mit der Größe der Vorzeile
         const bezL=doc.splitTextToSize(g.bez||'', wBez), fabL=doc.splitTextToSize(g.fab||'', wFab), typL=doc.splitTextToSize(g.typ||'', wTyp);
-        const rows=Math.max(bezL.length,fabL.length,typL.length,1); ac(rows*4.4+2);
+        const rows=Math.max(bezL.length,fabL.length,typL.length,1); ac(rows*4.4+2+(istNU(g)?3.4:0));
         doc.setFont('helvetica','normal'); doc.setFontSize(8.5); doc.setTextColor.apply(doc,dark);
         doc.text(String(g.pos||''),cx.pos,ya); doc.text(String(g.menge||''),cx.stk,ya); doc.text(String(g.einh||''),cx.einh,ya);
         doc.text(bezL,cx.bez,ya); doc.text(fabL,cx.fab,ya); doc.text(typL,cx.typ,ya);
