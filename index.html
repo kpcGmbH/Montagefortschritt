@@ -2272,8 +2272,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 174;
+const APP_VERSION = 175;
 const CHANGELOG = [
+  { v:175, titel:'Typenschild-Foto: flüssiger', punkte:[
+    'Nach der Aufnahme erscheint <b>sofort</b> „Foto wird geprüft…" – vorher geschah 1–3 Sekunden lang sichtbar nichts, während das Foto geprüft wurde.',
+    'Das Foto wird nur noch <b>einmal</b> verarbeitet statt zweimal (Prüfung und Verkleinern nutzen dasselbe Bild). Am Handy deutlich schneller und speichersparender.',
+    'Alle Fotos (auch normale Positionsfotos) werden ohne den speicherhungrigen Umweg verkleinert. Vorher konnte ein großes Foto nach 5 Sekunden unverkleinert hochgeladen werden – jetzt wird es verlässlich auf 1600 px gebracht.' ]},
   { v:174, titel:'PDFs deutlich kleiner', punkte:[
     'Alle Protokolle (Inbetriebnahme, DGUV, Einweisung, Schlüsselübergabe, Abnahme, Bautagebuch, Dichtigkeit, Servicebericht, Berichte) werden jetzt <b>komprimiert</b> erzeugt. Ein einseitiges Inbetriebnahmeprotokoll ohne Fotos hatte gut 1 MB, jetzt rund 70 KB – Inhalt und Aussehen unverändert.' ]},
   { v:173, titel:'Grundlagen-Einweisung: alle Punkte auf einmal', punkte:[
@@ -3818,15 +3822,44 @@ let TS_POS=null, TS_SRC='cam';
 // überbelichtet, Schild zu klein im Bild. Keine Texterkennung (offline, schnell):
 // erkannt werden schlechte Fotos, nicht ob die Seriennummer wirklich draufsteht.
 // Schwellen bewusst vorsichtig – lieber einmal zu wenig warnen als jedes Foto.
-async function tsBildPruefen(file){
+// v175: Das Foto wird nur noch EINMAL dekodiert (tsBildVorbereiten): verkleinert
+// auf 1600 px fürs Hochladen, daraus 640 px für die Prüfung. Vorher dekodierten
+// Prüfung und Komprimierung das Original je einmal – am Handy 1–3 s ohne jede
+// Rückmeldung, man tippte erneut oder hielt die App für hängend.
+async function tsBildVorbereiten(file){
+  let url=null;
+  try{
+    url=URL.createObjectURL(file);
+    const img=await new Promise((ok,nok)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=nok; i.src=url; });
+    const max=1600, sk=Math.min(1, max/Math.max(img.naturalWidth,img.naturalHeight));
+    const W=Math.max(8,Math.round(img.naturalWidth*sk)), H=Math.max(8,Math.round(img.naturalHeight*sk));
+    const c=document.createElement('canvas'); c.width=W; c.height=H;
+    const cx=c.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,W,H); cx.drawImage(img,0,0,W,H);
+    try{ URL.revokeObjectURL(url); }catch(e){} url=null;
+    const pruefung=await tsBildPruefen(c);
+    const blob=await new Promise(r=>c.toBlob(r,'image/jpeg',0.8));
+    // Kleiner ist es fast immer; ein schon kleines JPEG bleibt wie es ist
+    const istJpeg=/jpe?g/i.test(file.type||'');
+    return {pruefung, blob:(blob && (!istJpeg || blob.size<file.size)) ? blob : file};
+  }catch(e){
+    if(url) try{ URL.revokeObjectURL(url); }catch(_){}
+    return {pruefung:{fehler:[], werte:null}, blob:await tryCompressImage(file)};   // Prüfung darf das Speichern nie verhindern
+  }
+}
+async function tsBildPruefen(quelle){
   const fehler=[];
   try{
-    const url=URL.createObjectURL(file);
-    const img=await new Promise((ok,nok)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=nok; i.src=url; });
-    const sk=Math.min(1, 640/Math.max(img.naturalWidth,img.naturalHeight));
-    const w=Math.max(8,Math.round(img.naturalWidth*sk)), h=Math.max(8,Math.round(img.naturalHeight*sk));
+    // quelle: Canvas (aus tsBildVorbereiten) oder Datei (ältere Aufrufer)
+    let img=quelle, url=null;
+    if(!(quelle instanceof HTMLCanvasElement)){
+      url=URL.createObjectURL(quelle);
+      img=await new Promise((ok,nok)=>{ const i=new Image(); i.onload=()=>ok(i); i.onerror=nok; i.src=url; });
+    }
+    const iw=img.naturalWidth||img.width, ih=img.naturalHeight||img.height;
+    const sk=Math.min(1, 640/Math.max(iw,ih));
+    const w=Math.max(8,Math.round(iw*sk)), h=Math.max(8,Math.round(ih*sk));
     const c=document.createElement('canvas'); c.width=w; c.height=h;
-    const cx=c.getContext('2d',{willReadFrequently:true}); cx.drawImage(img,0,0,w,h); URL.revokeObjectURL(url);
+    const cx=c.getContext('2d',{willReadFrequently:true}); cx.drawImage(img,0,0,w,h); if(url) URL.revokeObjectURL(url);
     const d=cx.getImageData(0,0,w,h).data, g=new Float32Array(w*h);
     let sum=0, hell=0;
     for(let i=0,j=0;i<d.length;i+=4,j++){ const v=0.299*d[i]+0.587*d[i+1]+0.114*d[i+2]; g[j]=v; sum+=v; if(v>=250) hell++; }
@@ -3890,23 +3923,28 @@ function tsFoto(pos){
 function tsQuelle(src){
   TS_SRC=src;
   const ov=document.getElementById('fsrcOv'); if(ov) ov.remove();
-  const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*';
+  // Abgebrochene Aufrufe hinterlassen ihr Eingabefeld (kein change) – vorher wegräumen
+  document.querySelectorAll('input.ts-inp').forEach(x=>x.remove());
+  const inp=document.createElement('input'); inp.type='file'; inp.accept='image/*'; inp.className='ts-inp';
   if(src==='cam') inp.setAttribute('capture','environment');
   inp.style.display='none'; document.body.appendChild(inp);
-  inp.addEventListener('change', async function(e){ const f=e.target.files[0]; if(f) await tsFotoUpload(TS_POS, f); e.target.remove(); });
+  const pos=TS_POS;   // festhalten: TS_POS kann sich ändern, während die Kamera offen ist
+  inp.addEventListener('change', async function(e){ const f=e.target.files[0]; e.target.remove(); if(f) await tsFotoUpload(pos, f); });
   inp.click();
 }
 async function tsFotoUpload(pos, file){
   if(!pos||!file) return;
-  const pr=await tsBildPruefen(file);
+  showLoader('Foto wird geprüft…');                           // sofort Rückmeldung nach der Aufnahme
+  const vb=await tsBildVorbereiten(file), pr=vb.pruefung;
   let fraglich=null;
   if(pr.fehler.length){
+    hideLoader();
     if(await tsPruefDialog(pos, pr)==='neu') return;          // Kamera ist schon wieder offen
     fraglich=pr.fehler.map(f=>f.t);
   }
   showLoader('Typenschild wird gespeichert…');
   try{
-    const uf=await tryCompressImage(file);
+    const uf=vb.blob;
     const ts=uniqTs();
     const fname=folderFor(pos)+'/'+fotoPosTeil(pos)+'_'+vaDatum(new Date(ts))+'_Typenschild_'+ts+'.jpg';
     await queueUpload(fname, uf, 'image/jpeg', pos);
@@ -4227,14 +4265,18 @@ async function tryCompressImage(file){
   // abgelegt wird IMMER unter „…_<ts>.jpg", sonst läge unter dieser Endung ein PNG
   // (mit Drag & Drop sind Screenshots der Regelfall geworden).
   if(file.size < 500*1024 && istJpeg) return file;
+  // v175: Bild über eine Objekt-URL laden statt über readAsDataURL. Der Text-
+  // Datenstring eines 12-MP-Fotos ist ~8 MB groß und muss erst wieder zurück-
+  // dekodiert werden – am Handy spürbar langsam, und nach 5 s gab der Timeout
+  // auf und lud das UNVERKLEINERTE Original hoch. Jetzt 15 s.
   return new Promise((resolve)=>{
-    const timeout=setTimeout(()=>resolve(file),5000);
+    let url=null;
+    const fertig=b=>{ clearTimeout(timeout); if(url){ try{ URL.revokeObjectURL(url); }catch(e){} url=null; } resolve(b); };
+    const timeout=setTimeout(()=>fertig(file),15000);
     try{
-      const reader=new FileReader();
-      reader.onerror=()=>{clearTimeout(timeout);resolve(file);};
-      reader.onload=(e)=>{
+      {
         const img=new Image();
-        img.onerror=()=>{clearTimeout(timeout);resolve(file);};
+        img.onerror=()=>fertig(file);
         img.onload=()=>{
           clearTimeout(timeout);
           try{
@@ -4248,13 +4290,12 @@ async function tryCompressImage(file){
             ctx.drawImage(img,0,0,w,h);
             // Bei Nicht-JPEG das Ergebnis IMMER nehmen, auch wenn es größer ausfällt:
             // sonst läge unter der Endung .jpg wieder das PNG.
-            canvas.toBlob(blob=>resolve(blob&&(!istJpeg||blob.size<file.size)?blob:file),'image/jpeg',0.75);
-          }catch(err){resolve(file);}
+            canvas.toBlob(blob=>fertig(blob&&(!istJpeg||blob.size<file.size)?blob:file),'image/jpeg',0.75);
+          }catch(err){fertig(file);}
         };
-        img.src=e.target.result;
-      };
-      reader.readAsDataURL(file);
-    }catch(err){clearTimeout(timeout);resolve(file);}
+        url=URL.createObjectURL(file); img.src=url;
+      }
+    }catch(err){fertig(file);}
   });
 }
 
