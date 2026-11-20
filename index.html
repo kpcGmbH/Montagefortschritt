@@ -2285,8 +2285,11 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 178;
+const APP_VERSION = 179;
 const CHANGELOG = [
+  { v:179, titel:'Kleinauftrag: Geräte direkt eingeben', punkte:[
+    'Neue Baustelle: Neben „Mit Stückliste" und „Ohne Positionen" gibt es <b>„Kleinauftrag – Geräte direkt eingeben"</b> – für Aufträge mit z. B. nur einem Kombidämpfer oder einer Spülmaschine. Je Gerät Bezeichnung, Menge, Hersteller, Typ; die Leistung (Montage/Sanitär/Elektro/Potentialausgleich) schlägt die App nach Gerätetyp vor und lässt sich antippen.',
+    'Daraus entsteht ein Bereich „Lieferung" mit den Positionen 1, 2, … – ohne Etagen und Anlagen von Hand. Danach wie gewohnt: Typenschild, IBN digital, DGUV, Einweisung, Übergabeprotokoll, alles im Reiter Dokumente.' ]},
   { v:178, titel:'Fehlerprüfung v176–v177', punkte:[
     '„Einweisung erfolgt gesondert" wird beim Öffnen einmal festgelegt und gemerkt: bei CHEF\'S COMBI sprang der Standard wegen des vorbelegten Datums nie an, und ein abgehakter Einweisungspunkt konnte ihn mitten in der Arbeit umschalten. Schon abgelegte Protokolle bleiben beim Weiterbearbeiten wie sie waren.',
     'Zubehör-Erkennung: Geräte mit Möbel-Wort im Namen („Kühltheke mit Beleuchtung", „Korbtransportspülanlage mit Hauptschalter", „Enthärtungsanlage mit Steckdose", „Kühlarbeitstisch mit Steckdose") behalten Einweisung und Typenschild; ein „Infrarot-Bewegungsmelder" ist wieder Zubehör.',
@@ -12757,17 +12760,80 @@ function openImportWizard(){
     '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Auftrags-/Kommissionsnummer <span style="font-size:11px">(nur wenn abweichend von der Projektnummer)</span></label>'+
     '<input id="impAuftragsnr" type="text" placeholder="leer lassen = Projektnummer" style="width:100%;padding:10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;margin-bottom:5px">'+
     '<div style="font-size:11px;color:#a8a8a8;margin-bottom:16px">Anzeigename wird als „Nummer Ort Objekt" gebildet. Diese Angaben werden in ALLE Protokolle übernommen (Inbetriebnahme, DGUV, Einweisung, Servicebericht, Bautagebuch, Dichtigkeit, Mängelfreimeldung).</div>'+
+    // Drei Wege (v179): Stückliste · Kleinauftrag (Geräte direkt eingeben) · ohne Positionen
+    '<div style="font-size:13px;color:#a8a8a8;margin:4px 0 6px">Positionen</div><div id="impArtWahl"></div>'+
+    '<div id="impArtLv">'+
     '<label style="display:block;font-size:13px;color:#a8a8a8;margin-bottom:5px">Stückliste (Excel .xlsx/.csv oder PDF)</label>'+
     '<input id="impFile" type="file" accept=".xlsx,.xlsm,.xls,.csv,.pdf" onchange="handleImportFile(this.files[0])" style="width:100%;color:#fff;font-size:13px;margin-bottom:8px">'+
-    '<div style="font-size:11px;color:#a8a8a8;margin-bottom:14px">Empfohlen: Excel-Vorlage (saubere Spalten). PDF wird grob ausgelesen – bitte Vorschau prüfen.<br>'+
-      '<b>Optional:</b> ohne Stückliste anlegen – z. B. wenn zunächst nur Mängel aus einem Abnahmeprotokoll erfasst werden. Die Stückliste lässt sich später nachtragen.</div>'+
-    '<div id="impPreview"></div>'+
+    '<div style="font-size:11px;color:#a8a8a8;margin-bottom:14px">Empfohlen: Excel-Vorlage (saubere Spalten). PDF wird grob ausgelesen – bitte Vorschau prüfen.</div>'+
+    '<div id="impPreview"></div></div>'+
+    '<div id="impArtKlein" style="display:none"></div>'+
     // Der Knopf ist von Anfang an sichtbar – ohne Datei entsteht eine Baustelle ohne
     // Positionen (Rückfrage in confirmCreateProject).
     '<div id="impActions" style="margin-top:16px">'+
       '<button onclick="confirmCreateProject()" style="background:#3a7a3a;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Baustelle anlegen</button>'+
     '</div></div>';
   PENDING_LV=null;
+  IMP_ART='lv'; KLEIN=[{bez:'',menge:'1',fab:'',typ:'',gew:null}];
+  impArtRender();
+}
+// ── Kleinauftrag: Geräte direkt eingeben (ab v179) ───────────────────────
+// Wunsch des Nutzers (20.11.2026): kleine Aufträge mit nur einem Kombidämpfer oder
+// einer Spülmaschine. Bisher: Baustelle ohne Stückliste, dann Etage, Anlage und
+// Position einzeln von Hand. Jetzt werden die Geräte gleich im Assistenten
+// eingegeben; daraus entsteht EIN Bereich „Lieferung" mit den Positionen 1, 2, …
+// Danach läuft alles wie bei großen Baustellen (IBN, DGUV, Einweisung, Dokumente).
+let IMP_ART='lv', KLEIN=[];
+function impArtRender(){
+  const w=document.getElementById('impArtWahl'); if(!w) return;
+  const opt=(k,ic,t,d)=>'<div onclick="impArt(\''+k+'\')" style="border:1px solid '+(IMP_ART===k?'#b8860b;background:#3a3122':'#6a5433')+';border-radius:10px;padding:9px 12px;margin-bottom:7px;cursor:pointer;font-size:14px">'+ic+' '+t+
+    '<span style="display:block;color:#a8a8a8;font-size:11.5px;margin-top:2px">'+d+'</span></div>';
+  w.innerHTML=opt('lv','&#128196;','Mit Stückliste','Excel/PDF einlesen – für Küchenprojekte')+
+    opt('klein','&#128295;','Kleinauftrag – Geräte direkt eingeben','z. B. ein Kombidämpfer oder eine Spülmaschine. Keine Etagen/Anlagen nötig.')+
+    opt('leer','&#8709;','Ohne Positionen','z. B. nur Mängel aus einem Abnahmeprotokoll erfassen – Stückliste später nachtragbar');
+  const lv=document.getElementById('impArtLv'), kl=document.getElementById('impArtKlein'), act=document.getElementById('impActions');
+  if(lv) lv.style.display=IMP_ART==='lv'?'':'none';
+  if(kl){ kl.style.display=IMP_ART==='klein'?'':'none'; if(IMP_ART==='klein') kleinRender(); }
+  if(act) act.style.display=(IMP_ART==='lv' && !PENDING_LV)?'none':'block';
+}
+function impArt(k){ IMP_ART=k; impArtRender(); }
+// Leistung nach Gerätetyp vorschlagen (änderbar)
+function kleinGewAuto(bez){
+  bez=String(bez||''); const kopf=ewKopf(bez);
+  if(!bez.trim()) return ['M'];
+  if(TS_ZUBEHOER.test(kopf) || ewOhne(bez) || /untergestell|gestell|zubehör|blech|behälter|rost|tabs|reiniger/i.test(kopf)) return ['M'];
+  if(/batterie|armatur|becken|brause|ausguss/i.test(kopf)) return ['M','S'];
+  if(SPUEL_RE.test(kopf) || waIst(kopf) || /kombidämpf|kombidaempf|dämpfer|konvektomat|vario|eiswürfel|eisbereit|kaffee|wasserspender|dampfgar/i.test(kopf)) return ['M','S','E'];
+  if(/tisch|regal|schrank(?!.*(kühl|kuehl|wärme|waerme))|wagen|bord/i.test(kopf) && !TS_GERAET.test(kopf)) return ['M'];
+  return ['M','E'];
+}
+function kleinGewHTML(i){
+  const k=KLEIN[i], gew=k.gew||kleinGewAuto(k.bez);
+  return [['M','Montage'],['S','Sanitär'],['E','Elektro'],['PA','Potentialausgleich']].map(([c,l])=>{ const an=gew.indexOf(c)>=0;
+    return '<span onclick="kleinGew('+i+',\''+c+'\')" style="display:inline-block;border:1px solid '+(an?'#b8860b;background:#b8860b;font-weight:700':'#6a5433')+';border-radius:12px;padding:3px 10px;font-size:12px;margin:4px 4px 0 0;cursor:pointer">'+l+'</span>'; }).join('');
+}
+function kleinRender(){
+  const kl=document.getElementById('impArtKlein'); if(!kl) return;
+  const inp='width:100%;padding:9px 10px;border-radius:8px;border:1px solid #895500;background:#3a3530;color:#fff;font-size:15px;font-family:inherit;box-sizing:border-box';
+  const lab='display:block;font-size:12px;color:#a8a8a8;margin:6px 0 4px';
+  kl.innerHTML=KLEIN.map((k,i)=>'<div style="border:1px solid #4a423a;border-radius:10px;padding:8px 10px;margin-bottom:8px">'+
+    '<div style="display:flex;gap:8px"><div style="flex:1"><label style="'+lab+'">Gerät '+(i+1)+(KLEIN.length>1?' <span onclick="kleinWeg('+i+')" style="float:right;color:#e0a060;cursor:pointer">entfernen</span>':'')+'</label>'+
+      '<input value="'+escapeHtml(k.bez)+'" placeholder="z. B. Kombidämpfer 10x GN 1/1" oninput="kleinSet('+i+',\'bez\',this.value)" style="'+inp+'"></div>'+
+      '<div style="flex:0 0 64px"><label style="'+lab+'">Menge</label><input value="'+escapeHtml(k.menge)+'" inputmode="decimal" oninput="kleinSet('+i+',\'menge\',this.value)" style="'+inp+'"></div></div>'+
+    '<div style="display:flex;gap:8px"><div style="flex:1"><label style="'+lab+'">Hersteller</label><input value="'+escapeHtml(k.fab)+'" placeholder="z. B. Rational" oninput="kleinSet('+i+',\'fab\',this.value)" style="'+inp+'"></div>'+
+      '<div style="flex:1"><label style="'+lab+'">Typ</label><input value="'+escapeHtml(k.typ)+'" placeholder="z. B. iCombi Pro 10-1/1 E" oninput="kleinSet('+i+',\'typ\',this.value)" style="'+inp+'"></div></div>'+
+    '<label style="'+lab+'">Leistung'+(k.gew?'':' <span style="font-size:11px">(automatisch nach Gerät, antippen zum Ändern)</span>')+'</label><div id="kgw_'+i+'">'+kleinGewHTML(i)+'</div></div>').join('')+
+    '<div onclick="kleinNeu()" style="color:#d7c1ae;font-size:13px;cursor:pointer;margin:2px 0 4px">&#65291; weiteres Gerät</div>';
+}
+function kleinSet(i,f,v){ KLEIN[i][f]=v; if(f==='bez' && !KLEIN[i].gew){ const g=document.getElementById('kgw_'+i); if(g) g.innerHTML=kleinGewHTML(i); } }
+function kleinGew(i,c){ const k=KLEIN[i], g=(k.gew||kleinGewAuto(k.bez)).slice(), j=g.indexOf(c); if(j>=0) g.splice(j,1); else g.push(c);
+  k.gew=['M','S','E','PA'].filter(x=>g.indexOf(x)>=0); const el=document.getElementById('kgw_'+i); if(el) el.innerHTML=kleinGewHTML(i); }
+function kleinNeu(){ KLEIN.push({bez:'',menge:'1',fab:'',typ:'',gew:null}); kleinRender(); }
+function kleinWeg(i){ KLEIN.splice(i,1); kleinRender(); }
+function kleinLV(){
+  const items=KLEIN.filter(k=>String(k.bez||'').trim()).map((k,i)=>({pos:String(i+1), menge:String(k.menge||'1').trim()||'1', einh:'St',
+    bez:k.bez.trim(), fabrikat:String(k.fab||'').trim(), typ:String(k.typ||'').trim(), gew:(k.gew||kleinGewAuto(k.bez)).slice()}));
+  return items.length ? [{pos:'1.', label:'Lieferung', bez:'Lieferung', subsections:[{pos:'1.0.', bez:'Geräte', items}]}] : [];
 }
 async function handleImportFile(file){
   if(!file) return;
@@ -12828,10 +12894,18 @@ async function confirmCreateProject(){
   if(!plz){ alert('Bitte die PLZ der Baustelle eingeben (Pflichtfeld).'); document.getElementById('impPlz').focus(); return; }
   // Stückliste ist optional: für Abnahme-/Servicefälle wird zunächst nur die Baustelle
   // gebraucht (Mängel hängen als allgemeine Restarbeiten an ihr, nicht an Positionen).
-  const lv = PENDING_LV || [];
-  if(!PENDING_LV && !confirm('Es ist keine Stückliste hochgeladen.\n\nBaustelle OHNE Positionen anlegen?\n\n'
-    + 'Sinnvoll, wenn zunächst nur Mängel oder Restarbeiten erfasst werden.\n'
-    + 'Die Stückliste lässt sich später über „Stückliste nachtragen" ergänzen.')) return;
+  let lv;
+  if(IMP_ART==='klein'){
+    lv=kleinLV();
+    if(!lv.length){ alert('Bitte mindestens ein Gerät eingeben (Bezeichnung).'); return; }
+  } else if(IMP_ART==='leer'){
+    lv=[];
+  } else {
+    lv = PENDING_LV || [];
+    if(!PENDING_LV && !confirm('Es ist keine Stückliste hochgeladen.\n\nBaustelle OHNE Positionen anlegen?\n\n'
+      + 'Sinnvoll, wenn zunächst nur Mängel oder Restarbeiten erfasst werden.\n'
+      + 'Die Stückliste lässt sich später über „Stückliste nachtragen" ergänzen.')) return;
+  }
   const name=(nummer+' '+ort+' '+objekt).replace(/\s+/g,' ').trim();
   const act=document.getElementById('impActions');
   act.innerHTML='<div style="color:#d7c1ae">Baustelle wird angelegt …</div>';
