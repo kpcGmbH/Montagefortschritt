@@ -1756,15 +1756,20 @@ const EW_OHNE=/steckdose|steckerleiste|elektrifizierung|kabelkanal|kabelf(ü|ue)
 const EW_OHNE_KOPF=/beleuchtung|leuchte|lichtleiste|led-?band|led-?leiste|schalter/i;
 // Möbel als Hauptwort: dort zählt Elektro-Zubehör auch im Zusatz („Arbeitstisch mit Steckdose")
 const EW_MOEBEL=/batterie|armatur|becken|arbeitstisch|spültisch|spueltisch|zulauftisch|ablauftisch|auslauftisch|tischanlage|arbeitsschrank|wandschrank|hängeschrank|haengeschrank|regal|bord\b|wandbord|theke|anlage|zeile|möbel|moebel/i;
+// … außer das Hauptwort nennt ein Gerät („Kühltheke", „Korbtransportspülanlage",
+// „Enthärtungsanlage", „Kochzeile", „Warmhaltetheke", „Kühlarbeitstisch") –
+// Fehlerprüfung 20.11.2026.
+const EW_GERAET=/kühl|kuehl|gefrier|spül|spuel|enthärt|enthaert|osmose|koch|ausgabe|warm|wärme|waerme|heiz|bain|gar|brat|back|frit|grill|eis|dampf|dämpf|kaffee/i;
 // Hauptwort = Text vor dem ersten Zusatz („mit", „m.", „inkl.", „und", „u.", „&", „/", Komma, Klammer).
 // Prüfung 20.11.2026: Zubehör-Wörter wirkten auf die GANZE Bezeichnung – „Kühltisch
 // mit Steckdose" und „Kochblock inkl. Unterverteilung" verloren Einweisung und
 // Typenschild. Jetzt: Zubehör im Hauptwort immer; im Zusatz nur, wenn das Hauptwort
 // ein Möbel ist. Wärme-/Heizgeräte („Wärmeleuchte") sind nie Zubehör.
-function ewKopf(bez){ return String(bez||'').split(/\s(?:mit|m\.|inkl\.?|inklusive|incl\.?|und|u\.|&)\s|\s\/\s|,|\(/i)[0]; }
+function ewKopf(bez){ return String(bez||'').split(/\s(?:mit|m\.|inkl\.?|inklusive|incl\.?|und|u\.|&|für|fuer|f\.)\s|\s\/\s|,|\(/i)[0]; }
 function ewOhne(bez){ bez=String(bez||''); const kopf=ewKopf(bez);
-  if(/wärme|waerme|heiz|infrarot/i.test(kopf)) return false;
-  return EW_OHNE.test(kopf) || EW_OHNE_KOPF.test(kopf) || (EW_MOEBEL.test(kopf) && (EW_OHNE.test(bez) || EW_OHNE_KOPF.test(bez))); }
+  if(EW_OHNE.test(kopf)) return true;                                       // Steckdose, Bewegungsmelder … als Hauptwort
+  if(EW_OHNE_KOPF.test(kopf)) return !/wärme|waerme|heiz|infrarot/i.test(kopf);   // Licht/Schalter – außer Wärmeleuchte
+  return EW_MOEBEL.test(kopf) && !EW_GERAET.test(kopf) && (EW_OHNE.test(bez) || EW_OHNE_KOPF.test(bez)); }
 const POSITEM={};   // pos -> Stücklisten-Eintrag (beim Aufbau der Panels gefüllt)
 function ewItem(p){ return POSITEM[p] || (typeof tsItem==='function' ? tsItem(p) : null); }
 function ewAuto(p){ return !ewOhne((ewItem(p)||{}).bez); }
@@ -2280,8 +2285,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 177;
+const APP_VERSION = 178;
 const CHANGELOG = [
+  { v:178, titel:'Fehlerprüfung v176–v177', punkte:[
+    '„Einweisung erfolgt gesondert" wird beim Öffnen einmal festgelegt und gemerkt: bei CHEF\'S COMBI sprang der Standard wegen des vorbelegten Datums nie an, und ein abgehakter Einweisungspunkt konnte ihn mitten in der Arbeit umschalten. Schon abgelegte Protokolle bleiben beim Weiterbearbeiten wie sie waren.',
+    'Zubehör-Erkennung: Geräte mit Möbel-Wort im Namen („Kühltheke mit Beleuchtung", „Korbtransportspülanlage mit Hauptschalter", „Enthärtungsanlage mit Steckdose", „Kühlarbeitstisch mit Steckdose") behalten Einweisung und Typenschild; ein „Infrarot-Bewegungsmelder" ist wieder Zubehör.',
+    'Einweisungs-App: Checkliste nach dem Hauptwort – „Kaffeevollautomat mit Milchkühler" bekommt die Kaffee-, „Heißluftfritteuse" die Fritteusen-Liste.',
+    'Ordner konsolidieren repariert Protokoll-Verweise, die frühere Läufe getrennt hatten. Beim Ablegen eines Spülmaschinen-Protokolls steht der Hinweis zur Enthärtung in derselben Meldung.' ]},
   { v:177, titel:'Inbetriebnahme: Einweisung erfolgt gesondert', punkte:[
     'Inbetriebnahmeprotokolle haben oben den Schalter <b>„Einweisung erfolgt gesondert"</b> – Standard, wenn aus einer Position geöffnet. Einweisungspunkte der Hersteller-Protokolle (eingewiesen, unterwiesen, erklärt, Anleitung übergeben, Teilnehmer …) sind dann ausgegraut, zählen nicht im Fortschritt, reine Einweisungs-Abschnitte schrumpfen auf eine Zeile, die Unterschrift „Einweisung des Betreibers" entfällt. Im PDF steht statt leerer Kästchen „Erfolgt gesondert mit der Geräte-Einweisung".',
     'Wird direkt bei der Inbetriebnahme eingewiesen: Schalter aus – alles wie bisher. Alte Protokolle mit bereits ausgefüllter Einweisung behalten sie.',
@@ -3095,8 +3105,27 @@ function konsolMoveCount(){
   const root=safeName(curProjName());
   return konsolRefs().filter(r=>konsolReroot(r.old,root)).length;
 }
+// Verweise ({ueber}) auf den aktuellen Pfad ihres Originals bringen. Heilt Bestand von
+// vor v176, als „Konsolidieren" Original und Verweis getrennt verschob und einer der
+// beiden auf den alten Pfad zeigen blieb (Fehlerprüfung 20.11.2026). Zuordnung:
+// Original an der Position `ueber` mit gleichem Typ und Namen. Rückgabe: geänderte Positionen.
+function waVerweiseAbgleichen(){
+  const geaendert=new Set(), root=safeName(curProjName())+'/';
+  const imOrdner=p=>String(p||'').indexOf(root)===0;
+  Object.keys(ST).forEach(k=>{ const t=ST[k]; if(!t || !Array.isArray(t.pdfs)) return;
+    t.pdfs.forEach(x=>{ if(!x || !x.ueber) return;
+      const o=((ST[x.ueber]||{}).pdfs||[]).filter(p=>p && !p.ueber && p.type===x.type && p.name===x.name);
+      if(o.length!==1 || o[0].fname===x.fname) return;
+      const orig=o[0];
+      // Gültig ist der Pfad, der schon im AKTUELLEN Baustellenordner liegt – dorthin wurde
+      // verschoben; der andere zeigt auf den alten Ordner, aus dem die Datei weg ist.
+      if(imOrdner(orig.fname) && !imOrdner(x.fname)){ x.fname=orig.fname; x.dataFname=orig.dataFname||''; geaendert.add(k); }
+      else if(imOrdner(x.fname) && !imOrdner(orig.fname)){ orig.fname=x.fname; orig.dataFname=x.dataFname||''; geaendert.add(x.ueber); } }); });
+  return geaendert;
+}
 async function ordnerKonsolidieren(dry){
   if(!PID){ alert('Bitte zuerst die Baustelle öffnen.'); return; }
+  if(!dry){ const g=waVerweiseAbgleichen(); for(const k of g){ await enqueuePos(k); } }
   const root=safeName(curProjName());
   const moves=konsolRefs().map(r=>{ const neu=konsolReroot(r.old,root); return neu?Object.assign({},r,{neu}):null; }).filter(Boolean);
   if(dry){
@@ -8344,15 +8373,17 @@ async function ibnReceive(p){
     // Beim ERSETZEN nur dann nichts nachsetzen, wenn der Haken schon steht – seit den
     // Pflicht-Sperren (v148–152) kann das erste Ablegen den Haken auch verweigert haben.
     const auto = (replaced && gs(pos).ib) ? null : (type==='DGUV Protokoll' ? dguvNachholen(pos) : schrittAusProtokoll(pos, type));
+    // Wasseraufbereitung (v170) VOR der Meldung auswerten: ein zweiter Anschluss-Dialog
+    // würde den ersten (gleiches Overlay) überschreiben, ein zweiter Toast die
+    // Erfolgsmeldung verdrängen – deshalb der Hinweis IN der einen Meldung.
+    let a2=null, waZusatz='';
+    if(waPos && !gs(waPos).ib){ a2=schrittAusProtokoll(waPos, type);
+      if(a2 && (a2.stand==='gesetzt' || a2.stand==='nicht-relevant')) a2=null;
+      else if(a2 && a2.stand==='anschl' && auto && auto.stand==='anschl'){ waZusatz=' · Pos. '+waPos+': Stecker/Festanschluss noch offen – „Inbetriebnahme" dort abhaken'; a2=null; } }
     showToast('✓ '+type+' bei Position '+pos+(waPos?(' und '+waPos):'')+(replaced?' aktualisiert':' abgelegt')+
-              protoHinweis(auto));
+              protoHinweis(auto)+waZusatz);
     protoWarnen(pos, auto);
-    // Zweiter Dialog würde den ersten (gleiches Overlay) überschreiben: Anschluss-Frage der
-    // Wasseraufbereitung nur, wenn für die Spülmaschine keine offen ist – sonst Hinweis.
-    if(waPos && !gs(waPos).ib){ const a2=schrittAusProtokoll(waPos, type);
-      if(a2 && a2.stand!=='gesetzt' && a2.stand!=='nicht-relevant'){
-        if(a2.stand==='anschl' && auto && auto.stand==='anschl') showToast('Pos. '+waPos+': Stecker/Festanschluss noch offen – „Inbetriebnahme" dort abhaken',{bg:'#8b6d22'});
-        else protoWarnen(waPos, a2); } }
+    if(a2) protoWarnen(waPos, a2);
     ibnGoToPos(pos);
     return true;
   }catch(e){ _ibnSeen.delete(p.id); alert('IBN-Protokoll konnte nicht abgelegt werden: '+((e&&e.message)||e)); return false; }

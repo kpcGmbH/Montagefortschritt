@@ -795,15 +795,24 @@ function ewPunkt(it){ return !!(it && it.l && EW_PUNKT.test(it.l)); }
 function ewHatPunkte(o){ return !!o && (o.sections.some(s=>s.items.some(ewPunkt)) || o.kopf.some(f=>!f.aus&&ewPunkt(f)) || o.sign.roles.some(r=>r==='Einweisung des Betreibers')); }
 function ewGes(){
   if(CUR.mfr==='DGUV V3') return false;   // Prüfprotokoll, keine Einweisung („…auf die Gefahr hingewiesen")
-  if(STATE.ew_ges===true || STATE.ew_ges===false) return STATE.ew_ges;
-  // Standard: an, wenn aus einer Position geöffnet – außer ein älteres Protokoll hat
-  // die Einweisungspunkte schon ausgefüllt (dann war sie bei der Inbetriebnahme).
-  if(!(CUR.pos && IBNCTX && IBNCTX.pos===CUR.pos)) return false;
-  const o=CUR.dev && DB[CUR.mfr] && DB[CUR.mfr].devices[CUR.dev]; if(!o) return false;
+  return STATE.ew_ges===true;             // festgelegt in ewInit bzw. per Schalter
+}
+// Standard EINMAL beim Öffnen festlegen – VOR applyPrefills und im Stand gemerkt.
+// Fehlerprüfung 20.11.2026: Vorher wurde er bei jedem Aufruf neu berechnet; das
+// vorbelegte Datum in CHEF'S COMBI „Durchgeführt am" schaltete ihn so dauerhaft aus,
+// und ein Haken an einem Einweisungspunkt ließ ihn mitten in der Arbeit umspringen.
+// Standard „an" nur bei einem NEUEN Protokoll aus einer Position. Ein schon
+// abgelegtes Protokoll (Weiterbearbeiten, replaceFname) bleibt wie es war – sonst
+// verschwände dort z. B. die geleistete Unterschrift „Einweisung des Betreibers".
+function ewInit(o){
+  if(CUR.mfr==='DGUV V3' || STATE.ew_ges===true || STATE.ew_ges===false || !ewHatPunkte(o)) return;
+  if(!(CUR.pos && IBNCTX && IBNCTX.pos===CUR.pos)) return;     // ohne Position: aus (ewGes → false)
+  if(IBNCTX.replaceFname){ STATE.ew_ges=false; return; }
   let schon=false;
   o.sections.forEach((s,si)=>s.items.forEach((it,ii)=>{ if(!ewPunkt(it)) return; const v=STATE['s'+si+'i'+ii];
     if(v && (v.v || (typeof v==='string' && v.trim()) || (Array.isArray(v) && v.length))) schon=true; }));
-  return !schon;
+  o.sign.roles.forEach((r,gi)=>{ const g=STATE['g'+gi]; if(r==='Einweisung des Betreibers' && g && g.img) schon=true; });
+  STATE.ew_ges=!schon;
 }
 function ewGesSchalten(an){ STATE.ew_ges=!!an; saveState(); openForm(CUR.dev,true); }
 function ewSchalterHTML(o){
@@ -815,7 +824,7 @@ function ewSchalterHTML(o){
 }
 const EW_GES_TXT='Erfolgt gesondert mit der Geräte-Einweisung (kpc-Einweisungsprotokoll).';
 function openForm(dev,keepScroll){
-  CUR.dev=dev;if(!(CUR.fresh&&!CUR.pos))loadState();applyPrefills();setCrumbs();ibnUpdatePdfBtn();
+  CUR.dev=dev;if(!(CUR.fresh&&!CUR.pos))loadState();ewInit(DB[CUR.mfr].devices[dev]);applyPrefills();setCrumbs();ibnUpdatePdfBtn();
   const o=DB[CUR.mfr].devices[dev];
   waInit(o);
   var __sl=ibnStueckLabel();
@@ -1091,8 +1100,8 @@ function exportPDF(){
   if(anySig){
     secHead('Abschluss & Unterschriften');
     o.sign.roles.forEach((r,gi)=>{if(sigAus(r))return;sigBlock('g'+gi,r,o.sign.mode);});
-    if(__ewP && o.sign.roles.indexOf('Einweisung des Betreibers')>=0) kvLine('Einweisung des Betreibers','gesondert (Einweisungsprotokoll)');
   }
+  if(__ewP && o.sign.roles.indexOf('Einweisung des Betreibers')>=0) kvLine('Einweisung des Betreibers','gesondert (Einweisungsprotokoll)');
 
   // Gerätenummer in den Dateinamen: sonst heissen bei Stückzahl > 1 alle Protokolle
   // einer Position gleich und sind in der Liste nicht auseinanderzuhalten.
