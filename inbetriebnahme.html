@@ -76,6 +76,7 @@ body{
 .checkline{display:flex;gap:14px;align-items:flex-start;flex-wrap:wrap}
 .checkline .lbl{flex:1 1 230px;min-width:200px}
 .btns{display:flex;gap:7px;flex:none}
+.btns:has([data-inv]){flex-wrap:wrap;max-width:100%}.btn-tri[data-inv]{padding:6px 10px}
 .btn-tri{border:1.4px solid var(--line);background:#fff;border-radius:9px;padding:6px 14px;font-family:inherit;font-size:15px;cursor:pointer;color:var(--gray);min-width:54px;transition:.12s}
 .btn-tri:hover{border-color:var(--copper)}
 .btn-tri.on-yes{background:var(--ok);border-color:var(--ok);color:#fff}
