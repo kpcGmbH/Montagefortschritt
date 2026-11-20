@@ -919,6 +919,9 @@ async function onLoggedIn(){
   // Direkteinstieg aus der Hauptapp („🔑 Schlüsselübergabe" in Berichte & Dokumente):
   // Protokollart überspringen und gleich die Auswahl zeigen.
   // Auch aus dem Reiter „Dokumente": Geräte- oder Grundlagen-Einweisung direkt.
+  // Unterbrochene Einweisung ZUERST anbieten – ein Direkteinstieg hätte sie sonst
+  // ungefragt überschrieben (v184-Prüfung). Fortgesetzt -> kein Direkteinstieg.
+  if(pid && (h.get('neu')||h.get('entwurf')) && ewNotfallAnbieten()) return;
   if(pid && ['schluessel','geraete','allgemein'].includes(h.get('neu'))){ startSession(); sessionType(h.get('neu')); }
   // Aus dem Reiter „Dokumente" der Hauptapp: einen vorbereiteten Entwurf direkt öffnen
   if(pid && h.get('entwurf')){ const eid=h.get('entwurf');
@@ -1368,11 +1371,11 @@ function ewNotfallSichern(){ if(!SESSION||!PID) return;
   try{ const s=Object.assign({}, SESSION, {sig:'', sigKpc:'', sigNu:''});
     localStorage.setItem(ewNotfallKey(), JSON.stringify({ts:Date.now(), s})); }catch(e){} }
 function ewNotfallWeg(){ try{ if(PID) localStorage.removeItem(ewNotfallKey()); }catch(e){} }
-function ewNotfallAnbieten(){
-  if(SESSION||!PID) return;
+function ewNotfallAnbieten(){   // true = Stand wiederhergestellt
+  if(SESSION||!PID) return false;
   let o=null; try{ o=JSON.parse(localStorage.getItem(ewNotfallKey())||'null'); }catch(e){}
-  if(!o||!o.s||!o.s.typ) return;
-  if(Date.now()-(o.ts||0)>3*86400000){ ewNotfallWeg(); return; }
+  if(!o||!o.s||!o.s.typ) return false;
+  if(Date.now()-(o.ts||0)>3*86400000){ ewNotfallWeg(); return false; }
   const art=o.s.typ==='schluessel'?'Schlüsselübergabe':o.s.typ==='allgemein'?'Grundlagen-Einweisung':'Geräte-Einweisung';
   const anz=Object.keys(o.s.selected||{}).length;
   if(confirm('Hier wurde eine '+art+' nicht abgeschlossen'+(anz?(' ('+anz+' Gerät'+(anz>1?'e':'')+')'):'')+
@@ -1380,8 +1383,9 @@ function ewNotfallAnbieten(){
       'Fortsetzen? Die Unterschriften müssen neu geleistet werden.\n\n„Abbrechen" verwirft den Stand.')){
     SESSION=o.s; SESSION.collapsed=SESSION.collapsed||{};
     mkOverlay(SESSION.editId?'Protokoll korrigieren':SESSION.entwurfId?'Vorbereitetes Protokoll fortsetzen':'Protokoll fortsetzen');
-    renderSession();
-  } else ewNotfallWeg();
+    renderSession(); return true;
+  }
+  ewNotfallWeg(); return false;
 }
 document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') ewNotfallSichern(); });
 window.addEventListener('pagehide', ewNotfallSichern);
@@ -2026,7 +2030,8 @@ async function startOffline(){
   if(s){ PROJNAME=s.PROJNAME||PROJNAME; PROJ_AG=s.PROJ_AG||''; PROJ_ORT=s.PROJ_ORT||''; PROJ_ADR=s.PROJ_ADR||''; PROJ_AUFTRAG=s.PROJ_AUFTRAG||''; }
   document.getElementById('projName').textContent=PROJNAME;
   document.getElementById('projSub').textContent='Baustelle · offline';
-  renderOverview(); updSyncBadge(); setTimeout(ewNotfallAnbieten, 400);
+  renderOverview(); updSyncBadge();
+  if(ewNotfallAnbieten()) return true;   // unterbrochene Einweisung vor einem Direkteinstieg anbieten (v184-Prüfung); true = offline geöffnet
   // Direkteinstieg aus der Hauptapp auch OHNE Netz (bis 29.10.2026 nur online):
   // „Vervollständigen" im Reiter Dokumente öffnet den Entwurf, „Einweisen" die Art.
   if(['schluessel','geraete','allgemein'].includes(h.get('neu'))){ startSession(); sessionType(h.get('neu')); }

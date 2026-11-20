@@ -2277,16 +2277,29 @@ async function onLoggedIn(){
   openProjectFlow();
 }
 
+// ST_GELADEN: erst wenn der Stand der Baustelle geladen ist, darf ein zurückgereichtes
+// IBN/DGUV-Protokoll eingetragen werden (v184-Prüfung) – vorher lief ibnReceive auf
+// einem leeren Stand (Doppel-Einträge, „weiterbearbeiten" ersetzte nichts).
+let ST_GELADEN=false;
 function startData(){
-  loadState().then(()=>{ restoreUI(); upStats(); maybeOfferKonsolidieren(); setTimeout(maybeShowChangelog, 600); });
+  ST_GELADEN=false;
+  return loadState().then(()=>{ restoreUI(); upStats(); maybeOfferKonsolidieren(); setTimeout(maybeShowChangelog, 600); })
+    .finally(()=>{ ST_GELADEN=true; });
 }
 
 // ── „Was ist neu?" – Update-Hinweis beim ersten Start nach einem Update ──
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 184;
+const APP_VERSION = 185;
 const CHANGELOG = [
+  { v:185, titel:'Fehlerprüfung v184', punkte:[
+    'Homescreen-App: Ein zurückgereichtes IBN-/DGUV-Protokoll wurde eingetragen, bevor der Stand der Baustelle geladen war – „weiterbearbeiten" konnte das alte Protokoll dann nicht ersetzen (doppelt an der Position), DGUV-Restarbeiten wurden nicht erledigt. Jetzt erst nach dem Laden.',
+    'Temperaturen (°C, z. B. −18 bei Kühlgeräten) wieder mit voller Tastatur – auf dem Zahlenblock des iPhones fehlt das Minus.',
+    'IBN-Unterschrift nach dem Drehen: auch die Höhe wird richtig umgerechnet.',
+    'Einweisung: Eine unterbrochene Einweisung wird auch dann angeboten, wenn die App direkt aus der Montage-App („Vervollständigen", „Schlüsselübergabe") geöffnet wird – vorher konnte sie ungefragt überschrieben werden.',
+    'Voller Gerätespeicher: weggeräumt werden nur noch Protokollstände, die bereits an die Montage-App übergeben wurden – nie angefangene. Angefangene Protokolle von vor v184 werden auch über „Anschrift" und „Baustelle · Ort" der Baustelle zugeordnet.',
+    '„Baustelle wechseln" öffnete nach dem Zurück-Wischen (Android) manchmal stumm wieder dieselbe Baustelle.' ]},
   { v:184, titel:'Handy: iPhone- und Android-Prüfung', punkte:[
     '<b>App auf dem Homescreen:</b> Inbetriebnahme, DGUV und Einweisung öffnen sich jetzt im selben Fenster statt in einem eingeblendeten Browser. Dort fehlten Anmeldung und Ausführer, und ein Protokoll konnte in der Montage-App nicht ankommen. Danach geht es automatisch zurück zur selben Baustelle.',
     '<b>Einweisung:</b> Bei schwachem Netz springt die App nicht mehr zur Microsoft-Anmeldung (weiße Seite, Eingaben weg). Geht die App in den Hintergrund (Anruf, Sperrbildschirm), wird das angefangene Protokoll auf dem Gerät gesichert und beim nächsten Öffnen zum Fortsetzen angeboten – nur die Unterschriften sind neu zu leisten. Dasselbe Netz-Verhalten im Kundendienst.',
@@ -8082,7 +8095,7 @@ function speicherSofort(){
 }
 document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') speicherSofort(); });
 // Mit „Zurück" aus dem Seiten-Cache: Ladeanzeige von seiteOeffnen wieder weg
-window.addEventListener('pageshow',e=>{ if(e.persisted){ try{ hideLoader(); }catch(_){} } });
+window.addEventListener('pageshow',e=>{ if(e.persisted){ try{ hideLoader(); localStorage.removeItem('kpc_rueckkehr'); }catch(_){} } });
 window.addEventListener('pagehide',()=>{ speicherSofort(); });
 function rueckkehrMerken(){ try{ if(PID) localStorage.setItem('kpc_rueckkehr', JSON.stringify({pid:PID, t:Date.now()})); }catch(e){} }
 function rueckkehrHolen(){ try{ const o=JSON.parse(localStorage.getItem('kpc_rueckkehr')||'null'); localStorage.removeItem('kpc_rueckkehr');
@@ -8370,6 +8383,7 @@ async function ibnReceive(p){
   if(!p||!p.pos||!p.pdf||!p.id)return false;
   if(_ibnSeen.has(p.id))return true;                 // schon abgelegt -> Übergabe darf weg
   if(!PID) return false;                             // noch keine Baustelle offen -> aufheben, nicht verwerfen
+  if(!ST_GELADEN) return false;                      // Stand der Baustelle lädt noch -> aufheben (selectProject holt es danach)
   // Andere Baustelle offen (z. B. App wurde offline neu gestartet und eine andere
   // gewählt): aufheben statt an der falschen Baustelle ablegen (v168).
   if(p.projekt && !p.replaceFname && p.projekt!==curProjName()){
@@ -12805,16 +12819,18 @@ async function selectProject(pid){
     buildTabs(); buildPanels();
     updDichtTasks();
     ov.style.display='none';
-    startData();
+    try{ localStorage.removeItem('kpc_rueckkehr'); }catch(e){}   // Merker verbraucht (v184)
+    const geladen=startData().catch(()=>{});
     // Wartet ein Protokoll aus der IBN-App? Jetzt ist eine Baustelle offen, also
     // kann es abgelegt werden (der focus-Handler allein greift zu spät bzw. gar
     // nicht, wenn der Tab beim Laden schon im Vordergrund war).
-    setTimeout(async ()=>{
+    // ERST nach dem Laden des Stands (v184-Prüfung): in der Homescreen-App ist das der Normalweg.
+    geladen.then(()=>setTimeout(async ()=>{
       await ibnCheckPending();
       // Rücksprung aus der IBN-App (#ibnpos=…) – greift auch, wenn das Protokoll
       // schon über das Elternfenster abgelegt wurde.
       if(_ibnJumpPos){ const p=_ibnJumpPos; _ibnJumpPos=''; ibnGoToPos(p); }
-    }, 400);
+    }, 200));
   }catch(e){
     alert('Projekt konnte nicht geladen werden: '+(e.message||e));
     renderProjectPicker();

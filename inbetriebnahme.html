@@ -625,7 +625,7 @@ function openMySig(){var m=$('sigModal');if(!m)return;m.classList.remove('hidden
 function closeMySig(){var m=$('sigModal');if(m)m.classList.add('hidden');}
 function initMySigPad(){var cv=$('cv_mysig'),wrap=$('wrap_mysig');if(!cv)return;var ratio=window.devicePixelRatio||1;var r=wrap.getBoundingClientRect();cv.width=r.width*ratio;cv.height=r.height*ratio;var ctx=cv.getContext('2d');ctx.scale(ratio,ratio);ctx.lineWidth=2;ctx.lineCap='round';ctx.strokeStyle='#1a2733';cv.__ink=false;
   if(MYSIG){var im=new Image();im.onload=function(){ctx.drawImage(im,0,0,r.width,r.height);};im.src=MYSIG;$('ph_mysig').style.display='none';cv.__ink=true;}else{$('ph_mysig').style.display='';}
-  var drawing=false,last=null;function pos(e){var rr=cv.getBoundingClientRect();var t=e.touches?e.touches[0]:e;var f=rr.width?(cv.width/ratio)/rr.width:1;return{x:(t.clientX-rr.left)*f,y:(t.clientY-rr.top)*f};}
+  var drawing=false,last=null;function pos(e){var rr=cv.getBoundingClientRect();var t=e.touches?e.touches[0]:e;var fx=rr.width?(cv.width/ratio)/rr.width:1,fy=rr.height?(cv.height/ratio)/rr.height:1;return{x:(t.clientX-rr.left)*fx,y:(t.clientY-rr.top)*fy};}
   function start(e){drawing=true;last=pos(e);$('ph_mysig').style.display='none';cv.__ink=true;e.preventDefault();}
   function move(e){if(!drawing)return;var pp=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(pp.x,pp.y);ctx.stroke();last=pp;e.preventDefault();}
   function end(){drawing=false;}
@@ -754,13 +754,16 @@ function loadState(){ try{STATE=JSON.parse(localStorage.getItem(storeKey())||'nu
   if(!STATE&&storeKey()!==storeKeyAlt()){try{const alt=JSON.parse(localStorage.getItem(storeKeyAlt())||'null');
     const werte=alt?Object.keys(alt).filter(k=>typeof alt[k]==='string').map(k=>alt[k].trim().toLowerCase()):[];
     const hat=v=>{v=String(v||'').trim().toLowerCase();return !!v&&werte.indexOf(v)>=0;};
-    if(alt&&(hat(IBNCTX.projekt)||(hat(PROJECT.strasse)&&(hat(PROJECT.plz)||hat(PROJECT.kunde))))){STATE=alt;try{localStorage.setItem(storeKey(),JSON.stringify(alt));localStorage.removeItem(storeKeyAlt());}catch(e){}}}catch(e){}}
+    if(alt&&(hat(IBNCTX.projekt)||hat(projLabel())||hat(projAdresse())||(hat(PROJECT.strasse)&&(hat(PROJECT.plz)||hat(PROJECT.kunde)||hat(projPlzOrt()))))){STATE=alt;try{localStorage.setItem(storeKey(),JSON.stringify(alt));localStorage.removeItem(storeKeyAlt());}catch(e){}}}catch(e){}}
   STATE=STATE||{}; }
 // Bei vollem Speicher lokale Stände ANDERER Baustellen wegräumen (abgelegte Protokolle
 // liegen samt Datenstand in SharePoint). Stände dieser Baustelle bleiben – dort kann
 // noch ein angefangenes Protokoll eines anderen Geräts liegen.
-function ibnSpeicherAufraeumen(){try{const akt=storeKey();const pj=(IBNCTX&&IBNCTX.projekt)?('@'+IBNCTX.projekt):null;
-  Object.keys(localStorage).filter(k=>/^ibn:[^:]+:.+:/.test(k)&&k!==akt&&(!pj||!k.endsWith(pj))).forEach(k=>localStorage.removeItem(k));}catch(e){}}
+// Nur Stände, die nachweislich an die Montage-App übergeben wurden (__exportiert) –
+// nie angefangene, nie Alt-Schlüssel ohne Baustelle (v184-Prüfung).
+function ibnSpeicherAufraeumen(){try{const akt=storeKey();const pj=(IBNCTX&&IBNCTX.projekt)?('@'+IBNCTX.projekt):null;if(!pj)return;
+  Object.keys(localStorage).filter(k=>/^ibn:[^:]+:.+:.*@/.test(k)&&k!==akt&&!k.endsWith(pj)).forEach(k=>{
+    try{const o=JSON.parse(localStorage.getItem(k)||'null');if(o&&o.__exportiert)localStorage.removeItem(k);}catch(e){}});}catch(e){}}
 
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
 
@@ -987,7 +990,7 @@ function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 function fieldHTML(key,f){
   const v=esc(STATE[key]||'');
   if(f.k==='area')return '<div style="grid-column:1/-1"><label class="fieldlbl">'+f.l+'</label><textarea oninput="setVal(\''+key+'\',this.value)">'+v+'</textarea></div>';
-  if(f.k==='measure')return '<div><label class="fieldlbl">'+f.l+'</label><div class="measure"><input type="text"'+(/isolation/i.test(f.l)?'':' inputmode="decimal"')+' autocomplete="off" value="'+v+'" oninput="setVal(\''+key+'\',this.value)"><span class="unit">'+f.u+'</span></div></div>';
+  if(f.k==='measure')return '<div><label class="fieldlbl">'+f.l+'</label><div class="measure"><input type="text"'+((/isolation/i.test(f.l)||/°/.test(f.u||''))?'':' inputmode="decimal"')+' autocomplete="off" value="'+v+'" oninput="setVal(\''+key+'\',this.value)"><span class="unit">'+f.u+'</span></div></div>';
   return '<div><label class="fieldlbl">'+f.l+'</label><input type="text" value="'+v+'" oninput="setVal(\''+key+'\',this.value)"></div>';
 }
 
@@ -1059,7 +1062,7 @@ function initPad(key){
   let drawing=false,last=null;const ctx=cv.getContext('2d');
   // Koordinaten auf die Zeichenfläche umrechnen: wird das Handy nach dem Aufbau gedreht,
   // ist das Feld breiter/schmaler als die Fläche – sonst lag der Strich neben dem Finger (v184).
-  function pos(e){const r=cv.getBoundingClientRect();const t=e.touches?e.touches[0]:e;const f=r.width?(cv.width/ratio)/r.width:1;return{x:(t.clientX-r.left)*f,y:(t.clientY-r.top)*f};}
+  function pos(e){const r=cv.getBoundingClientRect();const t=e.touches?e.touches[0]:e;const fx=r.width?(cv.width/ratio)/r.width:1,fy=r.height?(cv.height/ratio)/r.height:1;return{x:(t.clientX-r.left)*fx,y:(t.clientY-r.top)*fy};}
   function start(e){drawing=true;last=pos(e);$('ph_'+key).style.display='none';e.preventDefault();}
   function move(e){if(!drawing)return;const p=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;e.preventDefault();}
   function end(){if(!drawing)return;drawing=false;const g=STATE[key]||{};g.img=cv.toDataURL('image/png');STATE[key]=g;if(STATE.__auto)delete STATE.__auto[key+'.img'];saveState();}
@@ -1563,9 +1566,11 @@ function ibnSendBack(durl,name){if(!IBNCTX||!IBNCTX.pos)return false;
   var payload={id:String(Date.now())+'_'+IBNCTX.pos,pos:IBNCTX.pos,pdf:durl,name:name,ptype:(__o.ptype||'IBN Protokoll'),projekt:IBNCTX.projekt||'',mfr:CUR.mfr,dev:CUR.dev,state:STATE,replaceFname:(IBNCTX.replaceFname||''),nr:(IBNCTX.nr||0),von:(IBNCTX.von||0),
     waPos:(waAktiv()&&waGewaehlt())?waGewaehlt().pos:''};
   if(dguvIst()){ const b=dguvBewerten(); payload.dguv={stand:b.stand, gruende:b.fail.concat(b.stand==='offen'?b.offen.map(x=>'offen: '+x):[]), ueber:b.ueber||''}; }
-  var __ok=false;try{localStorage.setItem('ibn:return',JSON.stringify(payload));__ok=true;}catch(e){
-    ibnSpeicherAufraeumen();try{localStorage.setItem('ibn:return',JSON.stringify(payload));__ok=true;}catch(e2){}}
   var __opener=false;try{__opener=!!(window.opener&&!window.opener.closed);}catch(e){}
+  var __ok=false;try{localStorage.setItem('ibn:return',JSON.stringify(payload));__ok=true;}catch(e){
+    if(!__opener){ibnSpeicherAufraeumen();try{localStorage.setItem('ibn:return',JSON.stringify(payload));__ok=true;}catch(e2){}}}
+  // Übergeben: dieser lokale Stand darf bei vollem Speicher weggeräumt werden (liegt in SharePoint)
+  if(__ok||__opener){try{STATE.__exportiert=Date.now();localStorage.setItem(storeKey(),JSON.stringify(STATE));}catch(e){}}
   if(!__ok&&!__opener){alert('Das Protokoll konnte nicht an die Montage-App übergeben werden – der Speicher dieses Geräts ist voll.\n\nDas PDF wurde heruntergeladen. Bitte in der Montage-App über „PDF hochladen" an der Position ablegen.');return false;}
   try{if(window.opener&&!window.opener.closed)window.opener.postMessage({__ibnReturn:true,payload:payload},location.origin);}catch(e){}
   return true;}
@@ -1826,7 +1831,7 @@ function applyLoadState(){var raw;try{raw=localStorage.getItem('ibn:load');}catc
   // wurden auf heute und den aktuellen Ausführer umgeschrieben. Wer eine Seriennummer
   // korrigiert, schreibt damit um, WER wann in Betrieb genommen hat.
   // Ohne `__auto` füllt applyPrefills nur noch, was WIRKLICH leer ist.
-  var __st=o.state||{}; try{ delete __st.__auto; }catch(e){}
+  var __st=o.state||{}; try{ delete __st.__auto; delete __st.__exportiert; }catch(e){}
   CUR.dev=o.dev;try{localStorage.setItem(storeKey(),JSON.stringify(__st));}catch(e){}   // derselbe Schlüssel, den openForm liest (ab v184 mit Baustelle)
   openForm(o.dev);toast('Protokoll zum Bearbeiten geladen');return true;}
 STD_MFRS=Object.keys(DB);loadCustom();mergeCustom();loadProject();loadUser();ensureMsal().catch(function(){});renderLoginState();renderAusfBtn();loadMySig();renderSigBtn();var __nav=applyLoadState()||applyUrlContext();initProjectBar();if(!__nav)goHome();
