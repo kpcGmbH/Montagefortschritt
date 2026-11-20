@@ -2285,8 +2285,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 180;
+const APP_VERSION = 181;
 const CHANGELOG = [
+  { v:181, titel:'DGUV-Prüfung mit automatischer Bewertung', punkte:[
+    'Das DGUV-Prüfprotokoll bewertet selbst: Sichtprüfung n. i. O., ein Messwert außerhalb des Grenzwerts oder Mängel in der Funktionsprüfung ergeben <b>NICHT BESTANDEN</b> – mit Gründen, laufend unten im Formular. „Bestanden" nur, wenn jeder Prüfschritt bestanden ist.',
+    'Grenzwerte nach DIN EN 50678 (VDE 0701) / DIN EN 50699 (VDE 0702): Schutzleiter max. 0,3 Ω (Festanschluss 1 Ω), Isolation min. 1 MΩ (mit Heizelementen 0,3 MΩ), neu Schutzleiter-/Ersatzableitstrom max. 3,5 mA (Heizung über 3,5 kW: 1 mA je kW, max. 10 mA). Sichtprüfung als i. O. / n. i. O. statt Ja/Nein.',
+    '„Gefahrlose Benutzung" / „Gerätesicherheit nicht gegeben" setzt die App aus dem Ergebnis; eine Prüfplakette ist bei Durchfall gesperrt. „Trotzdem bestanden" nur mit Begründung, die im PDF steht. Im PDF ein eigener Abschnitt „Ergebnis der Prüfung".',
+    'Hauptapp: Ein nicht bestandenes DGUV-Protokoll zählt nicht als Nachweis („Inbetriebnahme" bleibt gesperrt), ist rot gekennzeichnet und legt die Gründe als Restarbeit (Elektro) an. Eine spätere bestandene Prüfung erledigt sie automatisch.' ]},
   { v:180, titel:'Kleinauftrag: Korrekturen', punkte:[
     'Leistungsvorschlag verbessert: Spültische und Spülen bekommen Sanitär (ohne Elektro); Combi-Steamer, Eismaschinen, Kochkessel, Siebträger, Durchlauferhitzer, Boiler u. a. Montage, Sanitär, Elektro. Neue Auswahl „Nachunternehmer" (Kältetechnik).',
     'Mengen mit Komma (z. B. „2,5") verlangten das Zehnfache an Inbetriebnahmeprotokollen – jetzt zählt nur eine ganze Stückzahl.',
@@ -4215,7 +4220,8 @@ function dguvPflicht(pos){
 }
 function dguvSoll(pos){ return tsSoll(pos); }
 function dguvIst(pos){
-  const l=(gs(pos).pdfs||[]).filter(p=>p&&p.type==='DGUV Protokoll');
+  // Nicht bestandene Prüfungen (v181, Bewertung aus der IBN-App) sind kein Nachweis
+  const l=(gs(pos).pdfs||[]).filter(p=>p&&p.type==='DGUV Protokoll'&&p.dguvOk!==false);
   if(l.some(p=>p.alle)) return dguvSoll(pos);
   return l.length;
 }
@@ -8344,6 +8350,8 @@ async function ibnReceive(p){
     }
     if(!gs(pos).pdfs) gs(pos).pdfs=[];
     const entry={type:type, name:p.name||(type+'.pdf'), fname:fname, ibn:true, mfr:p.mfr||'', dev:p.dev||'', dataFname:dataFname, nr:(p.nr||0), von:(p.von||0)};
+    // DGUV-Ergebnis aus der IBN-App (v181): nur „bestanden" zählt als Nachweis
+    if(p.dguv && p.dguv.stand){ entry.dguvOk=(p.dguv.stand==='ok'); if(!entry.dguvOk) entry.dguvGruende=(p.dguv.gruende||[]).slice(0,8); }
     // Welchen vorhandenen Eintrag ersetzt dieses Protokoll?
     // 1. „✎ weiterbearbeiten" liefert den Dateinamen mit (replaceFname).
     // 2. OHNE replaceFname: Wer ein frisch geöffnetes Formular ZWEIMAL exportiert
@@ -8382,6 +8390,7 @@ async function ibnReceive(p){
     // und ein „entfällt" wäre schon beim ersten Ablegen gemeldet worden.
     // Beim ERSETZEN nur dann nichts nachsetzen, wenn der Haken schon steht – seit den
     // Pflicht-Sperren (v148–152) kann das erste Ablegen den Haken auch verweigert haben.
+    const dguvRA=dguvRestarbeit(pos, entry);   // v181: nicht bestanden -> Restarbeit, bestanden -> erledigt
     const auto = (replaced && gs(pos).ib) ? null : (type==='DGUV Protokoll' ? dguvNachholen(pos) : schrittAusProtokoll(pos, type));
     // Wasseraufbereitung (v170) VOR der Meldung auswerten: ein zweiter Anschluss-Dialog
     // würde den ersten (gleiches Overlay) überschreiben, ein zweiter Toast die
@@ -8390,13 +8399,32 @@ async function ibnReceive(p){
     if(waPos && !gs(waPos).ib){ a2=schrittAusProtokoll(waPos, type);
       if(a2 && (a2.stand==='gesetzt' || a2.stand==='nicht-relevant')) a2=null;
       else if(a2 && a2.stand==='anschl' && auto && auto.stand==='anschl'){ waZusatz=' · Pos. '+waPos+': Stecker/Festanschluss noch offen – „Inbetriebnahme" dort abhaken'; a2=null; } }
-    showToast('✓ '+type+' bei Position '+pos+(waPos?(' und '+waPos):'')+(replaced?' aktualisiert':' abgelegt')+
-              protoHinweis(auto)+waZusatz);
+    showToast((dguvRA==='neu'?'⛔ DGUV-Prüfung NICHT bestanden – als Restarbeit eingetragen · ':'✓ ')+type+' bei Position '+pos+(waPos?(' und '+waPos):'')+(replaced?' aktualisiert':' abgelegt')+
+              protoHinweis(auto)+waZusatz, dguvRA==='neu'?{bg:'#b3402a'}:undefined);
     protoWarnen(pos, auto);
     if(a2) protoWarnen(waPos, a2);
     ibnGoToPos(pos);
     return true;
   }catch(e){ _ibnSeen.delete(p.id); alert('IBN-Protokoll konnte nicht abgelegt werden: '+((e&&e.message)||e)); return false; }
+}
+// DGUV nicht bestanden (v181, Wunsch des Nutzers 20.11.2026): Gründe als Restarbeit an
+// der Position (Gewerk Elektro). Eine spätere BESTANDENE Prüfung derselben Position
+// erledigt diese automatisch angelegten Restarbeiten wieder. Rückgabe: 'neu'|'erledigt'|''.
+function dguvRestarbeit(pos, entry){
+  if(entry.type!=='DGUV Protokoll' || entry.dguvOk===undefined) return '';
+  const s=gs(pos), jetzt=new Date().toISOString();
+  if(entry.dguvOk===false){
+    if(s.restarbeiten.some(r=>r && r.auto==='dguv' && !r.done && r.quelle===entry.fname)) return '';
+    s.restarbeiten.push({txt:'DGUV-Prüfung nicht bestanden', desc:(entry.dguvGruende||[]).join('; '), done:false, mangel:false,
+      ersteller:USER||'', erstelltAm:jetzt, erledigtVon:'', erledigtAm:null, gw:'E', fotos:[], fotosOk:[], auto:'dguv', quelle:entry.fname});
+    histAdd(pos,'ra-neu','DGUV nicht bestanden');
+    try{ updRA(pos); }catch(e){}
+    return 'neu';
+  }
+  let n=0;
+  s.restarbeiten.forEach(r=>{ if(r && r.auto==='dguv' && !r.done){ r.done=true; r.erledigtVon='automatisch (DGUV bestanden)'; r.erledigtAm=jetzt; n++; } });
+  if(n){ try{ updRA(pos); }catch(e){} return 'erledigt'; }
+  return '';
 }
 // Springt die Position an, an der das Protokoll gelandet ist, und hebt sie kurz hervor –
 // sonst steht der Monteur nach dem Speichern irgendwo in der Liste.
@@ -8550,7 +8578,8 @@ function updPG(pos){
     const editBtn=(isPdf&&!istIbn)?`<button class="pdoc-btn pdoc-edit" onclick="pdfOpen('${pos}',${i})" title="Ausfüllen">&#9999;&#65039;</button>`:'';
     // Bei Stückzahl > 1 den Gerätezähler zeigen – sonst heissen alle Einträge gleich
     const nrTag=(p.nr&&p.von>1)?` <span class="pdoc-nr">Gerät ${p.nr}/${p.von}</span>`:'';
-    const ueTag=p.ueber?` <span class="pdoc-nr">über Pos. ${escapeHtml(p.ueber)}</span>`:'';
+    const ueTag=(p.ueber?` <span class="pdoc-nr">über Pos. ${escapeHtml(p.ueber)}</span>`:'')+
+      (p.dguvOk===false?` <span class="pdoc-nr" style="background:#b3402a;color:#fff" title="${escapeHtml((p.dguvGruende||[]).join('; '))}">nicht bestanden</span>`:'');
     return `<div class="pdoc">&#128196; <span class="pdoc-name" onclick="pdfView('${pos}',${i})">${p.type}: ${p.name}</span>${nrTag}${ueTag}${ibnBtn}${editBtn}<button class="pdoc-btn pdoc-del" onclick="delProto('${pos}',${i})" title="Löschen">&#10005;</button></div>`;
   }).join('');
 }

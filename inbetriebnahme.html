@@ -566,21 +566,28 @@ Winterhalter:{label:'Winterhalter',desc:'Spülmaschinen · Inbetriebnahmekarte &
      ],sign:{mode:'unterschrift',roles:['Kunde','Techniker']}}
   }},
 
-'DGUV V3':{label:'DGUV V3',desc:'Prüfprotokoll für elektrische Geräte nach Instandsetzung, Änderung – Wiederholungsprüfung (BetrSichV / DGUV Vorschrift 3, Prüfgrundlage DIN VDE 0701-0702)',icon:'⚡',
+'DGUV V3':{label:'DGUV V3',desc:'Prüfprotokoll für elektrische Geräte nach Instandsetzung, Änderung – Wiederholungsprüfung (BetrSichV / DGUV Vorschrift 3, Prüfgrundlage DIN EN 50678 (VDE 0701) / DIN EN 50699 (VDE 0702))',icon:'⚡',
   devices:{
    'Prüfprotokoll elektrische Geräte':{tags:['Elektro','Wiederholungsprüfung'],
-     pdfTitle:'PRÜFPROTOKOLL',pdfSub:'BetrSichV / DGUV Vorschrift 3 · DIN VDE 0701-0702',ptype:'DGUV Protokoll',
+     pdfTitle:'PRÜFPROTOKOLL',pdfSub:'BetrSichV / DGUV Vorschrift 3 · DIN EN 50678 (VDE 0701) / DIN EN 50699 (VDE 0702)',ptype:'DGUV Protokoll',
      kopf:[txt('Kunde'),txt('Gerät / Bezeichnung'),txt('Fabrikat'),txt('Typ / Modell'),txt('Seriennummer (S-Nr.)'),txt('Standort / Position'),txt('Baustelle'),txt('Datum'),txt('Anschrift')],   // Anschrift ans ENDE – siehe mKopf
      sections:[
+       // v181 (Abgleich 20.11.2026, Grenzwerte nach DIN EN 50678/50699, vom Nutzer
+       // bestätigt): Sichtprüfung als i. O. / n. i. O. statt Ja/Nein – positiv
+       // formulierte Fragen wurden falsch beantwortet. Gespeichert bleibt 'ja'/'nein'.
+       // Neue Punkte nur ANGEHÄNGT (Schlüssel s{i}i{j} nach Index).
        sec('01 · Sichtprüfung',[
          chk('Typenschild vorhanden und leserlich'),
-         chk('Gehäuse weist keine Beschädigung auf'),
-         chk('Allgemeiner Zustand ist zufriedenstellend')
-       ]),
+         chk('Gehäuse unbeschädigt'),
+         chk('Allgemeiner Zustand zufriedenstellend')
+       ],{cols:['i. O.','n. i. O.']}),
        sec('02 · Messung',[
-         mea('Schutzleiterwiderstand – Anschlussleitung bis 5 m Länge (SOLL max. 0,3 Ohm)','Ohm'),
-         mea('Schutzleiterwiderstand – bei festem Netzanschluss, zwischen Körper und Schutzleiter-Anschlussklemme (SOLL max. 1 Ohm)','Ohm'),
-         mea('Isolationswiderstand – Schutzklasse 1, Gerät mit Schutzleiteranschluss (SOLL min. 0,5 MOhm)','MOhm')
+         mea('Schutzleiterwiderstand – Anschlussleitung bis 5 m Länge (max. 0,3 Ohm)','Ohm'),
+         mea('Schutzleiterwiderstand – bei festem Netzanschluss, zwischen Körper und Schutzleiter-Anschlussklemme (max. 1 Ohm)','Ohm'),
+         mea('Isolationswiderstand – Schutzklasse I, 500 V DC (min. 1 MOhm, mit Heizelementen min. 0,3 MOhm)','MOhm'),
+         chk('Gerät mit Heizelementen (z. B. Kombidämpfer, Spülmaschine, Fritteuse)'),
+         mea('Anschlussleistung der Heizung (für den Grenzwert Ableitstrom)','kW'),
+         mea('Schutzleiterstrom / Ersatzableitstrom (max. 3,5 mA; Heizung > 3,5 kW: 1 mA je kW, max. 10 mA) – Pflicht, wenn die Isolation nicht gemessen werden kann','mA')
        ],{comment:false}),
        sec('03 · Funktionsprüfung',[
          opt('Ergebnis der Funktionsprüfung',['Keine Mängel festgestellt','Mängel lt. gesondertem Bericht festgestellt']),
@@ -823,8 +830,78 @@ function ewSchalterHTML(o){
              :'Die Einweisungspunkte werden hier mit ausgefüllt. Einschalten, wenn die Einweisung später gemeinsam mit den anderen Geräten erfolgt.')+'</small></div></label>';
 }
 const EW_GES_TXT='Erfolgt gesondert mit der Geräte-Einweisung (kpc-Einweisungsprotokoll).';
+// ── DGUV: automatische Bewertung (ab v181) ───────────────────────────────
+// Wunsch des Nutzers (20.11.2026): Servicetechniker verstanden einzelne Abfragen
+// falsch – das Gerät war eigentlich durchgefallen. Die App wertet jetzt selbst aus:
+// Sichtprüfung n. i. O., Messwert außerhalb des Grenzwerts (DIN EN 50678/50699) oder
+// Funktionsprüfung mit Mängeln => NICHT BESTANDEN. „Bestanden" nur, wenn JEDER Schritt
+// bestanden ist. Die Abschlusspunkte (gefahrlose Benutzung / Gerätesicherheit nicht
+// gegeben) setzt die App aus dem Ergebnis; „trotzdem bestanden" nur mit Begründung.
+// Schlüssel: s0i0-2 Sicht, s1i0 SL ≤5 m, s1i1 SL fest, s1i2 Iso, s1i3 Heizung, s1i4 kW,
+// s1i5 Ableitstrom, s2i0 Funktion, s2i1 gefahrlos, s2i2 Plakette, s2i3 nicht gegeben.
+function dguvIst(){ return CUR.mfr==='DGUV V3' && CUR.dev==='Prüfprotokoll elektrische Geräte'; }
+function dguvZahl(k){ const v=String(STATE[k]||'').replace(',','.').replace(/[^0-9.]/g,''); const n=parseFloat(v); return isFinite(n)?n:null; }
+function dguvFmt(n){ return String(Math.round(n*1000)/1000).replace('.',','); }
+function dguvBewerten(){
+  const fail=[], offen=[], heiz=(STATE.s1i3||{}).v==='ja', kw=dguvZahl('s1i4');
+  [['s0i0','Typenschild'],['s0i1','Gehäuse'],['s0i2','Allgemeiner Zustand']].forEach(([k,l])=>{ const v=(STATE[k]||{}).v;
+    if(v==='nein') fail.push(l+' n. i. O. (Sichtprüfung)'); else if(v!=='ja') offen.push('Sichtprüfung „'+l+'"'); });
+  const sl5=dguvZahl('s1i0'), slf=dguvZahl('s1i1');
+  if(sl5!==null && sl5>0.3) fail.push('Schutzleiterwiderstand '+dguvFmt(sl5)+' Ω (max. 0,3 Ω)');
+  if(slf!==null && slf>1) fail.push('Schutzleiterwiderstand (Festanschluss) '+dguvFmt(slf)+' Ω (max. 1 Ω)');
+  if(sl5===null && slf===null) offen.push('Schutzleiterwiderstand');
+  const iso=dguvZahl('s1i2'), isoMin=heiz?0.3:1;
+  if(iso!==null && iso<isoMin) fail.push('Isolationswiderstand '+dguvFmt(iso)+' MΩ (min. '+dguvFmt(isoMin)+' MΩ'+(heiz?', mit Heizelementen':'')+')');
+  const ab=dguvZahl('s1i5'), abMax=heiz ? (kw===null ? 10 : (kw>3.5 ? Math.min(kw*1,10) : 3.5)) : 3.5;
+  // Heizgerät ohne Leistungsangabe: Grenzwert unbekannt (3,5 bis 10 mA) – nachfragen statt durchfallen
+  if(heiz && kw===null && ab!==null && ab>3.5 && ab<=10) offen.push('Heizleistung in kW (für den Grenzwert Ableitstrom)');
+  else if(ab!==null && ab>abMax) fail.push('Schutzleiter-/Ableitstrom '+dguvFmt(ab)+' mA (max. '+dguvFmt(abMax)+' mA)');
+  if(iso===null && ab===null) offen.push('Isolationswiderstand oder Ableitstrom');
+  const fk=STATE.s2i0||[];
+  if(fk.indexOf('Mängel lt. gesondertem Bericht festgestellt')>=0) fail.push('Funktionsprüfung: Mängel festgestellt');
+  else if(fk.indexOf('Keine Mängel festgestellt')<0) offen.push('Ergebnis der Funktionsprüfung');
+  const ueber=STATE.dguv_ueber && STATE.dguv_ueber.grund;
+  const stand=fail.length ? (ueber?'ok':'fail') : (offen.length?'offen':'ok');
+  return {stand, fail, offen, ueber:fail.length&&ueber?STATE.dguv_ueber.grund:''};
+}
+// Abschlusspunkte aus dem Ergebnis setzen (vor Anzeige und PDF)
+function dguvSync(){
+  if(!dguvIst()) return;
+  const b=dguvBewerten();
+  if(b.stand==='fail'){ STATE.s2i1={v:'nein'}; STATE.s2i3={v:'ja'}; STATE.s2i2={v:'nein'}; }
+  else if(b.stand==='ok'){ STATE.s2i1={v:'ja'}; STATE.s2i3={v:'nein'}; }
+  else { delete STATE.s2i1; delete STATE.s2i3; }
+}
+function dguvErgebnisHTML(){
+  const b=dguvBewerten();
+  const farbe=b.stand==='ok'?'#3a7a3a':(b.stand==='fail'?'#b3402a':'#8b6d22');
+  const titel=b.stand==='ok'?(b.ueber?'&#9989; BESTANDEN – trotz Befund, mit Begründung':'&#9989; Ergebnis: BESTANDEN'):(b.stand==='fail'?'&#9940; Ergebnis: NICHT BESTANDEN':'&#9203; Ergebnis: noch offen');
+  const li=a=>a.map(x=>'<li>'+esc(x)+'</li>').join('');
+  return '<div style="background:'+farbe+';color:#fff;border-radius:10px;padding:10px 12px;margin:10px 0">'+
+    '<div style="font-weight:700;font-size:16px">'+titel+'</div>'+
+    (b.fail.length?'<ul style="margin:6px 0 0 18px;font-size:13.5px">'+li(b.fail)+'</ul>':'')+
+    (b.ueber?'<div style="font-size:13px;margin-top:6px">Begründung: '+esc(b.ueber)+' <button class="btn ghost small" style="margin-left:6px" onclick="dguvUeberWeg()">aufheben</button></div>':'')+
+    (b.stand==='offen'?'<div style="font-size:13px;margin-top:4px">Fehlt noch: '+esc(b.offen.join(', '))+'</div>':'')+
+    (b.stand==='fail'?'<div style="font-size:12.5px;margin-top:6px;opacity:.9">„Gefahrlose Benutzung" und „Prüfplakette" sind damit ausgeschlossen. <button class="btn ghost small" style="margin-left:6px;background:#fff" onclick="dguvUeber()">Trotzdem bestanden – Begründung</button></div>':'')+
+  '</div>';
+}
+function dguvUeber(){
+  const g=prompt('Das Gerät ist nach deinen Angaben durchgefallen.\n\nWarum soll es trotzdem als BESTANDEN gelten? Die Begründung steht im Protokoll.','');
+  if(g===null || !g.trim()) return;
+  STATE.dguv_ueber={grund:g.trim(), am:todayDE()}; saveState(); openForm(CUR.dev,true);
+}
+function dguvUeberWeg(){ delete STATE.dguv_ueber; saveState(); openForm(CUR.dev,true); }
+// Laufend: Messwert-Warnungen und Ergebnis nachziehen (aus updateProgress)
+function dguvLive(){
+  if(!dguvIst()) return;
+  const b=dguvBewerten();
+  [['s1i0',/^Schutzleiterwiderstand \d/],['s1i1',/Festanschluss/],['s1i2',/^Isolations/],['s1i5',/Ableitstrom/]].forEach(([k,re])=>{
+    const el=document.getElementById('dgw_'+k); if(!el) return; const f=b.fail.find(x=>re.test(x));
+    el.innerHTML=f?('&#10005; Grenzwert verletzt: '+esc(f)+' – Gerät besteht die Prüfung nicht'):''; });
+  const box=document.getElementById('dguvErg'); if(box) box.innerHTML=dguvErgebnisHTML();
+}
 function openForm(dev,keepScroll){
-  CUR.dev=dev;if(!(CUR.fresh&&!CUR.pos))loadState();ewInit(DB[CUR.mfr].devices[dev]);applyPrefills();setCrumbs();ibnUpdatePdfBtn();
+  CUR.dev=dev;if(!(CUR.fresh&&!CUR.pos))loadState();ewInit(DB[CUR.mfr].devices[dev]);applyPrefills();dguvSync();setCrumbs();ibnUpdatePdfBtn();
   const o=DB[CUR.mfr].devices[dev];
   waInit(o);
   var __sl=ibnStueckLabel();
@@ -841,7 +918,12 @@ function openForm(dev,keepScroll){
     h+='<div class="section"><div class="sh"><span class="bar"></span><h3>'+s.title+'</h3></div><div class="body">';
     const __nEw=__ew?s.items.filter(ewPunkt).length:0;
     if(__nEw && __nEw===s.items.length) h+='<div class="ewzu">&#128203; '+__nEw+' Punkt'+(__nEw===1?'':'e')+' – erfolgen mit der Geräte-Einweisung, hier nichts auszufüllen</div>';
-    else s.items.forEach((it,ii)=>{h+=(__ew&&ewPunkt(it))?('<div class="item ewges">'+esc(it.l)+'<span>&#8594; Einweisung</span></div>'):itemHTML('s'+si+'i'+ii,it,s);});
+    else s.items.forEach((it,ii)=>{
+      if(dguvIst() && si===2 && (ii===1 || ii===3)){ const v=(STATE['s2i'+ii]||{}).v; h+='<div class="item ewges">'+esc(it.l)+'<span>'+(v==='ja'?'&#10003; ja':(v==='nein'?'nein':'–'))+' · aus dem Ergebnis</span></div>'; return; }
+      h+=(__ew&&ewPunkt(it))?('<div class="item ewges">'+esc(it.l)+'<span>&#8594; Einweisung</span></div>'):itemHTML('s'+si+'i'+ii,it,s);
+      if(dguvIst() && si===1 && it.k==='measure') h+='<div id="dgw_s1i'+ii+'" style="color:#b3402a;font-size:13px;margin:-6px 0 6px"></div>';
+    });
+    if(dguvIst() && si===2) h+='<div id="dguvErg">'+dguvErgebnisHTML()+'</div>';
     if(si===waAbschnitt(o)) h+=waHTML(o);
     h+='</div></div>';
   });
@@ -907,7 +989,8 @@ function sigHTML(key,role,mode){
 
 /* ---------- State-Setter ---------- */
 function setVal(k,v){STATE[k]=v;if(STATE.__auto)delete STATE.__auto[k];saveState();}
-function setCheck(k,v,btn){const st=STATE[k]||{};st.v=(st.v===v?null:v);STATE[k]=st;
+function setCheck(k,v,btn){
+  if(dguvIst() && k==='s2i2' && v==='ja' && dguvBewerten().stand==='fail'){ alert('Das Gerät hat die Prüfung nach deinen Angaben NICHT bestanden – eine Prüfplakette darf nicht erteilt werden.\n\nGründe:\n· '+dguvBewerten().fail.join('\n· ')); return; }const st=STATE[k]||{};st.v=(st.v===v?null:v);STATE[k]=st;
   const p=btn.parentNode;[...p.children].forEach(b=>b.className='btn-tri');
   if(st.v){if(v===true)btn.classList.add('on-do');else btn.classList.add(v==='ja'?'on-yes':'on-no');}saveState();}
 function setCmt(k,v){const st=STATE[k]||{};st.c=v;STATE[k]=st;saveState();}
@@ -942,7 +1025,9 @@ function updateProgress(){
   const __ew=ewGes();
   o.sections.forEach((s,si)=>s.items.forEach((it,ii)=>{const k='s'+si+'i'+ii;
     if(__ew&&ewPunkt(it))return;   // erfolgt gesondert (v177)
+    if(dguvIst() && si===2 && (ii===1||ii===3)) return;   // aus dem Ergebnis (v181)
     if(it.k==='check'){total++;if((STATE[k]||{}).v)done++;}}));
+  if(dguvIst()){ dguvSync(); dguvLive(); }
   if(waAktiv()) WA_FELDER.forEach(f=>{ if(f.k==='check'){total++;if((STATE['wa_'+f.id]||{}).v)done++;} });
   const pct=total?Math.round(done/total*100):0;
   const pr=$('prog');if(pr)pr.style.width=pct+'%';
@@ -953,6 +1038,9 @@ function resetForm(){if(!confirm('Alle Eingaben dieses Protokolls löschen?'))re
 /* ---------- PDF Export ---------- */
 function exportPDF(){
   const o=DB[CUR.mfr].devices[CUR.dev];
+  if(dguvIst()){ dguvSync(); saveState(); const b=dguvBewerten();
+    if(b.stand==='offen' && !confirm('Die Prüfung ist noch unvollständig:\n· '+b.offen.join('\n· ')+'\n\nPDF trotzdem erstellen? Ergebnis im Protokoll: „noch offen".')) return;
+    if(b.stand==='fail' && !confirm('Das Gerät hat die Prüfung NICHT bestanden:\n· '+b.fail.join('\n· ')+'\n\nSo ablegen? (In der Montagefortschritt-App wird daraus eine Restarbeit, „Inbetriebnahme" bleibt gesperrt.)\n\nAbbrechen = Angaben prüfen/korrigieren.')) return; }
   // compress:true (v174): ohne sie legt jsPDF Logo und Schrift UNKOMPRIMIERT ab –
   // ein einseitiges IBN-Protokoll ohne Fotos hatte 1.057 KB, mit 72 KB.
   const {jsPDF}=window.jspdf;const doc=new jsPDF({compress:true,unit:'mm',format:'a4'});
@@ -1083,6 +1171,17 @@ function exportPDF(){
     if(__n) kvLine('Einweisung',EW_GES_TXT);   // gemischter Abschnitt: Einweisungspunkte gesondert
     y+=2;
   });
+  // DGUV: Ergebnis der Prüfung (v181)
+  if(dguvIst()){ const b=dguvBewerten();
+    ensure(48);   // Ergebnis, Befund und Plakette zusammen auf einer Seite
+    secHead('Ergebnis der Prüfung');
+    kvLine('Ergebnis', b.stand==='ok' ? (b.ueber?'BESTANDEN – trotz Befund (Begründung unten)':'BESTANDEN – unter Beachtung der gültigen Vorschriften ist eine gefahrlose Benutzung möglich')
+      : (b.stand==='fail' ? 'NICHT BESTANDEN – Gerätesicherheit nicht gegeben, ein gefahrloser Betrieb ist nicht möglich. Auf die Gefahr des Betreibens wurde hingewiesen.' : 'NOCH OFFEN – Prüfung unvollständig'));
+    if(b.fail.length) kvLine('Befund', b.fail.join(' · '));
+    if(b.ueber) kvLine('Begründung', b.ueber);
+    if(b.stand==='offen') kvLine('Fehlt', b.offen.join(' · '));
+    kvLine('Prüfplakette', (STATE.s2i2||{}).v==='ja' ? 'erteilt' : 'nicht erteilt');
+    y+=2; }
   // Wasseraufbereitung, die im Spülmaschinen-Protokoll miterledigt wird (v170):
   // eigener Abschnitt mit ALLEN Werten – auch denen, die oben im Hersteller-Teil
   // eingetragen wurden –, damit er für die zweite Position für sich allein steht.
@@ -1410,6 +1509,7 @@ function ibnSendBack(durl,name){if(!IBNCTX||!IBNCTX.pos)return false;
   var __o=(DB[CUR.mfr]&&DB[CUR.mfr].devices[CUR.dev])||{};
   var payload={id:String(Date.now())+'_'+IBNCTX.pos,pos:IBNCTX.pos,pdf:durl,name:name,ptype:(__o.ptype||'IBN Protokoll'),projekt:IBNCTX.projekt||'',mfr:CUR.mfr,dev:CUR.dev,state:STATE,replaceFname:(IBNCTX.replaceFname||''),nr:(IBNCTX.nr||0),von:(IBNCTX.von||0),
     waPos:(waAktiv()&&waGewaehlt())?waGewaehlt().pos:''};
+  if(dguvIst()){ const b=dguvBewerten(); payload.dguv={stand:b.stand, gruende:b.fail.concat(b.stand==='offen'?b.offen.map(x=>'offen: '+x):[]), ueber:b.ueber||''}; }
   try{localStorage.setItem('ibn:return',JSON.stringify(payload));}catch(e){}
   try{if(window.opener&&!window.opener.closed)window.opener.postMessage({__ibnReturn:true,payload:payload},location.origin);}catch(e){}
   return true;}
