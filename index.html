@@ -2280,8 +2280,12 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 176;
+const APP_VERSION = 177;
 const CHANGELOG = [
+  { v:177, titel:'Inbetriebnahme: Einweisung erfolgt gesondert', punkte:[
+    'Inbetriebnahmeprotokolle haben oben den Schalter <b>„Einweisung erfolgt gesondert"</b> – Standard, wenn aus einer Position geöffnet. Einweisungspunkte der Hersteller-Protokolle (eingewiesen, unterwiesen, erklärt, Anleitung übergeben, Teilnehmer …) sind dann ausgegraut, zählen nicht im Fortschritt, reine Einweisungs-Abschnitte schrumpfen auf eine Zeile, die Unterschrift „Einweisung des Betreibers" entfällt. Im PDF steht statt leerer Kästchen „Erfolgt gesondert mit der Geräte-Einweisung".',
+    'Wird direkt bei der Inbetriebnahme eingewiesen: Schalter aus – alles wie bisher. Alte Protokolle mit bereits ausgefüllter Einweisung behalten sie.',
+    'Einweisungs-App: Die Geräte-Checklisten enthalten jetzt die Einweisungspunkte der Hersteller – z. B. Spülmaschine mit Klarspüler/Reiniger, Enthärter, Sieben, Störungen, Körben; Kombidämpfer mit Hinweis auf DGUV-V3-Prüfung und Wartungsvertrag; neu eine Liste für Kaffeemaschinen. Bei allen Geräten neu: „Bedienungsanleitung übergeben". Kühlgeräte, Fritteusen, Induktion, Eiswürfelbereiter und Aufschnittmaschinen bekommen jetzt zuverlässig ihre eigene Liste (vorher oft nur die allgemeine).' ]},
   { v:176, titel:'Fehlerprüfung v170–v175', punkte:[
     'Inbetriebnahme: Ein altes Spülmaschinen-Protokoll wird beim Weiterbearbeiten nicht mehr ungefragt zur Inbetriebnahme der Enthärtung; ab dem 2. Gerät einer Position ist „Gilt auch als Inbetriebnahme von …" standardmäßig aus. Der Typ wechselt mit der gewählten Wasseraufbereitung.',
     'Baustelle umbenannt → „Ordner konsolidieren": Protokolle, die an zwei Positionen hängen (Spülmaschine + Enthärtung), werden einmal verschoben und bleiben an beiden Positionen erreichbar.',

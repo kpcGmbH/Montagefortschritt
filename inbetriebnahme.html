@@ -171,6 +171,13 @@ textarea{border:1.4px solid var(--line);border-radius:8px;min-height:64px;resize
 .toast{position:fixed;left:50%;bottom:84px;transform:translateX(-50%) translateY(20px);background:#222;color:#fff;
   padding:11px 18px;border-radius:10px;font-size:14.5px;opacity:0;pointer-events:none;transition:.25s;z-index:60}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+/* Einweisung erfolgt gesondert (v177) */
+.ewsw{display:flex;gap:10px;align-items:flex-start;background:#fbf4e6;border:1.5px solid var(--copper);border-radius:10px;padding:10px 12px;margin:10px 0;cursor:pointer}
+.ewsw input{width:20px;height:20px;accent-color:var(--copper);flex:0 0 auto;margin-top:1px}
+.ewsw b{color:var(--copper-d)}.ewsw small{display:block;color:var(--gray);font-size:12px;margin-top:2px}
+.item.ewges{color:#b5aea6;display:flex;justify-content:space-between;gap:10px;font-size:14px}
+.item.ewges span{color:var(--copper);font-size:12px;white-space:nowrap}
+.ewzu{background:var(--soft);border-radius:8px;padding:9px 11px;color:var(--gray);font-size:13.5px}
 /* Wasseraufbereitung im Spülmaschinen-Protokoll (v170) */
 .wabox{border:2px solid var(--copper);border-radius:10px;padding:10px 12px;margin:10px 0 4px;background:#fffaf1}
 .wabox.aus{border-style:dashed;background:transparent}
@@ -655,7 +662,7 @@ function isKunde(role){return /kunde/i.test(role);}
 // WICHTIG: Die Rollen werden NICHT aus sign.roles entfernt, sondern nur übersprungen.
 // Sonst verschieben sich die Indizes (g0/g1) und ein gespeicherter Entwurf zeigte die
 // Kundenunterschrift plötzlich als Technikerunterschrift.
-function sigAus(role){return isKunde(role);}
+function sigAus(role){return isKunde(role) || (role==='Einweisung des Betreibers' && CUR.dev && ewGes());}   // v177: gesondert
 function isTech(role,mode){if(mode==='ausgefuehrt')return true;if(/Kunde/i.test(role))return false;if(/Vertriebspartner/i.test(role))return false;return true;}
 // Jedes Hersteller-Formular beschriftet dieselbe Angabe anders ("Name des Kunden",
 // "Unternehmen (Kunde)", "Aufstelladresse – Name"). Vorher wurde NUR auf ^Kunde$
@@ -775,6 +782,38 @@ function ibnUpdatePdfBtn(){
   b.title = anPos? 'Protokoll als PDF sichern und an Position '+IBNCTX.pos+' in der Montagefortschritt-App ablegen'
                  : 'Protokoll als PDF herunterladen (keine Position gewählt – wird nicht in der App abgelegt)';
 }
+// ── Einweisung erfolgt gesondert (ab v177) ───────────────────────────────
+// Wunsch des Nutzers (20.11.2026): Eingewiesen wird meist NICHT bei der Inbetrieb-
+// nahme, sondern später gemeinsam mit den anderen Geräten (Einweisungs-App). Die
+// Einweisungspunkte der Hersteller-Protokolle blieben dadurch leer, das PDF wirkte
+// halb ausgefüllt. Mit dem Schalter (Standard: an, wenn aus einer Position geöffnet)
+// werden sie ausgegraut, zählen nicht und stehen im PDF als „erfolgt gesondert".
+// Erkannt PRO PRÜFPUNKT (Rational „6 · Einweisung" mischt Software-Update und
+// Einweisung). Die Inhalte stehen in den Checklisten der Einweisungs-App.
+const EW_PUNKT=/einweis|eingewiesen|unterwiesen|unterweis|erklärt|hingewiesen|informiert|empfohlen|teilnehmer|durchgeführt am|(bedienungs|betriebs)anleitung.*(ausgehändigt|übergeben)/i;
+function ewPunkt(it){ return !!(it && it.l && EW_PUNKT.test(it.l)); }
+function ewHatPunkte(o){ return !!o && (o.sections.some(s=>s.items.some(ewPunkt)) || o.kopf.some(f=>!f.aus&&ewPunkt(f)) || o.sign.roles.some(r=>r==='Einweisung des Betreibers')); }
+function ewGes(){
+  if(CUR.mfr==='DGUV V3') return false;   // Prüfprotokoll, keine Einweisung („…auf die Gefahr hingewiesen")
+  if(STATE.ew_ges===true || STATE.ew_ges===false) return STATE.ew_ges;
+  // Standard: an, wenn aus einer Position geöffnet – außer ein älteres Protokoll hat
+  // die Einweisungspunkte schon ausgefüllt (dann war sie bei der Inbetriebnahme).
+  if(!(CUR.pos && IBNCTX && IBNCTX.pos===CUR.pos)) return false;
+  const o=CUR.dev && DB[CUR.mfr] && DB[CUR.mfr].devices[CUR.dev]; if(!o) return false;
+  let schon=false;
+  o.sections.forEach((s,si)=>s.items.forEach((it,ii)=>{ if(!ewPunkt(it)) return; const v=STATE['s'+si+'i'+ii];
+    if(v && (v.v || (typeof v==='string' && v.trim()) || (Array.isArray(v) && v.length))) schon=true; }));
+  return !schon;
+}
+function ewGesSchalten(an){ STATE.ew_ges=!!an; saveState(); openForm(CUR.dev,true); }
+function ewSchalterHTML(o){
+  if(CUR.mfr==='DGUV V3' || !ewHatPunkte(o)) return '';
+  const an=ewGes();
+  return '<label class="ewsw"><input type="checkbox"'+(an?' checked':'')+' onchange="ewGesSchalten(this.checked)"><div><b>Einweisung erfolgt gesondert</b> (Einweisungsprotokoll)'+
+    '<small>'+(an?'Einweisungspunkte sind ausgegraut und stehen im PDF als „erfolgt gesondert". Ausschalten, wenn direkt bei der Inbetriebnahme eingewiesen wird.'
+             :'Die Einweisungspunkte werden hier mit ausgefüllt. Einschalten, wenn die Einweisung später gemeinsam mit den anderen Geräten erfolgt.')+'</small></div></label>';
+}
+const EW_GES_TXT='Erfolgt gesondert mit der Geräte-Einweisung (kpc-Einweisungsprotokoll).';
 function openForm(dev,keepScroll){
   CUR.dev=dev;if(!(CUR.fresh&&!CUR.pos))loadState();applyPrefills();setCrumbs();ibnUpdatePdfBtn();
   const o=DB[CUR.mfr].devices[dev];
@@ -782,14 +821,18 @@ function openForm(dev,keepScroll){
   var __sl=ibnStueckLabel();
   let h='<div class="formhead"><h2>'+CUR.mfr+' · '+dev+(__sl?(' <span class="tag">'+__sl+'</span>'):'')+'</h2><div class="sub">'+(o.pdfSub?(o.pdfTitle?o.pdfTitle.charAt(0)+o.pdfTitle.slice(1).toLowerCase()+' · ':'')+o.pdfSub:'Inbetriebnahmeprotokoll · Leistungsfeststellung')+'</div>'+
         '<div class="progress"><i id="prog"></i></div></div>'+((CUR.fresh&&!CUR.pos&&DRAFTAVAIL)?'<div class="draftbar">📝 Für dieses Gerät existiert ein früherer Entwurf. <button class="btn ghost small" onclick="continueDraft()">Letzten Entwurf fortsetzen</button></div>':'');
+  h+=ewSchalterHTML(o);
+  const __ew=ewGes();
   // Kopfdaten
   h+='<div class="section"><div class="sh"><span class="bar"></span><h3>Allgemeine Angaben</h3></div><div class="body"><div class="grid2">';
-  o.kopf.forEach((f,i)=>{if(f.aus)return;h+=fieldHTML('k'+i,f);});
+  o.kopf.forEach((f,i)=>{if(f.aus)return;h+=(__ew&&ewPunkt(f))?('<div><label class="fieldlbl">'+f.l+'</label><div class="ewzu">→ Einweisungsprotokoll</div></div>'):fieldHTML('k'+i,f);});
   h+='</div></div></div>';
   // Abschnitte
   o.sections.forEach((s,si)=>{
     h+='<div class="section"><div class="sh"><span class="bar"></span><h3>'+s.title+'</h3></div><div class="body">';
-    s.items.forEach((it,ii)=>{h+=itemHTML('s'+si+'i'+ii,it,s);});
+    const __nEw=__ew?s.items.filter(ewPunkt).length:0;
+    if(__nEw && __nEw===s.items.length) h+='<div class="ewzu">&#128203; '+__nEw+' Punkt'+(__nEw===1?'':'e')+' – erfolgen mit der Geräte-Einweisung, hier nichts auszufüllen</div>';
+    else s.items.forEach((it,ii)=>{h+=(__ew&&ewPunkt(it))?('<div class="item ewges">'+esc(it.l)+'<span>&#8594; Einweisung</span></div>'):itemHTML('s'+si+'i'+ii,it,s);});
     if(si===waAbschnitt(o)) h+=waHTML(o);
     h+='</div></div>';
   });
@@ -887,7 +930,9 @@ function clearPad(key){
 /* ---------- Fortschritt ---------- */
 function updateProgress(){
   if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev];let total=0,done=0;
+  const __ew=ewGes();
   o.sections.forEach((s,si)=>s.items.forEach((it,ii)=>{const k='s'+si+'i'+ii;
+    if(__ew&&ewPunkt(it))return;   // erfolgt gesondert (v177)
     if(it.k==='check'){total++;if((STATE[k]||{}).v)done++;}}));
   if(waAktiv()) WA_FELDER.forEach(f=>{ if(f.k==='check'){total++;if((STATE['wa_'+f.id]||{}).v)done++;} });
   const pct=total?Math.round(done/total*100):0;
@@ -1011,17 +1056,22 @@ function exportPDF(){
   newpage();
   // Kopfdaten
   secHead('Allgemeine Angaben');
-  o.kopf.forEach((f,i)=>{if(f.aus)return;const v=STATE['k'+i]||'';kvLine(f.l,(f.k==='measure'&&v)?(v+' '+f.u):v);});
+  const __ewP=ewGes();
+  o.kopf.forEach((f,i)=>{if(f.aus)return;if(__ewP&&ewPunkt(f)){kvLine(f.l,'gesondert (Einweisungsprotokoll)');return;}const v=STATE['k'+i]||'';kvLine(f.l,(f.k==='measure'&&v)?(v+' '+f.u):v);});
   y+=2;
   // Abschnitte
   o.sections.forEach((s,si)=>{
     secHead(s.title);
+    const __n=__ewP?s.items.filter(ewPunkt).length:0;
+    if(__n && __n===s.items.length){ kvLine('Einweisung',EW_GES_TXT); y+=2; return; }
     s.items.forEach((it,ii)=>{const k='s'+si+'i'+ii;
+      if(__ewP&&ewPunkt(it))return;
       if(it.k==='check')checkLine(it.l,STATE[k]||{},s.cols,it.comment&&s.comment);
       else if(it.k==='opts')optsLine(it.l,STATE[k]||[]);
       else if(it.k==='area')areaLine(it.l,STATE[k]||'');
       else {const v=STATE[k]||'';kvLine(it.l,(it.k==='measure'&&v)?(v+' '+it.u):v);}
     });
+    if(__n) kvLine('Einweisung',EW_GES_TXT);   // gemischter Abschnitt: Einweisungspunkte gesondert
     y+=2;
   });
   // Wasseraufbereitung, die im Spülmaschinen-Protokoll miterledigt wird (v170):
@@ -1041,6 +1091,7 @@ function exportPDF(){
   if(anySig){
     secHead('Abschluss & Unterschriften');
     o.sign.roles.forEach((r,gi)=>{if(sigAus(r))return;sigBlock('g'+gi,r,o.sign.mode);});
+    if(__ewP && o.sign.roles.indexOf('Einweisung des Betreibers')>=0) kvLine('Einweisung des Betreibers','gesondert (Einweisungsprotokoll)');
   }
 
   // Gerätenummer in den Dateinamen: sonst heissen bei Stückzahl > 1 alle Protokolle
