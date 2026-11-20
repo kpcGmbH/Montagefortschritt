@@ -2285,8 +2285,10 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 182;
+const APP_VERSION = 183;
 const CHANGELOG = [
+  { v:183, titel:'„Offensichtliche Mängel?" eindeutig', punkte:[
+    'In den Inbetriebnahmeprotokollen (allgemeine und MKN, 48 Stück) heißt bei „Offensichtliche Mängel des Gerätes?" ein „Ja" – anders als bei allen anderen Fragen – <b>schlecht</b>. Die Knöpfe heißen jetzt „Ja – Mängel vorhanden" (rot) und „Nein – keine Mängel" (grün), im PDF „Mängel / keine". Bereits ausgefüllte Protokolle behalten ihre Bedeutung.' ]},
   { v:182, titel:'DGUV-Bewertung: Korrekturen', punkte:[
     'Neues Feld <b>Schutzklasse</b> (I/II/III): Schutzklasse II braucht keinen Schutzleiter, Isolation min. 2 MΩ, Berührungsstrom max. 0,5 mA. Vorher blieben schutzisolierte Geräte immer „offen".',
     'Ein unvollständiges Protokoll („noch offen") gilt in der Hauptapp nicht mehr als „nicht bestanden": keine Restarbeit, gelb als „unvollständig" gekennzeichnet, zählt nur noch nicht als Nachweis.',

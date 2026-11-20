@@ -984,9 +984,12 @@ function itemHTML(key,it,sct){
     const on=st.v===true;
     btns='<button class="btn-tri'+(on?' on-do':'')+'" onclick="setCheck(\''+key+'\',true,this)">'+cols[0]+'</button>';
   }else{
-    const cls=['on-yes','on-no'];
+    // „Offensichtliche Mängel?" (48 Protokolle): hier ist „Ja" SCHLECHT – Knöpfe
+    // beschriftet und Farben vertauscht (v183, Wunsch des Nutzers). Gespeichert
+    // bleibt 'ja' = Mängel vorhanden, alte Protokolle stimmen weiter.
+    const inv=mInvers(it), cls=inv?['on-no','on-yes']:['on-yes','on-no'], lbl=inv?['Ja – Mängel vorhanden','Nein – keine Mängel']:cols;
     cols.forEach((c,ci)=>{const val=ci===0?'ja':'nein';const on=st.v===val;
-      btns+='<button class="btn-tri'+(on?' '+cls[ci]:'')+'" onclick="setCheck(\''+key+'\',\''+val+'\',this)">'+c+'</button>';});
+      btns+='<button class="btn-tri'+(on?' '+cls[ci]:'')+'"'+(inv?' data-inv="1"':'')+' onclick="setCheck(\''+key+'\',\''+val+'\',this)">'+lbl[ci]+'</button>';});
   }
   let h='<div class="item"><div class="checkline"><div class="lbl">'+it.l+'</div><div class="btns">'+btns+'</div></div>';
   if(it.comment&&sct.comment){h+='<div class="cmt"><input type="text" placeholder="Bemerkung" value="'+esc(st.c||'')+'" oninput="setCmt(\''+key+'\',this.value)"></div>';}
@@ -1009,11 +1012,14 @@ function sigHTML(key,role,mode){
 }
 
 /* ---------- State-Setter ---------- */
+// Fragen, bei denen „Ja" ein Problem bedeutet
+function mInvers(it){ return !!(it && it.k==='check' && /^Offensichtliche Mängel/i.test(it.l||'')); }
 function setVal(k,v){STATE[k]=v;if(STATE.__auto)delete STATE.__auto[k];saveState();}
 function setCheck(k,v,btn){
   if(dguvIst() && k==='s2i2' && v==='ja' && dguvBewerten().stand==='fail'){ alert('Das Gerät hat die Prüfung nach deinen Angaben NICHT bestanden – eine Prüfplakette darf nicht erteilt werden.\n\nGründe:\n· '+dguvBewerten().fail.join('\n· ')); return; }const st=STATE[k]||{};st.v=(st.v===v?null:v);STATE[k]=st;
   const p=btn.parentNode;[...p.children].forEach(b=>b.className='btn-tri');
-  if(st.v){if(v===true)btn.classList.add('on-do');else btn.classList.add(v==='ja'?'on-yes':'on-no');}saveState();}
+  const inv=btn.dataset&&btn.dataset.inv==='1';
+  if(st.v){if(v===true)btn.classList.add('on-do');else btn.classList.add((v==='ja')!==inv?'on-yes':'on-no');}saveState();}
 function setCmt(k,v){const st=STATE[k]||{};st.c=v;STATE[k]=st;saveState();}
 function toggleOpt(k,op,btn){let a=STATE[k]||[];const i=a.indexOf(op);if(i>=0)a.splice(i,1);else a.push(op);STATE[k]=a;btn.classList.toggle('on');saveState();}
 function setSig(k,f,v){const g=STATE[k]||{};g[f]=v;STATE[k]=g;if(STATE.__auto)delete STATE.__auto[k+'.'+f];saveState();}
@@ -1185,7 +1191,7 @@ function exportPDF(){
     s.items.forEach((it,ii)=>{const k='s'+si+'i'+ii;
       if(__ewP&&ewPunkt(it))return;
       if(dguvIst() && k==='s2i2' && dguvBewerten().stand==='fail'){ checkLine(it.l,{v:'nein'},s.cols,false); return; }   // keine Plakette bei Durchfall
-      if(it.k==='check')checkLine(it.l,STATE[k]||{},s.cols,it.comment&&s.comment);
+      if(it.k==='check')checkLine(it.l,STATE[k]||{},mInvers(it)?['Mängel','keine']:s.cols,it.comment&&s.comment);
       else if(it.k==='opts')optsLine(it.l,STATE[k]||[]);
       else if(it.k==='area')areaLine(it.l,STATE[k]||'');
       else {const v=STATE[k]||'';kvLine(it.l,(it.k==='measure'&&v)?(v+' '+it.u):v);}
