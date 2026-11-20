@@ -2285,8 +2285,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 181;
+const APP_VERSION = 182;
 const CHANGELOG = [
+  { v:182, titel:'DGUV-Bewertung: Korrekturen', punkte:[
+    'Neues Feld <b>Schutzklasse</b> (I/II/III): Schutzklasse II braucht keinen Schutzleiter, Isolation min. 2 MΩ, Berührungsstrom max. 0,5 mA. Vorher blieben schutzisolierte Geräte immer „offen".',
+    'Ein unvollständiges Protokoll („noch offen") gilt in der Hauptapp nicht mehr als „nicht bestanden": keine Restarbeit, gelb als „unvollständig" gekennzeichnet, zählt nur noch nicht als Nachweis.',
+    'Restarbeiten je Gerät: bei mehreren Geräten erledigt das Bestehen von Gerät 2 nicht mehr die Restarbeit von Gerät 1; erneutes Ablegen aktualisiert statt zu verdoppeln.',
+    'Prüfplakette wird nicht mehr still zurückgesetzt; „trotzdem bestanden" gilt nur für die begründeten Befunde; schon abgelegte DGUV-Protokolle werden beim Weiterbearbeiten nicht nach den neuen Grenzwerten umbewertet; Messwerte wie „OL"/„∞", „>200" und Heizleistung in Watt werden richtig gelesen.' ]},
   { v:181, titel:'DGUV-Prüfung mit automatischer Bewertung', punkte:[
     'Das DGUV-Prüfprotokoll bewertet selbst: Sichtprüfung n. i. O., ein Messwert außerhalb des Grenzwerts oder Mängel in der Funktionsprüfung ergeben <b>NICHT BESTANDEN</b> – mit Gründen, laufend unten im Formular. „Bestanden" nur, wenn jeder Prüfschritt bestanden ist.',
     'Grenzwerte nach DIN EN 50678 (VDE 0701) / DIN EN 50699 (VDE 0702): Schutzleiter max. 0,3 Ω (Festanschluss 1 Ω), Isolation min. 1 MΩ (mit Heizelementen 0,3 MΩ), neu Schutzleiter-/Ersatzableitstrom max. 3,5 mA (Heizung über 3,5 kW: 1 mA je kW, max. 10 mA). Sichtprüfung als i. O. / n. i. O. statt Ja/Nein.',
@@ -4221,7 +4226,7 @@ function dguvPflicht(pos){
 function dguvSoll(pos){ return tsSoll(pos); }
 function dguvIst(pos){
   // Nicht bestandene Prüfungen (v181, Bewertung aus der IBN-App) sind kein Nachweis
-  const l=(gs(pos).pdfs||[]).filter(p=>p&&p.type==='DGUV Protokoll'&&p.dguvOk!==false);
+  const l=(gs(pos).pdfs||[]).filter(p=>p&&p.type==='DGUV Protokoll'&&p.dguvOk!==false&&p.dguvStand!=='offen');
   if(l.some(p=>p.alle)) return dguvSoll(pos);
   return l.length;
 }
@@ -8351,7 +8356,9 @@ async function ibnReceive(p){
     if(!gs(pos).pdfs) gs(pos).pdfs=[];
     const entry={type:type, name:p.name||(type+'.pdf'), fname:fname, ibn:true, mfr:p.mfr||'', dev:p.dev||'', dataFname:dataFname, nr:(p.nr||0), von:(p.von||0)};
     // DGUV-Ergebnis aus der IBN-App (v181): nur „bestanden" zählt als Nachweis
-    if(p.dguv && p.dguv.stand){ entry.dguvOk=(p.dguv.stand==='ok'); if(!entry.dguvOk) entry.dguvGruende=(p.dguv.gruende||[]).slice(0,8); }
+    // 'offen' (unvollständig) ist KEIN Durchfall: zählt nur nicht als Nachweis, keine Restarbeit
+    if(p.dguv && p.dguv.stand){ entry.dguvStand=p.dguv.stand; if(p.dguv.stand!=='offen') entry.dguvOk=(p.dguv.stand==='ok');
+      if(p.dguv.stand!=='ok') entry.dguvGruende=(p.dguv.gruende||[]).slice(0,8); }
     // Welchen vorhandenen Eintrag ersetzt dieses Protokoll?
     // 1. „✎ weiterbearbeiten" liefert den Dateinamen mit (replaceFname).
     // 2. OHNE replaceFname: Wer ein frisch geöffnetes Formular ZWEIMAL exportiert
@@ -8399,8 +8406,10 @@ async function ibnReceive(p){
     if(waPos && !gs(waPos).ib){ a2=schrittAusProtokoll(waPos, type);
       if(a2 && (a2.stand==='gesetzt' || a2.stand==='nicht-relevant')) a2=null;
       else if(a2 && a2.stand==='anschl' && auto && auto.stand==='anschl'){ waZusatz=' · Pos. '+waPos+': Stecker/Festanschluss noch offen – „Inbetriebnahme" dort abhaken'; a2=null; } }
-    showToast((dguvRA==='neu'?'⛔ DGUV-Prüfung NICHT bestanden – als Restarbeit eingetragen · ':'✓ ')+type+' bei Position '+pos+(waPos?(' und '+waPos):'')+(replaced?' aktualisiert':' abgelegt')+
-              protoHinweis(auto)+waZusatz, dguvRA==='neu'?{bg:'#b3402a'}:undefined);
+    const dgFail=entry.dguvOk===false, dgOffen=entry.dguvStand==='offen';
+    showToast((dgFail?'⛔ DGUV-Prüfung NICHT bestanden – '+(dguvRA==='neu'?'als Restarbeit eingetragen':'Restarbeit aktualisiert')+' · ':(dgOffen?'⏳ DGUV-Prüfung unvollständig – zählt noch nicht als Nachweis · ':'✓ '))+
+              type+' bei Position '+pos+(waPos?(' und '+waPos):'')+(replaced?' aktualisiert':' abgelegt')+
+              protoHinweis(auto)+waZusatz, dgFail?{bg:'#b3402a'}:(dgOffen?{bg:'#8b6d22'}:undefined));
     protoWarnen(pos, auto);
     if(a2) protoWarnen(waPos, a2);
     ibnGoToPos(pos);
@@ -8412,18 +8421,21 @@ async function ibnReceive(p){
 // erledigt diese automatisch angelegten Restarbeiten wieder. Rückgabe: 'neu'|'erledigt'|''.
 function dguvRestarbeit(pos, entry){
   if(entry.type!=='DGUV Protokoll' || entry.dguvOk===undefined) return '';
-  const s=gs(pos), jetzt=new Date().toISOString();
+  const s=gs(pos), jetzt=new Date().toISOString(), nr=entry.nr||0;
+  // Je GERÄT (nr): bei Stückzahl > 1 erledigt das Bestehen von Gerät 2 nicht die
+  // Restarbeit von Gerät 1; erneutes Ablegen aktualisiert statt zu verdoppeln.
+  const offen=s.restarbeiten.filter(r=>r && r.auto==='dguv' && !r.done && (r.dguvNr||0)===nr);
   if(entry.dguvOk===false){
-    if(s.restarbeiten.some(r=>r && r.auto==='dguv' && !r.done && r.quelle===entry.fname)) return '';
-    s.restarbeiten.push({txt:'DGUV-Prüfung nicht bestanden', desc:(entry.dguvGruende||[]).join('; '), done:false, mangel:false,
-      ersteller:USER||'', erstelltAm:jetzt, erledigtVon:'', erledigtAm:null, gw:'E', fotos:[], fotosOk:[], auto:'dguv', quelle:entry.fname});
+    const desc=(entry.dguvGruende||[]).join('; ');
+    if(offen.length){ offen[0].desc=desc; offen[0].quelle=entry.fname; try{ updRA(pos); }catch(e){} return 'aktualisiert'; }
+    s.restarbeiten.push({txt:'DGUV-Prüfung nicht bestanden'+(nr>1||entry.von>1?(' (Gerät '+nr+')'):''), desc:desc, done:false, mangel:false,
+      ersteller:USER||'', erstelltAm:jetzt, erledigtVon:'', erledigtAm:null, gw:'E', fotos:[], fotosOk:[], auto:'dguv', quelle:entry.fname, dguvNr:nr});
     histAdd(pos,'ra-neu','DGUV nicht bestanden');
     try{ updRA(pos); }catch(e){}
     return 'neu';
   }
-  let n=0;
-  s.restarbeiten.forEach(r=>{ if(r && r.auto==='dguv' && !r.done){ r.done=true; r.erledigtVon='automatisch (DGUV bestanden)'; r.erledigtAm=jetzt; n++; } });
-  if(n){ try{ updRA(pos); }catch(e){} return 'erledigt'; }
+  offen.forEach(r=>{ r.done=true; r.erledigtVon='automatisch (DGUV bestanden)'; r.erledigtAm=jetzt; });
+  if(offen.length){ try{ updRA(pos); }catch(e){} return 'erledigt'; }
   return '';
 }
 // Springt die Position an, an der das Protokoll gelandet ist, und hebt sie kurz hervor –
@@ -8579,7 +8591,8 @@ function updPG(pos){
     // Bei Stückzahl > 1 den Gerätezähler zeigen – sonst heissen alle Einträge gleich
     const nrTag=(p.nr&&p.von>1)?` <span class="pdoc-nr">Gerät ${p.nr}/${p.von}</span>`:'';
     const ueTag=(p.ueber?` <span class="pdoc-nr">über Pos. ${escapeHtml(p.ueber)}</span>`:'')+
-      (p.dguvOk===false?` <span class="pdoc-nr" style="background:#b3402a;color:#fff" title="${escapeHtml((p.dguvGruende||[]).join('; '))}">nicht bestanden</span>`:'');
+      (p.dguvOk===false?` <span class="pdoc-nr" style="background:#b3402a;color:#fff" title="${escapeHtml((p.dguvGruende||[]).join('; '))}">nicht bestanden</span>`:'')+
+      (p.dguvStand==='offen'?` <span class="pdoc-nr" style="background:#8b6d22;color:#fff" title="${escapeHtml((p.dguvGruende||[]).join('; '))}">unvollständig</span>`:'');
     return `<div class="pdoc">&#128196; <span class="pdoc-name" onclick="pdfView('${pos}',${i})">${p.type}: ${p.name}</span>${nrTag}${ueTag}${ibnBtn}${editBtn}<button class="pdoc-btn pdoc-del" onclick="delProto('${pos}',${i})" title="Löschen">&#10005;</button></div>`;
   }).join('');
 }
