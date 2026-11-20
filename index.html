@@ -2277,7 +2277,8 @@ const CHANGELOG = [
   { v:175, titel:'Typenschild-Foto: flüssiger', punkte:[
     'Nach der Aufnahme erscheint <b>sofort</b> „Foto wird geprüft…" – vorher geschah 1–3 Sekunden lang sichtbar nichts, während das Foto geprüft wurde.',
     'Das Foto wird nur noch <b>einmal</b> verarbeitet statt zweimal (Prüfung und Verkleinern nutzen dasselbe Bild). Am Handy deutlich schneller und speichersparender.',
-    'Alle Fotos (auch normale Positionsfotos) werden ohne den speicherhungrigen Umweg verkleinert. Vorher konnte ein großes Foto nach 5 Sekunden unverkleinert hochgeladen werden – jetzt wird es verlässlich auf 1600 px gebracht.' ]},
+    'Alle Fotos (auch normale Positionsfotos) werden ohne den speicherhungrigen Umweg verkleinert. Vorher konnte ein großes Foto nach 5 Sekunden unverkleinert hochgeladen werden – jetzt wird es verlässlich auf 1600 px gebracht.',
+    'Typenschild-Pflicht nur noch, wo es ein Schild gibt: Möbel mit Becken (z. B. Vorbereitungsanlage, Einstellnische) und Zubehör (Untergestell, Kabel, Blende, Steckdose …) verlangen kein Foto mehr. Bei reinen Sanitär-Positionen bleibt es bei Geräten wie Enthärtung, Osmose, Filter, Durchlauferhitzer. Je Position übersteuerbar über „✎ Gewerk".' ]},
   { v:174, titel:'PDFs deutlich kleiner', punkte:[
     'Alle Protokolle (Inbetriebnahme, DGUV, Einweisung, Schlüsselübergabe, Abnahme, Bautagebuch, Dichtigkeit, Servicebericht, Berichte) werden jetzt <b>komprimiert</b> erzeugt. Ein einseitiges Inbetriebnahmeprotokoll ohne Fotos hatte gut 1 MB, jetzt rund 70 KB – Inhalt und Aussehen unverändert.' ]},
   { v:173, titel:'Grundlagen-Einweisung: alle Punkte auf einmal', punkte:[
@@ -3755,10 +3756,25 @@ const TS_OHNE=/batterie|armatur|becken|spültisch|spueltisch|zulauftisch|ablauft
 const TS_GERAET=/kühl|kuehl|gefrier|wärme|waerme|warmhalte|beheiz|heiz/i;
 function tsItem(pos){ let it=null; DATA.forEach(s=>s.subsections.forEach(sub=>sub.items.forEach(i=>{ if(i.pos===pos) it=i; }))); return it; }
 // Automatik ohne Übersteuerung (für den Dialog „✎ Gewerk")
+// v175 (Auswertung von 125 echten Typenschild-Fotos, 20.11.2026): Wo kein Schild
+// ist, wurde trotzdem eins verlangt – fotografiert wurden dann Siphon, Rohre oder
+// das ganze Gerät (Vorbereitungsanlage, Einstellnische, Untergestell). Deshalb:
+// · nur Sanitär (ohne Elektro): Pflicht nur noch bei Bezeichnungen, die nach GERÄT
+//   klingen (Enthärtung, Osmose, Filter, Durchlauferhitzer …) – Möbel mit Becken nicht;
+// · Zubehör hat nie ein eigenes Schild (Untergestell, Nische, Kabel, Blende …),
+//   ebenso Elektro-Zubehör wie Steckdosen (ewOhne) – das gilt VOR TS_GERAET, sonst
+//   wäre die „Kühlzellenblende" über „kühl" doch Pflicht.
+const TS_SANI_GERAET=/enthärt|enthaert|osmose|entsalz|wasseraufbereit|filter|durchlauferhitz|boiler|speicher|hebeanlage|pumpe|dosier|spülmasch|spuelmasch|eiswürfel|eiswuerfel|eisbereit|kaffee|wasserspender/i;
+const TS_ZUBEHOER=/untergestell|gestell\b|nische|schrankteil|\bkit\b|kabel|tischplatte|abdeckung|blende|sockel|konsole|zubehör|zubehoer|lochplatte|luftführung|luftfuehrung|stapel|rost\b|roste\b/i;
 function tsAuto(pos){
   const rel=relFields(pos);
   if(!rel.includes('ib') && !rel.includes('sa')) return false;   // weder Elektro noch Sanitär
   const it=tsItem(pos), bez=String((it&&it.bez)||'');
+  // Zubehör nur im HAUPTWORT: „Mikrowellengerät m. Wandkonsolen" bleibt ein Gerät
+  const kopf=bez.split(/\s(?:mit|m\.|inkl\.?|und|u\.|&)\s|,|\(/i)[0];
+  if(TS_ZUBEHOER.test(kopf) || ewOhne(bez)) return false;
+  // nur Sanitär: Gerät im Namen UND kein Möbel als Hauptwort („Spülmaschinen Zulauftisch")
+  if(!rel.includes('ib') && !rel.includes('ea')) return TS_SANI_GERAET.test(bez) && !TS_OHNE.test(kopf);
   if(TS_GERAET.test(bez)) return true;
   return !TS_OHNE.test(bez);
 }
@@ -12827,7 +12843,7 @@ function openGewerkChooser(pos){
     // Übernehmen wird nur gespeichert, was von der Automatik abweicht (confirmGewerk).
     +'<label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px dashed var(--line);border-radius:8px;margin:4px 0 8px;cursor:pointer">'
     +'<input type="checkbox" class="gwts" style="width:18px;height:18px" data-def="'+(tsPflicht(pos)?1:0)+'"'+(tsPflicht(pos)?' checked':'')+'>'
-    +'<span>&#127991; Typenschild-Foto erforderlich<br><span style="font-size:11px;color:var(--accent2)">automatisch bei Geräten mit Elektro oder Sanitär'
+    +'<span>&#127991; Typenschild-Foto erforderlich<br><span style="font-size:11px;color:var(--accent2)">automatisch: '+(tsAuto(pos)?'ja':'nein')+' (Geräte mit Elektro; nur Sanitär bei Enthärtung, Filter, Durchlauferhitzer …; nie bei Möbeln und Zubehör)'
     +((tsItem(pos)||{}).ts!==undefined?' · <b>hier von Hand festgelegt</b>':'')+'</span></span></label>'
     // IBN-Protokoll-Pflicht übersteuern – gleiche Logik wie beim Typenschild
     +'<label style="display:flex;align-items:center;gap:10px;padding:11px 12px;border:1px dashed var(--line);border-radius:8px;margin:0 0 8px;cursor:pointer">'
