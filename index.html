@@ -709,6 +709,59 @@ body.lvadm .bhdr .lvonly{display:inline-block !important;}
   .fab-solo{width:auto!important;padding:0 20px!important;flex:0 1 auto!important;}
   .fab-solo .fab-label{display:inline!important;}
 }
+
+/* ═══ Handy-Ansicht (v186): größere Tippflächen, lesbare Schrift, feste Leiste unten ═══
+   Wunsch des Nutzers (20.11.2026, Entwurf „mobil-groessen"). Nur bis 600 px Breite –
+   Tablet und PC bleiben unverändert. Apple empfiehlt 44 pt, Google 48 dp je Tippfläche;
+   vorher waren 60 von 78 Elementen einer Gerätekarte unter 40 px. */
+.mdock{display:none;}
+.pdoc-kurz{display:none;}
+/* auch Handy quer (breiter als 600 px, aber niedrig und mit Touch) */
+@media (max-width:600px), (pointer:coarse) and (max-height:500px){
+  /* Status-Knöpfe: zwei pro Zeile, 46 px */
+  .crow{display:grid;grid-template-columns:1fr 1fr;gap:7px;}
+  .ck{min-height:46px;justify-content:center;font-size:15px;border-radius:12px;padding:6px 11px;min-width:0;}
+  .ck-lbl{min-width:0;max-width:100%;}
+  .ckn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .ckn[data-kurz]{font-size:0;}
+  .ckn[data-kurz]::after{content:attr(data-kurz);font-size:15px;}
+  .ck-ts{font-size:12px!important;padding-left:0;max-width:100%;overflow:hidden;text-overflow:ellipsis;}
+  /* Foto / Protokoll / Notiz: gleich breite 46-px-Knöpfe */
+  .fsec{display:flex;flex-wrap:wrap;gap:7px;}
+  .fsec>.fbtn{flex:1 1 28%;min-height:46px;justify-content:center;font-size:15px;border-radius:12px;margin-left:0!important;}
+  .fsec>.fzeile,.fsec>.pgrid{flex:0 0 100%;}
+  /* Protokollzeilen: lesbarer Titel, 40-px-Knöpfe, Löschen rot und abgesetzt */
+  .pdoc{min-height:48px;font-size:13.5px;border-radius:10px;padding:4px 4px 4px 10px;gap:6px;}
+  .pdoc-full{display:none;}
+  .pdoc-kurz{display:inline;}
+  .pdoc .pdoc-nr{font-size:12px;}
+  .pdoc-btn{width:40px;height:40px;font-size:17px;border-radius:10px;background:var(--surface2);flex:0 0 40px;display:inline-flex;align-items:center;justify-content:center;padding:0;}
+  .pdoc-btn.pdoc-del{margin-left:8px;background:rgba(179,64,42,.14);color:#c0442c;}
+  /* Restarbeiten-Balken der Karte */
+  .cntgl{min-height:46px;font-size:14px;}
+  .raadd{min-height:44px;font-size:14px;}
+  /* Kleine Schrift anheben (vorher 8,5–11 px) */
+  .gtag{font-size:11.5px;padding:2px 8px;}
+  .sp{font-size:12.5px;}
+  .tab .n{font-size:12px;}
+  /* Feste Leiste unten statt des schwebenden „Berichte"-Knopfs */
+  .fab-bar{display:none!important;}
+  body.mdock-an{padding-bottom:calc(76px + env(safe-area-inset-bottom));}
+  body.mdock-an .mdock{display:flex;}
+  .mdock{position:fixed;left:0;right:0;bottom:0;z-index:50;background:#2b2b2b;
+    padding:4px 4px calc(6px + env(safe-area-inset-bottom));justify-content:space-around;
+    box-shadow:0 -2px 12px rgba(0,0,0,.18);}
+  .mdock button{flex:1;background:none;border:none;color:#e9e3dc;font-family:inherit;font-size:12px;
+    min-height:54px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;
+    -webkit-tap-highlight-color:transparent;cursor:pointer;}
+  .mdock button b{font-size:20px;font-weight:400;line-height:1;}
+  .mdock button.on{color:#e0b060;}
+  .mdock .mdn{font-size:10.5px;background:#b3402a;color:#fff;border-radius:9px;padding:0 5px;margin-left:2px;}
+  /* Menüs aus der Leiste: als Blatt von unten (über der Leiste) */
+  .ptype-menu.ptype-sheet.open{position:fixed;left:0!important;right:0;top:auto!important;bottom:0;max-width:none!important;
+    border-radius:16px 16px 0 0;padding-bottom:calc(10px + env(safe-area-inset-bottom));z-index:60;}
+  .ptype-menu.ptype-sheet .ptype-item{min-height:50px;font-size:15px;}
+}
 .nores{text-align:center;padding:40px;color:var(--accent2);font-size:14px;}
 
 /* ── Bottom-Sheet „Berichte & Dokumente" (fasst die früheren 7 FAB-Knöpfe zusammen) ── */
@@ -957,6 +1010,12 @@ body.alle-ber .gtag.gBER{display:inline-block;}
     <span class="fab-label">Berichte</span>
   </button>
 </div>
+<nav class="mdock" id="mdock" aria-label="Hauptnavigation">
+  <button id="mdPos" class="on" onclick="mdockPos()"><b>&#9776;</b>Positionen</button>
+  <button onclick="openBerichteSheet()"><b>&#128196;</b>Berichte</button>
+  <button id="mdDoku" onclick="mdockDoku()"><b>&#128193;</b>Dokumente</button>
+  <button id="mdRa" onclick="mdockRa(event,this)"><b>&#128203;</b><span>Restarbeiten<span class="mdn" id="mdRaN" style="display:none"></span></span></button>
+</nav>
 <input type="file" id="fi" accept="image/*" style="display:none">
 <input type="file" id="pi" accept=".pdf,.doc,.docx" style="display:none">
 
@@ -1981,6 +2040,7 @@ function klebeHoehe(){
 
 function swTab(p){
   ACT=p;
+  mdockSync();
   if(p==='__doku') dokuZeigen();
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('on',t.dataset.p===p));
   syncPanels();
@@ -2076,10 +2136,10 @@ function buildPanels(){
     <div class="ck" data-f="g" id="Kg${id}" onclick="tc('${item.pos}','g')" oncontextmenu="tcNA('${item.pos}','g');return false" ontouchstart="ckHoldStart(event,'${item.pos}','g')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Geliefert</span></span><span class="ck-ts" id="Tg${id}"></span></div>
     <div class="ck" data-f="m" id="Km${id}" onclick="tc('${item.pos}','m')" oncontextmenu="tcNA('${item.pos}','m');return false" ontouchstart="ckHoldStart(event,'${item.pos}','m')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Montiert</span></span><span class="ck-ts" id="Tm${id}"></span></div>
     <div class="ck ck-nu" data-f="nu" id="Knu${id}" onclick="tc('${item.pos}','nu')" oncontextmenu="tcNA('${item.pos}','nu');return false" ontouchstart="ckHoldStart(event,'${item.pos}','nu')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Ausgef&#252;hrt</span></span><span class="ck-ts" id="Tnu${id}"></span></div>
-    <div class="ck ck-sa" data-f="sa" id="Ksa${id}" onclick="tc('${item.pos}','sa')" oncontextmenu="tcNA('${item.pos}','sa');return false" ontouchstart="ckHoldStart(event,'${item.pos}','sa')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Sanitäranschluss</span></span><span class="ck-ts" id="Tsa${id}"></span></div>
-    <div class="ck ck-dp" data-f="dp" id="Kdp${id}" onclick="tc('${item.pos}','dp')" oncontextmenu="tcNA('${item.pos}','dp');return false" ontouchstart="ckHoldStart(event,'${item.pos}','dp')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Dichtigkeitsprüfung</span></span><span class="ck-ts" id="Tdp${id}"></span></div>
-    <div class="ck ck-ea" data-f="ea" id="Kea${id}" onclick="tc('${item.pos}','ea')" oncontextmenu="tcNA('${item.pos}','ea');return false" ontouchstart="ckHoldStart(event,'${item.pos}','ea')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Elektroanschluss</span></span><span class="ck-ts" id="Tea${id}"></span></div>
-    <div class="ck ck-pa" data-f="pa" id="Kpa${id}" onclick="tc('${item.pos}','pa')" oncontextmenu="tcNA('${item.pos}','pa');return false" ontouchstart="ckHoldStart(event,'${item.pos}','pa')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Potentialausgleich</span></span><span class="ck-ts" id="Tpa${id}"></span></div>
+    <div class="ck ck-sa" data-f="sa" id="Ksa${id}" onclick="tc('${item.pos}','sa')" oncontextmenu="tcNA('${item.pos}','sa');return false" ontouchstart="ckHoldStart(event,'${item.pos}','sa')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn" data-kurz="Sanitär">Sanitäranschluss</span></span><span class="ck-ts" id="Tsa${id}"></span></div>
+    <div class="ck ck-dp" data-f="dp" id="Kdp${id}" onclick="tc('${item.pos}','dp')" oncontextmenu="tcNA('${item.pos}','dp');return false" ontouchstart="ckHoldStart(event,'${item.pos}','dp')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn" data-kurz="Dichtigkeit">Dichtigkeitsprüfung</span></span><span class="ck-ts" id="Tdp${id}"></span></div>
+    <div class="ck ck-ea" data-f="ea" id="Kea${id}" onclick="tc('${item.pos}','ea')" oncontextmenu="tcNA('${item.pos}','ea');return false" ontouchstart="ckHoldStart(event,'${item.pos}','ea')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn" data-kurz="Elektro">Elektroanschluss</span></span><span class="ck-ts" id="Tea${id}"></span></div>
+    <div class="ck ck-pa" data-f="pa" id="Kpa${id}" onclick="tc('${item.pos}','pa')" oncontextmenu="tcNA('${item.pos}','pa');return false" ontouchstart="ckHoldStart(event,'${item.pos}','pa')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn" data-kurz="Potentialausgl.">Potentialausgleich</span></span><span class="ck-ts" id="Tpa${id}"></span></div>
     <div class="ck ck-ib" data-f="ib" id="Kib${id}" onclick="tc('${item.pos}','ib')" oncontextmenu="tcNA('${item.pos}','ib');return false" ontouchstart="ckHoldStart(event,'${item.pos}','ib')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Inbetriebnahme</span></span><span class="ck-ts" id="Tib${id}"></span></div>
     <div class="ck ck-ew" data-f="ew" id="Kew${id}" onclick="tc('${item.pos}','ew')" oncontextmenu="tcNA('${item.pos}','ew');return false" ontouchstart="ckHoldStart(event,'${item.pos}','ew')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Einweisung</span></span><span class="ck-ts" id="Tew${id}"></span></div>
   </div>
@@ -2291,8 +2351,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 185;
+const APP_VERSION = 186;
 const CHANGELOG = [
+  { v:186, titel:'Handy: größere Knöpfe, lesbare Schrift, Leiste unten', punkte:[
+    'Status-Knöpfe (Geliefert, Montiert, Sanitär …) am Handy doppelt so groß und immer zwei pro Zeile – weniger Fehltipper, auch mit Handschuhen. Datum und Name darunter gut lesbar („20.11. · Max M.").',
+    'Protokolle an der Position mit lesbarem Titel („IBN-Protokoll · Rational iCombi", „DGUV-Protokoll · bestanden") statt Dateiname. Bearbeiten und Löschen sind große Knöpfe mit Abstand; Löschen rot abgesetzt.',
+    'Feste Leiste unten: Positionen · Berichte · Dokumente · Restarbeiten (mit Zahl der offenen). Der schwebende „Berichte"-Knopf verdeckt nichts mehr.',
+    'Kleine Schrift (Gewerk-Kennzeichen, Zähler) angehoben. Tablet und PC bleiben unverändert.' ]},
   { v:185, titel:'Fehlerprüfung v184', punkte:[
     'Homescreen-App: Ein zurückgereichtes IBN-/DGUV-Protokoll wurde eingetragen, bevor der Stand der Baustelle geladen war – „weiterbearbeiten" konnte das alte Protokoll dann nicht ersetzen (doppelt an der Position), DGUV-Restarbeiten wurden nicht erledigt. Jetzt erst nach dem Laden.',
     'Temperaturen (°C, z. B. −18 bei Kühlgeräten) wieder mit voller Tastatur – auf dem Zahlenblock des iPhones fehlt das Minus.',
@@ -3271,7 +3336,12 @@ function renderHist(pos){
     (eintraege.length>=HIST_MAX?'<div class="hfoot">Es werden die letzten '+HIST_MAX+' Änderungen je Position aufbewahrt.</div>':'')+
   '</div>';
 }
-function ckLabel(s,f){const k=s.by&&s.by[f]?shortName(s.by[f])+' · ':'';return k+tsFmt(s.ts[f]);}
+function ckLabel(s,f){
+  // Handy (v186): „20.11. · Test M." – das volle Datum mit Uhrzeit steht im Verlauf
+  if(IST_HANDY()){ const d=s.ts&&s.ts[f]?new Date(s.ts[f]):null; const dt=(d&&!isNaN(d))?(('0'+d.getDate()).slice(-2)+'.'+('0'+(d.getMonth()+1)).slice(-2)+'.'):'';
+    return [dt, s.by&&s.by[f]?shortName(s.by[f]):''].filter(Boolean).join(' · '); }
+  const k=s.by&&s.by[f]?shortName(s.by[f])+' · ':'';return k+tsFmt(s.ts[f]);}
+function IST_HANDY(){ try{ return window.matchMedia('(max-width:600px), (pointer:coarse) and (max-height:500px)').matches; }catch(e){ return false; } }
 // Einen Status-Chip nach dem aktuellen Stand malen (erledigt / entfällt / offen).
 // Zentral, damit Klick, Wiederherstellen und Polling nicht auseinanderlaufen.
 function ckRender(pos,f){
@@ -4971,7 +5041,7 @@ function openFilterMenu(id, btn, html, knopfSel){
       if(!e.target.closest('#'+id) && !e.target.closest(knopfSel)) menu.classList.remove('open');
     });
   }
-  menu.innerHTML=html;
+  menu.innerHTML=html; menu.classList.remove('ptype-sheet');
   const r=btn.getBoundingClientRect();
   menu.style.top=(r.bottom+window.scrollY+4)+'px';
   menu.style.left=Math.max(8, Math.min(r.left+window.scrollX, window.innerWidth-292))+'px';
@@ -5051,6 +5121,7 @@ function rafHaeltPos(pos){ for(const k of RAF_HALTEN){ if(k.slice(0,k.lastIndexO
 function rafNachAenderung(){ updRafBtn(); }
 function setRAF(modus){
   RAF = modus || 'all';
+  mdockSync();
   RAF_HALTEN.clear();
   updRafBtn();
   updRaGwVis();          // Zeilen in den Listen mitfiltern
@@ -5059,6 +5130,7 @@ function setRAF(modus){
   updDichtTasks();       // Prüfprotokoll-Karte trägt keine Restarbeiten -> raus
 }
 function updRafBtn(){
+  mdockSync();
   const b=document.getElementById('rafBtn'); if(!b) return;
   b.classList.toggle('raf-ra', RAF==='ra');
   b.classList.toggle('raf-mangel', RAF==='mangel');
@@ -5082,6 +5154,19 @@ function rafMenu(btn){
     zeile('mangel','Nur mit offenen Mängeln des Auftraggebers','Aus Mängelliste oder Abnahmeprotokoll'),
     '#rafBtn');
 }
+// ── Leiste unten am Handy (v186) ──
+function mdockSync(){ try{
+  const d=document.getElementById('mdock'); if(!d) return;
+  const doku=ACT==='__doku', ra=(typeof RAF!=='undefined')&&RAF&&RAF!=='all';
+  document.getElementById('mdPos').classList.toggle('on', !doku && !ra);
+  document.getElementById('mdDoku').classList.toggle('on', doku);
+  document.getElementById('mdRa').classList.toggle('on', !!ra);
+  const n=document.getElementById('mdRaN'); if(n){ const z=PID?rafCount('ra'):0; n.textContent=z>99?'99+':String(z); n.style.display=z?'':'none'; }
+}catch(e){} }
+function mdockPos(){ if(RAF&&RAF!=='all') setRAF('all'); if(ACT==='__doku') swTab('__all'); else window.scrollTo({top:0,behavior:'smooth'}); mdockSync(); }
+function mdockDoku(){ swTab('__doku'); }
+function mdockRa(e,btn){ if(e) e.stopPropagation(); if(ACT==='__doku') swTab('__all'); rafMenu(btn);
+  const m=document.getElementById('rafMenu'); if(m) m.classList.add('ptype-sheet'); }
 function rafWahl(k){
   const m=document.getElementById('rafMenu'); if(m) m.classList.remove('open');
   setRAF(k);
@@ -8620,6 +8705,18 @@ document.getElementById('pi').addEventListener('change',async function(e){
   }
 });
 
+// Lesbarer Titel einer Protokollzeile am Handy (v186): „IBN-Protokoll · Rational iCombi Pro"
+// statt des Dateinamens „261120_IBN_Protokoll_Rational_iCombi-Pro-Classic_1.pdf".
+function pdocKurz(p){
+  const typ=String(p.type||'Dokument').replace(/ Protokoll$/,'-Protokoll').replace(/^Einweisungsprotokoll$/,'Einweisung');
+  if(p.type==='DGUV Protokoll'){
+    const st=p.dguvOk===false?'nicht bestanden':p.dguvStand==='offen'?'unvollständig':(p.dguvOk===true||p.dguvStand==='ok')?'bestanden':'';
+    if(st) return typ+' · '+st; }
+  let n=String(p.name||p.fname||'').split('/').pop().replace(/\.[a-z0-9]{2,4}$/i,'')
+    .replace(/^\d{6}_/,'').replace(/^(IBN_Protokoll|DGUV|Einweisungsprotokoll|Inbetriebnahmeprotokoll)_?/i,'')
+    .replace(/_\d{1,3}$/,'').replace(/_\d{10,}$/,'').replace(/[_-]+/g,' ').trim();
+  return n? typ+' · '+n : typ;
+}
 function updPG(pos){
   const id=sp(pos);
   const s=gs(pos);
@@ -8641,7 +8738,7 @@ function updPG(pos){
     const ueTag=(p.ueber?` <span class="pdoc-nr">über Pos. ${escapeHtml(p.ueber)}</span>`:'')+
       (p.dguvOk===false?` <span class="pdoc-nr" style="background:#b3402a;color:#fff" title="${escapeHtml((p.dguvGruende||[]).join('; '))}">nicht bestanden</span>`:'')+
       (p.dguvStand==='offen'?` <span class="pdoc-nr" style="background:#8b6d22;color:#fff" title="${escapeHtml((p.dguvGruende||[]).join('; '))}">unvollständig</span>`:'');
-    return `<div class="pdoc">&#128196; <span class="pdoc-name" onclick="pdfView('${pos}',${i})">${p.type}: ${p.name}</span>${nrTag}${ueTag}${ibnBtn}${editBtn}<button class="pdoc-btn pdoc-del" onclick="delProto('${pos}',${i})" title="Löschen">&#10005;</button></div>`;
+    return `<div class="pdoc">${p.type==='DGUV Protokoll'?'&#9889;':'&#128196;'} <span class="pdoc-name" onclick="pdfView('${pos}',${i})"><span class="pdoc-full">${p.type}: ${p.name}</span><span class="pdoc-kurz">${escapeHtml(pdocKurz(p))}</span></span>${nrTag}${ueTag}${ibnBtn}${editBtn}<button class="pdoc-btn pdoc-del" onclick="delProto('${pos}',${i})" title="Löschen">&#10005;</button></div>`;
   }).join('');
 }
 
@@ -12816,6 +12913,7 @@ async function selectProject(pid){
     Object.keys(ITEMID).forEach(k=>delete ITEMID[k]);
     Object.keys(IMG_CACHE).forEach(k=>delete IMG_CACHE[k]);
     ACT = '__all';
+    document.body.classList.add('mdock-an');   // Leiste unten am Handy (v186)
     buildTabs(); buildPanels();
     updDichtTasks();
     ov.style.display='none';
