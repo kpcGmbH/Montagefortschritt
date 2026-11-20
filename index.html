@@ -2067,10 +2067,10 @@ function buildPanels(){
   <div class="ih">
     <span class="pb">${item.pos}</span>
     <div class="ii">
-      <div class="ibez">${item.bez.trim()}</div>
-      <div class="imet">${item.fabrikat?'&#127981; '+item.fabrikat.trim():''}${item.typ?' &nbsp;&#128203; '+item.typ.trim():''}${berBadge(sec)}${ntBadge(item)}${gewBadgeEditable(item.pos,item.gew)}</div>
+      <div class="ibez">${escapeHtml(item.bez.trim())}</div>
+      <div class="imet">${item.fabrikat?'&#127981; '+escapeHtml(item.fabrikat.trim()):''}${item.typ?' &nbsp;&#128203; '+escapeHtml(item.typ.trim()):''}${berBadge(sec)}${ntBadge(item)}${gewBadgeEditable(item.pos,item.gew)}</div>
     </div>
-    <div class="img">${item.menge} ${item.einh}</div>
+    <div class="img">${escapeHtml(item.menge)} ${escapeHtml(item.einh)}</div>
   </div>
   <div class="crow">
     <div class="ck" data-f="g" id="Kg${id}" onclick="tc('${item.pos}','g')" oncontextmenu="tcNA('${item.pos}','g');return false" ontouchstart="ckHoldStart(event,'${item.pos}','g')" ontouchend="ckHoldEnd()" ontouchmove="ckHoldEnd()" ontouchcancel="ckHoldEnd()"><span class="ck-lbl"><span class="cki">&#9675;</span>&nbsp;<span class="ckn">Geliefert</span></span><span class="ck-ts" id="Tg${id}"></span></div>
@@ -2285,8 +2285,13 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 179;
+const APP_VERSION = 180;
 const CHANGELOG = [
+  { v:180, titel:'Kleinauftrag: Korrekturen', punkte:[
+    'Leistungsvorschlag verbessert: Spültische und Spülen bekommen Sanitär (ohne Elektro); Combi-Steamer, Eismaschinen, Kochkessel, Siebträger, Durchlauferhitzer, Boiler u. a. Montage, Sanitär, Elektro. Neue Auswahl „Nachunternehmer" (Kältetechnik).',
+    'Mengen mit Komma (z. B. „2,5") verlangten das Zehnfache an Inbetriebnahmeprotokollen – jetzt zählt nur eine ganze Stückzahl.',
+    'Sonderzeichen in Bezeichnung, Fabrikat und Typ (z. B. „<", „&") werden an der Karte richtig angezeigt.',
+    'Schlägt das Anlegen fehl (z. B. ohne Netz), bleiben alle Eingaben stehen; ein Gerät ohne Bezeichnung wird nicht mehr stillschweigend weggelassen.' ]},
   { v:179, titel:'Kleinauftrag: Geräte direkt eingeben', punkte:[
     'Neue Baustelle: Neben „Mit Stückliste" und „Ohne Positionen" gibt es <b>„Kleinauftrag – Geräte direkt eingeben"</b> – für Aufträge mit z. B. nur einem Kombidämpfer oder einer Spülmaschine. Je Gerät Bezeichnung, Menge, Hersteller, Typ; die Leistung (Montage/Sanitär/Elektro/Potentialausgleich) schlägt die App nach Gerätetyp vor und lässt sich antippen.',
     'Daraus entsteht ein Bereich „Lieferung" mit den Positionen 1, 2, … – ohne Etagen und Anlagen von Hand. Danach wie gewohnt: Typenschild, IBN digital, DGUV, Einweisung, Übergabeprotokoll, alles im Reiter Dokumente.' ]},
@@ -8063,7 +8068,9 @@ function itemByPos(pos){for(const s of DATA)for(const su of s.subsections)for(co
 // Bei Stückzahl > 1 braucht jedes Gerät sein eigenes Protokoll. Wie viele liegen
 // an dieser Position schon? (nur Protokolle desselben Typs zählen)
 function ibnCount(pos,type){ return (gs(pos).pdfs||[]).filter(p=>p.ibn&&(p.type||'')===type).length; }
-function ibnMenge(it){ const n=parseInt(String((it&&it.menge)||'').replace(/[^0-9]/g,''),10); return (n>0)?n:1; }
+// Wie tsSoll: nur eine ganze Zahl ≥ 1 zählt als Stückzahl. Vorher wurden alle
+// Nicht-Ziffern entfernt – aus „2,5" wurden 25 verlangte Protokolle (Prüfung 20.11.2026).
+function ibnMenge(it){ const m=parseFloat(String((it&&it.menge)||'').replace(',','.')); return (isFinite(m) && m>=1 && Math.round(m)===m) ? Math.min(m,50) : 1; }
 // Liegt schon eins vor, nicht kommentarlos den alten Entwurf laden – das gab dem
 // nächsten Gerät die Seriennummer des vorherigen.
 function ibnStart(pos,type,starten){
@@ -12802,14 +12809,17 @@ function kleinGewAuto(bez){
   bez=String(bez||''); const kopf=ewKopf(bez);
   if(!bez.trim()) return ['M'];
   if(TS_ZUBEHOER.test(kopf) || ewOhne(bez) || /untergestell|gestell|zubehör|blech|behälter|rost|tabs|reiniger/i.test(kopf)) return ['M'];
-  if(/batterie|armatur|becken|brause|ausguss/i.test(kopf)) return ['M','S'];
-  if(SPUEL_RE.test(kopf) || waIst(kopf) || /kombidämpf|kombidaempf|dämpfer|konvektomat|vario|eiswürfel|eisbereit|kaffee|wasserspender|dampfgar/i.test(kopf)) return ['M','S','E'];
+  if(/kälteaggregat|kaelteaggregat|kältetechn|kaeltetechn|verbundanlage|verbund-system|kälteanlage|kaelteanlage/i.test(kopf)) return ['NU'];   // Kältetechnik = Nachunternehmer
+  // Sanitär-Möbel VOR den Spülmaschinen („Topfspüle" ist ein Becken, keine Maschine)
+  if(/batterie|armatur|becken|brause|ausguss|spültisch|spueltisch|spüle\b|spuele\b|waschtisch|handwasch/i.test(kopf) && !/maschine|automat/i.test(kopf)) return ['M','S'];
+  if(SPUEL_RE.test(kopf) || waIst(kopf) || /kombidämpf|kombidaempf|dämpfer|konvektomat|combi|steamer|vario|eiswürfel|eisbereit|eismaschine|kaffee|siebträger|espresso|wasserspender|dampfgar|kochkessel|druckgar|kippbrat|durchlauferhitz|boiler|heißwasser|heisswasser|spülstraße|waschmaschine|zapfanlage|schankanlage/i.test(kopf)) return ['M','S','E'];
+  if(/filter|enthärt|osmose/i.test(kopf)) return ['M','S'];
   if(/tisch|regal|schrank(?!.*(kühl|kuehl|wärme|waerme))|wagen|bord/i.test(kopf) && !TS_GERAET.test(kopf)) return ['M'];
   return ['M','E'];
 }
 function kleinGewHTML(i){
   const k=KLEIN[i], gew=k.gew||kleinGewAuto(k.bez);
-  return [['M','Montage'],['S','Sanitär'],['E','Elektro'],['PA','Potentialausgleich']].map(([c,l])=>{ const an=gew.indexOf(c)>=0;
+  return [['M','Montage'],['S','Sanitär'],['E','Elektro'],['PA','Potentialausgleich'],['NU','Nachunternehmer']].map(([c,l])=>{ const an=gew.indexOf(c)>=0;
     return '<span onclick="kleinGew('+i+',\''+c+'\')" style="display:inline-block;border:1px solid '+(an?'#b8860b;background:#b8860b;font-weight:700':'#6a5433')+';border-radius:12px;padding:3px 10px;font-size:12px;margin:4px 4px 0 0;cursor:pointer">'+l+'</span>'; }).join('');
 }
 function kleinRender(){
@@ -12827,7 +12837,7 @@ function kleinRender(){
 }
 function kleinSet(i,f,v){ KLEIN[i][f]=v; if(f==='bez' && !KLEIN[i].gew){ const g=document.getElementById('kgw_'+i); if(g) g.innerHTML=kleinGewHTML(i); } }
 function kleinGew(i,c){ const k=KLEIN[i], g=(k.gew||kleinGewAuto(k.bez)).slice(), j=g.indexOf(c); if(j>=0) g.splice(j,1); else g.push(c);
-  k.gew=['M','S','E','PA'].filter(x=>g.indexOf(x)>=0); const el=document.getElementById('kgw_'+i); if(el) el.innerHTML=kleinGewHTML(i); }
+  k.gew=['M','S','E','PA','NU'].filter(x=>g.indexOf(x)>=0); const el=document.getElementById('kgw_'+i); if(el) el.innerHTML=kleinGewHTML(i); }
 function kleinNeu(){ KLEIN.push({bez:'',menge:'1',fab:'',typ:'',gew:null}); kleinRender(); }
 function kleinWeg(i){ KLEIN.splice(i,1); kleinRender(); }
 function kleinLV(){
@@ -12896,6 +12906,8 @@ async function confirmCreateProject(){
   // gebraucht (Mängel hängen als allgemeine Restarbeiten an ihr, nicht an Positionen).
   let lv;
   if(IMP_ART==='klein'){
+    const ohne=KLEIN.findIndex(k=>!String(k.bez||'').trim() && (String(k.fab||'').trim() || String(k.typ||'').trim()));
+    if(ohne>=0){ alert('Bei Gerät '+(ohne+1)+' fehlt die Bezeichnung (z. B. „Kombidämpfer").'); return; }
     lv=kleinLV();
     if(!lv.length){ alert('Bitte mindestens ein Gerät eingeben (Bezeichnung).'); return; }
   } else if(IMP_ART==='leer'){
@@ -12910,7 +12922,11 @@ async function confirmCreateProject(){
   const act=document.getElementById('impActions');
   act.innerHTML='<div style="color:#d7c1ae">Baustelle wird angelegt …</div>';
   try{ const pid=await createProject(name, lv, auftraggeber, {nummer,ort,objekt,strasse,plz,auftragsnr}); await selectProject(pid); }
-  catch(e){ alert('Anlegen fehlgeschlagen: '+(e.message||e)); openImportWizard(); }
+  catch(e){
+    alert('Anlegen fehlgeschlagen: '+(e.message||e));
+    // Eingaben stehen lassen (Kopfdaten, Geräte) – nur den Knopf zurückholen
+    act.innerHTML='<button onclick="confirmCreateProject()" style="background:#3a7a3a;color:#fff;border:none;border-radius:8px;padding:12px 24px;font-size:15px;font-weight:700;cursor:pointer;font-family:inherit">Baustelle anlegen</button>';
+  }
 }
 
 // Gewerk-Text -> Codes ['M','E','S'] (Montage / Elektro / Sanitär), mehrere möglich
@@ -13057,7 +13073,7 @@ function gewUI(pos, item, nurKarte){
     card.dataset.gew=gewAttr(item.gew);
     const imet=card.querySelector('.imet');
     const _sec=DATA.find(sc=>sc.subsections.some(sb=>sb.items.includes(item)));
-    if(imet) imet.innerHTML=(item.fabrikat?'&#127981; '+item.fabrikat.trim():'')+(item.typ?' &nbsp;&#128203; '+item.typ.trim():'')+berBadge(_sec)+ntBadge(item)+gewBadgeEditable(item.pos,item.gew);
+    if(imet) imet.innerHTML=(item.fabrikat?'&#127981; '+escapeHtml(item.fabrikat.trim()):'')+(item.typ?' &nbsp;&#128203; '+escapeHtml(item.typ.trim()):'')+berBadge(_sec)+ntBadge(item)+gewBadgeEditable(item.pos,item.gew);
   }
   if(nurKarte) return;
   applyFieldVisibility(); rc(pos); updProg(pos); upStats(); applyF();
