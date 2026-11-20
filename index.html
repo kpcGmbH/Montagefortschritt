@@ -2285,8 +2285,14 @@ function startData(){
 // APP_VERSION bei jedem Release zusammen mit sw.js hochzählen und oben einen
 // CHANGELOG-Eintrag ergänzen. Es werden nur Punkte gezeigt, die neuer sind als
 // die zuletzt vom Nutzer gesehene Version.
-const APP_VERSION = 183;
+const APP_VERSION = 184;
 const CHANGELOG = [
+  { v:184, titel:'Handy: iPhone- und Android-Prüfung', punkte:[
+    '<b>App auf dem Homescreen:</b> Inbetriebnahme, DGUV und Einweisung öffnen sich jetzt im selben Fenster statt in einem eingeblendeten Browser. Dort fehlten Anmeldung und Ausführer, und ein Protokoll konnte in der Montage-App nicht ankommen. Danach geht es automatisch zurück zur selben Baustelle.',
+    '<b>Einweisung:</b> Bei schwachem Netz springt die App nicht mehr zur Microsoft-Anmeldung (weiße Seite, Eingaben weg). Geht die App in den Hintergrund (Anruf, Sperrbildschirm), wird das angefangene Protokoll auf dem Gerät gesichert und beim nächsten Öffnen zum Fortsetzen angeboten – nur die Unterschriften sind neu zu leisten. Dasselbe Netz-Verhalten im Kundendienst.',
+    '<b>Inbetriebnahme:</b> Ein neues Protokoll öffnete mit den Daten (Seriennummer, Häkchen, Unterschriften) desselben Geräts einer FRÜHEREN Baustelle, wenn die Positionsnummer gleich war – etwa „1" bei Kleinaufträgen. Der Stand auf dem Gerät gilt jetzt je Baustelle.',
+    'Kein Hineinzoomen mehr beim Antippen eines Felds (iPhone); Messwerte mit Zahlenblock (Isolation weiter mit voller Tastatur für „OL" / „>200"); Unterschrift trifft nach dem Drehen des Handys wieder unter den Finger; voller Gerätespeicher wird gemeldet statt still verschluckt.',
+    'Hauptapp: offene Änderungen werden sofort gesichert, wenn die App in den Hintergrund geht.' ]},
   { v:183, titel:'„Offensichtliche Mängel?" eindeutig', punkte:[
     'In den Inbetriebnahmeprotokollen (allgemeine und MKN, 48 Stück) heißt bei „Offensichtliche Mängel des Gerätes?" ein „Ja" – anders als bei allen anderen Fragen – <b>schlecht</b>. Die Knöpfe heißen jetzt „Ja – Mängel vorhanden" (rot) und „Nein – keine Mängel" (grün), im PDF „Mängel / keine". Bereits ausgefüllte Protokolle behalten ihre Bedeutung.' ]},
   { v:182, titel:'DGUV-Bewertung: Korrekturen', punkte:[
@@ -3797,12 +3803,12 @@ function dokuNeuMenu(btn){
 // Einweisungs-App direkt in der gewünschten Protokollart öffnen
 function dokuEwNeu(typ){
   if(!PID) return;
-  window.open(EINWEISUNG_URL+'#pid='+encodeURIComponent(PID)+'&projekt='+encodeURIComponent(curProjName())+'&neu='+encodeURIComponent(typ),'_blank','noopener');
+  seiteOeffnen(EINWEISUNG_URL+'#pid='+encodeURIComponent(PID)+'&projekt='+encodeURIComponent(curProjName())+'&neu='+encodeURIComponent(typ),true);
 }
 // Entwurf der Einweisungs-App direkt zum Vervollständigen öffnen
 function dokuEwEntwurf(id){
   if(!PID) return;
-  window.open(EINWEISUNG_URL+'#pid='+encodeURIComponent(PID)+'&projekt='+encodeURIComponent(curProjName())+'&entwurf='+encodeURIComponent(id),'_blank','noopener');
+  seiteOeffnen(EINWEISUNG_URL+'#pid='+encodeURIComponent(PID)+'&projekt='+encodeURIComponent(curProjName())+'&entwurf='+encodeURIComponent(id),true);
 }
 // PDF eines Einweisungs-/Schlüsselprotokolls (Fenster SYNCHRON im Klick, §9)
 function dokuEwPdf(pfad){
@@ -8060,19 +8066,45 @@ const PROTO_TYPES=['IBN Protokoll','Einweisungsprotokoll','DGUV Protokoll'];
 const PROTO_DIRS={'IBN Protokoll':'_Inbetriebnahme','DGUV Protokoll':'_DGUV','Einweisungsprotokoll':'_Einweisung'};
 function protoDir(type,pos){ const d=PROTO_DIRS[type]; return d? safeName(curProjName())+'/'+d : folderFor(pos); }
 
+// ── Homescreen-App: Unterseiten im SELBEN Fenster öffnen (v184) ─────────────
+// Vom Homescreen gestartet kennt die App (vor allem auf dem iPhone) keine Tabs:
+// `window.open` öffnet ein eingeblendetes Browserfenster mit EIGENEM Speicher –
+// dort fehlen Anmeldung, Ausführer und die Rückgabe des Protokolls. Deshalb hier
+// in diesem Fenster weiter; die Unterseiten springen über „‹ Hauptapp" bzw. nach
+// dem Speichern (index.html#ibnpos=…) zurück, und die Baustelle öffnet sich wieder.
+const IST_HOMEAPP=(function(){ try{ return !!((window.matchMedia&&window.matchMedia('(display-mode: standalone)').matches)||navigator.standalone===true); }catch(e){ return false; } })();
+// Offene Änderungen (400-ms-Verzögerung von savePos) sofort sichern – vor dem
+// Seitenwechsel und wenn die App in den Hintergrund geht (iOS beendet sie dort oft).
+function speicherSofort(){
+  const offen=Object.keys(SAVE_TIMERS); if(!offen.length) return Promise.resolve();
+  offen.forEach(pos=>{ clearTimeout(SAVE_TIMERS[pos]); delete SAVE_TIMERS[pos]; });
+  return Promise.all([persistCurrentState(), ...offen.map(pos=>enqueuePos(pos))]).then(()=>{ try{ touchProject(PID); }catch(e){} flushOutbox(); }).catch(()=>{});
+}
+document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='hidden') speicherSofort(); });
+// Mit „Zurück" aus dem Seiten-Cache: Ladeanzeige von seiteOeffnen wieder weg
+window.addEventListener('pageshow',e=>{ if(e.persisted){ try{ hideLoader(); }catch(_){} } });
+window.addEventListener('pagehide',()=>{ speicherSofort(); });
+function rueckkehrMerken(){ try{ if(PID) localStorage.setItem('kpc_rueckkehr', JSON.stringify({pid:PID, t:Date.now()})); }catch(e){} }
+function rueckkehrHolen(){ try{ const o=JSON.parse(localStorage.getItem('kpc_rueckkehr')||'null'); localStorage.removeItem('kpc_rueckkehr');
+    if(o&&o.pid&&Date.now()-(o.t||0)<12*3600000) return o.pid; }catch(e){} return ''; }
+// noopener nur im Browser-Tab (Einweisung); IBN braucht window.opener
+async function seiteOeffnen(url, noopener){
+  if(IST_HOMEAPP){ rueckkehrMerken(); showLoader('Wird geöffnet …'); try{ await speicherSofort(); }catch(e){} location.href=url; return; }
+  if(noopener) window.open(url,'_blank','noopener'); else window.open(url,'_blank');
+}
 // ── Einweisung: projektweite Einweisungs-App öffnen (gleiche Origin, Kontext per Hash) ──
 const EINWEISUNG_URL='einweisung.html';
 function openEinweisung(){
   if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
   const url=EINWEISUNG_URL+'#pid='+encodeURIComponent(PID)+'&projekt='+encodeURIComponent(curProjName());
-  window.open(url,'_blank','noopener');
+  seiteOeffnen(url,true);
 }
 // Schlüsselübergabeprotokoll: dieselbe App, aber direkt in der Protokollart
 // „Schlüsselübergabe" (`neu=schluessel` wird dort in onLoggedIn ausgewertet).
 function openSchluesselprotokoll(){
   if(!PID){ alert('Bitte zuerst eine Baustelle öffnen.'); return; }
   const url=EINWEISUNG_URL+'#pid='+encodeURIComponent(PID)+'&projekt='+encodeURIComponent(curProjName())+'&neu=schluessel';
-  window.open(url,'_blank','noopener');
+  seiteOeffnen(url,true);
 }
 
 // ── IBN digital: Übergabe an die Inbetriebnahme-App (gleiche Origin) ──
@@ -8143,7 +8175,7 @@ function _openIbnDigital(pos,nr,menge){const it=itemByPos(pos)||{};const q=funct
   // BEWUSST OHNE 'noopener': die IBN-App ist unsere eigene Seite auf derselben Origin
   // und braucht window.opener, um das Protokoll direkt zurückzureichen und nach dem
   // Speichern hierher zurückzuspringen. Mit noopener war beides tot.
-  window.open(url,'_blank');}
+  seiteOeffnen(url);}
 // ── Geräteauswahl für gerätegebundene Protokolle (ab v123) ──────────────────
 // Aufgerufen aus „Berichte & Dokumente". Inbetriebnahme- und DGUV-Protokoll gehören
 // zu EINEM Gerät – die IBN-App braucht pos/bez/hersteller/typ, um das fertige
@@ -8238,7 +8270,7 @@ function openDguvDigital(){const pos=PPOS;document.getElementById('ptypeMenu')?.
   ibnStart(pos,'DGUV Protokoll',function(nr,menge){ _openDguvDigital(pos,nr,menge); });}
 function _openDguvDigital(pos,nr,menge){const it=itemByPos(pos)||{};const q=function(v){return encodeURIComponent(v||'');};
   const url=IBN_URL+'#proto=dguv&'+ibnStammHash()+'&hersteller='+q(it.fabrikat)+'&typ='+q(it.typ)+'&pos='+q(pos)+'&bez='+q(it.bez)+'&nr='+q(nr)+'&von='+q(menge);
-  window.open(url,'_blank');}   // ohne noopener – siehe openIbnDigital
+  seiteOeffnen(url);}   // ohne noopener – siehe openIbnDigital
 // ── Empfang des fertigen IBN-PDFs aus der IBN-App und Ablage bei der Position ──
 const _ibnSeen=new Set();
 // Rücksprungziel aus der IBN-App (#ibnpos=…). Hash sofort auslesen und entfernen,
@@ -8288,7 +8320,7 @@ async function editIbnProto(pos,i){
   // Das Fenster MUSS synchron im Klick aufgehen (§ mobiler Popup-Blocker) – der
   // Datenstand wird erst danach geladen. Vorher lag das `window.open` hinter dem
   // `await`; am Handy blockte der Browser es, und es passierte scheinbar nichts.
-  const win = kand.length ? window.open('','_blank') : null;   // ohne noopener – siehe openIbnDigital
+  const win = (kand.length && !IST_HOMEAPP) ? window.open('','_blank') : null;   // ohne noopener – siehe openIbnDigital; Homescreen-App: selbes Fenster (v184)
   if(win){ try{ win.document.write('<!doctype html><meta charset="utf-8"><title>Protokoll wird geladen …</title>'
     +'<body style="font:16px/1.5 system-ui,sans-serif;padding:28px;color:#333">Protokoll wird geladen …</body>'); win.document.close(); }catch(e){} }
   if(!kand.length){ alert('Für dieses Protokoll sind keine bearbeitbaren Daten gespeichert.'); return; }
@@ -8326,7 +8358,7 @@ async function editIbnProto(pos,i){
     // beim nächsten Mal wird nicht wieder gesucht.
     if(gefunden && p.dataFname!==gefunden){ p.dataFname=gefunden; saveFotos(pos); updPG(pos); }
     hideLoader();
-    if(win) win.location=IBN_URL; else window.open(IBN_URL,'_blank');
+    if(win) win.location=IBN_URL; else seiteOeffnen(IBN_URL);
   }catch(e){
     hideLoader(); if(win) try{ win.close(); }catch(e2){}
     alert('Konnte IBN-Protokoll nicht laden: '+((e&&e.message)||e));
@@ -11846,6 +11878,10 @@ async function openProjectFlow(){
       }
       return;
     }
+    // Zurück aus IBN/DGUV/Einweisung in der Homescreen-App (v184): dieselbe Baustelle
+    // wieder öffnen statt der Baustellenauswahl (dort wartet ggf. das Protokoll).
+    const rp=rueckkehrHolen();
+    if(rp && PROJECTS.some(p=>p.pid===rp)){ await selectProject(rp); return; }
     renderProjectPicker();
   }
   catch(e){ ov.innerHTML='<div style="color:#e08a8a;font-size:14px;max-width:520px;text-align:center;margin-top:50px">Projekte konnten nicht geladen werden:<br>'+escapeHtml(e.message||e)+'</div>'; console.error(e); }

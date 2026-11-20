@@ -301,7 +301,15 @@ async function msalLogin(){
 }
 async function getToken(){
   try{ return (await msalApp.acquireTokenSilent({scopes:GRAPH_SCOPES, account:msalAccount})).accessToken; }
-  catch(e){ if(USE_REDIRECT){ await msalApp.acquireTokenRedirect({scopes:GRAPH_SCOPES}); throw e; }
+  catch(e){
+    // v184 – wie in der Hauptapp: Kein Netz / Funkloch ist KEIN Grund zur Anmeldung.
+    // Bisher sprang die Seite dann zu Microsoft, die Anmeldeseite lud nicht (weiße
+    // Seite, in der Homescreen-App ohne Zurück), und die laufende Einweisung war weg.
+    // Als Netzfehler weiterreichen: die Warteschlange behält alles.
+    const netz = !navigator.onLine || (e && e.name!=='InteractionRequiredAuthError' &&
+      /no_network|network_error|networkerror|failed to fetch|load failed|endpoints_resolution|post_request_failed|network request failed/i.test((e.errorCode||'')+' '+(e.message||'')));
+    if(netz){ const n=new Error('Keine Verbindung zur Anmeldung ('+((e&&(e.errorCode||e.message))||e)+')'); n.name='TypeError'; throw n; }
+    if(USE_REDIRECT){ ewNotfallSichern(); await msalApp.acquireTokenRedirect({scopes:GRAPH_SCOPES}); throw e; }
     const res=await msalApp.acquireTokenPopup({scopes:GRAPH_SCOPES}); msalAccount=res.account; return res.accessToken; }
 }
 async function graph(path, opts){
@@ -971,6 +979,7 @@ async function openProject(pid, pname){
   document.getElementById('projSub').textContent='Baustelle';
   hideLoader();
   renderOverview();
+  setTimeout(ewNotfallAnbieten, 400);   // nach einem Direkteinstieg (neu=/entwurf=) ist SESSION gesetzt -> nichts
 }
 
 // ══════════════════ Übersicht ══════════════════
@@ -1347,7 +1356,35 @@ function mkOverlay(title){
   document.body.appendChild(ov);
   return { ov, body:ov.querySelector('#ewBody') };
 }
-function closeOverlay(){ const ov=document.getElementById('ewOv'); if(ov) ov.remove(); SESSION=null; }
+function closeOverlay(){ const ov=document.getElementById('ewOv'); if(ov) ov.remove(); SESSION=null; ewNotfallWeg(); }
+// ── Notfall-Sicherung (v184) ─────────────────────────────────────────────
+// Ein laufendes Protokoll lag nur im Arbeitsspeicher. Am Handy beendet das System
+// eine App im Hintergrund oft (Anruf, Kamera, Sperrbildschirm) – die angefangene
+// Einweisung war dann weg. Beim Verlassen der Seite wird sie deshalb auf dem Gerät
+// gesichert und beim nächsten Öffnen der Baustelle angeboten. Unterschriften NICHT
+// (wie beim Zwischenspeichern: sie gelten dem Stand, der beim Unterschreiben dastand).
+function ewNotfallKey(){ return 'ew:notfall:'+(PID||''); }
+function ewNotfallSichern(){ if(!SESSION||!PID) return;
+  try{ const s=Object.assign({}, SESSION, {sig:'', sigKpc:'', sigNu:''});
+    localStorage.setItem(ewNotfallKey(), JSON.stringify({ts:Date.now(), s})); }catch(e){} }
+function ewNotfallWeg(){ try{ if(PID) localStorage.removeItem(ewNotfallKey()); }catch(e){} }
+function ewNotfallAnbieten(){
+  if(SESSION||!PID) return;
+  let o=null; try{ o=JSON.parse(localStorage.getItem(ewNotfallKey())||'null'); }catch(e){}
+  if(!o||!o.s||!o.s.typ) return;
+  if(Date.now()-(o.ts||0)>3*86400000){ ewNotfallWeg(); return; }
+  const art=o.s.typ==='schluessel'?'Schlüsselübergabe':o.s.typ==='allgemein'?'Grundlagen-Einweisung':'Geräte-Einweisung';
+  const anz=Object.keys(o.s.selected||{}).length;
+  if(confirm('Hier wurde eine '+art+' nicht abgeschlossen'+(anz?(' ('+anz+' Gerät'+(anz>1?'e':'')+')'):'')+
+      ', zuletzt am '+new Date(o.ts).toLocaleString('de-DE',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'})+' Uhr.\n\n'+
+      'Fortsetzen? Die Unterschriften müssen neu geleistet werden.\n\n„Abbrechen" verwirft den Stand.')){
+    SESSION=o.s; SESSION.collapsed=SESSION.collapsed||{};
+    mkOverlay(SESSION.editId?'Protokoll korrigieren':SESSION.entwurfId?'Vorbereitetes Protokoll fortsetzen':'Protokoll fortsetzen');
+    renderSession();
+  } else ewNotfallWeg();
+}
+document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState==='hidden') ewNotfallSichern(); });
+window.addEventListener('pagehide', ewNotfallSichern);
 
 function renderSessionGeraete(){
   const body=document.getElementById('ewBody');
@@ -1553,12 +1590,13 @@ function sigPad(id, key){
   cv.width=Math.max(300,rect.width)*ratio; cv.height=160*ratio;
   const ctx=cv.getContext('2d'); ctx.scale(ratio,ratio); ctx.lineWidth=2.2; ctx.lineCap='round'; ctx.strokeStyle='#1a1a1a';
   let drawing=false, last=null, dirty=false;
-  function pt(e){ const r=cv.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; return {x:t.clientX-r.left, y:t.clientY-r.top}; }
+  // auf die Zeichenfläche umrechnen (Feld schmaler als 300 px oder Handy gedreht – v184)
+  function pt(e){ const r=cv.getBoundingClientRect(); const t=e.touches?e.touches[0]:e; const fx=r.width?(cv.width/ratio)/r.width:1, fy=r.height?(cv.height/ratio)/r.height:1; return {x:(t.clientX-r.left)*fx, y:(t.clientY-r.top)*fy}; }
   function down(e){ e.preventDefault(); drawing=true; last=pt(e); }
   function move(e){ if(!drawing)return; e.preventDefault(); const p=pt(e); ctx.beginPath(); ctx.moveTo(last.x,last.y); ctx.lineTo(p.x,p.y); ctx.stroke(); last=p; dirty=true; }
   function up(){ if(drawing&&dirty&&SESSION){ SESSION[key]=cv.toDataURL('image/png'); } drawing=false; }
   cv.addEventListener('mousedown',down); cv.addEventListener('mousemove',move); window.addEventListener('mouseup',up);
-  cv.addEventListener('touchstart',down,{passive:false}); cv.addEventListener('touchmove',move,{passive:false}); cv.addEventListener('touchend',up);
+  cv.addEventListener('touchstart',down,{passive:false}); cv.addEventListener('touchmove',move,{passive:false}); cv.addEventListener('touchend',up); cv.addEventListener('touchcancel',up);
   // vorhandene Unterschrift wiederherstellen
   if(SESSION && SESSION[key]){ const img=new Image(); img.onload=()=>ctx.drawImage(img,0,0,cv.width/ratio,cv.height/ratio); img.src=SESSION[key]; }
 }
@@ -1988,7 +2026,7 @@ async function startOffline(){
   if(s){ PROJNAME=s.PROJNAME||PROJNAME; PROJ_AG=s.PROJ_AG||''; PROJ_ORT=s.PROJ_ORT||''; PROJ_ADR=s.PROJ_ADR||''; PROJ_AUFTRAG=s.PROJ_AUFTRAG||''; }
   document.getElementById('projName').textContent=PROJNAME;
   document.getElementById('projSub').textContent='Baustelle · offline';
-  renderOverview(); updSyncBadge();
+  renderOverview(); updSyncBadge(); setTimeout(ewNotfallAnbieten, 400);
   // Direkteinstieg aus der Hauptapp auch OHNE Netz (bis 29.10.2026 nur online):
   // „Vervollständigen" im Reiter Dokumente öffnet den Entwurf, „Einweisen" die Art.
   if(['schluessel','geraete','allgemein'].includes(h.get('neu'))){ startSession(); sessionType(h.get('neu')); }

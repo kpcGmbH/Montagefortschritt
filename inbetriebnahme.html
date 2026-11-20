@@ -136,6 +136,8 @@ textarea{border:1.4px solid var(--line);border-radius:8px;min-height:64px;resize
 .bsbar input{flex:1 1 180px;min-width:140px;font-family:inherit;font-size:14.5px;border:none;border-bottom:1.4px solid var(--line);background:var(--soft);border-radius:6px 6px 0 0;padding:6px 9px}
 .bsbar input:focus{outline:none;border-bottom-color:var(--copper);background:#fff}
 .bsbar .bshint{font-size:12px;color:var(--gray);flex:1 1 100%;opacity:.8}
+/* v184: iOS zoomt bei Eingabefeldern unter 16 px beim Antippen hinein – am Handy mind. 16 px */
+@media (pointer:coarse){input[type=text],input:not([type]),textarea,select,.bsbar input,.edrow input[type=text],.edtitle{font-size:16px!important}}
 .edrow{display:flex;gap:8px;align-items:center;margin:7px 0;flex-wrap:wrap}
 .edrow input[type=text]{flex:1 1 220px;min-width:140px;font-size:14.5px}
 .edrow .edunit{flex:0 0 90px;min-width:70px}
@@ -623,12 +625,12 @@ function openMySig(){var m=$('sigModal');if(!m)return;m.classList.remove('hidden
 function closeMySig(){var m=$('sigModal');if(m)m.classList.add('hidden');}
 function initMySigPad(){var cv=$('cv_mysig'),wrap=$('wrap_mysig');if(!cv)return;var ratio=window.devicePixelRatio||1;var r=wrap.getBoundingClientRect();cv.width=r.width*ratio;cv.height=r.height*ratio;var ctx=cv.getContext('2d');ctx.scale(ratio,ratio);ctx.lineWidth=2;ctx.lineCap='round';ctx.strokeStyle='#1a2733';cv.__ink=false;
   if(MYSIG){var im=new Image();im.onload=function(){ctx.drawImage(im,0,0,r.width,r.height);};im.src=MYSIG;$('ph_mysig').style.display='none';cv.__ink=true;}else{$('ph_mysig').style.display='';}
-  var drawing=false,last=null;function pos(e){var rr=cv.getBoundingClientRect();var t=e.touches?e.touches[0]:e;return{x:t.clientX-rr.left,y:t.clientY-rr.top};}
+  var drawing=false,last=null;function pos(e){var rr=cv.getBoundingClientRect();var t=e.touches?e.touches[0]:e;var f=rr.width?(cv.width/ratio)/rr.width:1;return{x:(t.clientX-rr.left)*f,y:(t.clientY-rr.top)*f};}
   function start(e){drawing=true;last=pos(e);$('ph_mysig').style.display='none';cv.__ink=true;e.preventDefault();}
   function move(e){if(!drawing)return;var pp=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(pp.x,pp.y);ctx.stroke();last=pp;e.preventDefault();}
   function end(){drawing=false;}
   cv.onmousedown=start;cv.onmousemove=move;window.addEventListener('mouseup',end);
-  cv.addEventListener('touchstart',start,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',end);}
+  cv.addEventListener('touchstart',start,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',end);cv.addEventListener('touchcancel',end);}
 function clearMySig(){var cv=$('cv_mysig');
   if(cv&&cv.__ink&&!confirm('Eigene Signatur löschen?\n\nSie wird beim Speichern aus diesem Gerät entfernt und muss neu gezeichnet werden.'))return;
   if(cv){var ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);cv.__ink=false;}var ph=$('ph_mysig');if(ph)ph.style.display='';}
@@ -734,11 +736,31 @@ function applyPrefills(){if(!CUR.dev)return;const o=DB[CUR.mfr].devices[CUR.dev]
 
 // Gerätenummer gehört in den Schlüssel: sonst teilen sich alle Geräte einer Position
 // mit Stückzahl > 1 EINEN Entwurf (Gerät 2 erbte die Daten von Gerät 1).
-function storeKey(){return 'ibn:'+CUR.mfr+':'+CUR.dev+(CUR.pos?(':'+CUR.pos):'')+((CUR.nr>1)?('#'+CUR.nr):'');}
+// Ab v184 auch die BAUSTELLE: Positionsnummern wiederholen sich zwischen Baustellen
+// (Kleinauftrag: immer 1, 2, …) – ein neues Protokoll öffnete sonst mit Seriennummer,
+// Häkchen und Unterschriften des gleichen Geräts einer FRÜHEREN Baustelle.
+function storeKeyAlt(){return 'ibn:'+CUR.mfr+':'+CUR.dev+(CUR.pos?(':'+CUR.pos):'')+((CUR.nr>1)?('#'+CUR.nr):'');}
+function storeKey(){const pj=(CUR.pos&&IBNCTX&&IBNCTX.projekt)?('@'+IBNCTX.projekt):'';return storeKeyAlt()+pj;}
 // "Gerät 2 von 5" – nur wenn es an der Position wirklich mehrere gibt.
 function ibnStueckLabel(){ const c=IBNCTX||{}; if(!c.nr||(c.von||1)<2) return ''; return 'Gerät '+c.nr+' von '+c.von; }
-function saveState(){ if(CUR.fresh)CUR.fresh=false; if(CUR.dev){try{localStorage.setItem(storeKey(),JSON.stringify(STATE));}catch(e){}} updateProgress(); }
-function loadState(){ try{STATE=JSON.parse(localStorage.getItem(storeKey())||'{}')||{};}catch(e){STATE={};} }
+let __speicherVollGemeldet=false;
+function saveState(){ if(CUR.fresh)CUR.fresh=false; if(CUR.dev){try{localStorage.setItem(storeKey(),JSON.stringify(STATE));}catch(e){
+    // Gerätespeicher voll (v184): bisher still verschluckt – der Stand war dann nur noch im Fenster
+    if(!__speicherVollGemeldet){__speicherVollGemeldet=true;ibnSpeicherAufraeumen();try{localStorage.setItem(storeKey(),JSON.stringify(STATE));}catch(e2){alert('Der Speicher dieses Geräts ist voll – dieses Protokoll wird nur noch bis zum Schließen gehalten.\n\nBitte das Protokoll jetzt fertig ausfüllen und speichern.');}}}} updateProgress(); }
+function loadState(){ try{STATE=JSON.parse(localStorage.getItem(storeKey())||'null');}catch(e){STATE=null;}
+  // Stände von vor v184 (ohne Baustelle im Schlüssel): nur übernehmen, wenn sie
+  // erkennbar zu DIESER Baustelle gehören – die Kopfdaten tragen deren Anschrift
+  // (Straße + PLZ oder Kunde); der Baustellenname selbst steht nicht im Stand.
+  if(!STATE&&storeKey()!==storeKeyAlt()){try{const alt=JSON.parse(localStorage.getItem(storeKeyAlt())||'null');
+    const werte=alt?Object.keys(alt).filter(k=>typeof alt[k]==='string').map(k=>alt[k].trim().toLowerCase()):[];
+    const hat=v=>{v=String(v||'').trim().toLowerCase();return !!v&&werte.indexOf(v)>=0;};
+    if(alt&&(hat(IBNCTX.projekt)||(hat(PROJECT.strasse)&&(hat(PROJECT.plz)||hat(PROJECT.kunde))))){STATE=alt;try{localStorage.setItem(storeKey(),JSON.stringify(alt));localStorage.removeItem(storeKeyAlt());}catch(e){}}}catch(e){}}
+  STATE=STATE||{}; }
+// Bei vollem Speicher lokale Stände ANDERER Baustellen wegräumen (abgelegte Protokolle
+// liegen samt Datenstand in SharePoint). Stände dieser Baustelle bleiben – dort kann
+// noch ein angefangenes Protokoll eines anderen Geräts liegen.
+function ibnSpeicherAufraeumen(){try{const akt=storeKey();const pj=(IBNCTX&&IBNCTX.projekt)?('@'+IBNCTX.projekt):null;
+  Object.keys(localStorage).filter(k=>/^ibn:[^:]+:.+:/.test(k)&&k!==akt&&(!pj||!k.endsWith(pj))).forEach(k=>localStorage.removeItem(k));}catch(e){}}
 
 function toast(msg){const t=$('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2200);}
 
@@ -965,7 +987,7 @@ function esc(s){return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 function fieldHTML(key,f){
   const v=esc(STATE[key]||'');
   if(f.k==='area')return '<div style="grid-column:1/-1"><label class="fieldlbl">'+f.l+'</label><textarea oninput="setVal(\''+key+'\',this.value)">'+v+'</textarea></div>';
-  if(f.k==='measure')return '<div><label class="fieldlbl">'+f.l+'</label><div class="measure"><input type="text" value="'+v+'" oninput="setVal(\''+key+'\',this.value)"><span class="unit">'+f.u+'</span></div></div>';
+  if(f.k==='measure')return '<div><label class="fieldlbl">'+f.l+'</label><div class="measure"><input type="text"'+(/isolation/i.test(f.l)?'':' inputmode="decimal"')+' autocomplete="off" value="'+v+'" oninput="setVal(\''+key+'\',this.value)"><span class="unit">'+f.u+'</span></div></div>';
   return '<div><label class="fieldlbl">'+f.l+'</label><input type="text" value="'+v+'" oninput="setVal(\''+key+'\',this.value)"></div>';
 }
 
@@ -1035,12 +1057,14 @@ function initPad(key){
     const g=STATE[key];if(g&&g.img){const im=new Image();im.onload=()=>ctx.drawImage(im,0,0,r.width,r.height);im.src=g.img;$('ph_'+key).style.display='none';}}
   resize();
   let drawing=false,last=null;const ctx=cv.getContext('2d');
-  function pos(e){const r=cv.getBoundingClientRect();const t=e.touches?e.touches[0]:e;return{x:t.clientX-r.left,y:t.clientY-r.top};}
+  // Koordinaten auf die Zeichenfläche umrechnen: wird das Handy nach dem Aufbau gedreht,
+  // ist das Feld breiter/schmaler als die Fläche – sonst lag der Strich neben dem Finger (v184).
+  function pos(e){const r=cv.getBoundingClientRect();const t=e.touches?e.touches[0]:e;const f=r.width?(cv.width/ratio)/r.width:1;return{x:(t.clientX-r.left)*f,y:(t.clientY-r.top)*f};}
   function start(e){drawing=true;last=pos(e);$('ph_'+key).style.display='none';e.preventDefault();}
   function move(e){if(!drawing)return;const p=pos(e);ctx.beginPath();ctx.moveTo(last.x,last.y);ctx.lineTo(p.x,p.y);ctx.stroke();last=p;e.preventDefault();}
   function end(){if(!drawing)return;drawing=false;const g=STATE[key]||{};g.img=cv.toDataURL('image/png');STATE[key]=g;if(STATE.__auto)delete STATE.__auto[key+'.img'];saveState();}
   cv.addEventListener('mousedown',start);cv.addEventListener('mousemove',move);window.addEventListener('mouseup',end);
-  cv.addEventListener('touchstart',start,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',end);
+  cv.addEventListener('touchstart',start,{passive:false});cv.addEventListener('touchmove',move,{passive:false});cv.addEventListener('touchend',end);cv.addEventListener('touchcancel',end);
   PADS[key]=cv;
 }
 function clearPad(key){
@@ -1539,7 +1563,10 @@ function ibnSendBack(durl,name){if(!IBNCTX||!IBNCTX.pos)return false;
   var payload={id:String(Date.now())+'_'+IBNCTX.pos,pos:IBNCTX.pos,pdf:durl,name:name,ptype:(__o.ptype||'IBN Protokoll'),projekt:IBNCTX.projekt||'',mfr:CUR.mfr,dev:CUR.dev,state:STATE,replaceFname:(IBNCTX.replaceFname||''),nr:(IBNCTX.nr||0),von:(IBNCTX.von||0),
     waPos:(waAktiv()&&waGewaehlt())?waGewaehlt().pos:''};
   if(dguvIst()){ const b=dguvBewerten(); payload.dguv={stand:b.stand, gruende:b.fail.concat(b.stand==='offen'?b.offen.map(x=>'offen: '+x):[]), ueber:b.ueber||''}; }
-  try{localStorage.setItem('ibn:return',JSON.stringify(payload));}catch(e){}
+  var __ok=false;try{localStorage.setItem('ibn:return',JSON.stringify(payload));__ok=true;}catch(e){
+    ibnSpeicherAufraeumen();try{localStorage.setItem('ibn:return',JSON.stringify(payload));__ok=true;}catch(e2){}}
+  var __opener=false;try{__opener=!!(window.opener&&!window.opener.closed);}catch(e){}
+  if(!__ok&&!__opener){alert('Das Protokoll konnte nicht an die Montage-App übergeben werden – der Speicher dieses Geräts ist voll.\n\nDas PDF wurde heruntergeladen. Bitte in der Montage-App über „PDF hochladen" an der Position ablegen.');return false;}
   try{if(window.opener&&!window.opener.closed)window.opener.postMessage({__ibnReturn:true,payload:payload},location.origin);}catch(e){}
   return true;}
 // ── Wasseraufbereitung im Spülmaschinen-Protokoll (ab v170) ──────────────
@@ -1800,7 +1827,7 @@ function applyLoadState(){var raw;try{raw=localStorage.getItem('ibn:load');}catc
   // korrigiert, schreibt damit um, WER wann in Betrieb genommen hat.
   // Ohne `__auto` füllt applyPrefills nur noch, was WIRKLICH leer ist.
   var __st=o.state||{}; try{ delete __st.__auto; }catch(e){}
-  try{localStorage.setItem('ibn:'+o.mfr+':'+o.dev+(o.pos?(':'+o.pos):''),JSON.stringify(__st));}catch(e){}
+  CUR.dev=o.dev;try{localStorage.setItem(storeKey(),JSON.stringify(__st));}catch(e){}   // derselbe Schlüssel, den openForm liest (ab v184 mit Baustelle)
   openForm(o.dev);toast('Protokoll zum Bearbeiten geladen');return true;}
 STD_MFRS=Object.keys(DB);loadCustom();mergeCustom();loadProject();loadUser();ensureMsal().catch(function(){});renderLoginState();renderAusfBtn();loadMySig();renderSigBtn();var __nav=applyLoadState()||applyUrlContext();initProjectBar();if(!__nav)goHome();
 </script>

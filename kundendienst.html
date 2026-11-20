@@ -267,7 +267,13 @@ async function msalLogin(){
 }
 async function getToken(){
   try{ return (await msalApp.acquireTokenSilent({scopes:GRAPH_SCOPES, account:msalAccount})).accessToken; }
-  catch(e){ if(USE_REDIRECT){ await msalApp.acquireTokenRedirect({scopes:GRAPH_SCOPES}); throw e; }
+  catch(e){
+    // v184 – wie in der Hauptapp: Kein Netz / Funkloch führt NICHT zur Anmeldung
+    // (die Seite lud dann nicht, offene Eingaben waren weg). Als Netzfehler weiterreichen.
+    const netz = !navigator.onLine || (e && e.name!=='InteractionRequiredAuthError' &&
+      /no_network|network_error|networkerror|failed to fetch|load failed|endpoints_resolution|post_request_failed|network request failed/i.test((e.errorCode||'')+' '+(e.message||'')));
+    if(netz){ const n=new Error('Keine Verbindung zur Anmeldung ('+((e&&(e.errorCode||e.message))||e)+')'); n.name='TypeError'; throw n; }
+    if(USE_REDIRECT){ await msalApp.acquireTokenRedirect({scopes:GRAPH_SCOPES}); throw e; }
     const res=await msalApp.acquireTokenPopup({scopes:GRAPH_SCOPES}); msalAccount=res.account; return res.accessToken; }
 }
 async function graph(path, opts){
